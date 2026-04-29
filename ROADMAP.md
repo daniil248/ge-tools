@@ -202,7 +202,20 @@ in-tab Map + cross-tab через storage event.
   - UI: при попытке электрика отредактировать поле, не относящееся
     к щитам, — warning «Это поле управляется технологом».
 
-- [ ] **1.28.12** — Вкладка «👥 Группа» в свойствах потребителя
+- [ ] **1.28.11** — Tombstones для предотвращения резурекции
+  - Юзер (2026-04-28): «удаление стоек A-01, A-02 не приводит к их
+    удалению, после перезагрузки страницы они вновь появляются».
+  - При удалении rack-узла из «Неразмещённые» (× в палитре):
+    POR-объект удаляется → но `migrateProjectLegacyRacks` на следующий
+    bootstrap пересоздаёт его из legacy storage (rack-config.instances /
+    scs-config.rackTags / scs-config.contents).
+  - Решение: tombstones-список deleted rack-id в LS
+    `raschet.project.<pid>.rack-config.tombstones.v1`.
+    `_collectLegacyRacks` фильтрует по списку → resurrected ids
+    больше не возвращаются.
+  - Также cleanup legacy entries (rackTags, contents) при удалении.
+
+- [x] **1.28.12** — Вкладка «👥 Группа» в свойствах потребителя (закрыто v0.59.757)
   - Пользователь (2026-04-29): «Список потребителей разместить в отдельной
     вкладке свойств потребителя `Группа`, которая отображается только тогда
     когда потребитель групповой».
@@ -226,19 +239,6 @@ in-tab Map + cross-tab через storage event.
     POR-rack из `consumer-group.members[]` в standalone POR-rack.
   - Обратная операция: 1.28.9 (drag-drop одиночного на группу = вернуть).
   - Reverse-history snapshot перед split, чтобы Ctrl+Z восстановил группу.
-
-- [ ] **1.28.11** — Tombstones для предотвращения резурекции
-  - Юзер (2026-04-28): «удаление стоек A-01, A-02 не приводит к их
-    удалению, после перезагрузки страницы они вновь появляются».
-  - При удалении rack-узла из «Неразмещённые» (× в палитре):
-    POR-объект удаляется → но `migrateProjectLegacyRacks` на следующий
-    bootstrap пересоздаёт его из legacy storage (rack-config.instances /
-    scs-config.rackTags / scs-config.contents).
-  - Решение: tombstones-список deleted rack-id в LS
-    `raschet.project.<pid>.rack-config.tombstones.v1`.
-    `_collectLegacyRacks` фильтрует по списку → resurrected ids
-    больше не возвращаются.
-  - Также cleanup legacy entries (rackTags, contents) при удалении.
 
 **Acceptance:**
 - Один и тот же rack виден SCS-инженеру (как корпус с U-юнитами и contents)
