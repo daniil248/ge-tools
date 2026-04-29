@@ -1246,6 +1246,23 @@ function sectionChecks() {
         text: `${fullTag(n) || n.name}: расчётный ток ${fmt(info.designA || 0)} А превышает номинал автомата ${info.breakerIn || 0} А (${what} вручную — авто-пересчёт отключён)`,
       });
     }
+    // v0.59.710: предупреждения по падению напряжения. Норма IEC 60364-5-525:
+    // ≤ 5% от источника до конца. ГОСТ 32144-2013: предел отклонения ±10%.
+    if (Number(n._deltaUPct) > 10 &&
+        (n.type === 'consumer' || n.type === 'panel')) {
+      const _u = nodeVoltage(n) || 0;
+      const _ut = _u * (1 - n._deltaUPct / 100);
+      issues.push({
+        level: 'warn',
+        text: `${fullTag(n) || n.name}: ΔU = ${n._deltaUPct.toFixed(1)}% (U_клемм ≈ ${_ut.toFixed(0)} В при U_ном ${_u} В) — вне допустимых пределов ±10% по ГОСТ 32144-2013. Увеличьте сечение питающих кабелей или повысьте напряжение источника.`,
+      });
+    } else if (Number(n._deltaUPct) > 5 &&
+        (n.type === 'consumer' || n.type === 'panel')) {
+      issues.push({
+        level: 'info',
+        text: `${fullTag(n) || n.name}: ΔU = ${n._deltaUPct.toFixed(1)}% — превышение нормы IEC 60364-5-525 (≤ 5%), рекомендуется увеличить сечение питающих кабелей.`,
+      });
+    }
   }
 
   const text = [
