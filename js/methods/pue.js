@@ -211,11 +211,24 @@ function selectBreakerPue(Iload) {
   return BREAKER_SERIES[BREAKER_SERIES.length - 1];
 }
 
+// ================= Терминология ПУЭ =================
+// v0.59.658: термины параметров с точки зрения ПУЭ 7. Юзер: «термины лучше
+// отнести непосредственно к методикам».
+export const TERMS_PUE = {
+  utilization:    { label: 'Ки — коэффициент использования', short: 'Ки',          explain: 'отношение средней нагрузки к номинальной за рассматриваемый интервал (ПУЭ 7, гл. 1.3)', aliases: 'РТМ: Ки; IEC: utilization factor (k_u)', used: true },
+  peakDemand:     { label: 'К_расч — коэффициент расчётной нагрузки', short: 'К_расч', explain: 'отношение получасового максимума к среднесменной нагрузке',                          aliases: 'РТМ: Кмакс; IEC: peak demand factor',     used: false },
+  simultaneity:   { label: 'Ко — коэффициент одновременности', short: 'Ко',         explain: 'отношение совмещённого максимума к сумме индивидуальных максимумов',                  aliases: 'IEC: diversity factor (k_s); РТМ: Ко',     used: true },
+  effectiveCount: { label: '',                                short: '',            explain: '',                                                                                     aliases: '',                                          used: false },
+  powerFactor:    { label: 'cos φ',                           short: 'cos φ',       explain: 'коэффициент мощности (P/S)',                                                          aliases: 'IEC: power factor (PF)',                   used: true },
+  inrush:         { label: 'Кратность пускового тока',        short: 'Iпуск/Iном',  explain: 'во сколько раз пусковой ток больше номинального',                                     aliases: 'IEC: starting current ratio (Ist/In)',     used: true },
+};
+
 // ================= Публичный интерфейс =================
 
 export default {
   id: 'pue',
   label: 'ПУЭ 7',
+  terms: TERMS_PUE,
 
   materials: { Cu: 'Медь (Cu)', Al: 'Алюминий (Al)' },
   insulations: { PVC: 'ПВХ / резина' },

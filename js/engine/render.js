@@ -2051,9 +2051,22 @@ export function renderNodes() {
       const Icur = Number(n._loadA) || (Pcur > 0 && nodeVoltage(n)
         ? computeCurrentA(Pcur, nodeVoltage(n), cos, isThreePhase(n)) : 0);
       if (!n._powered) { statusLine = 'нет питания'; loadCls += ' off'; }
+      // v0.59.658: «доступная мощность» — сколько ЭП может потребить без
+      // срабатывания защиты или превышения ампасити кабеля. Считается в
+      // recalc.js как min(c._maxA, c._breakerIn). Юзер: «для потребителя
+      // можно добавить доступную мощность, которая вычисляется по
+      // длительному допустимому току кабеля и его защитному автомату».
+      const _availLabel = n._availableLimit === 'cable'
+        ? 'доступно (кабель)'
+        : n._availableLimit === 'breaker'
+          ? 'доступно (автомат)'
+          : 'доступно';
       loadLines = [
         _fmtRow('текущая', Pcur, Icur),
         _fmtRow('номин', Pnom, Inom),
+        (Number.isFinite(n._availableA) && n._availableA > 0)
+          ? _fmtRow(_availLabel, n._availableKw, n._availableA)
+          : null,
       ].filter(Boolean);
     } else if (n.type === 'channel') {
       loadLine = `${n.ambientC || 30}°C · ${n.lengthM || 0} м`;

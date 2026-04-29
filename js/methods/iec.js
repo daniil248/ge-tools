@@ -12,11 +12,25 @@ import {
   BREAKER_SERIES, GLOBAL
 } from '../engine/constants.js';
 
+// ================= Терминология IEC =================
+// v0.59.658: термины параметров с точки зрения IEC 60364.
+// Юзер: «термины лучше отнести непосредственно к методикам, в отдельных
+// файлах для каждой методики».
+export const TERMS_IEC = {
+  utilization:    { label: 'k_u — utilization factor',           short: 'k_u',     explain: 'доля от номинальной мощности, фактически используемая ЭП (IEC 60364-1, §4)', aliases: 'РТМ/ПУЭ: Ки (коэффициент использования)', used: true },
+  peakDemand:     { label: 'peak demand factor',                  short: 'k_pd',    explain: 'отношение пикового получасового спроса к средней нагрузке',                  aliases: 'РТМ: Кмакс; ПУЭ: К_расч',                 used: false },
+  simultaneity:   { label: 'k_s — diversity factor',              short: 'k_s',     explain: 'учитывает что не все нагрузки достигают пика одновременно (IEC 60364-1, §4)', aliases: 'РТМ/ПУЭ: Ко (коэффициент одновременности)', used: true },
+  effectiveCount: { label: '',                                    short: '',        explain: '',                                                                            aliases: '',                                          used: false },
+  powerFactor:    { label: 'cos φ (power factor)',                short: 'PF',      explain: 'ratio of active to apparent power (P/S)',                                     aliases: 'РТМ/ПУЭ: cos φ',                          used: true },
+  inrush:         { label: 'Starting current ratio (Ist/In)',     short: 'Ist/In',  explain: 'inrush current as multiple of rated current',                                 aliases: 'РТМ/ПУЭ: кратность пускового тока',       used: true },
+};
+
 // ================= Публичный интерфейс методики =================
 
 export default {
   id: 'iec',
   label: 'IEC 60364-5-52',
+  terms: TERMS_IEC,
 
   materials: { Cu: 'Медь (Cu)', Al: 'Алюминий (Al)' },
   insulations: { PVC: 'ПВХ', XLPE: 'СПЭ (XLPE)' },

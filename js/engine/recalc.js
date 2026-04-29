@@ -3278,6 +3278,40 @@ function recalc() {
     c._isInternalConnHidden = true;  // флаг для UI / BOM / отчётов
   }
 
+  // v0.59.657: «доступная мощность» потребителя — фактический максимум,
+  // который ЭП может потребить без срабатывания защиты или превышения
+  // длительно допустимого тока кабеля. Юзер: «для потребителя можно
+  // добавить доступную мощность, которая вычисляется по длительному
+  // допустимому току кабеля его питающего и его защитному автомату».
+  //   I_доступ = min(c._maxA, c._breakerIn)  — берётся узкое место
+  //   P_доступ = I_доступ × U × cos φ × (√3 если 3ф) / 1000
+  // Если у питающей линии нет ни кабеля ни автомата (или _maxA / _breakerIn
+  // не заданы) — поле остаётся null и UI его не показывает.
+  for (const n of state.nodes.values()) {
+    if (n.type !== 'consumer') continue;
+    n._availableKw = null;
+    n._availableA = null;
+    n._availableLimit = null; // 'cable' | 'breaker' — что именно ограничивает
+    const ins = (edgesIn.get(n.id) || []).filter(c => !c._virtual);
+    if (!ins.length) continue;
+    // Берём первую реальную входящую — у потребителя обычно один ввод
+    const c = ins[0];
+    const cableA = Number.isFinite(c._maxA) && c._maxA > 0 ? c._maxA : Infinity;
+    const brkA   = Number.isFinite(c._breakerIn) && c._breakerIn > 0 ? c._breakerIn : Infinity;
+    if (!Number.isFinite(cableA) && !Number.isFinite(brkA)) continue;
+    const Iavail = Math.min(cableA, brkA);
+    if (!Number.isFinite(Iavail) || Iavail <= 0) continue;
+    const limit = (cableA <= brkA) ? 'cable' : 'breaker';
+    const U = nodeCalcVoltage(n);
+    if (!U || U <= 0) { n._availableA = Iavail; n._availableLimit = limit; continue; }
+    const cos = Math.max(0.1, Math.min(1, Number(n.cosPhi) || 0.92));
+    const phaseK = isThreePhase(n) ? Math.sqrt(3) : 1;
+    const Pavail = (Iavail * U * cos * phaseK) / 1000;
+    n._availableKw = Pavail;
+    n._availableA = Iavail;
+    n._availableLimit = limit;
+  }
+
   // v0.59.653: РТМ 36.18.32.4-92 — расчёт максимума нагрузки по упорядоченным
   // диаграммам для всех панелей и источников. Параллельно с обычной логикой
   // _maxLoadKw — для возможности отображать оба значения и сравнивать.

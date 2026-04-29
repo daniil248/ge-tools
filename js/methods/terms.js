@@ -1,5 +1,5 @@
 // =========================================================================
-// Терминология электротехнических параметров по методикам
+// Терминология электротехнических параметров — методико-зависимый lookup
 // -------------------------------------------------------------------------
 // v0.59.657: для одного и того же физического параметра разные методики
 // используют разные обозначения. Юзер: «для терминов которые в разных
@@ -7,141 +7,51 @@
 // название. В подсказке к параметру нужно приводить аналоги из других
 // методик и отображать краткое разъяснение параметра».
 //
-// Юзер также: «поля в электрических параметрах должны быть связаны с
-// соответствующей выбранной методикой. Если в IEC нет понятия «Ки» —
-// не выводить в карточке».
+// v0.59.658: «термины лучше отнести непосредственно к методикам, в
+// отдельных файлах для каждой методики». Терминологические таблицы
+// перенесены в:
+//   - js/methods/iec.js → TERMS_IEC
+//   - js/methods/pue.js → TERMS_PUE
+//   - js/methods/rtm.js → TERMS_RTM
+// Этот файл — тонкий index, который просто пробрасывает getTerm/...
+// в нужную таблицу по methodId.
 //
-// Каждый ключ — это семантический параметр (utilization, peak-demand и
-// т.п.). Для каждой методики возвращаем:
-//   label    — короткое название поля как пишется в данной методике
-//   short    — буквенное обозначение (Ки, k_u, …)
-//   explain  — краткое разъяснение что это такое (1 строка)
-//   aliases  — аналоги из других методик (для tooltip)
-//   used     — используется ли этот параметр в данной методике (если
-//              false — UI должен скрывать поле)
+// Семантические ключи параметров:
+//   utilization     — Ки / k_u (utilization factor)
+//   peakDemand      — Кмакс / К_расч / peak demand factor
+//   simultaneity    — Ко / k_s (diversity factor)
+//   effectiveCount  — n_э (только в РТМ)
+//   powerFactor     — cos φ / PF
+//   inrush          — кратность пуска / Ist/In
+//
+// API:
+//   getTerm(key, methodId) → {label, short, explain, aliases, used}
+//   getTermTooltip(key, methodId) → строка для атрибута title=
+//   isTermUsed(key, methodId) → bool, нужно ли показывать поле в UI
 // =========================================================================
 
-const TERMS = {
-  // Коэффициент использования
-  utilization: {
-    rtm: {
-      label: 'Ки — коэффициент использования',
-      short: 'Ки',
-      explain: 'отношение средней активной мощности за наиболее загруженную смену к номинальной (РТМ 36.18.32.4-92, п. 1.3)',
-      aliases: 'IEC: utilization factor (k_u); ПУЭ: Ки',
-      used: true,
-    },
-    pue: {
-      label: 'Ки — коэффициент использования',
-      short: 'Ки',
-      explain: 'отношение средней нагрузки к номинальной за рассматриваемый интервал (ПУЭ 7, гл. 1.3)',
-      aliases: 'РТМ: Ки; IEC: utilization factor (k_u)',
-      used: true,
-    },
-    iec: {
-      label: 'k_u — utilization factor',
-      short: 'k_u',
-      explain: 'доля от номинальной мощности, фактически используемая ЭП (IEC 60364-1, §4)',
-      aliases: 'РТМ/ПУЭ: Ки (коэффициент использования)',
-      used: true,
-    },
-  },
+import { TERMS_IEC } from './iec.js';
+import { TERMS_PUE } from './pue.js';
+import { TERMS_RTM } from './rtm.js';
 
-  // Коэффициент максимума (peak demand factor) — только в РТМ берётся из таблицы;
-  // в IEC/ПУЭ принимается «по практике проектирования», явного поля нет.
-  peakDemand: {
-    rtm: {
-      label: 'Кмакс — коэффициент максимума',
-      short: 'Кмакс',
-      explain: 'из таблицы РТМ 36.18.32.4-92 (приложение 2) по n_э и Ки.ср; авто-расчёт',
-      aliases: 'IEC: peak demand factor; ПУЭ: К расч',
-      used: true,
-    },
-    pue: {
-      label: 'К расч — коэффициент расчётной нагрузки',
-      short: 'К_расч',
-      explain: 'отношение получасового максимума к среднесменной нагрузке',
-      aliases: 'РТМ: Кмакс; IEC: peak demand factor',
-      used: false, // обычно не задаётся юзером явно — только в РТМ
-    },
-    iec: {
-      label: 'peak demand factor',
-      short: 'k_pd',
-      explain: 'отношение пикового получасового спроса к средней нагрузке',
-      aliases: 'РТМ: Кмакс; ПУЭ: К_расч',
-      used: false,
-    },
-  },
+const TERM_TABLES = { iec: TERMS_IEC, pue: TERMS_PUE, rtm: TERMS_RTM };
 
-  // Коэффициент одновременности / diversity factor
-  simultaneity: {
-    rtm: {
-      label: 'Ко — коэффициент одновременности',
-      short: 'Ко',
-      explain: 'учитывает что не все ЭП работают одновременно с пиком; в РТМ обычно зашит в Кмакс',
-      aliases: 'IEC: diversity factor (k_s); ПУЭ: Ко',
-      used: false, // в РТМ зашит в Кмакс
-    },
-    pue: {
-      label: 'Ко — коэффициент одновременности',
-      short: 'Ко',
-      explain: 'отношение совмещённого максимума к сумме индивидуальных максимумов',
-      aliases: 'IEC: diversity factor (k_s); РТМ: Ко',
-      used: true,
-    },
-    iec: {
-      label: 'k_s — diversity factor',
-      short: 'k_s',
-      explain: 'учитывает что не все нагрузки достигают пика одновременно (IEC 60364-1, §4)',
-      aliases: 'РТМ/ПУЭ: Ко (коэффициент одновременности)',
-      used: true,
-    },
-  },
-
-  // Эффективное число ЭП — РТМ-специфичный параметр
-  effectiveCount: {
-    rtm: {
-      label: 'n_э — эффективное число ЭП',
-      short: 'n_э',
-      explain: 'фиктивное число одинаковых ЭП с равной мощностью, дающих ту же сумму квадратов: n_э = (Σ P_ном)² / Σ(P_ном²)',
-      aliases: 'IEC/ПУЭ: явно не используется',
-      used: true,
-    },
-    pue: { label: '', short: '', explain: '', aliases: '', used: false },
-    iec: { label: '', short: '', explain: '', aliases: '', used: false },
-  },
-
-  // cos φ — универсально
-  powerFactor: {
-    rtm: { label: 'cos φ', short: 'cos φ', explain: 'коэффициент мощности — отношение активной мощности к полной (P/S)', aliases: 'IEC: power factor (PF)', used: true },
-    pue: { label: 'cos φ', short: 'cos φ', explain: 'коэффициент мощности (P/S)', aliases: 'IEC: power factor (PF)', used: true },
-    iec: { label: 'cos φ (power factor)', short: 'PF', explain: 'ratio of active to apparent power (P/S)', aliases: 'РТМ/ПУЭ: cos φ', used: true },
-  },
-
-  // Кратность пускового тока (inrush)
-  inrush: {
-    rtm: { label: 'Кратность пускового тока', short: 'Iпуск/Iном', explain: 'во сколько раз пусковой ток больше номинального (для двигателей 5–7)', aliases: 'IEC: starting current ratio (Ist/In)', used: true },
-    pue: { label: 'Кратность пускового тока', short: 'Iпуск/Iном', explain: 'во сколько раз пусковой ток больше номинального', aliases: 'IEC: starting current ratio (Ist/In)', used: true },
-    iec: { label: 'Starting current ratio (Ist/In)', short: 'Ist/In', explain: 'inrush current as multiple of rated current', aliases: 'РТМ/ПУЭ: кратность пускового тока', used: true },
-  },
-};
+const _EMPTY_TERM = { label: '', short: '', explain: '', aliases: '', used: true };
 
 /**
  * Получить терминологию для указанного параметра в указанной методике.
  * Если methodId неизвестен — fallback на 'rtm' (как самый детальный
  * по русским терминам, чтобы у юзера всё работало по умолчанию).
  *
- * @param {string} key — семантический ключ параметра (utilization,
- *                       peakDemand, simultaneity, effectiveCount,
- *                       powerFactor, inrush)
+ * @param {string} key — семантический ключ параметра
  * @param {string} methodId — 'iec' | 'pue' | 'rtm'
  * @returns {{label:string, short:string, explain:string, aliases:string, used:boolean}}
  */
 export function getTerm(key, methodId) {
-  const def = TERMS[key];
-  if (!def) return { label: key, short: key, explain: '', aliases: '', used: true };
-  return def[methodId] || def.rtm || def.pue || def.iec
-      || { label: key, short: key, explain: '', aliases: '', used: true };
+  const table = TERM_TABLES[methodId] || TERM_TABLES.rtm;
+  const term = table[key];
+  if (!term) return { ..._EMPTY_TERM, label: key, short: key };
+  return term;
 }
 
 /** Полный tooltip-текст для поля: explain + aliases */
