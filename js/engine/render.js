@@ -566,8 +566,12 @@ export function renderProjectRegistry() {
       // v0.59.768: linked-aliased узлы числятся размещёнными через группу
       // (не отдельно). Показываем «↪ в группе X» вместо «нигде».
       const _aliasParent = n.linkedAlias ? state.nodes.get(n.linkedAlias) : null;
+      // v0.59.774: показываем effectiveTag группы (= первый экземпляр по
+      // сортировке), а не raw n.tag. Юзер: «группа потребителей должна
+      // иметь обозначение по обозначению первого экземпляра».
+      const _aliasParentTag = _aliasParent ? (effectiveTag(_aliasParent) || _aliasParent.tag || _aliasParent.id) : '';
       const placement = _aliasParent
-        ? `<span class="pal-reg-badge pal-reg-badge-pages" title="Связан с группой ${esc(_aliasParent.tag || _aliasParent.id)} (учтён там)" style="background:#dbeafe;color:#1e40af">↪ ${esc(_aliasParent.tag || 'группа')}</span>`
+        ? `<span class="pal-reg-badge pal-reg-badge-pages" title="Связан с группой ${esc(_aliasParentTag)} (учтён там)" style="background:#dbeafe;color:#1e40af">↪ ${esc(_aliasParentTag || 'группа')}</span>`
         : (pids.length === 0
           ? '<span class="pal-reg-badge pal-reg-badge-none" title="Не размещён ни на одной странице">нигде</span>'
           : `<span class="pal-reg-badge pal-reg-badge-pages" title="Размещён на ${pids.length} стр.">${pids.length}</span>`);

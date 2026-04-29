@@ -58,26 +58,50 @@ export function zonePrefix(zone) {
   return chain.map(z => z.zonePrefix || z.tag || '').filter(Boolean).join('.');
 }
 
-// Эффективное обозначение с учётом полной цепочки зон: «G1.S2.PNL1»
+// v0.59.774: базовое обозначение узла. Для consumer-группы с привязанными
+// экземплярами (linkedAliases) — берём обозначение первого экземпляра
+// в естественной сортировке (SR01 < SR02 < SR10). Юзер: «группа
+// потребителей должна иметь обозначение по обозначению первого экземпляра
+// (не размещенного а по сортировке)». Для остальных — просто n.tag.
+function _baseTag(n) {
+  if (n && Array.isArray(n.linkedAliases) && n.linkedAliases.length > 0) {
+    let firstTag = '';
+    for (const aid of n.linkedAliases) {
+      if (!aid) continue;
+      const a = state.nodes.get(aid);
+      if (!a || !a.tag) continue;
+      if (!firstTag || a.tag.localeCompare(firstTag, undefined, { numeric: true, sensitivity: 'base' }) < 0) {
+        firstTag = a.tag;
+      }
+    }
+    if (firstTag) return firstTag;
+  }
+  return (n && n.tag) || '';
+}
+
+// Эффективное обозначение с учётом полной цепочки зон: «G1.S2.PNL1».
+// v0.59.774: для consumer-группы базовое обозначение = обозначение первого
+// привязанного экземпляра по сортировке (см. _baseTag).
 export function effectiveTag(n) {
   if (!n) return '';
   if (n.type === 'zone') {
     const chain = zoneChain(n);
     return chain.map(z => z.zonePrefix || z.tag || '').filter(Boolean).join('.');
   }
+  const baseTag = _baseTag(n);
   // Секция многосекционного щита: PNL1.P1
   if (n.parentSectionedId) {
     const parent = state.nodes.get(n.parentSectionedId);
     if (parent) {
       const parentTag = effectiveTag(parent);
       // Секция использует свой tag как суффикс (P1, P2...)
-      return parentTag ? `${parentTag}.${n.tag || ''}` : (n.tag || '');
+      return parentTag ? `${parentTag}.${baseTag}` : baseTag;
     }
   }
   const z = findZoneForMember(n);
   if (z) {
     const prefix = zonePrefix(z);
-    if (prefix) return `${prefix}.${n.tag || ''}`;
+    if (prefix) return `${prefix}.${baseTag}`;
   }
   // Многосекционный контейнер: если сам не в зоне, проверить зону первой секции
   if (n.type === 'panel' && n.switchMode === 'sectioned' && Array.isArray(n.sectionIds) && n.sectionIds.length) {
@@ -86,11 +110,11 @@ export function effectiveTag(n) {
       const secZone = findZoneForMember(firstSec);
       if (secZone) {
         const prefix = zonePrefix(secZone);
-        if (prefix) return `${prefix}.${n.tag || ''}`;
+        if (prefix) return `${prefix}.${baseTag}`;
       }
     }
   }
-  return n.tag || '';
+  return baseTag;
 }
 
 // Узлы, принадлежащие зоне РЕКУРСИВНО (включая потомков дочерних зон
