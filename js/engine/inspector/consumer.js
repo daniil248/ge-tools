@@ -131,14 +131,22 @@ export function openConsumerParamsModal(n) {
   // с разными мощностями. Показывается только когда count > 1.
   const _groupMode = n.groupMode === 'individual' ? 'individual' : 'uniform';
   if (_cpCount > 1) {
+    // v0.59.663: Юзер: «мощность индивидуальная может быть доступна только
+    // если выбрана цепочка, когда один общий кабель, иначе разную мощность
+    // использовать нельзя». Опция «Индивидуальная» в селекте отключается
+    // через disabled когда не выбрано последовательное соединение
+    // (n.serialMode === false). Сам checkbox «Последовательное соединение»
+    // теперь всегда виден (раньше скрывался при individual).
+    const _indivDisabled = !n.serialMode;
     h.push(`<div class="field">
       <label>Тип группы</label>
       <select id="cp-groupMode">
         <option value="uniform"${_groupMode === 'uniform' ? ' selected' : ''}>Единообразная (все приборы одинаковые)</option>
-        <option value="individual"${_groupMode === 'individual' ? ' selected' : ''}>Индивидуальная (мощности разные)</option>
+        <option value="individual"${_groupMode === 'individual' ? ' selected' : ''}${_indivDisabled ? ' disabled' : ''}>Индивидуальная (мощности разные)${_indivDisabled ? ' — только при цепочке' : ''}</option>
       </select>
+      <div class="muted" id="cp-groupMode-hint" style="font-size:10px;margin-top:2px${_indivDisabled ? '' : ';display:none'}">Разные мощности возможны только при последовательном соединении (один общий кабель). Включите «Последовательное соединение» ниже, чтобы выбрать «Индивидуальная».</div>
     </div>`);
-    h.push(`<div class="field check" id="cp-serialMode-wrap" style="${_groupMode === 'individual' ? 'display:none' : ''}"><input type="checkbox" id="cp-serialMode"${n.serialMode ? ' checked' : ''}><label>Последовательное соединение (цепочка)</label></div>`);
+    h.push(`<div class="field check" id="cp-serialMode-wrap"><input type="checkbox" id="cp-serialMode"${n.serialMode ? ' checked' : ''}><label>Последовательное соединение (цепочка)</label></div>`);
     // v0.59.381: «Указание нагрузки» теперь доступно ВСЕГДА при count>1
     // (не только при последовательном) — пользователь может ввести
     // суммарную мощность группы и не пересчитывать единичную вручную.
@@ -319,8 +327,23 @@ export function openConsumerParamsModal(n) {
   // чтобы юзеру было видно связь расчётных значений с номинальными через
   // коэффициенты. Юзер: «почему расчётные значения не связаны с номинальными
   // через коэффициенты». — связь явная: P_расч = P_ном × N × Ки × LF.
+  // v0.59.663: Юзер: «расчётная мощность указывается для одного потребителя
+  // и справочно выводится для группы, только если не используется указание
+  // мощности или тока всех нагрузок одним числом». То есть:
+  //   - Если loadSpec='per-unit' (на каждый элемент) — расчётная P_calc / I_calc
+  //     показываются НА 1 ЕД., группа выводится справочно ниже.
+  //   - Если loadSpec='total' (на всю группу) — расчётная сразу для группы
+  //     (юзер ввёл сумму), справочный per-unit не нужен.
+  //   - Для single-consumer (count=1) — без изменений (всё одна штука).
+  // Заголовок и хинт переписаны соответственно.
+  const _calcPerUnit = (_cpCount > 1) && !_isTotalDisplay; // = (loadSpec === 'per-unit')
+  const _calcHeader = (_cpCount > 1)
+    ? (_isTotalDisplay
+        ? 'P_ном × Ки × множитель (на всю группу)'
+        : 'P_ном × Ки × множитель (на 1 ед.)')
+    : 'P_ном × Ки × множитель';
   h.push(`<div style="margin-top:6px;padding:8px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px">
-    <div class="muted" style="font-size:10px;margin-bottom:4px;font-weight:600;color:#0369a1">📊 Расчётная нагрузка = P_ном × ${_cpCount > 1 ? 'N × ' : ''}Ки × множитель</div>
+    <div class="muted" style="font-size:10px;margin-bottom:4px;font-weight:600;color:#0369a1">📊 Расчётная нагрузка = ${_calcHeader}</div>
     <div class="field" style="margin-bottom:4px">
       <label style="font-size:11px">Расчётная мощность P, кВт</label>
       <input type="number" id="cp-calcKw" min="0" step="0.1" value="">
@@ -329,7 +352,10 @@ export function openConsumerParamsModal(n) {
       <label style="font-size:11px">Расчётный ток I, А</label>
       <input type="number" id="cp-calcA" min="0" step="0.1" value="">
     </div>
-    <div class="muted" style="font-size:10px;margin-top:4px;line-height:1.4">Связано с номинальной нагрузкой через коэффициенты: P_расч = P_ном${_cpCount > 1 ? ' × N (количество)' : ''} × Ки × множитель; I_расч = P_расч × 1000 / (U × cos φ × √3<sub>3ф</sub>). При изменении расчётной P или I пересчитается Ки. При изменении Ки / множителя / P_ном${_cpCount > 1 ? ' / count' : ''} — пересчитается расчётная.</div>
+    ${_calcPerUnit
+      ? `<div class="muted" id="cp-calcGroupHint" style="font-size:10px;margin-top:4px;color:#0369a1;font-weight:600">Для группы (справочно): P_расч_группы = <span id="cp-calcKwGroup">—</span> кВт · I_расч_группы = <span id="cp-calcAGroup">—</span> А</div>`
+      : ''}
+    <div class="muted" style="font-size:10px;margin-top:4px;line-height:1.4">Связано с номинальной нагрузкой через коэффициенты: P_расч = P_ном × Ки × множитель; I_расч = P_расч × 1000 / (U × cos φ × √3<sub>3ф</sub>). При изменении расчётной P или I пересчитается Ки. При изменении Ки / множителя / P_ном — пересчитается расчётная.</div>
   </div>`);
   // v0.59.657: methodology-aware inrush label
   if (isTermUsed('inrush', _method)) {
@@ -634,13 +660,40 @@ export function openConsumerParamsModal(n) {
       const indiv = mode === 'individual' && cnt > 1;
       if (demandWrap) demandWrap.style.display = indiv ? 'none' : '';
       if (itemsWrap) itemsWrap.style.display = indiv ? '' : 'none';
-      if (serialWrap) serialWrap.style.display = indiv ? 'none' : '';
+      // v0.59.663: serialMode-чекбокс остаётся видимым всегда — он управляет
+      // доступностью «Индивидуальная» опции. Раньше прятался при индивид.
       if (indiv && itemsBody && itemsBody.children.length === 0) {
         // Миграция: первый переход → заполняем items из count × demandKw
         const per = Number(document.getElementById('cp-demandKw')?.value) || 0;
         for (let i = 0; i < cnt; i++) addItemRow('', per);
       }
     });
+  }
+  // v0.59.663: при включении/выключении «Последовательное соединение»
+  // опция «Индивидуальная» в cp-groupMode становится доступной/нет.
+  // Если серийность снимается, а сейчас выбрана individual → откатываем
+  // на uniform (нельзя оставить запрещённое состояние).
+  {
+    const _serialCb = document.getElementById('cp-serialMode');
+    const _gmHint = document.getElementById('cp-groupMode-hint');
+    if (_serialCb && groupModeSel) {
+      _serialCb.addEventListener('change', () => {
+        const enabled = _serialCb.checked;
+        const indivOpt = groupModeSel.querySelector('option[value="individual"]');
+        if (indivOpt) {
+          indivOpt.disabled = !enabled;
+          indivOpt.textContent = enabled
+            ? 'Индивидуальная (мощности разные)'
+            : 'Индивидуальная (мощности разные) — только при цепочке';
+        }
+        if (_gmHint) _gmHint.style.display = enabled ? 'none' : '';
+        // Если выкл серийность и сейчас выбрана individual → uniform.
+        if (!enabled && groupModeSel.value === 'individual') {
+          groupModeSel.value = 'uniform';
+          groupModeSel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }
   }
 
   // Live-обновление полей serial/loadSpec
@@ -790,44 +843,65 @@ export function openConsumerParamsModal(n) {
   if (calcKwInput && kuInput) {
     let _calcSyncing = false;
     const _readCount = () => Math.max(1, Number(countInputForCalc?.value) || 1);
-    const _readNomTotal = () => {
-      const per = Number(demandInput?.value) || 0;
-      // demandKw в форме хранится либо как per-unit, либо как total
-      // (зависит от cp-loadSpec). Считаем total.
-      const ls = (loadSpecSel?.value === 'total') ? 'total' : 'per-unit';
-      const cnt = _readCount();
-      return ls === 'total' ? per : per * cnt;
-    };
+    // v0.59.663: «Расчётная нагрузка» считается в режиме отображения, который
+    // выбран в loadSpec. Юзер: «расчётная мощность указывается для одного
+    // потребителя и справочно выводится для группы, если не используется
+    // указание мощности всех нагрузок одним числом».
+    //   loadSpec='per-unit' (по умолчанию) → P_calc / I_calc на 1 ед.;
+    //                                         P_calc_group выводится справочно
+    //   loadSpec='total'                  → P_calc / I_calc на всю группу
+    //                                         (юзер уже ввёл сумму)
+    const _isLoadSpecTotal = () => (loadSpecSel?.value === 'total');
+    const _readPnomDisplay = () => Number(demandInput?.value) || 0; // в текущем режиме UI
     const _readKu = () => Math.max(0, Math.min(1, Number(kuInput.value) || 0));
     const _readLf = () => Math.max(0, Math.min(3, Number(lfInput?.value) || 1));
+    const _calcGroupKwSpan = document.getElementById('cp-calcKwGroup');
+    const _calcGroupASpan  = document.getElementById('cp-calcAGroup');
     const _refreshCalc = () => {
       if (_calcSyncing) return;
       _calcSyncing = true;
       try {
-        const Pnom = _readNomTotal();
+        const PnomDisp = _readPnomDisplay(); // = P на 1 ед. ИЛИ P группы (по loadSpec)
         const ku = _readKu();
         const lf = _readLf();
-        const Pcalc = Pnom * ku * lf;
+        const Pcalc = PnomDisp * ku * lf;
         calcKwInput.value = Pcalc > 0 ? Pcalc.toFixed(2).replace(/\.00$/, '') : '';
         const Icalc = _PtoI(Pcalc);
         if (calcAInput) calcAInput.value = Icalc > 0 ? Icalc.toFixed(2).replace(/\.00$/, '') : '';
+        // Справочно для группы — только если режим per-unit и count > 1.
+        const cnt = _readCount();
+        if (cnt > 1 && !_isLoadSpecTotal() && _calcGroupKwSpan) {
+          const PcalcGroup = Pcalc * cnt;
+          const IcalcGroup = _PtoI(PcalcGroup);
+          _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
+          if (_calcGroupASpan) _calcGroupASpan.textContent = IcalcGroup > 0 ? IcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
+        }
       } finally { _calcSyncing = false; }
     };
     // Юзер ввёл расчётную P → пересчитать Ки.
+    // Pcalc и Pnom оба в текущем режиме (per-unit или total) — Ки = Pcalc / (Pnom × LF)
     calcKwInput.addEventListener('input', () => {
       if (_calcSyncing) return;
       _calcSyncing = true;
       try {
-        const Pnom = _readNomTotal();
+        const PnomDisp = _readPnomDisplay();
         const lf = _readLf();
         const Pcalc = Number(calcKwInput.value) || 0;
-        if (Pnom > 0 && lf > 0) {
-          const newKu = Pcalc / (Pnom * lf);
+        if (PnomDisp > 0 && lf > 0) {
+          const newKu = Pcalc / (PnomDisp * lf);
           kuInput.value = Math.max(0, Math.min(1, newKu)).toFixed(3).replace(/\.?0+$/, '');
         }
         // I_calc — синхронизируем
         const Icalc = _PtoI(Pcalc);
         if (calcAInput) calcAInput.value = Icalc > 0 ? Icalc.toFixed(2).replace(/\.00$/, '') : '';
+        // Справочно для группы (только если per-unit)
+        const cnt = _readCount();
+        if (cnt > 1 && !_isLoadSpecTotal() && _calcGroupKwSpan) {
+          const PcalcGroup = Pcalc * cnt;
+          const IcalcGroup = _PtoI(PcalcGroup);
+          _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
+          if (_calcGroupASpan) _calcGroupASpan.textContent = IcalcGroup > 0 ? IcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
+        }
       } finally { _calcSyncing = false; }
     });
     // Юзер ввёл расчётный I → P_calc → Ки.
@@ -838,19 +912,28 @@ export function openConsumerParamsModal(n) {
         const a = Number(calcAInput.value) || 0;
         const Pcalc = _ItoP(a);
         calcKwInput.value = Pcalc > 0 ? Pcalc.toFixed(2).replace(/\.00$/, '') : '';
-        const Pnom = _readNomTotal();
+        const PnomDisp = _readPnomDisplay();
         const lf = _readLf();
-        if (Pnom > 0 && lf > 0) {
-          const newKu = Pcalc / (Pnom * lf);
+        if (PnomDisp > 0 && lf > 0) {
+          const newKu = Pcalc / (PnomDisp * lf);
           kuInput.value = Math.max(0, Math.min(1, newKu)).toFixed(3).replace(/\.?0+$/, '');
+        }
+        // Справочно для группы (только если per-unit)
+        const cnt = _readCount();
+        if (cnt > 1 && !_isLoadSpecTotal() && _calcGroupKwSpan) {
+          const PcalcGroup = Pcalc * cnt;
+          const IcalcGroup = _PtoI(PcalcGroup);
+          _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
+          if (_calcGroupASpan) _calcGroupASpan.textContent = IcalcGroup > 0 ? IcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
         }
       } finally { _calcSyncing = false; }
     });
-    // При изменении Ки / множителя / P_ном / count — пересчитать P_calc.
+    // При изменении Ки / множителя / P_ном / count / loadSpec — пересчитать P_calc.
     kuInput.addEventListener('input', _refreshCalc);
     if (lfInput) lfInput.addEventListener('input', _refreshCalc);
     if (demandInput) demandInput.addEventListener('input', _refreshCalc);
     if (countInputForCalc) countInputForCalc.addEventListener('change', _refreshCalc);
+    if (loadSpecSel) loadSpecSel.addEventListener('change', _refreshCalc);
     // Инициализация при открытии формы.
     _refreshCalc();
   }

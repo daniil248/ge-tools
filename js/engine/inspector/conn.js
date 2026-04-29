@@ -134,11 +134,20 @@ export function renderInspectorConn(c) {
       const par = Math.max(1, c._cableParallel || 1);
       const cores = c._wireCount || (c._threePhase ? 5 : 3);
       let cableSpec = '';
+      // v0.59.663: для групповой нагрузки (isGroupBreakers — каждой линии
+      // свой автомат) хедер кабеля «(N линии)» переписывается в
+      // «(N линий — по одной на потребитель)», чтобы юзеру было ясно
+      // что это N независимых линий, а не N параллельных жил одной.
+      const _isGroupHere = !c._breakerIn && c._breakerPerLine && (c._breakerCount || 1) > 1;
       if (c._busbarNom) {
         cableSpec = `Шинопровод: <b>${c._busbarNom} А</b>`;
       } else if (c._cableSize) {
         const spec = `${cores}×${c._cableSize} мм²`;
-        cableSpec = par > 1 ? `Кабель: <b>${spec}</b> (${par} линии)` : `Кабель: <b>${spec}</b>`;
+        cableSpec = par > 1
+          ? (_isGroupHere
+              ? `Кабель: <b>${spec}</b> · ${par} линий (по одной на потребитель)`
+              : `Кабель: <b>${spec}</b> (${par} линии)`)
+          : `Кабель: <b>${spec}</b>`;
       }
       const effectiveBrkIn = c.manualBreakerIn || c._breakerIn || c._breakerPerLine || 0;
       const Iz = c._cableIz || 0;
@@ -146,7 +155,7 @@ export function renderInspectorConn(c) {
       // Для групповой нагрузки (N приборов, N×автомат per-line) координация
       // и oversize-проверка идут per-line: каждая линия защищена своим
       // автоматом InPerLine, Iz линии сравнивается с ним, а не с суммарным.
-      const isGroupBreakers = !c._breakerIn && c._breakerPerLine && (c._breakerCount || 1) > 1;
+      const isGroupBreakers = _isGroupHere;
       const brkRef = isGroupBreakers ? c._breakerPerLine : effectiveBrkIn;
       const izRef = isGroupBreakers ? Iz : IzTotal;
       const inLeIz = !brkRef || !izRef || brkRef <= izRef;
@@ -154,10 +163,23 @@ export function renderInspectorConn(c) {
       const oversize = izRef > 0 && brkRef > 0 && izRef > brkRef * 2 && (c._cableSize || 0) > 1.5;
       const bgColor = !protOk ? '#ffebee' : oversize ? '#fff8e1' : '#f5f5f5';
       const methodLabel = GLOBAL.calcMethod === 'pue' ? 'ПУЭ' : 'IEC 60364';
+      // v0.59.663: для ГРУППОВОГО потребителя (isGroupBreakers — у каждой
+      // линии свой автомат и своя нагрузка) терминология «параллельных жил»
+      // и суммарного тока неуместна. Юзер: «для кабелей групповых
+      // потребителей не нужно указывать слово параллельных жил и считать
+      // общий ток». Каждая линия — независимая, со своим током I_per_unit.
+      // Для НАСТОЯЩЕЙ параллельной прокладки одного силового луча
+      // (par > 1, но isGroupBreakers === false) — старая wording с «жилами»
+      // и Iz·n остаётся корректной (там действительно ток делится).
+      const _IperLine = isGroupBreakers ? (c._maxA || 0) : ((c._maxA || 0) / par);
       h.push(`<div style="font-size:11px;line-height:1.6;margin-top:4px;padding:6px;background:${bgColor};border-radius:4px">` +
         (cableSpec ? cableSpec + '<br>' : '') +
         (effectiveBrkIn ? `Автомат: <b>${effectiveBrkIn} A</b><br>` : '') +
-        (Iz ? `Iдоп на жилу (Iz): <b>${fmt(Iz)} A</b>${par > 1 ? ` · суммарно <b>${fmt(IzTotal)} А</b>` : ''}<br>` : '') +
+        (Iz
+          ? (isGroupBreakers
+              ? `Iдоп на линию (Iz): <b>${fmt(Iz)} A</b><br>`
+              : `Iдоп на жилу (Iz): <b>${fmt(Iz)} A</b>${par > 1 ? ` · суммарно <b>${fmt(IzTotal)} А</b>` : ''}<br>`)
+          : '') +
         (!inLeIz ? (c._parallelProtectionEff === 'common'
           ? '<span style="color:#e65100;font-size:11px">⚠ In > Iz·n при общей защите параллельных линий — рекомендуется увеличить сечение или перейти в режим «индивидуальная защита».</span><br>'
           : '<span style="color:#c62828;font-weight:600">⚠ In > Iz — кабель не защищён автоматом!</span><br>') : '') +
@@ -171,15 +193,30 @@ export function renderInspectorConn(c) {
       if (GLOBAL.showHelp !== false && c._cableSize) {
         const Iraw = c._maxA || 0;
         const IperNeeded = Iraw / par;
-        h.push(`<div style="background:#eef5ff;border:1px solid #bbdefb;border-radius:4px;padding:6px;font-size:11px;margin-top:6px;color:#1565c0;line-height:1.5">
-          <b>Как подбирался кабель:</b><br>
-          1) Расчётный ток линии Iрасч = <b>${fmt(Iraw)} А</b><br>
-          ${par > 1 ? `2) Параллельных жил — <b>${par}</b>, на жилу Iрасч/n = <b>${fmt(IperNeeded)} А</b><br>` : ''}
-          ${effectiveBrkIn ? `3) Координация с автоматом: Iz·n ≥ In, требуется Iz·n ≥ <b>${effectiveBrkIn} А</b><br>` : ''}
-          4) Коэффициенты условий прокладки: Kt=${(c._cableKt||1).toFixed(2)}, Kg=${(c._cableKg||1).toFixed(2)}, K=${(c._cableKtotal||1).toFixed(3)}<br>
-          5) Для ${methodLabel} выбрано ближайшее стандартное сечение <b>${c._cableSize} мм²</b>${par > 1 ? ` × ${par}` : ''}, дающее Iz=<b>${fmt(Iz)} А</b>${par > 1 ? ` (суммарно ${fmt(IzTotal)} А)` : ''}<br>
-          Правило: Iрасч ≤ Iz·n и In ≤ Iz·n.
-        </div>`);
+        if (isGroupBreakers) {
+          // Групповая нагрузка: N независимых линий, по одной на потребитель.
+          // Никакого «параллельного» деления тока — каждая линия
+          // подбирается по своему I_per_unit.
+          h.push(`<div style="background:#eef5ff;border:1px solid #bbdefb;border-radius:4px;padding:6px;font-size:11px;margin-top:6px;color:#1565c0;line-height:1.5">
+            <b>Как подбирался кабель:</b><br>
+            1) Линий — <b>${par}</b> (по одной на потребитель, у каждой свой автомат)<br>
+            2) Расчётный ток на линию Iрасч = <b>${fmt(_IperLine)} А</b> (ток одного потребителя)<br>
+            ${brkRef ? `3) Координация с автоматом линии: Iz ≥ In, требуется Iz ≥ <b>${brkRef} А</b><br>` : ''}
+            4) Коэффициенты условий прокладки: Kt=${(c._cableKt||1).toFixed(2)}, Kg=${(c._cableKg||1).toFixed(2)}, K=${(c._cableKtotal||1).toFixed(3)}<br>
+            5) Для ${methodLabel} выбрано ближайшее стандартное сечение одной линии <b>${c._cableSize} мм²</b>, дающее Iz=<b>${fmt(Iz)} А</b><br>
+            Правило: Iрасч_линии ≤ Iz и In_линии ≤ Iz.
+          </div>`);
+        } else {
+          h.push(`<div style="background:#eef5ff;border:1px solid #bbdefb;border-radius:4px;padding:6px;font-size:11px;margin-top:6px;color:#1565c0;line-height:1.5">
+            <b>Как подбирался кабель:</b><br>
+            1) Расчётный ток линии Iрасч = <b>${fmt(Iraw)} А</b><br>
+            ${par > 1 ? `2) Параллельных жил — <b>${par}</b>, на жилу Iрасч/n = <b>${fmt(IperNeeded)} А</b><br>` : ''}
+            ${effectiveBrkIn ? `3) Координация с автоматом: Iz·n ≥ In, требуется Iz·n ≥ <b>${effectiveBrkIn} А</b><br>` : ''}
+            4) Коэффициенты условий прокладки: Kt=${(c._cableKt||1).toFixed(2)}, Kg=${(c._cableKg||1).toFixed(2)}, K=${(c._cableKtotal||1).toFixed(3)}<br>
+            5) Для ${methodLabel} выбрано ближайшее стандартное сечение <b>${c._cableSize} мм²</b>${par > 1 ? ` × ${par}` : ''}, дающее Iz=<b>${fmt(Iz)} А</b>${par > 1 ? ` (суммарно ${fmt(IzTotal)} А)` : ''}<br>
+            Правило: Iрасч ≤ Iz·n и In ≤ Iz·n.
+          </div>`);
+        }
       }
     }
     h.push('</div>');
