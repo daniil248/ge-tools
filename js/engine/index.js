@@ -590,8 +590,20 @@ window.Raschet = {
         // Динамический импорт чтобы не циклить — install-mapping
         // импортирует state косвенно через GLOBAL/conns, не имеет
         // прямой зависимости от методик.
-        import('../methods/install-mapping.js').then(mod => {
-          mod.migrateConnsForMethodChange(state, GLOBAL, _oldMid, _newMid);
+        import('../methods/install-mapping.js').then(async mod => {
+          const count = mod.migrateConnsForMethodChange(state, GLOBAL, _oldMid, _newMid);
+          // v0.59.727: уведомление о миграции, если были изменения.
+          // Toast через flash() — даёт обратную связь: «эти 12 полей
+          // переключены в новые ключи методики, твои настройки сохранены».
+          if (count > 0) {
+            try {
+              const utilsMod = await import('./utils.js');
+              if (utilsMod && typeof utilsMod.flash === 'function') {
+                const _label = (m) => m === 'rtm' ? 'РТМ' : m === 'pue' ? 'ПУЭ' : 'IEC';
+                utilsMod.flash(`Методика: ${_label(_oldMid)} → ${_label(_newMid)}. Параметров обновлено: ${count}`);
+              }
+            } catch {}
+          }
           // Перерисовать после миграции — recalc подхватит новые значения.
           try { render(); } catch {}
           try { renderInspector(); } catch {}
