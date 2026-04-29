@@ -138,7 +138,11 @@ export function openConsumerParamsModal(n) {
     // (n.serialMode === false). Сам checkbox «Последовательное соединение»
     // теперь всегда виден (раньше скрывался при individual).
     const _indivDisabled = !n.serialMode;
-    h.push(`<div class="field">
+    // v0.59.746: «Тип группы» имеет смысл только при последовательном
+    // соединении (без него «Индивидуальная» недоступна → uniform по умолчанию,
+    // и сам селектор не нужен). Поэтому весь блок скрывается при
+    // отключённом cp-serialMode (видимость переключается в hadler ниже).
+    h.push(`<div class="field" id="cp-groupMode-wrap" style="${_indivDisabled ? 'display:none' : ''}">
       <label>Тип группы</label>
       <select id="cp-groupMode">
         <option value="uniform"${_groupMode === 'uniform' ? ' selected' : ''}>Единообразная (все приборы одинаковые)</option>
@@ -809,8 +813,19 @@ export function openConsumerParamsModal(n) {
   if (countInput) countInput.addEventListener('change', updateDemandUi);
   if (serialCb) {
     serialCb.addEventListener('change', () => {
-      // Только переключаем видимость serial-зависимых меток (если будут).
-      // На loadSpec/demand больше не влияет.
+      // v0.59.746: «Тип группы» виден только в режиме «Последовательное».
+      // Без serial — выбор индивидуальной всё равно недоступен, селектор
+      // лишний. При снятии чекбокса принудительно сбрасываем groupMode в
+      // 'uniform', чтобы скрытое 'individual' не оставалось живым в форме
+      // (и не сбивало рендер блока members при следующем открытии).
+      const wrap = document.getElementById('cp-groupMode-wrap');
+      const gmSel = document.getElementById('cp-groupMode');
+      const isSerial = !!serialCb.checked;
+      if (wrap) wrap.style.display = isSerial ? '' : 'none';
+      if (!isSerial && gmSel) {
+        gmSel.value = 'uniform';
+        gmSel.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     });
   }
 
