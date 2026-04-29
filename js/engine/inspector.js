@@ -1,6 +1,6 @@
 import { state, svg, inspectorBody, uid, pagesForNode } from './state.js';
 import { GLOBAL, DEFAULTS, CHANNEL_TYPES, CABLE_TYPES, NODE_H, LINE_COLORS, CONSUMER_CATALOG, TRANSFORMER_CATALOG, INSTALL_METHODS, BREAKER_SERIES, BREAKER_TYPES, ZONE_PASTEL_PALETTE, SYSTEMS_CATALOG, getSystemMeta, getAllSystems } from './constants.js';
-import { escHtml, escAttr, fmt, field, checkField, flash } from './utils.js';
+import { escHtml, escAttr, fmt, field, checkField, flash, helpIcon } from './utils.js';
 import { nodeVoltage, isThreePhase, computeCurrentA, nodeWireCount, cableVoltageClass, formatVoltageLevelLabel, consumerTotalDemandKw, consumerCountEffective } from './electrical.js';
 import { nodeInputCount, nodeOutputCount, nodeWidth, getNodeGeometryMm } from './geometry.js';
 import { getCurrentPage, getPageKind, PAGE_KINDS, PAGE_KINDS_META } from './state.js';
@@ -718,29 +718,24 @@ export function renderInspectorNode(n) {
         </div>`;
       }
     }
+    // v0.59.703: серые инлайн-блоки про резервирование заменены на helpIcon.
+    const _redGroupTip = 'Два и более источников с одинаковой группой → параллельная работа + взаимный резерв (N-1). Каждый участник должен в одиночку выдерживать пиковую нагрузку (на случай отказа другого). Например: 2 трансформатора в группе «T» → доступная мощность = sum − max = мощность одного.';
+    const _backupTip = 'Резервный тир (backup) — не участвует в нормальной работе, активируется только при отказе основного источника. Например, ДГУ резервный — стартует при отказе городской сети. Учитывается отдельно при N-1 анализе.';
+    const _standbyTip = 'Подменный (cold standby) — холодный резерв, подменяет любой отказавший источник своего тира. Пример: +1 ДГУ к двум рабочим. Не считается в нормальной доступной мощности; вступает в работу только при отказе одного из активных.';
     h.push(`<div class="inspector-section" style="padding:6px 0">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-        <span style="font-size:12px;color:#666">Группа резерва:</span>
-        <input type="text" id="src-redundancy-group" value="${n.redundancyGroup ? String(n.redundancyGroup).replace(/"/g, '&quot;') : ''}" placeholder="напр. T, DGU" style="flex:1;padding:2px 6px;font-size:12px;border:1px solid #ccc;border-radius:3px" title="Участники одной группы работают параллельно и взаимно резервируют друг друга (N-1)">
-      </div>
-      <div class="muted" style="font-size:10px;margin-top:2px;line-height:1.4">
-        Два и более источников с одинаковой группой → параллельная работа + взаимный резерв. Каждый должен в одиночку выдерживать пиковую нагрузку.
+        <span style="font-size:12px;color:#666">Группа резерва:${helpIcon(_redGroupTip)}</span>
+        <input type="text" id="src-redundancy-group" value="${n.redundancyGroup ? String(n.redundancyGroup).replace(/"/g, '&quot;') : ''}" placeholder="напр. T, DGU" style="flex:1;padding:2px 6px;font-size:12px;border:1px solid #ccc;border-radius:3px">
       </div>
       ${groupSummaryHtml}
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:6px">
         <input type="checkbox" id="src-is-backup"${n.isBackup ? ' checked' : ''} style="margin:0">
-        <span>Резервный тир (backup)</span>
+        <span>Резервный тир (backup)${helpIcon(_backupTip)}</span>
       </label>
-      <div class="muted" style="font-size:10px;margin-top:2px;line-height:1.4">
-        Не участвует в нормальной работе. Например, ДГУ при отказе городской сети.
-      </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:6px">
         <input type="checkbox" id="src-is-standby"${n.isStandby ? ' checked' : ''} style="margin:0">
-        <span>Подменный (cold standby)</span>
+        <span>Подменный (cold standby)${helpIcon(_standbyTip)}</span>
       </label>
-      <div class="muted" style="font-size:10px;margin-top:2px;line-height:1.4">
-        Подменяет любой отказавший источник своего тира. Пример: +1 ДГУ к двум рабочим.
-      </div>
     </div>`);
     h.push(sourceStatusBlock(n));
   } else if (n.type === 'panel') {
