@@ -617,6 +617,33 @@ export function openConsumerParamsModal(n) {
       // uniform mode. Реализован picker для 1.28.10 (link existing) v0.59.761;
       // 1.28.13 (split-out) пока placeholder.
       h.push(`<div id="cp-items-wrap" class="field" style="display:none"><div id="cp-items-body"></div><span id="cp-items-sum" class="muted"></span></div>`);
+      // v0.59.763: список приборов в группе. Анонимные «слоты» (count − linkedMembers.length)
+      // показываются как «Экземпляр #N» без идентификации. Линкованные через
+      // 1.28.10 picker — с tag/name/kw + кнопка «✂ Исключить» (1.28.13).
+      const _linked = Array.isArray(n.linkedMembers) ? n.linkedMembers : [];
+      const _totalCount = Math.max(1, Number(n.count) || 1);
+      const _anonCount = Math.max(0, _totalCount - _linked.length);
+      const _perUnitKw = Number(n.demandKw) || 0;
+      h.push(`<div class="field" style="margin-top:8px">
+        <label style="font-size:11px;font-weight:600;color:#37474f;margin-bottom:4px;display:block">Список приборов в группе (${_totalCount})</label>
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:11.5px;max-height:240px;overflow-y:auto">
+          ${_linked.map((lm, idx) => `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:3px">
+            <span style="font-size:10px;color:#15803d;font-weight:600;min-width:18px">🔗</span>
+            <span style="font-weight:600">${escHtml(lm.tag || ('#' + (idx + 1)))}</span>
+            <span class="muted">${escHtml(lm.name || '')}</span>
+            <span class="muted" style="margin-left:auto;font-size:10px">${(Number(lm.demandKw) || 0).toFixed(2)} кВт</span>
+            <button type="button" class="cp-unlink-btn" data-unlink-idx="${idx}" title="Исключить из группы (восстановить как отдельный узел)" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">✂</button>
+          </div>`).join('')}
+          ${_anonCount > 0 ? Array.from({length: _anonCount}, (_, i) => `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;color:#6b7280">
+            <span style="font-size:10px;font-weight:600;min-width:18px">·</span>
+            <span style="font-style:italic">Экземпляр #${_linked.length + i + 1}</span>
+            <span class="muted" style="font-size:10px">аноним</span>
+            <span class="muted" style="margin-left:auto;font-size:10px">${_perUnitKw > 0 ? _perUnitKw.toFixed(2) + ' кВт' : '— кВт'}</span>
+          </div>`).join('') : ''}
+        </div>
+        ${_anonCount > 0 ? `<div class="muted" style="font-size:10px;margin-top:4px;color:#6b7280">Анонимные экземпляры созданы как параметр <code>count</code> без идентификации. Чтобы связать с реальными узлами проекта — используйте picker ниже.</div>` : ''}
+      </div>`);
+
       // v0.59.761: picker одиночных потребителей для связи с группой
       // (ROADMAP 1.28.10). v0.59.762 расширение: включаем НЕ ТОЛЬКО размещённых
       // на текущей странице, но и unplaced (POR-объекты от технолога без
@@ -704,9 +731,8 @@ export function openConsumerParamsModal(n) {
           🔗 В проекте нет одиночных ${_grpSubtype === 'rack' ? 'стоек' : 'потребителей'} для связи. Создайте новый узел через палитру или добавьте импортом.
         </div>`);
       }
-      h.push(`<div class="muted" style="font-size:11px;margin-top:6px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;color:#92400e">
-        ✂ <b>Исключение экземпляра</b> — в разработке (ROADMAP 1.28.13).
-      </div>`);
+      // 1.28.13 (исключение) — реализовано в v0.59.763 через ✂ кнопку
+      // на каждом linked-экземпляре в списке выше.
     }
     h.push(`</div>`); // /panel group
   }
@@ -887,6 +913,46 @@ export function openConsumerParamsModal(n) {
     _wireCard(card);
     refreshItemsSum();
   };
+  // v0.59.763: handlers «✂ Исключить» (split-out, ROADMAP 1.28.13). Восстанавливает
+  // отдельный consumer-узел по метаданным linkedMembers[idx], уменьшает n.count.
+  {
+    const unlinkBtns = document.querySelectorAll('.cp-unlink-btn');
+    unlinkBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.unlinkIdx);
+        if (!Array.isArray(n.linkedMembers) || idx < 0 || idx >= n.linkedMembers.length) return;
+        const lm = n.linkedMembers[idx];
+        try { snapshot('group-unlink:' + n.id + '/' + lm.originalId); } catch {}
+        // Создаём новый consumer-узел рядом с группой со скопированными параметрами.
+        const ox = (n.x || 0) + 240;
+        const oy = (n.y || 0);
+        const newId = 'n_split_' + Date.now() + '_' + idx;
+        state.nodes.set(newId, {
+          id: newId,
+          type: 'consumer',
+          x: ox, y: oy,
+          tag: lm.tag || '',
+          name: lm.name || ((n.name || 'Потребитель') + ' (отделён)'),
+          demandKw: lm.demandKw || (Number(n.demandKw) || 0),
+          cosPhi: lm.cosPhi != null ? lm.cosPhi : (Number(n.cosPhi) || 0.92),
+          phase: lm.phase || n.phase || '3ph',
+          consumerSubtype: lm.consumerSubtype || n.consumerSubtype || '',
+          voltageLevelIdx: lm.voltageLevelIdx != null ? lm.voltageLevelIdx : n.voltageLevelIdx,
+          count: 1,
+          groupMode: 'uniform',
+          pageIds: Array.isArray(n.pageIds) ? [...n.pageIds] : [],
+          kUse: n.kUse || 1,
+        });
+        // Уменьшаем count группы и удаляем запись из linkedMembers.
+        n.count = Math.max(1, (Number(n.count) || 1) - 1);
+        n.linkedMembers.splice(idx, 1);
+        try { flash(`Экземпляр «${lm.tag || lm.originalId}» отделён от группы ${n.tag} (×${n.count})`, 'success'); } catch {}
+        notifyChange();
+        openConsumerParamsModal(n);
+      });
+    });
+  }
+
   // v0.59.761: handlers для picker «🔗 Связать с существующими» (ROADMAP 1.28.10).
   // Объединяет выбранные одиночные consumer-узлы в текущую группу: count += 1
   // на каждого, узел и его связи удаляются.
@@ -920,12 +986,28 @@ export function openConsumerParamsModal(n) {
         const ids = checked.map(cb => cb.dataset.linkId).filter(Boolean);
         try { snapshot('group-link:' + n.id + '←' + ids.join(',')); } catch {}
         let merged = 0;
+        // v0.59.763: сохраняем метаданные о привязанных экземплярах в
+        // n.linkedMembers[], чтобы в Группа-tab был виден список стоек
+        // (а не просто увеличенный count). Юзер: «стойка присоединилась
+        // но нет списка стоек внутри???» (ROADMAP 1.28.10/1.28.13/1.28.14).
+        if (!Array.isArray(n.linkedMembers)) n.linkedMembers = [];
         for (const id of ids) {
           const src = state.nodes.get(id);
           if (!src) continue;
+          // Snapshot identity ДО удаления узла
+          n.linkedMembers.push({
+            originalId: src.id,
+            tag: src.tag || '',
+            name: src.name || '',
+            demandKw: Number(src.demandKw) || 0,
+            cosPhi: Number(src.cosPhi) || null,
+            phase: src.phase || null,
+            consumerSubtype: src.consumerSubtype || '',
+            voltageLevelIdx: Number.isFinite(Number(src.voltageLevelIdx)) ? Number(src.voltageLevelIdx) : null,
+            linkedAt: Date.now(),
+          });
           // увеличиваем count группы и удаляем источник со связями
           n.count = (Number(n.count) || 1) + (Number(src.count) || 1);
-          // снести входящие/исходящие связи источника
           const connsToDel = [];
           for (const c of state.conns.values()) {
             if (c.from?.nodeId === src.id || c.to?.nodeId === src.id) connsToDel.push(c.id);
@@ -937,7 +1019,6 @@ export function openConsumerParamsModal(n) {
         if (merged > 0) {
           try { flash(`Объединено ${merged} ${merged === 1 ? 'потребитель' : 'потребителя/-ей'} в группу ${n.tag || n.id} (×${n.count})`, 'success'); } catch {}
           notifyChange();
-          // Перерисовать модалку с обновлённым списком
           openConsumerParamsModal(n);
         }
       });
