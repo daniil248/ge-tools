@@ -944,6 +944,27 @@ export function exportPNG() {
  * (чтобы не терять ориентацию пользователя сильным скачком). Если узлы
  * уже видны — zoom оставляем, только сдвигаем центр.
  */
+// v0.59.714: центрирование на узле (для navigate-to-issue из чеклиста).
+export function centerOnNode(n) {
+  if (!n) return;
+  const w = nodeWidth(n);
+  const h = (typeof n.height === 'number') ? n.height : NODE_H;
+  const pad = 200;
+  const bboxW = w + pad * 2;
+  const bboxH = h + pad * 2;
+  const W = svg.clientWidth || 800;
+  const H = svg.clientHeight || 600;
+  let zoom = Math.min(W / bboxW, H / bboxH, 1.5);
+  if (!Number.isFinite(zoom) || zoom <= 0) zoom = 1;
+  if (zoom < 0.5) zoom = 0.5;
+  state.view.zoom = zoom;
+  const cx = n.x + w / 2;
+  const cy = n.y + h / 2;
+  state.view.x = cx - (W / 2) / zoom;
+  state.view.y = cy - (H / 2) / zoom;
+  updateViewBox();
+}
+
 export function centerOnConn(conn) {
   if (!conn) return;
   const fromN = state.nodes.get(conn.from?.nodeId);

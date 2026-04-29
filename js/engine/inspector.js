@@ -435,16 +435,25 @@ function renderInspectorPage() {
   // v0.59.702: запрос на ТУ из свойств страницы.
   const tuPgBtn = document.getElementById('pg-open-tu-request');
   if (tuPgBtn) tuPgBtn.addEventListener('click', () => openTuRequestModal(null));
-  // v0.59.713: клик по проблемной строке чеклиста — переход к первому
-  // проблемному узлу. Выделение узла + перерисовка инспектора.
+  // v0.59.713/714: клик по проблемной строке чеклиста — переход к первому
+  // проблемному узлу. Выделение узла + центрирование холста (если включено
+  // GLOBAL.autoCenterOnSelect или Ctrl+клик) + перерисовка инспектора.
   inspectorBody.querySelectorAll('[data-checklist-jump]').forEach(el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', async (ev) => {
       const id = el.getAttribute('data-checklist-jump');
       if (!id) return;
       const tgt = state.nodes.get(id);
       if (!tgt) return;
       state.selectedKind = 'node';
       state.selectedId = id;
+      // Центрировать холст на узле (всегда при клике из чеклиста —
+      // это явное действие навигации, не случайный select).
+      try {
+        const expMod = await import('./export.js');
+        if (expMod && typeof expMod.centerOnNode === 'function') {
+          expMod.centerOnNode(tgt);
+        }
+      } catch {}
       try { _render(); } catch {}
       try { renderInspector(); } catch {}
     });
