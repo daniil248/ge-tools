@@ -25,6 +25,70 @@ export function bindInteractionDeps({ undo, redo, fitAll, serialize }) {
 }
 
 /* ---- helpers ---- */
+
+// v0.59.758: helpers для auto-merge при drag-drop совместимых потребителей
+// (ROADMAP 1.28.9). Применяются на mouseup после drag'а consumer-узла.
+//   _isCompatibleConsumer(a, b) — true, если оба consumer и электрически
+//     совместимы для слияния в группу (тот же subtype/phase/voltage,
+//     cosPhi ±0.05, demandKw ±5%, оба в uniform-режиме).
+//   _findConsumerOverlapAt(dragged) — ищет другой consumer, на чей bbox
+//     попадает центр dragged-ноды.
+//   _mergeConsumersIntoGroup(target, source) — поглощает source в target:
+//     target.count += source.count, source удаляется вместе с её связями.
+function _isCompatibleConsumer(a, b) {
+  if (!a || !b || a.id === b.id) return false;
+  if (a.type !== 'consumer' || b.type !== 'consumer') return false;
+  if ((a.consumerSubtype || '') !== (b.consumerSubtype || '')) return false;
+  if ((a.phase || '3ph') !== (b.phase || '3ph')) return false;
+  const vA = Number(a.voltageLevelIdx);
+  const vB = Number(b.voltageLevelIdx);
+  // Если оба заданы — должны совпадать. Если ни один — ОК (дефолт совпадает).
+  if (Number.isFinite(vA) && Number.isFinite(vB) && vA !== vB) return false;
+  const cosA = Number(a.cosPhi) || 0.92;
+  const cosB = Number(b.cosPhi) || 0.92;
+  if (Math.abs(cosA - cosB) > 0.05) return false;
+  const kwA = Number(a.demandKw) || 0;
+  const kwB = Number(b.demandKw) || 0;
+  if (kwA <= 0 || kwB <= 0) return false;
+  if (Math.abs(kwA - kwB) / Math.max(kwA, kwB) > 0.05) return false;
+  // Individual-режим не объединяем — в нём каждый прибор имеет свои параметры.
+  if (a.groupMode === 'individual' || b.groupMode === 'individual') return false;
+  return true;
+}
+
+function _findConsumerOverlapAt(dragged) {
+  if (!dragged || dragged.type !== 'consumer') return null;
+  const cx = dragged.x + nodeWidth(dragged) / 2;
+  const cy = dragged.y + nodeHeight(dragged) / 2;
+  for (const n of state.nodes.values()) {
+    if (n.id === dragged.id) continue;
+    if (n.type !== 'consumer') continue;
+    const nw = nodeWidth(n), nh = nodeHeight(n);
+    if (cx >= n.x && cx <= n.x + nw && cy >= n.y && cy <= n.y + nh) {
+      return n;
+    }
+  }
+  return null;
+}
+
+function _mergeConsumersIntoGroup(target, source) {
+  // target поглощает source. Возвращает targetId.
+  if (!target || !source || target.id === source.id) return null;
+  const tCount = Math.max(1, Number(target.count) || 1);
+  const sCount = Math.max(1, Number(source.count) || 1);
+  target.count = tCount + sCount;
+  // Удаляем все связи source (входы и выходы) и сам узел.
+  const connsToDel = [];
+  for (const c of state.conns.values()) {
+    if (c.from?.nodeId === source.id || c.to?.nodeId === source.id) {
+      connsToDel.push(c.id);
+    }
+  }
+  for (const cid of connsToDel) state.conns.delete(cid);
+  state.nodes.delete(source.id);
+  return target.id;
+}
+
 // Effective grid step for snap: schematic pages = GLOBAL.gridStep (40),
 // layout pages = 10 mm (1 SVG unit = 1 mm), shift/ctrl = 1 mm fine snap.
 // Phase 2.3 (v0.58.2): layout-aware drag snap.
@@ -1622,6 +1686,28 @@ export function initInteraction() {
             }
           }
           render();
+        }
+      }
+      // v0.59.758: auto-merge при drop'е consumer-ноды поверх другой совместимой
+      // consumer-ноды (ROADMAP 1.28.9). Целевая нода (target) поглощает
+      // dragged-source: target.count += source.count, source удаляется со всеми
+      // связями. Совместимость = subtype/phase/voltage/cosPhi±0.05/demandKw±5%.
+      if (wasNodeDrag && draggedNodeId) {
+        const dragged = state.nodes.get(draggedNodeId);
+        if (dragged && dragged.type === 'consumer') {
+          const target = _findConsumerOverlapAt(dragged);
+          if (target && _isCompatibleConsumer(dragged, target)) {
+            // snapshot перед merge для Ctrl+Z
+            try { snapshot('consumer-merge:' + target.id + '←' + dragged.id); } catch {}
+            const tagBefore = target.tag || target.name || target.id;
+            const newCount = (Number(target.count) || 1) + (Number(dragged.count) || 1);
+            _mergeConsumersIntoGroup(target, dragged);
+            // Перевыбрать target после удаления dragged
+            state.selectedKind = 'node';
+            state.selectedId = target.id;
+            try { flash(`Объединено в группу ${tagBefore} (×${newCount})`, 'success'); } catch {}
+            render();
+          }
         }
       }
       if (wasNodeDrag || wasWpDrag || wasZoneResize || wasRotate || wasLength) notifyChange();
