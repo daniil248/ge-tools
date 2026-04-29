@@ -294,18 +294,24 @@ function sectionSources() {
 // 2. ИБП
 function sectionUps() {
   const items = collectUpses();
+  // v0.59.683: добавлена колонка «Свободно, кВт» (резерв на вводе ИБП)
+  // и расширена колонка «Статус» — отмечается ⚠ ПЕРЕГРУЗ при
+  // зафиксированном автомате ввода, не справляющемся с нагрузкой.
   const cols = [
     { label: 'Обозн.',       width: 18 },
-    { label: 'Имя',          width: 35 },
-    { label: 'Pном, кВт',    align: 'right', width: 18 },
-    { label: 'Pтек., кВт',   align: 'right', width: 18 },
-    { label: 'Pмакс., кВт',  align: 'right', width: 20 },
-    { label: 'АКБ, кВт·ч',   align: 'right', width: 18 },
-    { label: 'Автономия',    align: 'right', width: 18 },
+    { label: 'Имя',          width: 30 },
+    { label: 'Pном, кВт',    align: 'right', width: 16 },
+    { label: 'Pтек., кВт',   align: 'right', width: 16 },
+    { label: 'Pмакс., кВт',  align: 'right', width: 16 },
+    { label: 'Свободно, кВт', align: 'right', width: 16 },
+    { label: 'АКБ, кВт·ч',   align: 'right', width: 14 },
+    { label: 'Автономия',    align: 'right', width: 14 },
     { label: 'Статус' },
   ];
   const rows = [];
   const details = []; // paragraphs / notes per ИБП
+  let totalUpsFreeKw = 0;
+  let upsOverloadCount = 0;
   for (const u of items) {
     const cap = Number(u.capacityKw) || 0;
     const load = u._loadKw || 0;
@@ -317,12 +323,19 @@ function sectionUps() {
     const autStr = autLoad > 0
       ? (aut >= 60 ? (aut / 60).toFixed(1) + ' ч' : Math.round(aut) + ' мин')
       : '—';
-    let status = u._onBattery ? 'от АКБ'
-               : u._powered ? 'норма'
-               : 'без питания';
+    let status;
+    if (u._breakerOverload) {
+      const info = u._breakerOverloadInfo || {};
+      status = `⚠ ПЕРЕГРУЗ ВВОДА (${fmt(info.designA || 0)} > ${info.breakerIn || 0} А)`;
+      upsOverloadCount++;
+    } else if (u._onBattery) status = 'от АКБ';
+    else if (u._powered) status = 'норма';
+    else status = 'без питания';
+    const freeKw = (Number.isFinite(u._freeKw) && u._freeKw > 0) ? fmt(u._freeKw) : '—';
+    if (Number.isFinite(u._freeKw) && u._freeKw > 0) totalUpsFreeKw += u._freeKw;
     rows.push([
       fullTag(u), decorateName(u),
-      fmt(cap), fmt(load), fmt(maxLoad),
+      fmt(cap), fmt(load), fmt(maxLoad), freeKw,
       fmt(batt), autStr, status,
     ]);
 
@@ -369,8 +382,17 @@ function sectionUps() {
   if (rows.length) {
     text.push(...textTable(cols, rows));
     text.push('');
+    text.push('ИТОГО свободно (резерв) по вводам ИБП: ' + fmt(totalUpsFreeKw) + ' кВт');
+    if (upsOverloadCount > 0) {
+      text.push(`⚠ ПЕРЕГРУЖЕНО ВВОДОВ ИБП: ${upsOverloadCount}`);
+    }
+    text.push('');
     blocks.push(B.h2('Сводная таблица ИБП'));
     blocks.push(B.table(blockCols(cols), rows));
+    blocks.push(B.paragraph('Свободно, кВт — резерв пропускной способности входной линии ИБП (limit_max − Iрасч_ввода). ИТОГО по всем ИБП: ' + fmt(totalUpsFreeKw) + ' кВт.'));
+    if (upsOverloadCount > 0) {
+      blocks.push(B.paragraph(`⚠ Перегружено вводов ИБП: ${upsOverloadCount}. На вводе ИБП расчётный ток превышает зафиксированный автомат — авто-пересчёт отключён, требуется ручная корректировка.`));
+    }
     if (details.length) {
       blocks.push(B.h2('Карточки ИБП'));
       for (const d of details) {
