@@ -1211,10 +1211,22 @@ export function initInteraction() {
       // Обычный клик -- одиночное выделение
       state.selection.clear();
       selectNode(id);
-      // v0.59.749: диагностика для пользовательских отчётов «не могу двигать
-      // щит». Если state.readOnly=true (роль viewer/guest или ручной toggle)
-      // — явно сообщаем в консоль, чтобы диагностика занимала секунды,
-      // а не часы. Один раз на ~5 с (rate-limit).
+      // v0.59.751: расширенная диагностика для отчётов «не двигается щит».
+      // Лог по каждому клику на узел (rate-limit 2 с) показывает: roli / readOnly,
+      // selected-state ДО и ПОСЛЕ, наличие state.drag. Юзер копирует строку
+      // в console и сразу видно, в чём блок.
+      if (!window.__dragLogTs || (Date.now() - window.__dragLogTs) > 2000) {
+        window.__dragLogTs = Date.now();
+        try {
+          console.info('[interaction] node-click', {
+            nodeId: id,
+            readOnly: !!state.readOnly,
+            selectedAfter: { kind: state.selectedKind, id: state.selectedId },
+            willStartDrag: !state.readOnly,
+            myLockKey: state.myLockNodeId || null,
+          });
+        } catch {}
+      }
       if (state.readOnly) {
         if (!window.__dragBlockedLogTs || (Date.now() - window.__dragBlockedLogTs) > 5000) {
           window.__dragBlockedLogTs = Date.now();
