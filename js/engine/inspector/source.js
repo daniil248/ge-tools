@@ -62,16 +62,11 @@ export function openImpedanceModal(n) {
 
   if (isUtility) {
     h.push('<div class="muted" style="font-size:11px;margin-bottom:8px">Городская сеть / ЛЭП. Параметры КЗ задаются напрямую.</div>');
-    // Phase 1.20.39: поле «Разрешённая мощность» из ТУ сетевой организации.
-    // Раньше для utility capacityKw нигде не задавалась → источник
-    // городской сети не учитывался в «общей доступной мощности».
-    h.push(field('Разрешённая мощность по ТУ, кВт',
-      `<input type="number" id="imp-utility-pmax" min="0" max="1000000" step="1" value="${n.capacityKw ?? 0}">`));
-    h.push(`<div class="muted" style="font-size:10px;margin-top:-4px;line-height:1.4">`
-      + 'Выделенная мощность из технических условий сетевой организации (кВт). '
-      + 'Используется в Dashboard и sidebar для «общей / доступной мощности». '
-      + 'Для городской сети номинальная Snom не имеет смысла — только разрешённый лимит.'
-      + `</div>`);
+    // v0.59.693: подсказка вынесена в helpIcon рядом с лейблом.
+    h.push(`<div class="field">
+      <label>Разрешённая мощность по ТУ, кВт${helpIcon('Выделенная сетевой организацией активная мощность (из технических условий на технологическое присоединение). Используется в Dashboard и sidebar как лимит «общей доступной мощности». Для городской сети номинальная Snom не имеет смысла — только разрешённый лимит из ТУ.')}</label>
+      <input type="number" id="imp-utility-pmax" min="0" max="1000000" step="1" value="${n.capacityKw ?? 0}">
+    </div>`);
     // v0.59.605 (Phase 18): расчёт компенсации реактивной мощности.
     // Юзер: «добавь расчёт компенсации реактивной мощности на городском
     // вводе». Энергоснабжающая организация требует cosφ ≥ 0.95 (или 0.99
@@ -91,9 +86,14 @@ export function openImpedanceModal(n) {
       const sel = t.snomKva === n.snomKva ? ' selected' : '';
       tOpts += `<option value="${t.snomKva}"${sel}>${t.label}</option>`;
     }
-    h.push(field('Типовой номинал (ГОСТ 11677)', `<select id="imp-tCatalog">${tOpts}</select>`));
-    h.push(`<div class="muted" style="font-size:10px;margin-top:-4px">При выборе заполняются Uk, Pk, P0 по ГОСТ. Поле Snom остаётся ручным для редактирования.</div>`);
-    h.push(field('Номинальная мощность (Snom), кВА', `<input type="number" id="imp-snom" min="1" max="100000" step="1" value="${n.snomKva ?? 400}">`));
+    h.push(`<div class="field">
+      <label>Типовой номинал (ГОСТ 11677)${helpIcon('Выбор стандартного номинала из каталога ГОСТ 11677. При выборе автоматически заполняются Uk, Pk, P0 (потери) по ГОСТ. Поле Snom остаётся редактируемым — для случаев нестандартных мощностей или импорта из паспорта.')}</label>
+      <select id="imp-tCatalog">${tOpts}</select>
+    </div>`);
+    h.push(`<div class="field">
+      <label>Номинальная мощность (Snom), кВА${helpIcon('Полная номинальная мощность трансформатора (нагрузочная способность по нагреву обмоток). Связь с активной мощностью: P_ном = Snom × cos φ. Стандартный ряд (ГОСТ 11677): 25/40/63/100/160/250/400/630/1000/1600/2500 кВА для распределительных ТП.')}</label>
+      <input type="number" id="imp-snom" min="1" max="100000" step="1" value="${n.snomKva ?? 400}">
+    </div>`);
   } else if (subtype === 'generator') {
     // v0.59.631: ISO 8528-1 режимы работы ДГУ — теперь в этой же модалке
     // (юзер: «не используй настройку в нескольких местах, только в Параметры
@@ -148,9 +148,18 @@ export function openImpedanceModal(n) {
           + 'Если задан Ik — Ssc игнорируется.'
         : 'Задайте ток 3ф КЗ в точке подключения или мощность КЗ сети.')
       + `</div>`);
-    h.push(field('Ток трёхфазного КЗ Ik, кА', `<input type="number" id="imp-ikka" min="0" max="200" step="0.1" value="${n.ikKA ?? 10}">`));
-    h.push(field('ИЛИ Мощность КЗ сети (Ssc), МВА', `<input type="number" id="imp-ssc" min="0" max="10000" step="1" value="${n.sscMva ?? 0}">`));
-    h.push(field('Отношение Xs/Rs', `<input type="number" id="imp-xsrs" min="0.1" max="50" step="0.1" value="${n.xsRsRatio ?? 10}">`));
+    h.push(`<div class="field">
+      <label>Ток трёхфазного КЗ Ik, кА${helpIcon('Ток 3-фазного короткого замыкания в точке подключения, из ТУ сетевой организации. Связь с мощностью КЗ: Ssc = √3 × U × Ik / 1000. Типичные значения на 10 кВ: сельская сеть 6–9 кА (Ssc 100–150 МВА), городская 12–20 кА (200–350 МВА), промышленная 29–58 кА (500–1000 МВА). Если задан Ik — Ssc игнорируется.')}</label>
+      <input type="number" id="imp-ikka" min="0" max="200" step="0.1" value="${n.ikKA ?? 10}">
+    </div>`);
+    h.push(`<div class="field">
+      <label>ИЛИ Мощность КЗ сети (Ssc), МВА${helpIcon('Альтернатива Ik. Полная мощность КЗ сети в точке подключения. Связь: Ik = Ssc / (√3 × U). Типичные значения см. в подсказке для Ik. Используется только если Ik не задан (= 0).')}</label>
+      <input type="number" id="imp-ssc" min="0" max="10000" step="1" value="${n.sscMva ?? 0}">
+    </div>`);
+    h.push(`<div class="field">
+      <label>Отношение Xs/Rs${helpIcon('Отношение реактивного к активному сопротивлению источника. Типично для городской сети 10 кВ: 10:1. Влияет на угол сдвига фазы тока КЗ.')}</label>
+      <input type="number" id="imp-xsrs" min="0.1" max="50" step="0.1" value="${n.xsRsRatio ?? 10}">
+    </div>`);
   } else {
     // Трансформатор с подключённым upstream → Ssc берётся от utility
     const hasUpstream = isTransformer && [...(state.conns?.values() || [])].some(
@@ -169,26 +178,32 @@ export function openImpedanceModal(n) {
         + `</div>`);
     }
     if (isTransformer) {
-      h.push(field('Напряжение КЗ трансформатора (Uk), %', `<input type="number" id="imp-uk" min="0" max="25" step="0.5" value="${n.ukPct ?? 4.5}">`));
-      h.push(`<div class="muted" style="font-size:10px;margin-top:-4px;line-height:1.4">`
-        + 'Uk% — из паспорта трансформатора (каталожное). Типичные значения: '
-        + '25–250 кВА → 4.0–4.5%, 400–630 кВА → 4.5–5.5%, 1000–2500 кВА → 5.5–6.0%.'
-        + `</div>`);
+      h.push(`<div class="field">
+        <label>Напряжение КЗ трансформатора (Uk), %${helpIcon('Uk% — каталожное значение из паспорта трансформатора. Определяет полное сопротивление обмоток в режиме КЗ: Z_тр = Uk × U²ном / Snom. Типичные значения по ГОСТ 11677: 25–250 кВА → 4.0–4.5%; 400–630 кВА → 4.5–5.5%; 1000–2500 кВА → 5.5–6.0%. Чем меньше Uk — тем больше ток КЗ, но меньше падение напряжения при нагрузке.')}</label>
+        <input type="number" id="imp-uk" min="0" max="25" step="0.5" value="${n.ukPct ?? 4.5}">
+      </div>`);
     } else {
-      h.push(field('Xd\'\' (сверхпереходное), о.е.', `<input type="number" id="imp-xdpp" min="0.01" max="1" step="0.01" value="${n.xdpp ?? 0.15}">`));
+      h.push(`<div class="field">
+        <label>Xd&apos;&apos; (сверхпереходное), о.е.${helpIcon('Сверхпереходное (subtransient) реактивное сопротивление генератора в относительных единицах. Определяет начальный ток КЗ (первые 5–10 мс): I_кз = U × 1.1 / (X_d&apos;&apos; × Z_base). Типичные значения для синхронных генераторов: 0.10–0.20 (явнополюсные малой/средней мощности); 0.15–0.25 (турбогенераторы).')}</label>
+        <input type="number" id="imp-xdpp" min="0.01" max="1" step="0.01" value="${n.xdpp ?? 0.15}">
+      </div>`);
     }
-    h.push(field('Отношение Xs/Rs', `<input type="number" id="imp-xsrs" min="0.1" max="50" step="0.1" value="${n.xsRsRatio ?? 10}">`));
+    h.push(`<div class="field">
+      <label>Отношение Xs/Rs${helpIcon('Отношение реактивного к активному сопротивлению источника. Для городской сети 10 кВ типично 10:1 (Xs >> Rs); для трансформатора зависит от потерь Pk; для удалённой подстанции — выше. Влияет на угол сдвига фазы тока КЗ. Чем больше — тем «индуктивнее» источник.')}</label>
+      <input type="number" id="imp-xsrs" min="0.1" max="50" step="0.1" value="${n.xsRsRatio ?? 10}">
+    </div>`);
   }
 
   if (isTransformer) {
     h.push('<h4 style="margin:16px 0 8px">Потери трансформатора</h4>');
-    h.push(field('Потери КЗ (Pk), кВт', `<input type="number" id="imp-pk" min="0" max="100" step="0.1" value="${n.pkW ?? 5.5}">`));
-    h.push(field('Потери ХХ (P0), кВт', `<input type="number" id="imp-p0" min="0" max="50" step="0.1" value="${n.p0W ?? 0.83}">`));
-    h.push(`<div class="muted" style="font-size:10px;margin-top:-4px;line-height:1.4">`
-      + 'Pk — потери короткого замыкания (нагрев обмоток при номинальном токе). '
-      + 'P0 — потери холостого хода (нагрев магнитопровода). '
-      + 'Значения из паспорта трансформатора или каталога производителя.'
-      + `</div>`);
+    h.push(`<div class="field">
+      <label>Потери КЗ (Pk), кВт${helpIcon('Pk — активные потери в опыте короткого замыкания (нагрев обмоток при номинальном токе). Из паспорта трансформатора или ГОСТ 11677. Используется для расчёта реальной нагрузки/потерь и эффективности при разной загрузке (P_loss_load = Pk × (load/Snom)²).')}</label>
+      <input type="number" id="imp-pk" min="0" max="100" step="0.1" value="${n.pkW ?? 5.5}">
+    </div>`);
+    h.push(`<div class="field">
+      <label>Потери ХХ (P0), кВт${helpIcon('P0 — активные потери холостого хода (нагрев магнитопровода). Не зависят от нагрузки — присутствуют пока трансформатор под напряжением. Из паспорта трансформатора. Влияют на годовые потери электроэнергии: W_loss = P0 × 8760 + Pk × (load/Snom)² × hours_load.')}</label>
+      <input type="number" id="imp-p0" min="0" max="50" step="0.1" value="${n.p0W ?? 0.83}">
+    </div>`);
   }
 
   if (!isTransformer && n.auxInput) {
