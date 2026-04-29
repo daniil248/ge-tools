@@ -2292,7 +2292,11 @@ function recalc() {
   for (const c of state.conns.values()) {
     const fromN = state.nodes.get(c.from.nodeId);
     if (!fromN) continue;
-    if (fromN.type !== 'panel' && fromN.type !== 'ups' && fromN.type !== 'source') {
+    // v0.59.753: 'generator' (ДГУ) добавлен в whitelist источников с
+     // отходящим автоматом. Раньше для ДГУ → JB/панель breakerIn оставался
+     // null («Не определён» в инспекторе) — а ДГУ-выход ОБЯЗАН иметь свой
+     // автомат защиты по правилам IEC 60204-1 / ГОСТ Р 50571.
+    if (fromN.type !== 'panel' && fromN.type !== 'ups' && fromN.type !== 'source' && fromN.type !== 'generator') {
       c._breakerIn = null;
       c._breakerPerLine = null;
       c._breakerCount = 0;
@@ -3275,13 +3279,21 @@ function recalc() {
   }
 
   // === ΔU — падение напряжения ===
-  // Для каждой активной связи: ΔU_seg = √3 × I × (R×cosφ + X×sinφ) × L / U × 100% (3ф)
+  // Для каждой связи: ΔU_seg = √3 × I × (R×cosφ + X×sinφ) × L / U × 100% (3ф)
   // X кабеля ≈ 0.08 мОм/м (типичное для стандартных кабелей)
+  // v0.59.753: считаем ΔU и для неактивных линий (state='powered'/'dead')
+  // — при сценариях резервирования (АВР, ДГУ-дежурство) линия может быть
+  // обесточена СЕЙЧАС, но при активации понесёт максимальную нагрузку.
+  // Юзер: «то что линия не под напряжением не значит что на ней не нужно
+  // рассчитывать падение напряжения и прочие параметры».
+  // Для активных линий используем фактический _loadA, для остальных —
+  // расчётный _maxA (по которому подбирался кабель).
   const X_PER_M = 0.00008; // Ом/м
   for (const c of state.conns.values()) {
     c._deltaUSegPct = 0;
-    if (c._state !== 'active' || !c._cableSize || !(c._loadA > 0)) continue;
-    const I = c._loadA;
+    if (!c._cableSize) continue;
+    const I = (c._state === 'active' && c._loadA > 0) ? c._loadA : (Number(c._maxA) || 0);
+    if (!(I > 0)) continue;
     const L = Number(c._cableLength || c.lengthM || 1);
     const S = Number(c._cableSize) || 1;
     const par = Math.max(1, c._cableParallel || 1);
@@ -3293,8 +3305,16 @@ function recalc() {
     const U = Number(c._voltage) || GLOBAL.voltage3ph;
     const k = c._threePhase ? Math.sqrt(3) : 2;
     c._deltaUSegPct = (k * I * (R * cos + X * sin)) / U * 100;
+    // Флаг для UI: ΔU посчитан в design-mode (по максимальной нагрузке),
+    // а не по фактическому току. Инспектор связи покажет соответствующую
+    // подсказку, чтобы юзер понимал, что это «расчётная» величина.
+    c._deltaUDesignMode = (c._state !== 'active' || !(c._loadA > 0));
   }
-  // Суммарный ΔU на каждом узле — идём от источника вниз по активным связям
+  // Суммарный ΔU на каждом узле — идём от источника вниз.
+  // v0.59.753: если узел сейчас обесточен, но имеет потенциальный фидер
+  // (state='powered'/'dead'), берём первый из них для расчёта проектной
+  // ΔU. Так юзер видит ожидаемое падение напряжения после АВР-переключения
+  // или активации ДГУ. Приоритет: 'active' → 'powered' → 'dead'.
   function nodeDeltaU(nid, visited) {
     visited = visited || new Set();
     if (visited.has(nid)) return 0;
@@ -3302,12 +3322,18 @@ function recalc() {
     const n = state.nodes.get(nid);
     if (!n) return 0;
     if (n.type === 'source' || n.type === 'generator') return 0;
-    // Ищем активный фидер (вход), через который питаемся
+    let activeFeeder = null;
+    let poweredFeeder = null;
+    let deadFeeder = null;
     for (const c of state.conns.values()) {
-      if (c.to.nodeId !== nid || c._state !== 'active') continue;
-      return nodeDeltaU(c.from.nodeId, visited) + (c._deltaUSegPct || 0);
+      if (c.to.nodeId !== nid) continue;
+      if (c._state === 'active' && !activeFeeder) activeFeeder = c;
+      else if (c._state === 'powered' && !poweredFeeder) poweredFeeder = c;
+      else if (c._state === 'dead' && !deadFeeder) deadFeeder = c;
     }
-    return 0;
+    const c = activeFeeder || poweredFeeder || deadFeeder;
+    if (!c) return 0;
+    return nodeDeltaU(c.from.nodeId, visited) + (c._deltaUSegPct || 0);
   }
   for (const n of state.nodes.values()) {
     n._deltaUPct = nodeDeltaU(n.id);

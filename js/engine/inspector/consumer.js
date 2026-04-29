@@ -434,19 +434,39 @@ export function openConsumerParamsModal(n) {
     : 'P_ном × Ки × множитель';
   // v0.59.685: подсказки расчётной нагрузки вынесены в «?» иконку.
   const _calcMainTip = `Расчётная нагрузка = P_ном × Ки × множитель сценария. I_расч = P_расч × 1000 / (U × cos φ × √3 для 3ф). При изменении расчётной P или I — пересчитается Ки. При изменении Ки / множителя / P_ном — пересчитается расчётная. Ограничение: Pрасч / Iрасч клампятся до P_ном × множитель (т.е. Ки ≤ 1) — выше номинального ввести нельзя.${_calcPerUnit ? ' Для группы суммарная Pрасч и Iрасч показываются справочно ниже.' : ''}`;
+  // v0.59.753: парные ряды Pрасч + Iрасч в режиме группы — симметрично с
+  // номинальной парой v0.59.738. Юзер: «для расчётной нагрузки сделай так
+  // же как и для номинальной, мощность группы и мощность одного».
+  //   count > 1 + uniform → ДВА ряда (группа + единица), 4 поля синх.
+  //   count === 1 / individual → ОДИН ряд (P + I per-unit).
+  const _calcGridStyle = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end';
+  const _calcGroupRow = _calcPerUnit
+    ? `<div class="field" id="cp-calcGroup-wrap" style="margin-bottom:4px;${_calcGridStyle}">
+        <div>
+          <label style="font-size:11px">Расчётная мощность всей группы, кВт</label>
+          <input type="number" id="cp-calcKwGroup" min="0" step="0.1" value="">
+        </div>
+        <div>
+          <label style="font-size:11px">Расчётный ток всей группы, А</label>
+          <input type="number" id="cp-calcAGroup" min="0" step="0.1" value="">
+        </div>
+      </div>`
+    : '';
+  const _calcUnitLabelP = _calcPerUnit ? 'Расчётная мощность каждого, кВт' : 'Расчётная мощность P, кВт';
+  const _calcUnitLabelI = _calcPerUnit ? 'Расчётный ток каждого, А' : 'Расчётный ток I, А';
   h.push(`<div style="margin-top:6px;padding:8px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px">
     <div class="muted" style="font-size:10px;margin-bottom:4px;font-weight:600;color:#0369a1">📊 Расчётная нагрузка = ${_calcHeader}${helpIcon(_calcMainTip)}</div>
-    <div class="field" style="margin-bottom:4px">
-      <label style="font-size:11px">Расчётная мощность P, кВт</label>
-      <input type="number" id="cp-calcKw" min="0" step="0.1" value="">
+    ${_calcGroupRow}
+    <div class="field" style="margin-bottom:0;${_calcGridStyle}">
+      <div>
+        <label style="font-size:11px">${_calcUnitLabelP}</label>
+        <input type="number" id="cp-calcKw" min="0" step="0.1" value="">
+      </div>
+      <div>
+        <label style="font-size:11px">${_calcUnitLabelI}</label>
+        <input type="number" id="cp-calcA" min="0" step="0.1" value="">
+      </div>
     </div>
-    <div class="field" style="margin-bottom:0">
-      <label style="font-size:11px">Расчётный ток I, А</label>
-      <input type="number" id="cp-calcA" min="0" step="0.1" value="">
-    </div>
-    ${_calcPerUnit
-      ? `<div class="muted" id="cp-calcGroupHint" style="font-size:10px;margin-top:4px;color:#0369a1;font-weight:600">Для группы (справочно): P_расч_группы = <span id="cp-calcKwGroup">—</span> кВт · I_расч_группы = <span id="cp-calcAGroup">—</span> А</div>`
-      : ''}
   </div>`);
   // v0.59.657: methodology-aware inrush label с «?» иконкой подсказки.
   if (isTermUsed('inrush', _method)) {
@@ -972,123 +992,106 @@ export function openConsumerParamsModal(n) {
     if (countInput) countInput.addEventListener('change', _refreshAll);
   }
 
-  // v0.59.652: блок «Расчётная нагрузка» — двунаправленный пересчёт
-  // P_calc ↔ Ки и P_calc ↔ I_calc.
+  // v0.59.753: «Расчётная нагрузка» — теперь парные ряды (группа + единица)
+  // в режиме count > 1 + uniform, симметрично с номинальным блоком v0.59.738.
+  // Юзер: «для расчётной нагрузки сделай так же как и для номинальной,
+  // мощность группы и мощность одного».
+  //   Канонический источник: Pcalc_unit (cp-calcKw).
+  //   Производные: Icalc_unit (= _PtoI(Pcalc_unit)),
+  //                Pcalc_group = Pcalc_unit × N,
+  //                Icalc_group = Icalc_unit × N.
+  //   Clamp: Pcalc_unit ≤ Pnom_unit × LF (Ки ≤ 1); Pcalc_group ≤ Pnom_group × LF.
   const calcKwInput = document.getElementById('cp-calcKw');
   const calcAInput = document.getElementById('cp-calcA');
+  const calcKwGroupInput = document.getElementById('cp-calcKwGroup');
+  const calcAGroupInput  = document.getElementById('cp-calcAGroup');
   const kuInput = document.getElementById('cp-kUse');
   const lfInput = document.getElementById('cp-loadFactor') || document.getElementById('cp-normalLoadFactor');
   const countInputForCalc = document.getElementById('cp-count');
   if (calcKwInput && kuInput) {
     let _calcSyncing = false;
     const _readCount = () => Math.max(1, Number(countInputForCalc?.value) || 1);
-    // v0.59.663: «Расчётная нагрузка» считается в режиме отображения, который
-    // выбран в loadSpec. Юзер: «расчётная мощность указывается для одного
-    // потребителя и справочно выводится для группы, если не используется
-    // указание мощности всех нагрузок одним числом».
-    //   loadSpec='per-unit' (по умолчанию) → P_calc / I_calc на 1 ед.;
-    //                                         P_calc_group выводится справочно
-    //   loadSpec='total'                  → P_calc / I_calc на всю группу
-    //                                         (юзер уже ввёл сумму)
-    const _isLoadSpecTotal = () => (loadSpecSel?.value === 'total');
-    const _readPnomDisplay = () => Number(demandInput?.value) || 0; // в текущем режиме UI
+    const _readPnomUnit = () => Number(demandInput?.value) || 0; // всегда per-unit с v0.59.738
     const _readKu = () => Math.max(0, Math.min(1, Number(kuInput.value) || 0));
     const _readLf = () => Math.max(0, Math.min(3, Number(lfInput?.value) || 1));
-    const _calcGroupKwSpan = document.getElementById('cp-calcKwGroup');
-    const _calcGroupASpan  = document.getElementById('cp-calcAGroup');
+    const _fmtCalc = (v) => v > 0 ? v.toFixed(2).replace(/\.00$/, '') : '';
+    // Распространяет от канонического Pcalc_unit на все 4 поля.
+    const _propFromCalcUnit = (PcalcUnit) => {
+      const cnt = _readCount();
+      const IcalcUnit = _PtoI(PcalcUnit);
+      calcKwInput.value = _fmtCalc(PcalcUnit);
+      if (calcAInput) calcAInput.value = _fmtCalc(IcalcUnit);
+      if (calcKwGroupInput) calcKwGroupInput.value = _fmtCalc(PcalcUnit * cnt);
+      if (calcAGroupInput) calcAGroupInput.value = _fmtCalc(IcalcUnit * cnt);
+    };
+    // Полный recompute из формулы Pnom × Ku × LF — например, при смене Ku/LF/Pnom/count.
     const _refreshCalc = () => {
       if (_calcSyncing) return;
       _calcSyncing = true;
       try {
-        const PnomDisp = _readPnomDisplay(); // = P на 1 ед. ИЛИ P группы (по loadSpec)
+        const PnomUnit = _readPnomUnit();
         const ku = _readKu();
         const lf = _readLf();
-        const Pcalc = PnomDisp * ku * lf;
-        calcKwInput.value = Pcalc > 0 ? Pcalc.toFixed(2).replace(/\.00$/, '') : '';
-        const Icalc = _PtoI(Pcalc);
-        if (calcAInput) calcAInput.value = Icalc > 0 ? Icalc.toFixed(2).replace(/\.00$/, '') : '';
-        // Справочно для группы — только если режим per-unit и count > 1.
-        const cnt = _readCount();
-        if (cnt > 1 && _calcGroupKwSpan) {
-          const PcalcGroup = Pcalc * cnt;
-          const IcalcGroup = _PtoI(PcalcGroup);
-          _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
-          if (_calcGroupASpan) _calcGroupASpan.textContent = IcalcGroup > 0 ? IcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
-        }
+        const PcalcUnit = PnomUnit * ku * lf;
+        _propFromCalcUnit(PcalcUnit);
       } finally { _calcSyncing = false; }
     };
-    // v0.59.745: clamp Pcalc/Icalc до номинальных (×LF). Юзер: «в расчётной
-    // мощности и токе запретить выбирать значения выше номинальных». Раньше
-    // при вводе Pcalc выше Pном×LF сама величина оставалась в поле, а
-    // Ки клампился до 1 — получалась рассинхронизация (показано P_расч=0.4
-    // при P_ном=0.21 LF=1, хотя Ки уже =1). Теперь:
-    //   max Pcalc = Pnom × LF  (соответствует Ki=1)
-    //   max Icalc = _PtoI(max Pcalc)
-    // Если юзер ввёл выше — поле клампится до max + Ki=1.
-    const _writeCalcGroupSpans = (Pcalc) => {
-      const cnt = _readCount();
-      if (cnt > 1 && _calcGroupKwSpan) {
-        const PcalcGroup = Pcalc * cnt;
-        const IcalcGroup = _PtoI(PcalcGroup);
-        _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
-        if (_calcGroupASpan) _calcGroupASpan.textContent = IcalcGroup > 0 ? IcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
+    // Применяет clamp Pcalc_unit ≤ Pnom_unit × LF и обновляет Ku.
+    const _applyCalcUnitP = (PcalcUnitWanted) => {
+      const PnomUnit = _readPnomUnit();
+      const lf = _readLf();
+      const Pmax = PnomUnit * lf;
+      const PcalcUnit = (PnomUnit > 0 && lf > 0)
+        ? Math.max(0, Math.min(PcalcUnitWanted, Pmax))
+        : Math.max(0, PcalcUnitWanted);
+      if (PnomUnit > 0 && lf > 0) {
+        const newKu = PcalcUnit / (PnomUnit * lf);
+        kuInput.value = Math.max(0, Math.min(1, newKu)).toFixed(3).replace(/\.?0+$/, '');
       }
+      _propFromCalcUnit(PcalcUnit);
     };
-    // Юзер ввёл расчётную P → пересчитать Ки.
-    // Pcalc и Pnom оба в режиме per-unit — Ки = Pcalc / (Pnom × LF), Pcalc ≤ Pnom × LF.
+    // Юзер ввёл Pcalc_unit (cp-calcKw)
     calcKwInput.addEventListener('input', () => {
       if (_calcSyncing) return;
       _calcSyncing = true;
-      try {
-        const PnomDisp = _readPnomDisplay();
-        const lf = _readLf();
-        const Pmax = PnomDisp * lf; // максимум при Ki=1
-        let Pcalc = Number(calcKwInput.value) || 0;
-        // Cap до номинальной × LF
-        if (PnomDisp > 0 && lf > 0 && Pcalc > Pmax) {
-          Pcalc = Pmax;
-          calcKwInput.value = Pmax > 0 ? Pmax.toFixed(2).replace(/\.00$/, '') : '';
-        }
-        if (PnomDisp > 0 && lf > 0) {
-          const newKu = Pcalc / (PnomDisp * lf);
-          kuInput.value = Math.max(0, Math.min(1, newKu)).toFixed(3).replace(/\.?0+$/, '');
-        }
-        // I_calc — синхронизируем (с уже clamped Pcalc)
-        const Icalc = _PtoI(Pcalc);
-        if (calcAInput) calcAInput.value = Icalc > 0 ? Icalc.toFixed(2).replace(/\.00$/, '') : '';
-        _writeCalcGroupSpans(Pcalc);
-      } finally { _calcSyncing = false; }
+      try { _applyCalcUnitP(Number(calcKwInput.value) || 0); }
+      finally { _calcSyncing = false; }
     });
-    // Юзер ввёл расчётный I → P_calc → Ки. С clamping до номинального тока.
+    // Юзер ввёл Icalc_unit (cp-calcA) — обратная Pcalc_unit
     if (calcAInput) calcAInput.addEventListener('input', () => {
       if (_calcSyncing) return;
       _calcSyncing = true;
       try {
-        const PnomDisp = _readPnomDisplay();
-        const lf = _readLf();
-        const Pmax = PnomDisp * lf;
-        const Imax = _PtoI(Pmax); // верхняя граница Icalc
-        let a = Number(calcAInput.value) || 0;
-        // Cap до номинального тока × LF
-        if (Imax > 0 && a > Imax) {
-          a = Imax;
-          calcAInput.value = Imax.toFixed(2).replace(/\.00$/, '');
-        }
-        const Pcalc = _ItoP(a);
-        calcKwInput.value = Pcalc > 0 ? Pcalc.toFixed(2).replace(/\.00$/, '') : '';
-        if (PnomDisp > 0 && lf > 0) {
-          const newKu = Pcalc / (PnomDisp * lf);
-          kuInput.value = Math.max(0, Math.min(1, newKu)).toFixed(3).replace(/\.?0+$/, '');
-        }
-        _writeCalcGroupSpans(Pcalc);
+        const I = Number(calcAInput.value) || 0;
+        _applyCalcUnitP(_ItoP(I));
       } finally { _calcSyncing = false; }
     });
-    // При изменении Ки / множителя / P_ном / count — пересчитать P_calc.
-    // v0.59.744: loadSpec-селектор удалён.
+    // Юзер ввёл Pcalc_group → Pcalc_unit = P_group / N
+    if (calcKwGroupInput) calcKwGroupInput.addEventListener('input', () => {
+      if (_calcSyncing) return;
+      _calcSyncing = true;
+      try {
+        const cnt = _readCount();
+        const Pgroup = Number(calcKwGroupInput.value) || 0;
+        _applyCalcUnitP(cnt > 0 ? Pgroup / cnt : 0);
+      } finally { _calcSyncing = false; }
+    });
+    // Юзер ввёл Icalc_group → Pcalc_unit = _ItoP(I_group / N)
+    if (calcAGroupInput) calcAGroupInput.addEventListener('input', () => {
+      if (_calcSyncing) return;
+      _calcSyncing = true;
+      try {
+        const cnt = _readCount();
+        const Igroup = Number(calcAGroupInput.value) || 0;
+        _applyCalcUnitP(_ItoP(cnt > 0 ? Igroup / cnt : 0));
+      } finally { _calcSyncing = false; }
+    });
+    // Реакция на смену Ки / LF / Pnom_unit / count — пересчитать всё.
     kuInput.addEventListener('input', _refreshCalc);
     if (lfInput) lfInput.addEventListener('input', _refreshCalc);
     if (demandInput) demandInput.addEventListener('input', _refreshCalc);
     if (countInputForCalc) countInputForCalc.addEventListener('change', _refreshCalc);
+    if (countInputForCalc) countInputForCalc.addEventListener('input', _refreshCalc);
     // Инициализация при открытии формы.
     _refreshCalc();
   }
