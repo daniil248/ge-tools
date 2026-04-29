@@ -364,14 +364,24 @@ function _preserveLocalDisplay(remoteScheme) {
   try {
     const st = window.Raschet?._state;
     if (!st) return remoteScheme;
+    // v0.59.650: синхронизируем live state.view → state.pages[current].view
+    // ПЕРЕД построением localViews. Иначе используется устаревший
+    // pages[i].view (последний раз обновлённый при serialize) → юзер
+    // получает «вид сбрасывается» при ремот-апдейтах.
+    // Юзер: «у второго пользователя вид сбрасывается на неопределённый,
+    // каждый раз в одно место, возможно в ноль».
+    if (Array.isArray(st.pages) && st.currentPageId && st.view) {
+      const curPage = st.pages.find(p => p && p.id === st.currentPageId);
+      if (curPage) curPage.view = { ...st.view };
+    }
     for (const f of DISPLAY_ONLY_FIELDS) {
       if (st[f] !== undefined) remoteScheme[f] = st[f];
     }
-    // Также сохраняем per-page view
+    // Также сохраняем per-page view (включая только что засинхренный current).
     if (Array.isArray(remoteScheme.pages) && Array.isArray(st.pages)) {
       const localViews = new Map(st.pages.map(p => [p.id, p.view]));
       for (const p of remoteScheme.pages) {
-        if (localViews.has(p.id)) p.view = localViews.get(p.id);
+        if (localViews.has(p.id) && localViews.get(p.id)) p.view = localViews.get(p.id);
       }
     }
   } catch (e) { console.warn('[preserveLocalDisplay]', e); }
