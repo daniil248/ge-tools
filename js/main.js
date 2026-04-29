@@ -3265,12 +3265,14 @@ function renderCableTable() {
   const fLabel = (F.label || '').toLowerCase();
   const fFromTo = (F.fromTo || '').toLowerCase();
   const fCategory = F.category || '';
-  const filtered = conns.filter(c => {
-    if (cls === 'HV' && !c._isHV) return false;
-    if (cls === 'DC' && !c._isDC) return false;
-    if (cls === 'LV' && (c._isHV || c._isDC)) return false;
-    // Phase 1.20.7: фильтр по категории кабеля (силовой/слаботочный/…)
-    if (fCategory) {
+  // v0.59.648: cross-filter — каждый dropdown собирает distinct-значения из
+  // строк, прошедших ВСЕ ОСТАЛЬНЫЕ фильтры (но не свой). Юзер-memory:
+  // «опции каждого select зависят от значений всех остальных фильтров».
+  const _cablePasses = (c, exceptKey) => {
+    if (exceptKey !== 'class' && cls === 'HV' && !c._isHV) return false;
+    if (exceptKey !== 'class' && cls === 'DC' && !c._isDC) return false;
+    if (exceptKey !== 'class' && cls === 'LV' && (c._isHV || c._isDC)) return false;
+    if (exceptKey !== 'category' && fCategory) {
       const rec = c.cableMark ? allMarks.find(m => m.id === c.cableMark) : null;
       const catVal = rec?.category || (c._isHV ? 'hv' : (c._isDC ? 'dc' : 'power'));
       if (catVal !== fCategory) return false;
@@ -3282,27 +3284,25 @@ function renderCableTable() {
         .filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (fLabel && !String(c.lineLabel || '').toLowerCase().includes(fLabel)
+    if (exceptKey !== 'label' && fLabel
+        && !String(c.lineLabel || '').toLowerCase().includes(fLabel)
         && !`${_ctNodeTag(fromN)}-${_ctNodeTag(toN)}`.toLowerCase().includes(fLabel)) {
       return false;
     }
-    if (fFromTo) {
+    if (exceptKey !== 'fromTo' && fFromTo) {
       const ft = `${_ctNodeTag(fromN)} ${_ctNodeTag(toN)}`.toLowerCase();
       if (!ft.includes(fFromTo)) return false;
     }
-    // Phase 1.20.2: марка / проводник / способ — equality с distinct
-    // значениями из dropdown (значение filter — либо brand из справочника,
-    // либо id марки; поддерживаем оба).
-    if (fMark) {
+    if (exceptKey !== 'mark' && fMark) {
       const rec = allMarks.find(m => m.id === c.cableMark);
       const brand = (rec?.brand || c.cableMark || '(без марки)').toLowerCase();
       if (brand !== fMark && (c.cableMark || '').toLowerCase() !== fMark) return false;
     }
-    if (fMethod) {
+    if (exceptKey !== 'method' && fMethod) {
       const method = String(c._cableMethod || c.installMethod || '').toLowerCase();
       if (method !== fMethod) return false;
     }
-    if (fCond) {
+    if (exceptKey !== 'conductor' && fCond) {
       const cores = c._wireCount || (c._isHV ? 3 : (c._threePhase ? 5 : 3));
       const size = c._cableSize || '?';
       const n = Number(c._neutralSizeMm2) || 0;
@@ -3313,26 +3313,30 @@ function renderCableTable() {
           : `${cores}×${size} мм²`).toLowerCase();
       if (spec !== fCond) return false;
     }
-    if (F.parallel != null) {
-      if (Math.max(1, Number(c._cableParallel) || 1) !== F.parallel) return false;
-    }
-    if (F.breaker != null) {
+    if (exceptKey !== 'parallel' && F.parallel != null
+        && Math.max(1, Number(c._cableParallel) || 1) !== F.parallel) return false;
+    if (exceptKey !== 'breaker' && F.breaker != null) {
       const inNom = Number(c.manualBreakerIn) || Number(c._breakerIn) || 0;
       if (inNom !== F.breaker) return false;
     }
-    if (F.curve) {
+    if (exceptKey !== 'curve' && F.curve) {
       const curveVal = String(c.breakerCurve || c._breakerCurveEff || '').toUpperCase();
       if (curveVal !== F.curve) return false;
     }
-    if (F.status && _ctConnStatus(c) !== F.status) return false;
+    if (exceptKey !== 'status' && F.status && _ctConnStatus(c) !== F.status) return false;
     const L = Number(c.lengthM) || 0;
     if (F.lengthMin != null && L < F.lengthMin) return false;
     if (F.lengthMax != null && L > F.lengthMax) return false;
     const Imax = Number(c._maxA) || 0;
     if (F.imaxMin != null && Imax < F.imaxMin) return false;
     if (F.imaxMax != null && Imax > F.imaxMax) return false;
+    // v0.59.636/648: фильтры по материалу / изоляции / bundling.
+    if (exceptKey !== 'material' && F.material && (c.material || '') !== F.material) return false;
+    if (exceptKey !== 'insulation' && F.insulation && (c.insulation || '') !== F.insulation) return false;
+    if (exceptKey !== 'bundling' && F.bundling && (c.bundling || '') !== F.bundling) return false;
     return true;
-  });
+  };
+  const filtered = conns.filter(c => _cablePasses(c, ''));
   // Чистим selected от id'шников которые ушли из выборки
   for (const id of [..._cableTableSelected]) {
     if (!filtered.find(c => c.id === id)) _cableTableSelected.delete(id);
@@ -3394,32 +3398,52 @@ function renderCableTable() {
   const distinctMethods = new Set();
   const distinctBreakers = new Set();     // номиналы In, А
   const distinctCurves = new Set();       // типы/кривые автоматов
+  // v0.59.648: cross-filter — каждый dropdown собирает distinct-значения из
+  // строк, прошедших ВСЕ ОСТАЛЬНЫЕ фильтры. Для каждой связи проверяем
+  // _cablePasses(c, exceptKey) с тем ключом, который сейчас собираем.
   for (const c of conns) {
-    if (c.cableMark) {
-      const rec = allMarks.find(m => m.id === c.cableMark);
-      distinctMarks.add(rec?.brand || c.cableMark);
-    } else {
-      distinctMarks.add('(без марки)');
+    // Mark
+    if (_cablePasses(c, 'mark')) {
+      if (c.cableMark) {
+        const rec = allMarks.find(m => m.id === c.cableMark);
+        distinctMarks.add(rec?.brand || c.cableMark);
+      } else {
+        distinctMarks.add('(без марки)');
+      }
     }
-    if (c._busbarNom) {
-      distinctConductors.add(`шинопровод ${c._busbarNom} А`);
-    } else {
-      const cores = c._wireCount || (c._isHV ? 3 : (c._threePhase ? 5 : 3));
-      const size = c._cableSize || '?';
-      // Phase 1.20.3: reduced-neutral нотация «3×95 + 1×50» когда N меньше L
-      const n = Number(c._neutralSizeMm2) || 0;
-      const spec = (n > 0 && n < Number(size))
-        ? `${cores - 1}×${size} + 1×${n} мм²`
-        : `${cores}×${size} мм²`;
-      distinctConductors.add(spec);
+    // Conductor
+    if (_cablePasses(c, 'conductor')) {
+      if (c._busbarNom) {
+        distinctConductors.add(`шинопровод ${c._busbarNom} А`);
+      } else {
+        const cores = c._wireCount || (c._isHV ? 3 : (c._threePhase ? 5 : 3));
+        const size = c._cableSize || '?';
+        const n = Number(c._neutralSizeMm2) || 0;
+        const spec = (n > 0 && n < Number(size))
+          ? `${cores - 1}×${size} + 1×${n} мм²`
+          : `${cores}×${size} мм²`;
+        distinctConductors.add(spec);
+      }
     }
-    distinctParallels.add(Math.max(1, Number(c._cableParallel) || 1));
-    const m = c._cableMethod || c.installMethod;
-    if (m) distinctMethods.add(m);
-    const inNom = Number(c.manualBreakerIn) || Number(c._breakerIn) || 0;
-    distinctBreakers.add(inNom);
-    const cv = String(c.breakerCurve || c._breakerCurveEff || '').toUpperCase();
-    if (cv) distinctCurves.add(cv);
+    // Parallel
+    if (_cablePasses(c, 'parallel')) {
+      distinctParallels.add(Math.max(1, Number(c._cableParallel) || 1));
+    }
+    // Method
+    if (_cablePasses(c, 'method')) {
+      const m = c._cableMethod || c.installMethod;
+      if (m) distinctMethods.add(m);
+    }
+    // Breaker
+    if (_cablePasses(c, 'breaker')) {
+      const inNom = Number(c.manualBreakerIn) || Number(c._breakerIn) || 0;
+      distinctBreakers.add(inNom);
+    }
+    // Curve
+    if (_cablePasses(c, 'curve')) {
+      const cv = String(c.breakerCurve || c._breakerCurveEff || '').toUpperCase();
+      if (cv) distinctCurves.add(cv);
+    }
   }
   const sortedMarks = [...distinctMarks].sort((a, b) => a.localeCompare(b, 'ru'));
   const sortedConductors = [...distinctConductors].sort((a, b) => {
