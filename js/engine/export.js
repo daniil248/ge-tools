@@ -105,6 +105,15 @@ export function initToolbar() {
         + 'может быть привязана к разным проектам. Чтобы синхронизировать — используйте '
         + '«Экспорт JSON» в карточке проекта и «Импорт» на другом устройстве. '
         + 'Cloud-sync каталога и проектов — Фаза 5.5.';
+      // v0.59.743: cloud-схема (window.Raschet.currentProjectName) — отдельный
+      // концепт от локального активного проекта. Показываем РАССИНХРОН, если
+      // оба заданы и не совпадают, чтобы юзер не путался: «то Qarmet, то СКС».
+      const cloudSchemeName = (window.Raschet?.currentProjectName) || '';
+      const cloudSchemeId = (window.Raschet?.currentProjectId) || '';
+      const isMismatch = cloudSchemeName && pid && pid !== cloudSchemeId;
+      const mismatchNote = isMismatch
+        ? ` <span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:3px;font-size:10px" title="Cloud-схема и локальный активный проект — разные. Cloud влияет на схему/коллаб, локальный — на каталоги/scoping. Если хотите свести — открой ${cloudSchemeName.replace(/[<>&"]/g,'')} через /projects/ или поменяй локальный активный.">⚠ ≠ cloud</span>`
+        : '';
       if (key === 'raschet.scheme') {
         badge.innerHTML = '<span style="color:#b91c1c">⚠ Вне проекта</span> · <a href="projects/" style="color:#1565c0">выбрать проект →</a> <span title="' + hint.replace(/"/g,'&quot;') + '" style="cursor:help;color:#94a3b8">ⓘ</span>';
       } else if (pkind === 'sketch') {
@@ -113,9 +122,9 @@ export function initToolbar() {
         // своему мастеру (ownerModule) и засоряется его данными.
         const ownerHint = powner ? ' (модуль: ' + powner.replace(/[<>&"]/g,'') + ')' : '';
         const warn = 'Сейчас активен мини-проект' + ownerHint + '. Главный Конструктор рассчитан на полноценный проект. Перейдите в /projects/ и активируйте настоящий проект (или создайте новый).';
-        badge.innerHTML = '<span style="color:#b45309">🧪 Мини-проект: <b>' + (pname ? pname.replace(/[<>&"]/g,'') : pid) + '</b></span> · <a href="projects/" style="color:#1565c0">выбрать полноценный →</a> <span title="' + warn.replace(/"/g,'&quot;') + '" style="cursor:help;color:#94a3b8">ⓘ</span>';
+        badge.innerHTML = '<span style="color:#b45309">🧪 Мини-проект: <b>' + (pname ? pname.replace(/[<>&"]/g,'') : pid) + '</b></span>' + mismatchNote + ' · <a href="projects/" style="color:#1565c0">выбрать полноценный →</a> <span title="' + warn.replace(/"/g,'&quot;') + '" style="cursor:help;color:#94a3b8">ⓘ</span>';
       } else {
-        badge.innerHTML = '📁 Проект: <b>' + (pname ? pname.replace(/[<>&"]/g,'') : pid) + '</b> · <a href="projects/" style="color:#1565c0">сменить →</a> <span title="' + hint.replace(/"/g,'&quot;') + '" style="cursor:help;color:#94a3b8">ⓘ</span>';
+        badge.innerHTML = '📁 Проект: <b>' + (pname ? pname.replace(/[<>&"]/g,'') : pid) + '</b>' + mismatchNote + ' · <a href="projects/" style="color:#1565c0">сменить →</a> <span title="' + hint.replace(/"/g,'&quot;') + '" style="cursor:help;color:#94a3b8">ⓘ</span>';
       }
       badge.title = hint;
     }
