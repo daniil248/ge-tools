@@ -1819,6 +1819,28 @@ window.__raschetOpenProjectParams = function() { openProjectParamsModal(); };
 
 window.__raschetOpenProjectInfo = function() { openProjectInfoModal(); };
 
+// v0.59.715: программное открытие модалки отчётов с опциональным
+// выделением конкретной секции (по id, например 'checks'). Используется
+// из чеклиста проектирования в правом сайдбаре.
+window.__raschetOpenReports = function(sectionId) {
+  try {
+    openReportsModal();
+    // Если указан id раздела — найти и кликнуть по элементу в списке
+    // (выделит конкретный отчёт в каталоге).
+    if (sectionId && els.reportsList) {
+      setTimeout(() => {
+        const item = els.reportsList.querySelector(`[data-report-id="${sectionId}"]`);
+        if (item && typeof item.click === 'function') {
+          // Скроллим к элементу и подсвечиваем; click — если есть hover-эффект.
+          item.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          item.style.background = '#fff7ed';
+          setTimeout(() => { item.style.background = ''; }, 1500);
+        }
+      }, 120);
+    }
+  } catch (e) { console.warn('[openReports]', e); }
+};
+
 function openProjectInfoModal() {
   const pi = (window.Raschet?._state?.project) || {};
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
@@ -2689,6 +2711,9 @@ function renderReportsList() {
     const tplName = tplRec ? tplRec.name : '—';
     const item = document.createElement('div');
     item.className = 'rpt-item';
+    // v0.59.715: data-report-id для программного выделения раздела
+    // через window.__raschetOpenReports(sectionId).
+    if (sec.id) item.setAttribute('data-report-id', sec.id);
     const main = document.createElement('div');
     main.className = 'rpt-item__main';
     const title = document.createElement('div');
