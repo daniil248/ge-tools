@@ -26,6 +26,7 @@ import { getCableType } from '../../shared/cable-types-catalog.js';
 import { pricesForElement } from '../../shared/price-records.js';
 import { listElements } from '../../shared/element-library.js';
 import { listShipments, getWarehouse, SHIPMENT_MODES, SHIPMENT_STATUSES } from '../../shared/logistics-schemas.js';
+import { getTerm } from '../methods/terms.js';
 
 // ——— общие хелперы ———
 function fullTag(n) { if (!n) return ''; return effectiveTag(n) || n.tag || ''; }
@@ -389,6 +390,12 @@ function sectionUps() {
 // 3. ЩИТЫ
 function sectionPanels() {
   const items = collectPanels();
+  // v0.59.669: methodology-aware названия колонок «Ксим» и «cos φ» —
+  // в IEC «Ксим» переводится в k_s (diversity factor), в ПУЭ остаётся «Ко».
+  // cos φ в IEC = «PF» (power factor).
+  const _mid = GLOBAL.calcMethod || 'iec';
+  const _ksimShort = getTerm('simultaneity', _mid).short || 'Ксим';
+  const _cosShort = getTerm('powerFactor', _mid).short || 'cos φ';
   const cols = [
     { label: 'Обозн.',      width: 18 },
     { label: 'Имя',         width: 35 },
@@ -396,8 +403,8 @@ function sectionPanels() {
     { label: 'Вх/Вых',      align: 'center', width: 14 },
     { label: 'Pрасч, кВт',  align: 'right', width: 18 },
     { label: 'Iрасч, А',    align: 'right', width: 14 },
-    { label: 'Ксим',        align: 'right', width: 12 },
-    { label: 'cos φ',       align: 'right', width: 12 },
+    { label: _ksimShort,    align: 'right', width: 12 },
+    { label: _cosShort,     align: 'right', width: 12 },
     { label: 'Режим' },
   ];
   const rows = items.map(p => {
@@ -433,7 +440,7 @@ function sectionPanels() {
     blocks.push(B.h2('Состав щитов'));
     blocks.push(B.table(blockCols(cols), rows));
     blocks.push(B.paragraph(
-      'Ксим — коэффициент одновременности (совпадения максимумов). ' +
+      `${_ksimShort} — ${getTerm('simultaneity', _mid).explain || 'коэффициент одновременности'}. ` +
       'Режим: ЩИТ — обычный ввод, АВР — автоматическое включение резерва, РУЧН — ручное переключение.'
     ));
   } else {
@@ -534,6 +541,9 @@ function sectionRtm() {
 // 4. ПОТРЕБИТЕЛИ
 function sectionConsumers() {
   const items = collectConsumers();
+  // v0.59.669: methodology-aware заголовок «cos φ».
+  const _midC = GLOBAL.calcMethod || 'iec';
+  const _cosShortC = getTerm('powerFactor', _midC).short || 'cos φ';
   const cols = [
     { label: 'Обозн.',       width: 18 },
     { label: 'Имя',          width: 38 },
@@ -541,7 +551,7 @@ function sectionConsumers() {
     { label: 'Pед, кВт',     align: 'right', width: 14 },
     { label: 'Кол.',         align: 'right', width: 10 },
     { label: 'Pрасч, кВт',   align: 'right', width: 16 },
-    { label: 'cos φ',        align: 'right', width: 12 },
+    { label: _cosShortC,     align: 'right', width: 12 },
     { label: 'Iуст, А',      align: 'right', width: 12 },
     { label: 'Iрасч, А',     align: 'right', width: 12 },
     { label: 'Iпуск, А',     align: 'right', width: 12 },
