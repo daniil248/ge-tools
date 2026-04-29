@@ -435,7 +435,7 @@ function _renderGenIsoBlock(n) {
   h.push('Стандарт <b>ISO 8528-1:2018</b> определяет 5 режимов работы ДГУ. ');
   h.push('Сортировка ниже — по нарастанию рейтинга: COP &lt; DCC ≈ PRP &lt; LTP &lt; ESP. ');
   h.push('У каждого режима свой допустимый рейтинг по kW и kVA — заполните по табличке производителя. ');
-  h.push('Программа проверяет достаточность по <b>обоим</b> (kW + kVA) против worst-case нагрузки.');
+  h.push('Программа проверяет достаточность по <b>обоим</b> (kW + kVA) против наиболее тяжёлого режима нагрузки.');
   h.push('</div>');
 
   let opts = '';
@@ -519,7 +519,7 @@ function _renderGenIsoBlock(n) {
     status = 'нет downstream-нагрузки на ДГУ'; color = '#6b7280';
   }
   h.push(`<div style="margin-top:10px;padding:8px 10px;background:#f0f9ff;border-radius:4px;font-size:11px;line-height:1.7">
-    <b>Проверка достаточности по worst-case (макс. сценарий нагрузки):</b><br>
+    <b>Проверка достаточности по наиболее тяжёлому режиму нагрузки:</b><br>
     Нагрузка (все ИБП в байпасе): <b>${Pmax.toFixed(2)} kW</b> · <b>${Smax.toFixed(2)} kVA</b> <span class="muted">(cos φ ${cosW.toFixed(3)})</span><br>
     Рейтинг ${escHtml(curMode)}: <b>${ratedKw ? ratedKw.toFixed(0) : '—'} kW</b> · <b>${ratedKva ? ratedKva.toFixed(0) : '—'} kVA</b><br>
     Загрузка: kW <b>${(utilP * 100).toFixed(0)}%</b> · kVA <b>${(utilS * 100).toFixed(0)}%</b> → max <b>${(util * 100).toFixed(0)}%</b><br>
@@ -1177,7 +1177,7 @@ export function sourceStatusBlock(n) {
       const sW = Number(n._powerSWorst) || 0;
       const aW = Number(n._loadAWorst) || 0;
       const qDelta = Math.abs((Number(n._powerQWorst) || 0) - (Number(n._powerQ) || 0));
-      parts.push(`<span style="color:#c2410c"><b>В байпасе ИБП</b> (worst-case для УРКМ/ДГУ):</span>`);
+      parts.push(`<span style="color:#c2410c"><b>В байпасе ИБП</b> (наиболее тяжёлый режим — для УРКМ и подбора ДГУ):</span>`);
       parts.push(`&nbsp;&nbsp;${fmt(pW)} kW · ${fmt(aW)} A · Q ${fmt(qW)} kvar · S <b>${fmt(sW)} kVA</b> · cos φ <b>${cosW.toFixed(2)}</b>${qDelta < 0.05 ? ' <span class="muted">(совпадает с текущим)</span>' : ''}`);
     }
     // v0.59.627/631: для генератора — статус достаточности по worst-case
