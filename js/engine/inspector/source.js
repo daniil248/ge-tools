@@ -104,14 +104,18 @@ export function openImpedanceModal(n) {
   }
 
   const outIdx = (typeof n.voltageLevelIdx === 'number') ? n.voltageLevelIdx : 0;
-  h.push(field(isTransformer ? 'Выходное напряжение (вторичная обмотка)' : 'Выходное напряжение',
-    `<select id="imp-voltage-out">${voltageLevelOptions(outIdx, null)}</select>`));
+  // v0.59.700: helpIcon на полях напряжения и группы соединений.
+  h.push(`<div class="field">
+    <label>${isTransformer ? 'Выходное напряжение (вторичная обмотка)' : 'Выходное напряжение'}${helpIcon('Класс напряжения на выходе источника. Для трансформатора — вторичная (низшая) сторона. Стандартные классы по IEC 60038: 0.4 кВ (400/230 В) — для распределительных сетей; 6/10/35 кВ — среднее напряжение; 110/220 кВ — высокое.')}</label>
+    <select id="imp-voltage-out">${voltageLevelOptions(outIdx, null)}</select>
+  </div>`);
 
   if (isTransformer) {
     // Группа соединений обмоток (IEC 60076-1)
     const vg = n.vectorGroup || 'Dyn11';
-    h.push(field('Группа соединений обмоток',
-      `<select id="imp-vectorGroup">
+    h.push(`<div class="field">
+      <label>Группа соединений обмоток${helpIcon('IEC 60076-1: схема соединения первичной/вторичной обмоток + сдвиг фаз. Dyn11 (Δ/Y-н, сдвиг 330°) — стандарт для силовых ТП 6–10/0.4 кВ; Yyn0 (Y/Y-н) — симметричные нагрузки без 3-й гармоники; Dzn0 (Δ/зигзаг-н) — несимметричные нагрузки с малым током КЗ; YNd11 — для повышающих ТП.')}</label>
+      <select id="imp-vectorGroup">
         <option value="Dyn11"${vg === 'Dyn11' ? ' selected' : ''}>Dyn11 — Δ/Y-н (треугольник / звезда с нейтралью)</option>
         <option value="Yyn0"${vg === 'Yyn0' ? ' selected' : ''}>Yyn0 — Y/Y-н (звезда / звезда с нейтралью)</option>
         <option value="Dyn5"${vg === 'Dyn5' ? ' selected' : ''}>Dyn5 — Δ/Y-н (сдвиг 150°)</option>
@@ -120,12 +124,8 @@ export function openImpedanceModal(n) {
         <option value="YNyn0"${vg === 'YNyn0' ? ' selected' : ''}>YNyn0 — Y-н/Y-н (двойная звезда)</option>
         <option value="YNd11"${vg === 'YNd11' ? ' selected' : ''}>YNd11 — Y-н/Δ</option>
         <option value="Dd0"${vg === 'Dd0' ? ' selected' : ''}>Dd0 — Δ/Δ</option>
-      </select>`));
-    h.push(`<div class="muted" style="font-size:10px;margin-top:-4px;line-height:1.4">`
-      + 'Dyn11 — стандартная для силовых ТП 6–10/0.4 кВ. '
-      + 'Yyn0 — для симметричных нагрузок без 3-й гармоники. '
-      + 'Dzn0 — для несимметричных нагрузок с малым током КЗ.'
-      + `</div>`);
+      </select>
+    </div>`);
 
     const inIdx = (typeof n.inputVoltageLevelIdx === 'number') ? n.inputVoltageLevelIdx : (() => {
       const levels = GLOBAL.voltageLevels || [];
@@ -134,8 +134,10 @@ export function openImpedanceModal(n) {
       }
       return 0;
     })();
-    h.push(field('Входное напряжение (первичная обмотка)',
-      `<select id="imp-voltage-in">${voltageLevelOptions(inIdx, null)}</select>`));
+    h.push(`<div class="field">
+      <label>Входное напряжение (первичная обмотка)${helpIcon('Класс напряжения на входе трансформатора (первичная / высшая сторона). Связь с выходным: коэффициент трансформации kt = U1ном / U2ном. Влияет на расчёт тока КЗ через соотношение Z_сети_приведённое = Z_сети × (U2/U1)².')}</label>
+      <select id="imp-voltage-in">${voltageLevelOptions(inIdx, null)}</select>
+    </div>`);
   }
 
   h.push('<h4 style="margin:16px 0 8px">Параметры короткого замыкания</h4>');
@@ -208,8 +210,14 @@ export function openImpedanceModal(n) {
 
   if (!isTransformer && n.auxInput) {
     h.push('<h4 style="margin:16px 0 8px">Собственные нужды</h4>');
-    h.push(field('Мощность СН, kW', `<input type="number" id="imp-auxKw" min="0" max="1000" step="0.1" value="${n.auxDemandKw || 0}">`));
-    h.push(field('cos φ СН', `<input type="number" id="imp-auxCos" min="0.1" max="1" step="0.01" value="${n.auxCosPhi || 0.85}">`));
+    h.push(`<div class="field">
+      <label>Мощность СН, kW${helpIcon('Мощность собственных нужд генератора (СН) — потребление подогрева, зарядного устройства АКБ запуска, освещения шкафа, маслонасоса. Питается от внешней сети через auxInput, не от самого генератора. Типично 1–5 кВт для среднемощных ДГУ.')}</label>
+      <input type="number" id="imp-auxKw" min="0" max="1000" step="0.1" value="${n.auxDemandKw || 0}">
+    </div>`);
+    h.push(`<div class="field">
+      <label>cos φ СН${helpIcon('Коэффициент мощности нагрузки собственных нужд. Обычно 0.85 — стандартный для смешанной нагрузки (зарядное + подогрев + насосы).')}</label>
+      <input type="number" id="imp-auxCos" min="0.1" max="1" step="0.01" value="${n.auxCosPhi || 0.85}">
+    </div>`);
     h.push(`<div class="field check"><input type="checkbox" id="imp-auxBrk"${n.auxBreakerOn !== false ? ' checked' : ''}><label>Автомат СН включён</label></div>`);
   }
 
@@ -434,7 +442,10 @@ function _renderGenIsoBlock(n) {
   for (const m of GEN_RATING_MODES) {
     opts += `<option value="${m.id}"${curMode === m.id ? ' selected' : ''}>${escHtml(m.label)}</option>`;
   }
-  h.push(field('Активный режим работы (ISO 8528)', `<select id="gr-mode">${opts}</select>`));
+  h.push(`<div class="field">
+    <label>Активный режим работы (ISO 8528)${helpIcon('Режим работы ДГУ по ISO 8528-1. ESP (Emergency Standby) — резервное питание при отказе сети, до 200 ч/год. PRP (Prime) — основной источник в местах без сети, без ограничения часов, но с переменной нагрузкой. COP (Continuous) — постоянная работа с фиксированной нагрузкой 100% времени. LTP (Limited-Time Prime) — расширенный PRP с ограничением до 500 ч/год. Каждый режим имеет свой паспортный номинал.')}</label>
+    <select id="gr-mode">${opts}</select>
+  </div>`);
   const curHint = (GEN_RATING_MODES.find(m => m.id === curMode) || {}).hint || '';
   h.push(`<div class="muted" id="gr-mode-hint" style="font-size:11px;margin-top:-4px;margin-bottom:8px;line-height:1.4;color:#475569">${escHtml(curHint)}</div>`);
 
@@ -681,9 +692,14 @@ export function openAutomationModal(n) {
   h.push(`<button type="button" id="auto-add-group" style="font-size:12px;padding:5px 12px;border:1px dashed #999;background:transparent;border-radius:4px;cursor:pointer;width:100%;margin-top:4px">+ Добавить сценарий</button>`);
 
   h.push('<h4 style="margin:16px 0 8px">Задержки</h4>');
-  h.push(field('Задержка запуска, сек', `<input type="number" id="auto-startDelay" min="0" max="600" step="1" value="${n.startDelaySec || 0}">`));
-  h.push(field('Задержка остановки, сек', `<input type="number" id="auto-stopDelay" min="0" max="600" step="1" value="${n.stopDelaySec ?? 2}">`));
-  h.push('<div class="muted" style="font-size:10px;margin-top:-4px">Задержка запуска — время до выхода на рабочий режим.<br>Задержка остановки — время остывания после снятия нагрузки.</div>');
+  h.push(`<div class="field">
+    <label>Задержка запуска, сек${helpIcon('Время от команды запуска до выхода на номинальные обороты и принятие нагрузки. Стандартно 5–15 сек для современных ДГУ с предпусковым подогревом; до 60 сек для ДГУ без подогрева в холодный период.')}</label>
+    <input type="number" id="auto-startDelay" min="0" max="600" step="1" value="${n.startDelaySec || 0}">
+  </div>`);
+  h.push(`<div class="field">
+    <label>Задержка остановки, сек${helpIcon('Время остывания двигателя после снятия нагрузки до полной остановки. Обычно 60–300 сек — позволяет двигателю охладиться при работе в холостую, продлевая ресурс. Без этой задержки — резкая остановка нагретого двигателя сокращает срок службы.')}</label>
+    <input type="number" id="auto-stopDelay" min="0" max="600" step="1" value="${n.stopDelaySec ?? 2}">
+  </div>`);
   h.push('</div>');
 
   body.innerHTML = h.join('');
