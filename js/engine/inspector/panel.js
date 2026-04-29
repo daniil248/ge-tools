@@ -2342,7 +2342,24 @@ export function panelStatusBlock(n) {
     if (n._cosPhi) parts.push(`${_cosShort} итог: <b>${n._cosPhi.toFixed(2)}</b>`);
   }
   if (n._ikA && isFinite(n._ikA)) parts.push(`Ik (ток КЗ): <b>${fmt(n._ikA / 1000)} кА</b>`);
-  if (n._deltaUPct > 0) parts.push(`ΔU суммарный: <b>${n._deltaUPct.toFixed(2)}%</b>${n._deltaUPct > 5 ? ' ⚠ > 5%' : ''}`);
+  // v0.59.709: расширенное отображение падения напряжения и рабочего
+  // напряжения на шинах щита. Симметрично с consumer modal v0.59.704
+  // и cable inspector v0.59.705.
+  if (n._deltaUPct > 0) {
+    const _drop = n._deltaUPct;
+    const _uNom = nodeVoltage(n) || 0;
+    const _uTerm = _uNom * (1 - _drop / 100);
+    const _color = _drop <= 1 ? '#15803d'
+      : _drop <= 3 ? '#0369a1'
+      : _drop <= 5 ? '#ca8a04'
+      : _drop <= 10 ? '#ea580c'
+      : '#b91c1c';
+    const _badge = _drop <= 5 ? '' : (_drop <= 10 ? ' ⚠ > 5%' : ' ⛔ > 10% (вне ±10%)');
+    parts.push(`ΔU суммарный: <b style="color:${_color}">${_drop.toFixed(2)}%</b>${_badge}`);
+    if (_uNom > 0) {
+      parts.push(`U на шинах: <b style="color:${_color}">${_uTerm.toFixed(1)} В</b> <span class="muted">(номинал ${_uNom} В)</span>`);
+    }
+  }
 
   // Запас номинала шкафа — сравниваем с максимальным током.
   if (Number(n.capacityA) > 0) {

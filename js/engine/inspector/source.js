@@ -1193,7 +1193,22 @@ export function sourceStatusBlock(n) {
       }
     }
     if (n._ikA && isFinite(n._ikA)) parts.push(`Ik на шинах: <b>${fmt(n._ikA / 1000)} кА</b>`);
-    if (n._deltaUPct > 0) parts.push(`ΔU: <b>${n._deltaUPct.toFixed(2)}%</b>`);
+    // v0.59.709: расширенное ΔU с цветом и U на выходе.
+    if (n._deltaUPct > 0) {
+      const _drop = n._deltaUPct;
+      const _uNom = nodeVoltage(n) || 0;
+      const _uTerm = _uNom * (1 - _drop / 100);
+      const _color = _drop <= 1 ? '#15803d'
+        : _drop <= 3 ? '#0369a1'
+        : _drop <= 5 ? '#ca8a04'
+        : _drop <= 10 ? '#ea580c'
+        : '#b91c1c';
+      const _badge = _drop <= 5 ? '' : (_drop <= 10 ? ' ⚠ > 5%' : ' ⛔ > 10%');
+      parts.push(`ΔU: <b style="color:${_color}">${_drop.toFixed(2)}%</b>${_badge}`);
+      if (_uNom > 0 && _drop > 1) {
+        parts.push(`U на выходе: <b style="color:${_color}">${_uTerm.toFixed(1)} В</b>`);
+      }
+    }
   }
   if (n.type === 'generator' && n.triggerNodeId) {
     const t = state.nodes.get(n.triggerNodeId);
