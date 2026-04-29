@@ -29,7 +29,7 @@ import { recalc } from './recalc.js';
 import { effectiveTag } from './zones.js';
 import { fmt, fmtPower, escHtml, escAttr } from './utils.js';
 import { snapshot, notifyChange } from './history.js';
-import { computeCurrentA, nodeVoltage, isThreePhase, cableVoltageClass, consumerTotalDemandKw, consumerCountEffective } from './electrical.js';
+import { computeCurrentA, nodeVoltage, nodeCalcVoltage, isThreePhase, cableVoltageClass, consumerTotalDemandKw, consumerCountEffective } from './electrical.js';
 import { rsToast, rsPrompt } from '../../shared/dialog.js';
 
 let _renderInspector;
@@ -2072,16 +2072,24 @@ export function renderNodes() {
       const _isUniformGroup = cnt > 1 && n.groupMode !== 'individual';
       const _isIndivGroup = n.groupMode === 'individual' && Array.isArray(n.items) && n.items.length > 1;
       const cos = Math.max(0.1, Math.min(1, Number(n.cosPhi) || 0.92));
+      // v0.59.664: используем nodeCalcVoltage (vLN для 1ph, vLL для 3ph),
+      // как делает cable engine (consumerNominalCurrent). Раньше брали
+      // nodeVoltage (всегда vLL), что для 1-фазных потребителей в системе
+      // 400/230 давало заниженный ток в √3 раз (18.2 А вместо 31.7 А).
+      // Юзер: «и кабель 25 мм² как получился на 7 кВт». Кабель подобран
+      // ВЕРНО (по 31.7 А с Kg=0.55 + In=40 А → 25 мм²), а карточка
+      // показывала противоречивое 18.2 А — из-за расхождения U.
+      const Ucalc = nodeCalcVoltage(n);
       // Pnom: total → per-unit для uniform-группы
       const PnomTotal = consumerTotalDemandKw(n); // demandKw × count или Σ items
       const Pnom = _isUniformGroup ? (PnomTotal / cnt) : PnomTotal;
-      const Inom = (Pnom > 0 && nodeVoltage(n))
-        ? computeCurrentA(Pnom, nodeVoltage(n), cos, isThreePhase(n))
+      const Inom = (Pnom > 0 && Ucalc)
+        ? computeCurrentA(Pnom, Ucalc, cos, isThreePhase(n))
         : 0;
       const PcurTotal = Number(n._loadKw) || 0;
       const Pcur = _isUniformGroup ? (PcurTotal / cnt) : PcurTotal;
-      const IcurTotal = Number(n._loadA) || (PcurTotal > 0 && nodeVoltage(n)
-        ? computeCurrentA(PcurTotal, nodeVoltage(n), cos, isThreePhase(n)) : 0);
+      const IcurTotal = Number(n._loadA) || (PcurTotal > 0 && Ucalc
+        ? computeCurrentA(PcurTotal, Ucalc, cos, isThreePhase(n)) : 0);
       const Icur = _isUniformGroup ? (IcurTotal / cnt) : IcurTotal;
       if (!n._powered) { statusLine = 'нет питания'; loadCls += ' off'; }
       // v0.59.658: «доступная мощность» — сколько ЭП может потребить без
