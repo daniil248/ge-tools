@@ -1347,21 +1347,45 @@ function sectionChecks() {
     blocks.push(B.paragraph('Замечаний по схеме нет — все потребители подключены и получают питание, щиты имеют отходящие линии, источники не перегружены.'));
     return { text: text.join('\n'), blocks };
   }
+  // v0.59.724: дедупликация одинаковых сообщений с подсчётом «(×N)».
+  // Пользователь: «у меня столько потребителей с одинаковым названием
+  // или ты его столько раз по циклу записал». Если в схеме есть N
+  // консьюмеров с одинаковым тегом (копии без переименования), они
+  // дают одинаковые тексты warn — раньше каждый шёл отдельной строкой,
+  // отчёт раздувался. Теперь идентичные тексты группируются.
+  const _dedupe = (list) => {
+    const counts = new Map();
+    const order = [];
+    for (const i of list) {
+      const k = i.text;
+      if (!counts.has(k)) { counts.set(k, 0); order.push(k); }
+      counts.set(k, counts.get(k) + 1);
+    }
+    return order.map(k => {
+      const n = counts.get(k);
+      return n > 1 ? `${k} (×${n})` : k;
+    });
+  };
   const warns = issues.filter(i => i.level === 'warn');
   const infos = issues.filter(i => i.level === 'info');
+  const warnTexts = _dedupe(warns);
+  const infoTexts = _dedupe(infos);
   if (warns.length) {
-    text.push('ПРЕДУПРЕЖДЕНИЯ:');
-    for (const i of warns) text.push('  ⚠ ' + i.text);
+    text.push(`ПРЕДУПРЕЖДЕНИЯ (${warns.length}${warnTexts.length !== warns.length ? `, уникальных: ${warnTexts.length}` : ''}):`);
+    for (const t of warnTexts) text.push('  ⚠ ' + t);
     text.push('');
     blocks.push(B.h2('Предупреждения'));
-    blocks.push(B.list(warns.map(i => '⚠ ' + i.text)));
+    if (warnTexts.length !== warns.length) {
+      blocks.push(B.paragraph(`Всего записей: <b>${warns.length}</b>, уникальных формулировок: <b>${warnTexts.length}</b>. Одинаковые сообщения объединены с пометкой «(×N)» — например, при наличии нескольких копий потребителя с одинаковым обозначением.`));
+    }
+    blocks.push(B.list(warnTexts.map(t => '⚠ ' + t)));
   }
   if (infos.length) {
-    text.push('СПРАВОЧНО:');
-    for (const i of infos) text.push('  ℹ ' + i.text);
+    text.push(`СПРАВОЧНО (${infos.length}${infoTexts.length !== infos.length ? `, уникальных: ${infoTexts.length}` : ''}):`);
+    for (const t of infoTexts) text.push('  ℹ ' + t);
     text.push('');
     blocks.push(B.h2('Справочно'));
-    blocks.push(B.list(infos.map(i => 'ℹ ' + i.text)));
+    blocks.push(B.list(infoTexts.map(t => 'ℹ ' + t)));
   }
   return { text: text.join('\n'), blocks };
 }
