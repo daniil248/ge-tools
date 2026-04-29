@@ -1281,7 +1281,11 @@ async function openProject(id) {
           if (matchedLocal) {
             if (prevActive !== porPid) {
               ps.setActiveProjectId(porPid);
-              try { window.dispatchEvent(new StorageEvent('storage', { key: 'raschet.activeProjectId.v1', newValue: porPid })); } catch {}
+              // v0.59.748: убран синтетический dispatchEvent('storage') —
+              // он мог фриться внутри той же вкладки с непредсказуемыми
+              // side-effect'ами (re-init scs-config / catalog re-sync).
+              // Кросс-таб synchronization обеспечивается естественным
+              // storage-event'ом из localStorage.setItem в setActiveProjectId.
               const prev = localProjects.find(p => p.id === prevActive);
               const prevName = prev?.name || (prevActive ? prevActive.slice(0, 8) : '— нет —');
               flash(`Активный проект синхронизирован со схемой: «${matchedLocal.name}» (был: ${prevName})`, 'info');
