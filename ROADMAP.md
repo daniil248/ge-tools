@@ -1,6 +1,6 @@
 # Raschet — Roadmap архитектурного развития платформы
 
-> **Статус:** v0.59.781 (2026-04-30). Фаза 1.27 — «Проекты» в проде, Фаза 1.28 — POR-registry в проде, cross-discipline reconciliation закрыта (1.28.10–18). 1.28.11 (Tombstones) полностью закрыт — wiring к POR-playground delete и engine deleteNode + tech-workspace card в hub.html и project.js + nav-label. Запущены: Фаза 20 (Технолог ЦОД, базовый скелет) + Local/Online switcher.
+> **Статус:** v0.59.782 (2026-04-30). Фаза 1.27 — «Проекты» в проде, Фаза 1.28 — POR-registry в проде, cross-discipline reconciliation закрыта (1.28.10–18, 1.28.11 Tombstones). Фаза 20 (Технолог ЦОД) — базовый скелет + nav в hub/project + catalog-picker (v0.59.782): ↗ кнопки «📦 Привязать модель…» открывают модалку element-library, авто-копируют параметры из выбранной модели, отображают модель в кнопке. Local/Online switcher. Открыто: 20.7 (полный план), 20.9 (DOCX), 20.10 (compare), 20.11 (handoff в schematic), Phase 19 (пресеты карточек).
 
 > **Правило ведения:** roadmap обновляется ПОСТОЯННО — при появлении новой фичи / задачи и при закрытии любого этапа. Hotfix'ы (regressions, мелкие правки UX) НЕ попадают в roadmap, только содержательная функциональность. Это правило зафиксировано пользователем 2026-04-29.
 

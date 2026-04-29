@@ -234,6 +234,27 @@ function renderActiveVariant() {
   }
   // Summary line
   $('tw-content-summary').textContent = `${c.racks.count} стоек × ${c.racks.kwPerRack} кВт = ${itKw.toFixed(1)} кВт IT · Σ ${sumM2} м²`;
+  // v0.59.782: bind-button состояние с модель-ссылкой
+  const setBindState = (domain, modelRef) => {
+    const btn = document.querySelector(`.tw-bind-btn[data-bind-domain="${domain}"]`);
+    if (!btn) return;
+    if (modelRef && modelRef.id) {
+      btn.dataset.bound = '1';
+      btn.innerHTML = `📦 ${escHtml(modelRef.manufacturer || '')} ${escHtml(modelRef.model || '')} ✏`;
+      btn.title = `Привязана модель: ${modelRef.manufacturer || ''} ${modelRef.model || ''}. Click — изменить или снять.`;
+    } else {
+      btn.removeAttribute('data-bound');
+      btn.innerHTML = '📦 Привязать модель…';
+      const map = { rack: 'стойки', ups: 'ИБП', cool: 'кондиционера', tp: 'трансформатора ТП', dgu: 'ДГУ', pdu: 'PDU' };
+      btn.title = `Привязать к конкретной модели ${map[domain] || domain} из каталога`;
+    }
+  };
+  setBindState('rack', c.racks.modelRef);
+  setBindState('ups', c.ups.modelRef);
+  setBindState('cool', c.cooling.modelRef);
+  setBindState('tp', c.feed.tp.modelRef);
+  setBindState('dgu', c.feed.dgu.modelRef);
+  setBindState('pdu', c.pdu.modelRef);
 }
 
 // ─── Persistence
@@ -324,16 +345,175 @@ function setMode(mode) {
   renderActiveVariant();
 }
 
-// ─── Bind-model buttons (placeholders)
+// ─── Bind-model buttons → catalog-picker
+// v0.59.782: интеграция с element-library — пользователь может выбрать
+// конкретную модель из общего каталога. Юзер: «может сразу выбрать
+// конкретные изделия, а не только подобрать и определить параметры».
+//
+// Маппинг domain → element kind (см. shared/element-library.js):
+//   rack → 'rack'
+//   ups  → 'ups'
+//   cool → 'cooler' (если в библиотеке нет — fallback к фильтру по category)
+//   tp   → 'transformer'
+//   dgu  → 'generator'
+//   pdu  → 'pdu'
+const DOMAIN_KIND = {
+  rack: 'rack',
+  ups: 'ups',
+  cool: 'cooler',
+  tp: 'transformer',
+  dgu: 'generator',
+  pdu: 'pdu',
+};
+const DOMAIN_LABEL = {
+  rack: 'Стойка', ups: 'ИБП', cool: 'Кондиционер',
+  tp: 'Трансформатор', dgu: 'ДГУ', pdu: 'PDU',
+};
+
+async function openModelPicker(domain) {
+  const cur = _variants.find(x => x.id === _activeId);
+  if (!cur) return;
+  const kind = DOMAIN_KIND[domain];
+  if (!kind) { alert(`Неизвестный domain: ${domain}`); return; }
+  let elements = [];
+  try {
+    const lib = await import('../shared/element-library.js');
+    elements = lib.listElements({ kind }) || [];
+  } catch (e) {
+    alert(`Не удалось загрузить библиотеку: ${e.message || e}`);
+    return;
+  }
+  const overlay = document.createElement('div');
+  overlay.className = 'tw-picker-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:inherit';
+  const currentRefId = cur.concept[_domainPath(domain)]?.modelRef?.id || null;
+  const rows = elements.map(el => {
+    const sel = el.id === currentRefId ? ' style="background:#dbeafe;border-color:#1e40af"' : '';
+    const kw = el.demandKw ?? el.kva ?? el.power ?? '';
+    return `<div class="tw-picker-row" data-id="${escAttr(el.id)}"${sel}>
+      <span class="tw-picker-mfr">${escHtml(el.manufacturer || '')}</span>
+      <span class="tw-picker-model"><b>${escHtml(el.model || el.name || el.id)}</b></span>
+      <span class="tw-picker-kind muted">${escHtml(el.kind || '')}</span>
+      <span class="tw-picker-power muted">${kw ? kw + (el.kind === 'ups' ? ' кВА' : ' кВт') : ''}</span>
+    </div>`;
+  }).join('');
+  overlay.innerHTML = `<div class="tw-picker">
+    <div class="tw-picker-head">
+      <h3>📦 Выбор модели — ${escHtml(DOMAIN_LABEL[domain])}</h3>
+      <button type="button" class="tw-picker-close">×</button>
+    </div>
+    <div class="tw-picker-search-row">
+      <input type="text" class="tw-picker-search" placeholder="🔍 Поиск по производителю / модели...">
+      <span class="muted" style="font-size:11px">${elements.length} моделей</span>
+    </div>
+    <div class="tw-picker-list">
+      ${elements.length === 0
+        ? `<div class="muted" style="padding:20px;text-align:center">В библиотеке нет элементов kind="${kind}". Добавьте их в каталоге (catalog/).</div>`
+        : rows}
+    </div>
+    <div class="tw-picker-actions">
+      ${currentRefId ? `<button type="button" class="tw-picker-clear">🗑 Снять привязку</button>` : ''}
+      <span style="flex:1"></span>
+      <button type="button" class="tw-picker-cancel">Отмена</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('.tw-picker-close').addEventListener('click', close);
+  overlay.querySelector('.tw-picker-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  // Search filter
+  const search = overlay.querySelector('.tw-picker-search');
+  if (search) {
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      overlay.querySelectorAll('.tw-picker-row').forEach(row => {
+        const txt = row.textContent.toLowerCase();
+        row.style.display = (!q || txt.includes(q)) ? '' : 'none';
+      });
+    });
+    search.focus();
+  }
+  // Click row → bind
+  overlay.querySelectorAll('.tw-picker-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const elId = row.dataset.id;
+      const el = elements.find(e => e.id === elId);
+      if (!el) return;
+      _bindModel(domain, el);
+      close();
+    });
+  });
+  // Clear binding
+  const clearBtn = overlay.querySelector('.tw-picker-clear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => { _bindModel(domain, null); close(); });
+  }
+}
+
+function _domainPath(domain) {
+  // Возвращает имя поля внутри concept для данного domain'а.
+  if (domain === 'rack') return 'racks';
+  if (domain === 'ups') return 'ups';
+  if (domain === 'cool') return 'cooling';
+  if (domain === 'tp') return null;  // tp/dgu — внутри feed.*
+  if (domain === 'dgu') return null;
+  if (domain === 'pdu') return 'pdu';
+  return null;
+}
+
+function _bindModel(domain, element) {
+  const cur = _variants.find(x => x.id === _activeId);
+  if (!cur || cur.readOnly) return;
+  const ref = element ? {
+    id: element.id,
+    manufacturer: element.manufacturer || '',
+    model: element.model || element.name || element.id,
+    kind: element.kind,
+  } : null;
+  const path = _domainPath(domain);
+  if (path) {
+    cur.concept[path].modelRef = ref;
+    // Авто-копирование параметров: если модель содержит ключевые поля,
+    // подставляем их (но НЕ перезаписываем то что юзер уже ввёл вручную
+    // и оно отличается от прежнего modelRef).
+    if (element && domain === 'rack') {
+      if (Number.isFinite(element.widthMm)) cur.concept.racks.widthMm = element.widthMm;
+      if (Number.isFinite(element.depthMm)) cur.concept.racks.depthMm = element.depthMm;
+      if (Number.isFinite(element.demandKw) && !cur.concept.racks.kwPerRack) {
+        cur.concept.racks.kwPerRack = element.demandKw;
+      }
+    } else if (element && domain === 'ups') {
+      if (Number.isFinite(element.kva || element.ratedKva) && !cur.concept.ups.ratedKva) {
+        cur.concept.ups.ratedKva = element.kva || element.ratedKva;
+      }
+    } else if (element && domain === 'cool') {
+      if (Number.isFinite(element.kwCool || element.kw) && !cur.concept.cooling.kwPerUnit) {
+        cur.concept.cooling.kwPerUnit = element.kwCool || element.kw;
+      }
+    }
+  } else if (domain === 'tp') {
+    cur.concept.feed.tp.modelRef = ref;
+    if (element && Number.isFinite(element.kva) && !cur.concept.feed.tp.kva) {
+      cur.concept.feed.tp.kva = element.kva;
+    }
+  } else if (domain === 'dgu') {
+    cur.concept.feed.dgu.modelRef = ref;
+    if (element && Number.isFinite(element.kw) && !cur.concept.feed.dgu.kw) {
+      cur.concept.feed.dgu.kw = element.kw;
+    }
+  }
+  persistVariants();
+  renderActiveVariant();
+  if (element) alert(`✓ Модель «${ref.model}» привязана. Параметры обновлены из каталога.`);
+  else alert('✗ Привязка снята. Параметры остались — скорректируйте вручную.');
+}
+
 function bindModelButtons() {
   document.querySelectorAll('.tw-bind-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const dom = btn.dataset.bindDomain;
-      const map = {
-        rack: 'стойка', ups: 'ИБП', cool: 'кондиционер',
-        tp: 'трансформатор', dgu: 'ДГУ', pdu: 'PDU',
-      };
-      alert(`📦 Привязка модели «${map[dom] || dom}» к каталогу — функция в разработке (Phase 20.1.x).\n\nПосле подключения catalog-picker откроется модалка выбора конкретной модели.`);
+      openModelPicker(dom);
     });
   });
 }
