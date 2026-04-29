@@ -290,10 +290,64 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tx-wiz-type').value = '';
     document.getElementById('tx-wiz-group').value = 'Dyn11';
     document.getElementById('tx-wiz-results').innerHTML = '';
+    _txSyncLoadAFromKva();
   });
+  // v0.59.736: связь tx-wiz-loadKva ↔ tx-wiz-loadA (двунаправленная).
+  _txWireWizLoadFields();
 
   render();
 });
+
+// v0.59.736: bidirectional sync для tx-wiz-loadKva ↔ tx-wiz-loadA.
+// Ток считается на стороне НН (вторичной обмотки) — это эксплуатационный
+// ориентир для подбора кабеля и автомата ЩСН. Формула:
+//   I[А] = S[кВА] · 1000 / (√3 · U_LV[В])  (для 3ф 400/690В)
+//   I[А] = S[кВА] · 1000 / U_LV[В]         (для 1ф 230В)
+function _txKvaToA(kva) {
+  if (!(kva > 0)) return 0;
+  const ulv = Number(document.getElementById('tx-wiz-ulv')?.value) || 400;
+  const k = ulv >= 380 ? Math.sqrt(3) : 1;
+  return (kva * 1000) / (k * ulv);
+}
+function _txAToKva(a) {
+  if (!(a > 0)) return 0;
+  const ulv = Number(document.getElementById('tx-wiz-ulv')?.value) || 400;
+  const k = ulv >= 380 ? Math.sqrt(3) : 1;
+  return (a * k * ulv) / 1000;
+}
+function _txSyncLoadAFromKva() {
+  const kvaEl = document.getElementById('tx-wiz-loadKva');
+  const aEl = document.getElementById('tx-wiz-loadA');
+  if (!kvaEl || !aEl) return;
+  const a = _txKvaToA(Number(kvaEl.value) || 0);
+  aEl.value = a > 0 ? a.toFixed(1).replace(/\.0$/, '') : '';
+}
+let _txWizFieldsWired = false;
+function _txWireWizLoadFields() {
+  if (_txWizFieldsWired) { _txSyncLoadAFromKva(); return; }
+  const kvaEl = document.getElementById('tx-wiz-loadKva');
+  const aEl = document.getElementById('tx-wiz-loadA');
+  if (!kvaEl || !aEl) return;
+  _txWizFieldsWired = true;
+  let _syncing = false;
+  kvaEl.addEventListener('input', () => {
+    if (_syncing) return;
+    _syncing = true;
+    try { _txSyncLoadAFromKva(); } finally { _syncing = false; }
+  });
+  aEl.addEventListener('input', () => {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      const kva = _txAToKva(Number(aEl.value) || 0);
+      kvaEl.value = kva > 0 ? kva.toFixed(1).replace(/\.0$/, '') : '';
+    } finally { _syncing = false; }
+  });
+  // Смена U_LV → пересчитать I из текущей S.
+  document.getElementById('tx-wiz-ulv')?.addEventListener('change', _txSyncLoadAFromKva);
+  // Инициализация — заполнить tx-wiz-loadA из дефолтного 630 кВА.
+  _txSyncLoadAFromKva();
+}
 
 // ===== WIZARD подбора трансформатора =====
 function _classifyTxType(t) {

@@ -2442,6 +2442,11 @@ export const CHANGELOGS = {
   ],
 
   'transformer-config': [
+    { version: '0.59.736', date: '2026-04-29', items: [
+      '⚖️ Парные поля «Нагрузка, кВА» ↔ «Нагрузка, А (на стороне НН)» в мастере подбора с двусторонним пересчётом. Аналогично panel-config (v0.59.731), mv-config (v0.59.732), rack-config (v0.59.733), mdc-config (v0.59.734), ups-config (v0.59.735), cable-calc (v0.59.729-730).',
+      'Ток считается на вторичной обмотке: при U_LV ≥ 380В → 3ф (I = S·1000 / (√3·U)), при 230В → 1ф (I = S·1000 / U). Cos φ не учитывается (kVA, не kW). Смена U_LV в селекте → автопересчёт.',
+      'Файлы: transformer-config/index.html (+<input id="tx-wiz-loadA">), transformer-config/transformer-config.js (_txKvaToA / _txAToKva / _txWireWizLoadFields / _txSyncLoadAFromKva + вызов в init).',
+    ] },
     { version: '0.59.188', date: '2026-04-22', items: [
       'Левый сайдбар standalone-режима: «Основные настройки» / «Свойства» / «Конфигурации трансформаторов» через shared/config-sidebar.js. В embedded-режиме (body.tc-embed) скрывается.',
       'Файлы: transformer-config/index.html (main.tc-layout + aside + mount); transformer-config/transformer-config.css (grid-layout).',
