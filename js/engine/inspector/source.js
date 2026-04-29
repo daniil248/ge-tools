@@ -13,6 +13,7 @@ import { nodeVoltage, sourceImpedance, formatVoltageLevelLabel, cableVoltageClas
 import { getTerm, getTermTooltip } from '../../methods/terms.js';
 import { rtmInfoBlock } from './rtm-block.js';
 import { snapshot, notifyChange } from '../history.js';
+import { getActiveProjectId, getProject, updateProject } from '../../../shared/project-storage.js';
 import { render } from '../render.js';
 // Ленивая привязка чтобы избежать цикла на этапе загрузки. Связывается
 // из inspector.js через bindInspectorSourceDeps.
@@ -821,8 +822,26 @@ export function openTuRequestModal(n) {
   };
   const Pdeclared = _stdRound(Pmax);
   const Sdeclared = _stdRound(Smax);
-  // Параметры формы — заявитель, объект (хранятся в n.tuRequest).
+  // v0.59.692: данные о заявителе берутся ИЗ СВОЙСТВ ПРОЕКТА (общие
+   //  для всей схемы), а не из конкретного источника. Если на схеме
+   //  несколько utility-вводов — данные одинаковые. Хранятся в
+   //  active project через updateProject({tuDefaults: {...}}). На уровне
+   //  узла остаются только местные поля (точка присоединения N) и
+   //  выбранная категория надёжности.
+  let projectMeta = {};
+  let activeProjectId = null;
+  try {
+    activeProjectId = getActiveProjectId();
+    const proj = activeProjectId ? getProject(activeProjectId) : null;
+    projectMeta = (proj && proj.tuDefaults) || {};
+    // fallback: если у проекта ещё нет tuDefaults — подставляем имя/описание.
+    if (!projectMeta.applicant && proj?.name) projectMeta = { ...projectMeta, applicant: proj.name };
+    if (!projectMeta.address && proj?.description) projectMeta = { ...projectMeta, address: proj.description };
+  } catch {}
   const tu = n.tuRequest || {};
+  // Слияние: per-node (точка присоединения, категория, дата) + project-level
+  // (заявитель, адрес, назначение).
+  const _val = (key) => tu[key] ?? projectMeta[key] ?? '';
   const _esc = (s) => String(s ?? '').replace(/[<>"']/g, ch =>
     ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   body.innerHTML = `
@@ -836,13 +855,13 @@ export function openTuRequestModal(n) {
       <h3 style="margin:8px 0 6px;font-size:13px">1. Заявитель и объект</h3>
       <div style="display:grid;grid-template-columns:160px 1fr;gap:6px 8px;font-size:11px">
         <label>Наименование заявителя:</label>
-        <input type="text" id="tu-applicant" value="${_esc(tu.applicant)}" placeholder="ООО «...» / ФИО">
+        <input type="text" id="tu-applicant" value="${_esc(_val('applicant'))}" placeholder="ООО «...» / ФИО (из свойств проекта)">
         <label>Адрес объекта:</label>
-        <input type="text" id="tu-address" value="${_esc(tu.address)}" placeholder="г. ..., ул. ..., д. ...">
+        <input type="text" id="tu-address" value="${_esc(_val('address'))}" placeholder="г. ..., ул. ..., д. ... (из свойств проекта)">
         <label>Назначение объекта:</label>
-        <input type="text" id="tu-purpose" value="${_esc(tu.purpose)}" placeholder="ЦОД / производство / административное здание">
+        <input type="text" id="tu-purpose" value="${_esc(_val('purpose'))}" placeholder="ЦОД / производство / административное здание">
         <label>Точка присоединения:</label>
-        <input type="text" id="tu-pointName" value="${_esc(tu.pointName)}" placeholder="ТП-N / РУ ... / ЛЭП ...">
+        <input type="text" id="tu-pointName" value="${_esc(tu.pointName ?? '')}" placeholder="ТП-N / РУ ... / ЛЭП ...">
         <label>Дата формирования:</label>
         <input type="text" id="tu-date" value="${_esc(tu.date || today)}">
       </div>
@@ -857,7 +876,7 @@ export function openTuRequestModal(n) {
             <td style="padding:3px 6px;border:1px solid #d7dde5;color:#666">расчёт: ${fmt(Smax)} кВА</td></tr>
         <tr><td style="padding:3px 6px;border:1px solid #d7dde5">Реактивная мощность Q, квар</td>
             <td style="padding:3px 6px;border:1px solid #d7dde5;text-align:right;font-weight:600">${fmt(Qmax)}</td>
-            <td style="padding:3px 6px;border:1px solid #d7dde5;color:#666">в worst-case (все ИБП в байпасе)</td></tr>
+            <td style="padding:3px 6px;border:1px solid #d7dde5;color:#666">в режиме сервисного байпаса ИБП (расчётный максимум)</td></tr>
         <tr><td style="padding:3px 6px;border:1px solid #d7dde5">cos φ (расчётный)</td>
             <td style="padding:3px 6px;border:1px solid #d7dde5;text-align:right;font-weight:600">${cosWorst.toFixed(3)}</td>
             <td style="padding:3px 6px;border:1px solid #d7dde5;color:#666">текущий: ${cosCur.toFixed(3)}</td></tr>
@@ -888,13 +907,17 @@ export function openTuRequestModal(n) {
 
       <h3 style="margin:14px 0 6px;font-size:13px">5. Обоснование расчёта</h3>
       <div class="muted" style="font-size:10.5px;line-height:1.5">
-        Заявленная мощность = максимальная расчётная активная мощность,
-        потребляемая через данный ввод, с учётом коэффициентов
-        использования (Ки), одновременности (Ко) и worst-case сценария
-        (все ИБП в байпасе — реактивная мощность потребителей идёт
-        насквозь). Округление вверх до ближайшего стандартного значения
-        ряда мощностей. Метод расчёта максимальной нагрузки —
-        ${(GLOBAL.calcMethod === 'rtm') ? 'РТМ 36.18.32.4-92 (упорядоченные диаграммы Г.М.&nbsp;Каялова, приложение 2)' : (GLOBAL.calcMethod === 'pue') ? 'ПУЭ 7' : 'IEC 60364-5-52'}.
+        Заявленная мощность определена как максимальная расчётная
+        активная мощность, потребляемая через данный ввод с учётом
+        коэффициентов использования (Ки) и одновременности (Ко). Реактивная
+        составляющая определена в режиме сервисного байпаса источников
+        бесперебойного питания, при котором реактивная мощность
+        потребителей не компенсируется инверторами и поступает на ввод
+        в полном объёме (расчётный максимум для подбора оборудования
+        электроснабжения). Активная мощность округлена в большую сторону
+        до ближайшего стандартного значения ряда мощностей. Методика
+        расчёта максимальной нагрузки —
+        ${(GLOBAL.calcMethod === 'rtm') ? 'РТМ 36.18.32.4-92 (метод упорядоченных диаграмм Г.М.&nbsp;Каялова, приложение 2)' : (GLOBAL.calcMethod === 'pue') ? 'ПУЭ&nbsp;7' : 'IEC&nbsp;60364-5-52'}.
       </div>
 
       <div style="margin-top:14px;font-size:10.5px;color:#666;border-top:1px dashed #d7dde5;padding-top:8px">
@@ -905,17 +928,25 @@ export function openTuRequestModal(n) {
   `;
   // Привязка обработчиков.
   const _read = (id) => document.getElementById(id)?.value || '';
-  // Авто-сохранение полей в n.tuRequest при изменении (preserve-on-miss):
+  // v0.59.692: разделяем хранение:
+  //   проект-уровень (общее для схемы): applicant, address, purpose
+  //     → updateProject(activeProjectId, { tuDefaults: {...} })
+  //   узел-уровень (специфичное для конкретного ввода): pointName,
+  //     date, category → n.tuRequest
   const _saveFields = () => {
-    const next = {
+    const projDefaults = {
       applicant: _read('tu-applicant'),
       address:   _read('tu-address'),
       purpose:   _read('tu-purpose'),
+    };
+    if (activeProjectId) {
+      try { updateProject(activeProjectId, { tuDefaults: projDefaults }); } catch {}
+    }
+    n.tuRequest = {
       pointName: _read('tu-pointName'),
       date:      _read('tu-date'),
       category:  _read('tu-cat'),
     };
-    n.tuRequest = next;
   };
   ['tu-applicant','tu-address','tu-purpose','tu-pointName','tu-date','tu-cat'].forEach(id => {
     const el = document.getElementById(id);
@@ -950,7 +981,7 @@ export function openTuRequestModal(n) {
         '2. ЗАЯВЛЕННАЯ МОЩНОСТЬ',
         '   Активная P:    ' + fmt(Pdeclared) + ' кВт (расчёт: ' + fmt(Pmax) + ')',
         '   Полная S:      ' + fmt(Sdeclared) + ' кВА (расчёт: ' + fmt(Smax) + ')',
-        '   Реактивная Q:  ' + fmt(Qmax) + ' квар (worst-case)',
+        '   Реактивная Q:  ' + fmt(Qmax) + ' квар (в режиме сервисного байпаса ИБП)',
         '   cos φ:         ' + cosWorst.toFixed(3),
         '   Расчётный I:   ' + fmt(Imax) + ' А',
         '   Класс U:       ' + Uclass + ' (Uном = ' + Uvolt + ' В)',
@@ -965,9 +996,14 @@ export function openTuRequestModal(n) {
         '   ИБП в схеме: ' + (hasUps ? 'есть' : 'нет'),
         '',
         '5. ОБОСНОВАНИЕ',
-        '   Заявленная мощность — максимум расчётной активной нагрузки',
-        '   через данный ввод с учётом Ки, Ко и worst-case (все ИБП',
-        '   в байпасе). Метод: ' + ((GLOBAL.calcMethod === 'rtm') ? 'РТМ 36.18.32.4-92'
+        '   Заявленная мощность определена как максимальная расчётная',
+        '   активная мощность, потребляемая через данный ввод с учётом',
+        '   коэффициентов использования (Ки) и одновременности (Ко).',
+        '   Реактивная мощность определена в режиме сервисного байпаса',
+        '   источников бесперебойного питания, при котором реактивная',
+        '   составляющая нагрузки не компенсируется инверторами и',
+        '   поступает на ввод в полном объёме.',
+        '   Методика: ' + ((GLOBAL.calcMethod === 'rtm') ? 'РТМ 36.18.32.4-92'
           : (GLOBAL.calcMethod === 'pue') ? 'ПУЭ 7' : 'IEC 60364-5-52') + '.',
         '',
         'При подаче приложить: однолинейная схема, расчёт нагрузок,',
