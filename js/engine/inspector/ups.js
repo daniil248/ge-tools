@@ -3,7 +3,7 @@
 // зависимостей (render/history/utils) — инъекция не нужна.
 import { GLOBAL, autoUpsBreakerNominals, CONSUMER_CATALOG } from '../constants.js';
 import { state } from '../state.js';
-import { escHtml, escAttr, fmt, field, flash } from '../utils.js';
+import { escHtml, escAttr, fmt, field, flash, helpIcon } from '../utils.js';
 import { effectiveOn } from '../modes.js';
 import { effectiveTag } from '../zones.js';
 import { nodeVoltage, isThreePhase, computeCurrentA, upsChargeKw, formatVoltageLevelLabel } from '../electrical.js';
@@ -421,15 +421,13 @@ export function openUpsParamsModal(n) {
     vOpts += `<option value="${i}"${i === curIdx ? ' selected' : ''}>${escHtml(formatVoltageLevelLabel(levels[i]))}</option>`;
   }
   h.push(field('Уровень напряжения', `<select id="up-voltage">${vOpts}</select>`));
-  // v0.59.665: methodology-aware label для cos φ — название/tooltip берутся
-  // из таблицы терминов соответствующей методики (см. js/methods/terms.js).
+  // v0.59.665/686: methodology-aware label + helpIcon с tooltip-справкой.
   {
     const _cosT = getTerm('powerFactor', GLOBAL.calcMethod || 'iec');
     const _cosTip = getTermTooltip('powerFactor', GLOBAL.calcMethod || 'iec');
-    h.push(`<div class="field" title="${escAttr(_cosTip)}">
-      <label>${escHtml(_cosT.label)}<span class="muted" style="font-size:10px;font-weight:400;margin-left:4px">${escHtml(_cosT.aliases)}</span></label>
+    h.push(`<div class="field">
+      <label>${escHtml(_cosT.label)}${helpIcon(_cosTip)}</label>
       <input type="number" id="up-cosPhi" min="0.1" max="1" step="0.01" value="${n.cosPhi || 1.0}"${_lockAttr}>
-      ${_cosT.explain ? `<div class="muted" style="font-size:10px;margin-top:2px">${escHtml(_cosT.explain)}</div>` : ''}
     </div>`);
   }
 

@@ -2,7 +2,7 @@
 // вспомогательные функции отрисовки. Выделено из inspector.js.
 import { DEFAULTS, BREAKER_SERIES, GLOBAL } from '../constants.js';
 import { state, uid } from '../state.js';
-import { escHtml, escAttr, fmt, field, flash } from '../utils.js';
+import { escHtml, escAttr, fmt, field, flash, helpIcon } from '../utils.js';
 import { effectiveTag } from '../zones.js';
 import { snapshot, notifyChange } from '../history.js';
 import { render } from '../render.js';
@@ -507,23 +507,19 @@ export function openPanelParamsModal(n) {
     // клеммник + маленькая коробка. Эти поля не показываем.
     if (!isTerminal) {
       h.push('<div style="display:flex;gap:12px">');
-      // v0.59.661/671: methodology-aware label для Ксим. РТМ: «Ко» (зашит
-      // в Кмакс, used:false — поле остаётся, но с явным предупреждением
-      // что нестандартно). ПУЭ: «Ко». IEC: «k_s — diversity factor».
+      // v0.59.661/671/686: methodology-aware label + helpIcon. РТМ: «Ко»
+      // (зашит в Кмакс, used:false — поле остаётся, но в тултипе
+      // предупреждение). ПУЭ: «Ко». IEC: «k_s — diversity factor».
       const _mid = GLOBAL.calcMethod || 'iec';
       const _ksimT = getTerm('simultaneity', _mid);
       const _ksimTip = getTermTooltip('simultaneity', _mid);
       const _ksimLabel = _ksimT.label || 'Ксим';
-      const _ksimAliases = _ksimT.aliases || '';
-      // v0.59.671: для РТМ (used=false) показываем предупреждающий хинт,
-      // что Ко уже зашит в Кмакс — этот множитель применится поверх.
-      const _ksimRtmNote = (_mid === 'rtm')
-        ? `<div class="muted" style="font-size:10px;margin-top:2px;color:#c2410c">⚠ В РТМ 36.18.32.4-92 коэффициент одновременности уже зашит в Кмакс (см. блок РТМ в боковом инспекторе). Этот множитель применится поверх и обычно должен оставаться = 1.0.</div>`
+      const _ksimRtmWarn = (_mid === 'rtm')
+        ? ' ВНИМАНИЕ: в РТМ 36.18.32.4-92 коэффициент одновременности уже зашит в Кмакс — этот множитель применится поверх и обычно должен оставаться = 1.0.'
         : '';
-      h.push(`<div style="flex:1" title="${escAttr(_ksimTip)}">
-        <div class="field"><label>${escHtml(_ksimLabel)}<span class="muted" style="font-size:10px;font-weight:400;margin-left:4px">${escHtml(_ksimAliases)}</span></label>
-        <input type="number" id="pp-kSim" min="0" max="1.2" step="0.05" value="${n.kSim ?? 1}">
-        ${_ksimRtmNote}</div>
+      h.push(`<div style="flex:1">
+        <div class="field"><label>${escHtml(_ksimLabel)}${helpIcon((_ksimTip || '') + _ksimRtmWarn)}</label>
+        <input type="number" id="pp-kSim" min="0" max="1.2" step="0.05" value="${n.kSim ?? 1}"></div>
       </div>`);
       {
         const curA = n.capacityA ?? 160;
@@ -576,7 +572,8 @@ export function openPanelParamsModal(n) {
     // коробка не преобразует земляную систему, проходит N/PE сквозь.
     if (!isTerminal) {
       const eo = n.earthingOut || '';
-      h.push(field('Система заземления на выходе', `
+      h.push(`<div class="field">
+        <label>Система заземления на выходе${helpIcon('Определяет дефолтные флаги N/PE для всех кабелей, выходящих из щита. Потребитель может переопределить индивидуально. По умолчанию — глобальная настройка проекта.')}</label>
         <select id="pp-earthingOut">
           <option value=""${eo === '' ? ' selected' : ''}>(по умолчанию — глобальная)</option>
           <option value="TN-S"${eo === 'TN-S' ? ' selected' : ''}>TN-S (3L+N+PE)</option>
@@ -585,8 +582,8 @@ export function openPanelParamsModal(n) {
           <option value="TT"${eo === 'TT' ? ' selected' : ''}>TT (3L+N+PE, локальный PE)</option>
           <option value="IT-N"${eo === 'IT-N' ? ' selected' : ''}>IT с нейтралью (3L+N+PE)</option>
           <option value="IT"${eo === 'IT' ? ' selected' : ''}>IT без нейтрали (3L+PE)</option>
-        </select>`));
-      h.push('<div class="muted" style="font-size:11px;margin-top:-6px;margin-bottom:8px">Система заземления определяет дефолтные флаги N/PE для всех кабелей, выходящих из щита. Потребитель может переопределить индивидуально.</div>');
+        </select>
+      </div>`);
     }
   }
 
@@ -625,8 +622,14 @@ export function openPanelParamsModal(n) {
         // Задержки — для всех АВР
         h.push('<h4 style="margin:12px 0 8px">Задержки</h4>');
         h.push('<div style="display:flex;gap:12px">');
-        h.push('<div style="flex:1">' + field('Переключение, сек', `<input type="number" id="pp-avrDelay" min="0" max="30" step="0.5" value="${n.avrDelaySec ?? 2}">`) + '</div>');
-        h.push('<div style="flex:1">' + field('Разбежка, сек', `<input type="number" id="pp-avrInterlock" min="0" max="10" step="0.5" value="${n.avrInterlockSec ?? 1}">`) + '</div>');
+        h.push(`<div style="flex:1"><div class="field">
+          <label>Переключение, сек${helpIcon('Время от обнаружения отказа основного ввода до подключения резервного. Стандарт: 0.4–10 сек в зависимости от типа АВР.')}</label>
+          <input type="number" id="pp-avrDelay" min="0" max="30" step="0.5" value="${n.avrDelaySec ?? 2}">
+        </div></div>`);
+        h.push(`<div style="flex:1"><div class="field">
+          <label>Разбежка, сек${helpIcon('Минимальное время разрыва между отключением одного ввода и включением другого — для исключения встречных потоков и провалов фазы.')}</label>
+          <input type="number" id="pp-avrInterlock" min="0" max="10" step="0.5" value="${n.avrInterlockSec ?? 1}">
+        </div></div>`);
         h.push('</div>');
       } // end hasAVR
     } // end multiInput
@@ -735,8 +738,10 @@ export function openPanelParamsModal(n) {
     h.push(`<div class="muted" style="font-size:11px;margin-bottom:6px;line-height:1.45">Включи флаг для щита, который физически содержит конденсаторную батарею (обычно ГРЩ / РУ 0,4 кВ — главный щит после трансформатора). Расчёт ведётся по downstream-нагрузкам с этого щита, в текущем и worst-case режимах (все ИБП в байпасе).</div>`);
     h.push(`<div class="field check"><input type="checkbox" id="pp-ukrm-active"${ukrmActive ? ' checked' : ''}><label>Точка установки УРКМ (этот щит — ГРЩ)</label></div>`);
     if (ukrmActive) {
-      h.push(field('Целевой cos φ (по ТУ)', `<input type="number" id="pp-ukrm-targetCos" min="0.7" max="1.0" step="0.01" value="${cosTar}">`));
-      h.push(`<div class="muted" style="font-size:10px;margin-top:-4px;line-height:1.4">Стандарт: 0.95 (мелкие/средние) или 0.99 (крупные потребители).</div>`);
+      h.push(`<div class="field">
+        <label>Целевой cos φ (по ТУ)${helpIcon('Целевой коэффициент мощности после компенсации, обычно задаётся в ТУ от энергоснабжающей организации. Стандарт: 0.95 (мелкие/средние потребители) или 0.99 (крупные).')}</label>
+        <input type="number" id="pp-ukrm-targetCos" min="0.7" max="1.0" step="0.01" value="${cosTar}">
+      </div>`);
       h.push(`<div class="muted" style="font-size:11.5px;line-height:1.7;padding:8px 10px;background:#f0f9ff;border-radius:4px;margin-top:6px">
         <b>Текущий режим</b> (ИБП в работе): P ${P.toFixed(2)} kW · Q ${Q.toFixed(2)} kvar · S ${S.toFixed(2)} kVA<br>
         &nbsp;&nbsp;cos φ: <b>${cosCur.toFixed(3)}</b> → треб. УКРМ: <b style="color:${QcompCur > 0 ? '#b91c1c' : '#15803d'}">${QcompCur.toFixed(2)} kvar</b>
