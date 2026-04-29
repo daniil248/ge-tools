@@ -118,8 +118,20 @@ export function renderInspectorConn(c) {
     h.push(`<button type="button" id="cp-link-preview" class="full-btn" style="margin-bottom:8px">${previewOn ? '✓ Скрыть путь' : '👁 Показать путь (пунктир)'}</button>`);
   }
 
-  if (c._state === 'active') {
-    h.push('<div class="inspector-section"><h4>Нагрузка линии</h4>');
+  // v0.59.754: блок «Нагрузка линии» / «Проводник» / «Подбор кабеля» теперь
+  // показывается и для НЕАКТИВНЫХ линий с спроектированным кабелем (резерв
+  // АВР, дежурный ДГУ). Юзер: «то что линия не под напряжением не значит
+  // что на ней не нужно рассчитывать падение напряжения и прочие
+  // параметры». Добавляется баннер «проектная нагрузка», чтобы юзер
+  // понимал, что значения показаны для design-режима.
+  const _hasCableDesign = !!(c._cableSize || c._cableIz || c._busbarNom);
+  if (c._state === 'active' || _hasCableDesign) {
+    h.push('<div class="inspector-section">');
+    if (c._state !== 'active') {
+      const _stateLabel = c._state === 'dead' ? 'отключена' : (c._state === 'powered' ? 'зарезервирована' : 'не активна');
+      h.push(`<div class="muted" style="font-size:11px;padding:6px 8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;color:#92400e;margin-bottom:8px;line-height:1.4">⚠ Линия сейчас ${_stateLabel} (нет тока). Ниже показаны <b>проектные</b> параметры — рассчитанные по максимальному току (${(Number(c._maxA)||0).toFixed(1)} А), на который подобран кабель. При активации (АВР / запуск ДГУ) эти значения станут фактическими.</div>`);
+    }
+    h.push('<h4>Нагрузка линии</h4>');
     const _par = Math.max(1, c._cableParallel || 1);
     const loadPerLine = (c._loadA || 0) / _par;
     const maxPerLine = (c._maxA || 0) / _par;
