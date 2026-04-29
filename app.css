@@ -885,6 +885,12 @@ input, select { font: inherit; }
 .node-load  { font: 600 11px -apple-system, "Segoe UI", sans-serif; fill: #1976d2; pointer-events: none; }
 .node-load.overload { fill: #c62828; }
 .node-load.off { fill: #9e9e9e; }
+/* v0.59.651: 2-3-строчный блок «текущая/макс/номин» в карточке узла. */
+.node-load.node-load-row { font-size: 10px; font-weight: 500; fill: #475569; }
+.node-load.node-load-row.overload { fill: #c62828; font-weight: 600; }
+.node-load.node-load-status { font-size: 10px; fill: #6b7280; font-style: italic; }
+.node-load.node-load-status.off { fill: #9e9e9e; font-style: italic; }
+.node-load.node-load-status.overload { fill: #c62828; font-style: italic; font-weight: 600; }
 
 .port {
   fill: #fff;

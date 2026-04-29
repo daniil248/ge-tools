@@ -1911,73 +1911,140 @@ export function renderNodes() {
       g.appendChild(text(12, 49, subTxt, 'node-sub'));
     }
 
-    // Нагрузка
+    // v0.59.651: единый формат карточки (вариант B по запросу юзера) для
+    // всех узлов кроме потребителей и каналов:
+    //   текущая:   P kW · I А
+    //   макс.расч: P kW · I А
+    //   номинальн: P kW · I А
+    // Подписи слева, значения справа. Состояния (off, без питания, байпас,
+    // АВР-таймер) показываются ниже в виде статус-строки.
     let loadLine = '', loadCls = 'node-load';
+    let loadLines = null; // массив строк для нового формата
+    let statusLine = '';  // статус (off, бат, авр-таймер и т.п.)
+
+    const _fmtRow = (label, p, a) => {
+      const parts = [];
+      if (p != null && Number.isFinite(p)) parts.push(`${fmt(p)} kW`);
+      if (a != null && Number.isFinite(a) && a > 0) parts.push(`${fmt(a)} А`);
+      if (!parts.length) return null;
+      return `${label}: ${parts.join(' · ')}`;
+    };
+
     if (n.type === 'source') {
-      if (!effectiveOn(n)) { loadLine = `Отключён · ${fmt(n.capacityKw)} kW`; loadCls += ' off'; }
-      else {
-        loadLine = `${fmt(n._loadKw)} (макс ${fmt(n._maxLoadKw || 0)}) / ${fmt(n.capacityKw)} kW`;
-        if (n._overload) loadCls += ' overload';
-      }
+      const cos = Number(n._cosPhi) || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 1.0;
+      const capA = (n.capacityKw && nodeVoltage(n))
+        ? computeCurrentA(n.capacityKw, nodeVoltage(n), cos, isThreePhase(n))
+        : 0;
+      if (!effectiveOn(n)) { statusLine = `Отключён`; loadCls += ' off'; }
+      if (n._overload) loadCls += ' overload';
+      loadLines = [
+        _fmtRow('текущая', n._loadKw, n._loadA),
+        _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
+        _fmtRow('номин', n.capacityKw, capA),
+      ].filter(Boolean);
     } else if (n.type === 'generator') {
       const hasTrigger = (Array.isArray(n.triggerGroups) && n.triggerGroups.length) || n.triggerNodeId;
-      if (!effectiveOn(n)) { loadLine = `Отключён · ${fmt(n.capacityKw)} kW`; loadCls += ' off'; }
+      const cos = Number(n._cosPhi) || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 1.0;
+      const capA = (n.capacityKw && nodeVoltage(n))
+        ? computeCurrentA(n.capacityKw, nodeVoltage(n), cos, isThreePhase(n))
+        : 0;
+      if (!effectiveOn(n)) { statusLine = 'Отключён'; loadCls += ' off'; }
       else if (hasTrigger && n._startCountdown > 0) {
-        loadLine = `ПУСК через ${Math.ceil(n._startCountdown)} с · ${fmt(n.capacityKw)} kW`;
-        loadCls += ' off';
+        statusLine = `ПУСК через ${Math.ceil(n._startCountdown)} с`; loadCls += ' off';
       } else if (hasTrigger && n._stopCountdown > 0) {
-        loadLine = `${fmt(n._loadKw)} / ${fmt(n.capacityKw)} kW · стоп ${Math.ceil(n._stopCountdown)} с`;
+        statusLine = `Стоп через ${Math.ceil(n._stopCountdown)} с`;
       } else if (hasTrigger && !n._running) {
-        loadLine = `Дежурство · ${fmt(n.capacityKw)} kW`;
-        loadCls += ' off';
-      } else {
-        loadLine = `${fmt(n._loadKw)} (макс ${fmt(n._maxLoadKw || 0)}) / ${fmt(n.capacityKw)} kW`;
-        if (n._overload) loadCls += ' overload';
+        statusLine = 'Дежурство'; loadCls += ' off';
       }
+      if (n._overload) loadCls += ' overload';
+      loadLines = [
+        _fmtRow('текущая', n._loadKw, n._loadA),
+        _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
+        _fmtRow('номин', n.capacityKw, capA),
+      ].filter(Boolean);
     } else if (n.type === 'panel') {
-      if (n.maintenance) {
-        loadLine = 'Обслуживание'; loadCls += ' off';
-      } else if (!n._powered) {
-        loadLine = 'Без питания';
-        loadCls += ' off';
-      } else {
-        loadLine = `Текущее: ${fmt(n._loadA || 0)} A / ${fmt(n._loadKw || 0)} kW`;
-        if (n._marginWarn === 'low') loadCls += ' overload';
-      }
-      // Таймер АВР
+      if (n.maintenance) { statusLine = 'Обслуживание'; loadCls += ' off'; }
+      else if (!n._powered) { statusLine = 'Без питания'; loadCls += ' off'; }
+      const cos = Number(n._cosPhi) || GLOBAL.defaultCosPhi || 1.0;
+      const capA = Number(n.capacityA) || 0;
+      const capKw = capA > 0 && nodeVoltage(n)
+        ? (capA * nodeVoltage(n) * (isThreePhase(n) ? Math.sqrt(3) : 1) * cos / 1000)
+        : 0;
+      if (n._marginWarn === 'low') loadCls += ' overload';
+      loadLines = [
+        _fmtRow('текущая', n._loadKw, n._loadA),
+        _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
+        _fmtRow('номин', capKw, capA),
+      ].filter(Boolean);
+      // Таймер АВР — добавляем к статусу
       if (n._avrSwitchCountdown > 0) {
-        loadLine += ` · АВР ${Math.ceil(n._avrSwitchCountdown)}с`;
+        statusLine = (statusLine ? statusLine + ' · ' : '') + `АВР ${Math.ceil(n._avrSwitchCountdown)}с`;
       } else if (n._avrInterlockCountdown > 0) {
-        loadLine += ` · разб. ${Math.ceil(n._avrInterlockCountdown)}с`;
+        statusLine = (statusLine ? statusLine + ' · ' : '') + `разб. ${Math.ceil(n._avrInterlockCountdown)}с`;
       }
     } else if (n.type === 'ups') {
-      if (!effectiveOn(n)) { loadLine = 'Отключён'; loadCls += ' off'; }
-      else if (!n._powered) { loadLine = 'Без питания'; loadCls += ' off'; }
-      else {
-        let suffix = '';
-        if (n._onStaticBypass) suffix = ' · БАЙПАС';
-        else if (n._onBattery) {
-          const sec = Math.max(0, Math.round(n._runtimeLeftSec || 0));
-          const mm = Math.floor(sec / 60);
-          const ss = sec % 60;
-          suffix = ` · БАТ ${mm}:${String(ss).padStart(2, '0')}`;
-        }
-        // Показываем ток / макс.ток и мощность
-        const cosForCap = n._cosPhi || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 1.0;
-        const capA = computeCurrentA(n.capacityKw, nodeVoltage(n), cosForCap, isThreePhase(n));
-        loadLine = `${fmt(n._loadA || 0)} / ${fmt(capA)} A · ${fmt(n._loadKw)} / ${fmt(n.capacityKw)} kW${suffix}`;
-        if (n._overload) loadCls += ' overload';
+      if (!effectiveOn(n)) { statusLine = 'Отключён'; loadCls += ' off'; }
+      else if (!n._powered) { statusLine = 'Без питания'; loadCls += ' off'; }
+      else if (n._onStaticBypass) statusLine = 'БАЙПАС';
+      else if (n._onBattery) {
+        const sec = Math.max(0, Math.round(n._runtimeLeftSec || 0));
+        const mm = Math.floor(sec / 60);
+        const ss = sec % 60;
+        statusLine = `БАТ ${mm}:${String(ss).padStart(2, '0')}`;
       }
+      const cosForCap = n._cosPhi || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 1.0;
+      const capA = (n.capacityKw && nodeVoltage(n))
+        ? computeCurrentA(n.capacityKw, nodeVoltage(n), cosForCap, isThreePhase(n))
+        : 0;
+      if (n._overload) loadCls += ' overload';
+      loadLines = [
+        _fmtRow('текущая', n._loadKw, n._loadA),
+        _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
+        _fmtRow('номин', n.capacityKw, capA),
+      ].filter(Boolean);
     } else if (n.type === 'consumer') {
-      loadLine = n._powered ? fmtPower(n.demandKw) : `${fmtPower(n.demandKw)} · нет`;
-      if (!n._powered) loadCls += ' off';
+      // v0.59.651: для потребителей такой же формат — текущая + номинальная
+      // (с током). Юзер: «для потребителей добавь сразу возможность
+      // указывать как мощность так и ток, с автоматическим пересчётом».
+      const cnt = consumerCountEffective(n);
+      const Pnom = consumerTotalDemandKw(n); // demandKw × count или Σ items
+      const cos = Math.max(0.1, Math.min(1, Number(n.cosPhi) || 0.92));
+      const Inom = (Pnom > 0 && nodeVoltage(n))
+        ? computeCurrentA(Pnom, nodeVoltage(n), cos, isThreePhase(n))
+        : 0;
+      const Pcur = Number(n._loadKw) || 0;
+      const Icur = Number(n._loadA) || (Pcur > 0 && nodeVoltage(n)
+        ? computeCurrentA(Pcur, nodeVoltage(n), cos, isThreePhase(n)) : 0);
+      if (!n._powered) { statusLine = 'нет питания'; loadCls += ' off'; }
+      loadLines = [
+        _fmtRow('текущая', Pcur, Icur),
+        _fmtRow('номин', Pnom, Inom),
+      ].filter(Boolean);
     } else if (n.type === 'channel') {
       loadLine = `${n.ambientC || 30}°C · ${n.lengthM || 0} м`;
-      // IEC 60364-5-52: иконка способа прокладки (справа) + расположения кабелей (левее)
       drawChannelIcon(g, w, resolveChannelKey(n));
       drawBundlingIcon(g, w - 82, n.bundling || 'touching');
     }
-    g.appendChild(text(12, NODE_H - 12, loadLine, loadCls));
+
+    // Рендер: либо одной строкой (consumer/channel/устаревший формат),
+    // либо 3-строчным блоком (новый вариант B).
+    if (loadLines && loadLines.length) {
+      // 3 строки внизу: располагаем снизу вверх с шагом 12px.
+      const lineCount = loadLines.length;
+      const baseY = NODE_H - 12;
+      const lineH = 12;
+      // Если есть статус — резервируем верхнюю строчку под него.
+      const statusOffset = statusLine ? lineH : 0;
+      for (let i = 0; i < lineCount; i++) {
+        const y = baseY - statusOffset - (lineCount - 1 - i) * lineH;
+        g.appendChild(text(12, y, loadLines[i], loadCls + ' node-load-row'));
+      }
+      if (statusLine) {
+        g.appendChild(text(12, baseY, statusLine, loadCls + ' node-load-status'));
+      }
+    } else {
+      g.appendChild(text(12, NODE_H - 12, loadLine, loadCls));
+    }
 
     // Порты — входы
     // v0.58.56: на страницах без 'electrical' системы — пропускаем все

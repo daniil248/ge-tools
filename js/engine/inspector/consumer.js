@@ -169,6 +169,18 @@ export function openConsumerParamsModal(n) {
     <label id="cp-demandKw-label">${_demandLabel}${_lkIcon}</label>
     <input type="number" id="cp-demandKw" min="0" step="0.1" value="${_displayDemand}"${_lk}>
   </div>`);
+  // v0.59.651: парный ввод тока, А — двунаправленный пересчёт с мощностью.
+  // Юзер: «для потребителей добавь сразу возможность указывать как мощность
+  // так и ток, с автоматическим пересчётом других параметров».
+  // I = P × 1000 / (U × cos φ × √3 фазный коэф.); P = I × U × cos φ × √3 / 1000.
+  // При изменении одного поля пересчитываем другое — ведущим является тот,
+  // в котором юзер только что печатал. cos φ и фаза берутся из текущих
+  // значений в форме; при их изменении ток пересчитывается из мощности.
+  h.push(`<div id="cp-demandA-wrap" class="field" style="${_groupMode === 'individual' && _cpCount > 1 ? 'display:none' : ''}">
+    <label>Расчётный ток I, А ${_lkIcon}</label>
+    <input type="number" id="cp-demandA" min="0" step="0.1" value=""${_lk}>
+    <div class="muted" style="font-size:10px;margin-top:2px">Связан с «Установленной мощностью» через U/cos φ/фазу. При изменении одного поля автоматически пересчитывается другое.</div>
+  </div>`);
   // v0.59.91: общие параметры нужны раньше (в карточках членов group'а для
   // «унаследовать от родителя» и в основных селектах ниже).
   const levels = GLOBAL.voltageLevels || [];
@@ -626,6 +638,83 @@ export function openConsumerParamsModal(n) {
       const wrap = document.getElementById('cp-crfOverride-wrap');
       if (wrap) wrap.style.display = (starterSel.value === 'custom') ? '' : 'none';
     });
+  }
+
+  // v0.59.651: двунаправленный пересчёт P ↔ I.
+  // P (kW) = I (А) × U (В) × cos φ × √3 (для 3ph) / 1000
+  // I (А) = P (kW) × 1000 / (U × cos φ × √3 для 3ph)
+  // U берётся из выбранного уровня напряжения, cos φ — из текущего поля.
+  const demandAInput = document.getElementById('cp-demandA');
+  const cosInput = document.getElementById('cp-cosPhi');
+  const phaseSel = document.getElementById('cp-phase');
+  const voltSel = document.getElementById('cp-voltage');
+  const _getU = () => {
+    const idx = voltSel ? Number(voltSel.value) : -1;
+    if (Number.isFinite(idx) && idx >= 0) {
+      const lv = (GLOBAL.voltageLevels || [])[idx];
+      if (lv && Number(lv.vLL)) return Number(lv.vLL);
+    }
+    // fallback из узла: phase ph выбран → стандартное напряжение
+    const ph = phaseSel ? phaseSel.value : (n.phase || '3ph');
+    if (ph === 'dc') return 48;
+    if (ph === '1ph') return 230;
+    return 400;
+  };
+  const _getCos = () => Math.max(0.1, Math.min(1, Number(cosInput?.value) || Number(n.cosPhi) || 0.92));
+  const _is3ph = () => (phaseSel ? phaseSel.value : (n.phase || '3ph')) === '3ph';
+  const _isDC = () => (phaseSel ? phaseSel.value : n.phase) === 'dc';
+  const _PtoI = (kw) => {
+    const U = _getU();
+    if (!U || U <= 0 || !(kw > 0)) return 0;
+    const cos = _isDC() ? 1 : _getCos();
+    const k = _is3ph() && !_isDC() ? Math.sqrt(3) : 1;
+    return (kw * 1000) / (U * cos * k);
+  };
+  const _ItoP = (a) => {
+    const U = _getU();
+    if (!U || U <= 0 || !(a > 0)) return 0;
+    const cos = _isDC() ? 1 : _getCos();
+    const k = _is3ph() && !_isDC() ? Math.sqrt(3) : 1;
+    return (a * U * cos * k) / 1000;
+  };
+  // Инициализация поля I — посчитать из текущего P.
+  if (demandInput && demandAInput) {
+    const initI = _PtoI(Number(demandInput.value) || 0);
+    demandAInput.value = initI > 0 ? initI.toFixed(2).replace(/\.00$/, '') : '';
+    // P → I (юзер ввёл мощность)
+    let _syncing = false;
+    demandInput.addEventListener('input', () => {
+      if (_syncing) return;
+      _syncing = true;
+      try {
+        const p = Number(demandInput.value) || 0;
+        const i = _PtoI(p);
+        demandAInput.value = i > 0 ? i.toFixed(2).replace(/\.00$/, '') : '';
+      } finally { _syncing = false; }
+    });
+    // I → P (юзер ввёл ток)
+    demandAInput.addEventListener('input', () => {
+      if (_syncing) return;
+      _syncing = true;
+      try {
+        const a = Number(demandAInput.value) || 0;
+        const p = _ItoP(a);
+        demandInput.value = p > 0 ? p.toFixed(2).replace(/\.00$/, '') : '';
+      } finally { _syncing = false; }
+    });
+    // При смене U/cos/phase — пересчитать I из текущего P.
+    const _refreshI = () => {
+      if (_syncing) return;
+      _syncing = true;
+      try {
+        const p = Number(demandInput.value) || 0;
+        const i = _PtoI(p);
+        demandAInput.value = i > 0 ? i.toFixed(2).replace(/\.00$/, '') : '';
+      } finally { _syncing = false; }
+    };
+    if (cosInput) cosInput.addEventListener('input', _refreshI);
+    if (phaseSel) phaseSel.addEventListener('change', _refreshI);
+    if (voltSel) voltSel.addEventListener('change', _refreshI);
   }
 
   const applyBtn = document.getElementById('consumer-params-apply');
