@@ -463,6 +463,26 @@ export function renderInspectorConn(c) {
     h.push(`<span style="font-size:10px;color:${manualCable ? '#e65100' : '#999'}">ручной</span>`);
     h.push('</div>');
 
+    // v0.59.719: быстрое действие «Увеличить сечение» при высоком ΔU
+    // на сегменте. Engine подбирает сечение по ампасити (Iрасч ≤ Iz·n),
+    // не по падению напряжения — поэтому при пограничной ампасити
+    // ΔU может быть избыточным. Кнопка переключает в ручной режим
+    // и устанавливает следующий стандартный размер.
+    {
+      const _segDrop = Number(c._deltaUSegPct) || 0;
+      const _curSize = c._cableSize || 0;
+      if (_segDrop > 5 && _curSize > 0 && _curSize < 300) {
+        const _idx = SECTIONS.indexOf(_curSize);
+        const _nextSize = (_idx >= 0 && _idx < SECTIONS.length - 1) ? SECTIONS[_idx + 1] : null;
+        if (_nextSize) {
+          h.push(`<div style="margin-bottom:6px;padding:6px 8px;background:#fff7ed;border-left:3px solid #f59e0b;border-radius:3px;font-size:11px">
+            ⚠ Падение напряжения на сегменте <b>${_segDrop.toFixed(2)}%</b> > 5% (норма IEC 60364-5-525).
+            <button type="button" id="cbl-bump-size" style="margin-left:6px;padding:2px 8px;font-size:11px;border:1px solid #b45309;background:#fffbeb;color:#92400e;border-radius:3px;cursor:pointer" title="Перевести в ручной режим и установить следующее стандартное сечение">↑ Увеличить до ${_nextSize} мм²</button>
+          </div>`);
+        }
+      }
+    }
+
     if (manualCable) {
       const mSize = c.manualCableSize || autoSize || 240;
       const mPar = c.manualCableParallel || autoPar || 1;
@@ -1039,6 +1059,28 @@ export function renderInspectorConn(c) {
         c.manualCableParallel = c._cableParallel || 1;
       }
       render(); renderInspector(); notifyChange();
+    });
+  }
+
+  // v0.59.719: быстрое «Увеличить сечение на ступень» для уменьшения ΔU.
+  const bumpBtn = document.getElementById('cbl-bump-size');
+  if (bumpBtn) {
+    bumpBtn.addEventListener('click', () => {
+      const SECTIONS = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150, 185, 240, 300];
+      const cur = c._cableSize || 0;
+      const idx = SECTIONS.indexOf(cur);
+      if (idx < 0 || idx >= SECTIONS.length - 1) {
+        flash('Сечение уже на максимуме');
+        return;
+      }
+      const next = SECTIONS[idx + 1];
+      snapshot('cable-bump:' + c.id);
+      c.manualCableSize = next;
+      c.manualCableParallel = c._cableParallel || 1;
+      render();
+      renderInspector();
+      notifyChange();
+      flash(`Сечение увеличено: ${cur} → ${next} мм²`);
     });
   }
 
