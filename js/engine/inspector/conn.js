@@ -176,7 +176,18 @@ export function renderInspectorConn(c) {
             : (_segDrop > 0 ? `<br>ΔU на сегменте: <b style="color:${_segColor}">${_segDrop.toFixed(2)}%</b> ${helpIcon(_segDropTip)}` : '')
           ) +
           (_cumDrop > 0 ? `<br>ΔU от источника: <b style="color:${_cumColor}">${_cumDrop.toFixed(2)}%</b> ${helpIcon(_cumDropTip)}` : '') +
-          `<br>U на конце: <b style="color:${_cumColor}">${_vEnd.toFixed(1)} В</b>`
+          // v0.59.767: флаг нормы по U_term (отклонение от номинала ±10% ГОСТ
+          // 32144-2013). Юзер: «добавь флаг что напряжение на конце в норме
+          // или нет».
+          (() => {
+            const dev = _cumDrop; // % падение от номинала (ΔU)
+            let badge, color;
+            if (dev <= 5) { badge = '✓ норма'; color = '#15803d'; }
+            else if (dev <= 10) { badge = '⚠ на границе ±10%'; color = '#ca8a04'; }
+            else { badge = '⛔ вне ±10% (ГОСТ 32144)'; color = '#b91c1c'; }
+            const tip = 'Норма по ГОСТ 32144-2013: отклонение U на клеммах потребителя ≤ ±10% от номинала. ΔU > 5% — рекомендуется увеличить сечение кабеля; ΔU > 10% — обязательно (нагрузка работает ненадёжно или с пониженным КПД).';
+            return `<br>U на конце: <b style="color:${_cumColor}">${_vEnd.toFixed(1)} В</b> <span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${color}1a;color:${color};border:1px solid ${color}66;margin-left:4px">${badge}</span> ${helpIcon(tip)}`;
+          })()
         : '') +
       (c._ikA && isFinite(c._ikA) ? `<br>Ik в точке: <b>${fmt(c._ikA / 1000)} кА</b>` : '') +
       `</div>`);
