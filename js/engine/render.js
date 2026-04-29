@@ -1922,9 +1922,23 @@ export function renderNodes() {
     let loadLines = null; // массив строк для нового формата
     let statusLine = '';  // статус (off, бат, авр-таймер и т.п.)
 
-    const _fmtRow = (label, p, a) => {
+    // v0.59.656: для источников/генераторов/трансформаторов/UPS на карточке
+    // показываем кВт И кВА (юзер: «для источников питания нужно выводить
+    // кВт и кВА»). S = P / cos φ (если cos φ > 0); если P=0, S=0.
+    // Для строки «номин» у источника также показываем nameplate Snom (n.snomKva)
+    // если он задан — это паспортная мощность трансформатора/генератора.
+    const _Stxt = (p, cos) => {
+      if (!Number.isFinite(p) || p <= 0) return null;
+      const c = Math.max(0.1, Math.min(1, Number(cos) || 0.92));
+      return p / c;
+    };
+    const _fmtRow = (label, p, a, sOverride) => {
       const parts = [];
       if (p != null && Number.isFinite(p)) parts.push(`${fmt(p)} kW`);
+      const s = (sOverride != null && Number.isFinite(sOverride) && sOverride > 0)
+        ? sOverride
+        : _Stxt(p, n._cosPhi || n.cosPhi || GLOBAL.defaultCosPhi);
+      if (s != null && Number.isFinite(s) && s > 0) parts.push(`${fmt(s)} kVA`);
       if (a != null && Number.isFinite(a) && a > 0) parts.push(`${fmt(a)} А`);
       if (!parts.length) return null;
       return `${label}: ${parts.join(' · ')}`;
@@ -1935,12 +1949,17 @@ export function renderNodes() {
       const capA = (n.capacityKw && nodeVoltage(n))
         ? computeCurrentA(n.capacityKw, nodeVoltage(n), cos, isThreePhase(n))
         : 0;
+      // v0.59.656: для трансформатора/источника nameplate — Snom (kVA) и Pnom (kW=Snom×cosφ).
+      // n.snomKva — паспортная мощность; если не задана, считаем S = Pnom/cosφ.
+      const SnomNameplate = (Number(n.snomKva) > 0)
+        ? Number(n.snomKva)
+        : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cos) : 0);
       if (!effectiveOn(n)) { statusLine = `Отключён`; loadCls += ' off'; }
       if (n._overload) loadCls += ' overload';
       loadLines = [
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
-        _fmtRow('номин', n.capacityKw, capA),
+        _fmtRow('номин', n.capacityKw, capA, SnomNameplate),
       ].filter(Boolean);
     } else if (n.type === 'generator') {
       const hasTrigger = (Array.isArray(n.triggerGroups) && n.triggerGroups.length) || n.triggerNodeId;
@@ -1948,6 +1967,10 @@ export function renderNodes() {
       const capA = (n.capacityKw && nodeVoltage(n))
         ? computeCurrentA(n.capacityKw, nodeVoltage(n), cos, isThreePhase(n))
         : 0;
+      // v0.59.656: для генератора nameplate — обычно kVA, считаем по cos φ
+      const SnomNameplate = (Number(n.snomKva) > 0)
+        ? Number(n.snomKva)
+        : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cos) : 0);
       if (!effectiveOn(n)) { statusLine = 'Отключён'; loadCls += ' off'; }
       else if (hasTrigger && n._startCountdown > 0) {
         statusLine = `ПУСК через ${Math.ceil(n._startCountdown)} с`; loadCls += ' off';
@@ -1960,7 +1983,7 @@ export function renderNodes() {
       loadLines = [
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
-        _fmtRow('номин', n.capacityKw, capA),
+        _fmtRow('номин', n.capacityKw, capA, SnomNameplate),
       ].filter(Boolean);
     } else if (n.type === 'panel') {
       if (n.maintenance) { statusLine = 'Обслуживание'; loadCls += ' off'; }
@@ -1972,6 +1995,9 @@ export function renderNodes() {
       // проверки перегруза (см. n._marginWarn в recalc).
       const cos = Number(n._cosPhi) || GLOBAL.defaultCosPhi || 1.0;
       const PnomSum = (n._rtmMax && Number.isFinite(n._rtmMax.PnomSum)) ? n._rtmMax.PnomSum : 0;
+      // v0.59.656: для kVA на щите используем SnomSum = √(PnomSum²+QnomSum²)
+      // из rtmComputeMax — это полная мощность с учётом cos φ каждого ЭП.
+      const SnomSum = (n._rtmMax && Number.isFinite(n._rtmMax.SnomSum)) ? n._rtmMax.SnomSum : 0;
       const InomSum = (PnomSum > 0 && nodeVoltage(n))
         ? computeCurrentA(PnomSum, nodeVoltage(n), cos, isThreePhase(n))
         : 0;
@@ -1979,7 +2005,7 @@ export function renderNodes() {
       loadLines = [
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
-        _fmtRow('номин', PnomSum, InomSum),
+        _fmtRow('номин', PnomSum, InomSum, SnomSum),
       ].filter(Boolean);
       // Таймер АВР — добавляем к статусу
       if (n._avrSwitchCountdown > 0) {
@@ -2001,11 +2027,15 @@ export function renderNodes() {
       const capA = (n.capacityKw && nodeVoltage(n))
         ? computeCurrentA(n.capacityKw, nodeVoltage(n), cosForCap, isThreePhase(n))
         : 0;
+      // v0.59.656: nameplate ИБП обычно даётся в kVA (capacityKva) + kW (capacityKw).
+      const SnomNameplate = (Number(n.capacityKva) > 0)
+        ? Number(n.capacityKva)
+        : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cosForCap) : 0);
       if (n._overload) loadCls += ' overload';
       loadLines = [
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
-        _fmtRow('номин', n.capacityKw, capA),
+        _fmtRow('номин', n.capacityKw, capA, SnomNameplate),
       ].filter(Boolean);
     } else if (n.type === 'consumer') {
       // v0.59.651: для потребителей такой же формат — текущая + номинальная

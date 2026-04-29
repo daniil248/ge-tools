@@ -176,10 +176,17 @@ export function openConsumerParamsModal(n) {
   // При изменении одного поля пересчитываем другое — ведущим является тот,
   // в котором юзер только что печатал. cos φ и фаза берутся из текущих
   // значений в форме; при их изменении ток пересчитывается из мощности.
+  // v0.59.656: переименовали в «Номинальный ток» — связан с установленной
+  // мощностью (P_ном), а не с расчётной. Юзер: «почему расчётные значения
+  // не связаны с номинальными через коэффициенты». Расчётная нагрузка
+  // (с учётом Ки и множителя) — в отдельном блоке ниже.
+  const _nomIlabel = (_cpCount > 1)
+    ? (_isTotalDisplay ? 'Номинальный ток группы I, А' : 'Номинальный ток (на единицу) I, А')
+    : 'Номинальный ток I, А';
   h.push(`<div id="cp-demandA-wrap" class="field" style="${_groupMode === 'individual' && _cpCount > 1 ? 'display:none' : ''}">
-    <label>Расчётный ток I, А ${_lkIcon}</label>
+    <label>${_nomIlabel} ${_lkIcon}</label>
     <input type="number" id="cp-demandA" min="0" step="0.1" value=""${_lk}>
-    <div class="muted" style="font-size:10px;margin-top:2px">Связан с «Установленной мощностью» через U/cos φ/фазу. При изменении одного поля автоматически пересчитывается другое.</div>
+    <div class="muted" style="font-size:10px;margin-top:2px">Связан с «${_demandLabel.replace(', kW','')}» через U/cos φ/фазу: I = P × 1000 / (U × cos φ × √3<sub>3ф</sub>). При изменении одного поля автоматически пересчитывается другое.</div>
   </div>`);
   // v0.59.91: общие параметры нужны раньше (в карточках членов group'а для
   // «унаследовать от родителя» и в основных селектах ниже).
@@ -279,13 +286,17 @@ export function openConsumerParamsModal(n) {
     h.push(`<div class="muted" style="font-size:10px;margin-top:-2px">1.0 = номинал, 0.5 = 50%, 0 = выключено.</div>`);
   }
   // v0.59.652: Расчётная мощность и ток — двунаправленный пересчёт через Ки.
-  // P_расч = P_ном × Ки × множитель_нагрузки
-  // Ки = P_расч / (P_ном × множитель_нагрузки)
+  // P_расч = P_ном × N × Ки × множитель_нагрузки
+  // Ки = P_расч / (P_ном × N × множитель_нагрузки)
   // I_расч = computeCurrentA(P_расч, U, cos φ, фаза)
   // Юзер: «автоматический пересчёт расчётной мощности из коэффициентов
   // или коэффициентов из известной расчётной мощности».
+  // v0.59.656: формула в заголовке развёрнута до «P_ном × N × Ки × множитель»,
+  // чтобы юзеру было видно связь расчётных значений с номинальными через
+  // коэффициенты. Юзер: «почему расчётные значения не связаны с номинальными
+  // через коэффициенты». — связь явная: P_расч = P_ном × N × Ки × LF.
   h.push(`<div style="margin-top:6px;padding:8px 10px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px">
-    <div class="muted" style="font-size:10px;margin-bottom:4px;font-weight:600;color:#0369a1">📊 Расчётная нагрузка (P × Ки × множитель)</div>
+    <div class="muted" style="font-size:10px;margin-bottom:4px;font-weight:600;color:#0369a1">📊 Расчётная нагрузка = P_ном × ${_cpCount > 1 ? 'N × ' : ''}Ки × множитель</div>
     <div class="field" style="margin-bottom:4px">
       <label style="font-size:11px">Расчётная мощность P, кВт</label>
       <input type="number" id="cp-calcKw" min="0" step="0.1" value="">
@@ -294,7 +305,7 @@ export function openConsumerParamsModal(n) {
       <label style="font-size:11px">Расчётный ток I, А</label>
       <input type="number" id="cp-calcA" min="0" step="0.1" value="">
     </div>
-    <div class="muted" style="font-size:10px;margin-top:4px;line-height:1.4">При изменении расчётной P или I пересчитается Ки. При изменении Ки/множителя/P_ном — пересчитается расчётная.</div>
+    <div class="muted" style="font-size:10px;margin-top:4px;line-height:1.4">Связано с номинальной нагрузкой через коэффициенты: P_расч = P_ном${_cpCount > 1 ? ' × N (количество)' : ''} × Ки × множитель; I_расч = P_расч × 1000 / (U × cos φ × √3<sub>3ф</sub>). При изменении расчётной P или I пересчитается Ки. При изменении Ки / множителя / P_ном${_cpCount > 1 ? ' / count' : ''} — пересчитается расчётная.</div>
   </div>`);
   h.push(field('Кратность пускового тока' + _lkIcon, `<input type="number" id="cp-inrush" min="1" max="10" step="0.1" value="${n.inrushFactor ?? 1}"${_lk}>`));
 
