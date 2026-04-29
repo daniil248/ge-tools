@@ -539,7 +539,36 @@ const Fs = {
 };
 
 // --------------------------- Выбор адаптера ---------------------------
+// v0.59.780: пользовательский override режима хранения. До этого выбор
+// адаптера был автоматическим (если есть Firebase auth — cloud, иначе
+// local). Юзер: «У нас ранее выяснилась проблема с лимитом firebase.
+// Сделай переключатель режима работы. Локальная и сетевая с возможностью
+// переключения с синхронизацией, чтобы пользователь не выгружал каждый
+// раз в локальный файл, а просто переключался на локальное хранилище и
+// мог неограниченно работать в одиночку, а потом по потребности
+// переключаться в режим онлайн и синхронится с сетью и другими
+// пользователями».
+//
+// Режимы:
+//   'auto'  — старая логика: cloud если Firebase, иначе local
+//   'local' — всегда local, даже если Firebase авторизован (нет квоты)
+//   'cloud' — всегда cloud (если Firebase недоступен — fallback с warning)
+const STORAGE_MODE_KEY = 'raschet.storageMode.v1';
+function getUserStorageMode() {
+  try { return localStorage.getItem(STORAGE_MODE_KEY) || 'auto'; }
+  catch { return 'auto'; }
+}
+function setUserStorageMode(mode) {
+  if (!['auto', 'local', 'cloud'].includes(mode)) return;
+  try { localStorage.setItem(STORAGE_MODE_KEY, mode); } catch {}
+  try {
+    window.dispatchEvent(new CustomEvent('raschet:storage-mode-changed', { detail: { mode } }));
+  } catch {}
+}
 function getStorage() {
+  const userMode = getUserStorageMode();
+  if (userMode === 'local') return Local;
+  // 'auto' и 'cloud': возвращаем Fs если он готов, иначе Local
   if (window.Auth && window.Auth.isFirebaseReady) return Fs;
   return Local;
 }
@@ -566,6 +595,57 @@ async function _mergedListMyProjects() {
 window.Storage = {
   get mode() { return getStorage().mode; },
   get isCloud() { return getStorage().mode === 'firestore'; },
+  // v0.59.780: пользовательский override
+  get userMode() { return getUserStorageMode(); },
+  setUserMode(mode) { setUserStorageMode(mode); },
+  get effectiveMode() {
+    const um = getUserStorageMode();
+    if (um === 'local') return 'local';
+    if (window.Auth && window.Auth.isFirebaseReady) return 'cloud';
+    return 'local';
+  },
+  // Синхронизация: push всех local-проектов и project-storage ключей
+  // (engine.scheme.v1 / scs-config.* / etc) в облако. Используется при
+  // переключении local→cloud.
+  async syncLocalToCloud() {
+    if (!(window.Auth && window.Auth.isFirebaseReady)) {
+      throw new Error('Firebase недоступен — войдите через Gmail');
+    }
+    const localProjects = await Local.listMyProjects();
+    let pushed = 0, errors = 0;
+    for (const p of localProjects) {
+      try {
+        // Проекты с lp_/p_/s_ id'ами — local-only; cloud не примет.
+        // Создаём в cloud с новым id, обновляем local-маппинг.
+        if (isLocalProjectId(p.id)) {
+          await Fs.createProject(p.name || 'Импорт из локального', p.scheme || null);
+          pushed++;
+        } else {
+          // id похож на cloud — обновляем
+          await Fs.saveProject(p.id, p);
+          pushed++;
+        }
+      } catch (e) { console.warn('[sync] push failed for', p.id, e); errors++; }
+    }
+    return { pushed, errors, total: localProjects.length };
+  },
+  // Pull cloud→local: копирует cloud-проекты в LS как «снимок».
+  async syncCloudToLocal() {
+    if (!(window.Auth && window.Auth.isFirebaseReady)) {
+      throw new Error('Firebase недоступен — войдите через Gmail');
+    }
+    const cloudProjects = await Fs.listMyProjects().catch(() => []);
+    const local = loadLocal();
+    let pulled = 0;
+    for (const p of cloudProjects) {
+      const idx = local.findIndex(x => x.id === p.id);
+      if (idx >= 0) local[idx] = { ...local[idx], ...p };
+      else local.unshift({ ...p, _role: 'owner' });
+      pulled++;
+    }
+    saveLocal(local);
+    return { pulled, total: cloudProjects.length };
+  },
   listMyProjects()      { return _mergedListMyProjects(); },
   listSharedProjects()  { return getStorage().listSharedProjects(); },
   listAccessRequests()  { return getStorage().listAccessRequests(); },

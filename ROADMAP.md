@@ -1,6 +1,6 @@
 # Raschet — Roadmap архитектурного развития платформы
 
-> **Статус:** v0.59.777 (2026-04-30). Фаза 1.27 — модуль «Проекты» в проде, Фаза 1.28 — POR-registry в проде; cross-discipline reconciliation полностью закрыта (1.28.10/12/13/14/15/16/17/18): slot-based IDENTIFY-AS, click-навигация, auto-tag, Ctrl+click из реестра, group-as-container, split-out + materialize, divergence banner с Accept/Ignore + canvas badge. Открыт 1.28.11 (Tombstones). См. блок «Завершено после v0.59.601» ниже.
+> **Статус:** v0.59.780 (2026-04-30). Фаза 1.27 — «Проекты» в проде, Фаза 1.28 — POR-registry в проде, cross-discipline reconciliation закрыта. Запущены: Фаза 20 (Технолог ЦОД, базовый скелет — список вариантов + 6 секций концепции + handoff-placeholder) и Local/Online switcher (новая глобальная фича: пользователь может переключить режим хранения с Firebase на чисто локальное чтобы не палить квоту, и наоборот; manual sync push/pull). Открыт 1.28.11 (Tombstones).
 
 > **Правило ведения:** roadmap обновляется ПОСТОЯННО — при появлении новой фичи / задачи и при закрытии любого этапа. Hotfix'ы (regressions, мелкие правки UX) НЕ попадают в roadmap, только содержательная функциональность. Это правило зафиксировано пользователем 2026-04-29.
 

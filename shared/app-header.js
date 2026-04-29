@@ -130,6 +130,7 @@ export function mountHeader(opts = {}) {
       projBadgeHtml +
     `</div>` +
     `<div class="rs-header-right">` +
+      `<button type="button" class="rs-storage-mode-btn" aria-label="Режим хранения" title="Режим хранения данных — локальный или облачный (Firebase)"></button>` +
       `<button type="button" class="rs-icon-btn rs-gear-btn" aria-label="Глобальные настройки" title="Глобальные настройки платформы">${GEAR_SVG}</button>` +
       `<div class="rs-auth-widget">` +
         `<button type="button" class="rs-icon-btn rs-signin-btn" style="display:none" title="Войти">${USER_SVG}<span style="margin-left:6px">Войти</span></button>` +
@@ -143,6 +144,30 @@ export function mountHeader(opts = {}) {
   // Шестерёнка
   const gearBtn = header.querySelector('.rs-gear-btn');
   if (gearBtn) gearBtn.addEventListener('click', () => openSettingsModal());
+
+  // v0.59.780: режим хранения — Local / Online (Firebase). Юзер может
+  // переключиться в local чтобы не палить квоту, или в cloud для
+  // совместной работы. Кнопка показывает текущий режим, click открывает
+  // модалку с переключателем + sync-кнопками.
+  const storageModeBtn = header.querySelector('.rs-storage-mode-btn');
+  if (storageModeBtn) {
+    const updateStorageBadge = () => {
+      const userMode = (window.Storage && window.Storage.userMode) || 'auto';
+      const effective = (window.Storage && window.Storage.effectiveMode) || 'local';
+      const isCloud = effective === 'cloud';
+      const overrideMark = (userMode !== 'auto') ? ' 🔒' : '';
+      storageModeBtn.innerHTML = isCloud ? `☁ Онлайн${overrideMark}` : `💾 Локально${overrideMark}`;
+      storageModeBtn.classList.toggle('rs-storage-cloud', isCloud);
+      storageModeBtn.classList.toggle('rs-storage-local', !isCloud);
+      storageModeBtn.title = isCloud
+        ? 'Режим: Онлайн (Firebase). Click — настроить.'
+        : 'Режим: Локальный (без квот Firebase). Click — настроить и синхронизировать.';
+    };
+    updateStorageBadge();
+    window.addEventListener('raschet:storage-mode-changed', updateStorageBadge);
+    setTimeout(updateStorageBadge, 800); // дождаться window.Auth ready
+    storageModeBtn.addEventListener('click', () => openStorageModeModal());
+  }
 
   // Back-кнопка — возврат на предыдущий модуль.
   const backBtn = header.querySelector('.rs-back-btn');
@@ -274,4 +299,104 @@ function _wireAuthWidget(header) {
     }, 500);
   }
   render();
+}
+
+// v0.59.780: модалка переключения режима хранения. Показывает текущий
+// режим (auto/local/cloud), эффективный режим, кнопки переключения
+// и sync (push local→cloud / pull cloud→local).
+function openStorageModeModal() {
+  const Storage = window.Storage;
+  if (!Storage) return;
+  const userMode = Storage.userMode || 'auto';
+  const effective = Storage.effectiveMode || 'local';
+  const fbReady = !!(window.Auth && window.Auth.isFirebaseReady);
+  const overlay = document.createElement('div');
+  overlay.className = 'rs-storage-modal-overlay';
+  overlay.innerHTML = `<div class="rs-storage-modal">
+    <div class="rs-storage-modal-head">
+      <h3>Режим хранения данных</h3>
+      <button type="button" class="rs-storage-modal-close" aria-label="Закрыть">×</button>
+    </div>
+    <div class="rs-storage-modal-body">
+      <div class="rs-storage-status">
+        <div><b>Текущий режим:</b> <span class="${effective === 'cloud' ? 'rs-mode-cloud' : 'rs-mode-local'}">${effective === 'cloud' ? '☁ Онлайн (Firebase)' : '💾 Локально (LocalStorage)'}</span></div>
+        <div><b>Firebase:</b> ${fbReady ? '<span style="color:#16a34a">✓ Готов</span>' : '<span style="color:#dc2626">✗ Недоступен (войдите через Gmail)</span>'}</div>
+      </div>
+      <div class="rs-storage-modes">
+        <label class="rs-storage-mode-row${userMode === 'auto' ? ' selected' : ''}">
+          <input type="radio" name="rs-storage-mode" value="auto"${userMode === 'auto' ? ' checked' : ''}>
+          <div>
+            <div class="rs-storage-mode-name">🔄 Автоматически</div>
+            <div class="rs-storage-mode-desc">Если Firebase авторизован — облако; иначе — локально.</div>
+          </div>
+        </label>
+        <label class="rs-storage-mode-row${userMode === 'local' ? ' selected' : ''}">
+          <input type="radio" name="rs-storage-mode" value="local"${userMode === 'local' ? ' checked' : ''}>
+          <div>
+            <div class="rs-storage-mode-name">💾 Только локально</div>
+            <div class="rs-storage-mode-desc">Все данные в LocalStorage браузера. Без квот Firebase, без совместной работы. Подходит для одиночной работы без ограничений.</div>
+          </div>
+        </label>
+        <label class="rs-storage-mode-row${userMode === 'cloud' ? ' selected' : ''}${!fbReady ? ' disabled' : ''}">
+          <input type="radio" name="rs-storage-mode" value="cloud"${userMode === 'cloud' ? ' checked' : ''}${!fbReady ? ' disabled' : ''}>
+          <div>
+            <div class="rs-storage-mode-name">☁ Только онлайн</div>
+            <div class="rs-storage-mode-desc">Firebase Firestore. Совместная работа, синхронизация между устройствами. Требует входа через Gmail.</div>
+          </div>
+        </label>
+      </div>
+      <div class="rs-storage-sync">
+        <h4>Синхронизация</h4>
+        <p class="muted">При смене режима данные не переносятся автоматически. Используйте кнопки ниже для явной синхронизации.</p>
+        <div class="rs-storage-sync-actions">
+          <button type="button" class="rs-storage-push" ${!fbReady ? 'disabled' : ''} title="Загрузить локальные проекты в облако">⬆ Local → Cloud</button>
+          <button type="button" class="rs-storage-pull" ${!fbReady ? 'disabled' : ''} title="Скачать облачные проекты в локальное хранилище">⬇ Cloud → Local</button>
+        </div>
+        <div class="rs-storage-sync-result muted" id="rs-storage-sync-result"></div>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('.rs-storage-modal-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelectorAll('input[name="rs-storage-mode"]').forEach(r => {
+    r.addEventListener('change', () => {
+      if (!r.checked) return;
+      Storage.setUserMode(r.value);
+      rsToast(`Режим хранения: ${r.value === 'auto' ? 'авто' : (r.value === 'local' ? 'локально' : 'онлайн')}`, 'ok');
+      // Re-render rows
+      overlay.querySelectorAll('.rs-storage-mode-row').forEach(row => row.classList.remove('selected'));
+      r.closest('.rs-storage-mode-row').classList.add('selected');
+    });
+  });
+  const resultEl = overlay.querySelector('#rs-storage-sync-result');
+  overlay.querySelector('.rs-storage-push').addEventListener('click', async (e) => {
+    if (!confirm('Загрузить ВСЕ локальные проекты в облако? Существующие cloud-копии будут обновлены.')) return;
+    e.target.disabled = true;
+    resultEl.textContent = '⏳ Синхронизация...';
+    try {
+      const res = await Storage.syncLocalToCloud();
+      resultEl.textContent = `✓ Загружено: ${res.pushed}/${res.total}` + (res.errors ? ` (ошибок: ${res.errors})` : '');
+      rsToast(`Загружено в облако: ${res.pushed} проектов`, 'ok');
+    } catch (err) {
+      resultEl.textContent = `✗ ${err.message || err}`;
+      rsToast('Ошибка sync: ' + (err.message || err), 'err');
+    }
+    e.target.disabled = false;
+  });
+  overlay.querySelector('.rs-storage-pull').addEventListener('click', async (e) => {
+    if (!confirm('Скачать ВСЕ облачные проекты в локальное хранилище? Локальные копии будут обновлены.')) return;
+    e.target.disabled = true;
+    resultEl.textContent = '⏳ Синхронизация...';
+    try {
+      const res = await Storage.syncCloudToLocal();
+      resultEl.textContent = `✓ Скачано: ${res.pulled}/${res.total}`;
+      rsToast(`Скачано из облака: ${res.pulled} проектов`, 'ok');
+    } catch (err) {
+      resultEl.textContent = `✗ ${err.message || err}`;
+      rsToast('Ошибка sync: ' + (err.message || err), 'err');
+    }
+    e.target.disabled = false;
+  });
 }
