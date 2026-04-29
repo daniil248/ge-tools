@@ -507,20 +507,23 @@ export function openPanelParamsModal(n) {
     // клеммник + маленькая коробка. Эти поля не показываем.
     if (!isTerminal) {
       h.push('<div style="display:flex;gap:12px">');
-      // v0.59.661: methodology-aware label для Ксим (коэф. одновременности
-      // = simultaneity / diversity factor). РТМ: «Ко» (но в РТМ обычно
-      // зашит в Кмакс, поэтому помечен used:false — но в этой панели
-      // продолжает использоваться как простой множитель). ПУЭ: «Ко».
-      // IEC: «k_s — diversity factor».
-      const _ksimT = getTerm('simultaneity', GLOBAL.calcMethod || 'iec');
-      const _ksimTip = getTermTooltip('simultaneity', GLOBAL.calcMethod || 'iec');
-      // Если методика не использует параметр (РТМ) — оставляем поле,
-      // но с пояснением «в РТМ обычно зашит в Кмакс».
+      // v0.59.661/671: methodology-aware label для Ксим. РТМ: «Ко» (зашит
+      // в Кмакс, used:false — поле остаётся, но с явным предупреждением
+      // что нестандартно). ПУЭ: «Ко». IEC: «k_s — diversity factor».
+      const _mid = GLOBAL.calcMethod || 'iec';
+      const _ksimT = getTerm('simultaneity', _mid);
+      const _ksimTip = getTermTooltip('simultaneity', _mid);
       const _ksimLabel = _ksimT.label || 'Ксим';
       const _ksimAliases = _ksimT.aliases || '';
+      // v0.59.671: для РТМ (used=false) показываем предупреждающий хинт,
+      // что Ко уже зашит в Кмакс — этот множитель применится поверх.
+      const _ksimRtmNote = (_mid === 'rtm')
+        ? `<div class="muted" style="font-size:10px;margin-top:2px;color:#c2410c">⚠ В РТМ 36.18.32.4-92 коэффициент одновременности уже зашит в Кмакс (см. блок РТМ в боковом инспекторе). Этот множитель применится поверх и обычно должен оставаться = 1.0.</div>`
+        : '';
       h.push(`<div style="flex:1" title="${escAttr(_ksimTip)}">
         <div class="field"><label>${escHtml(_ksimLabel)}<span class="muted" style="font-size:10px;font-weight:400;margin-left:4px">${escHtml(_ksimAliases)}</span></label>
-        <input type="number" id="pp-kSim" min="0" max="1.2" step="0.05" value="${n.kSim ?? 1}"></div>
+        <input type="number" id="pp-kSim" min="0" max="1.2" step="0.05" value="${n.kSim ?? 1}">
+        ${_ksimRtmNote}</div>
       </div>`);
       {
         const curA = n.capacityA ?? 160;
