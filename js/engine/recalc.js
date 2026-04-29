@@ -10,6 +10,8 @@ import { nodeVoltage, nodeVoltageLN, nodeCalcVoltage, isThreePhase, nodeWireCoun
 import { CONSUMER_CATALOG, STARTER_TYPES } from './constants.js';
 import { effectiveOn, effectiveLoadFactor } from './modes.js';
 import { runModules as runCalcModules } from '../../shared/calc-modules/index.js';
+// v0.59.653: РТМ 36.18.32.4-92 — расчёт максимума по упорядоченным диаграммам.
+import { rtmComputeMax as _rtmComputeMax } from '../../shared/calc-modules/rtm-load.js';
 
 // v0.59.611/619/620: per-subtype Capacity Reservation Factor (CRF / K_рез).
 // Категории используются ТОЛЬКО для группировки подтипов в UI.
@@ -249,6 +251,42 @@ function _classifyUpsPeers(panelId) {
     }
   }
   return { peers, valid: true, share: 1 / peers.length, reason: '' };
+}
+
+// v0.59.653: собирает все downstream-потребители для РТМ-расчёта.
+// Возвращает массив { Pnom, Ku, cosPhi } для всех ЭП, достижимых
+// от данного узла (через щиты/каналы/junction-box, не пересекая ИБП —
+// у ИБП своя внутренняя логика загрузки).
+export function collectDownstreamConsumers(nodeId) {
+  const seen = new Set();
+  const out = [];
+  function walk(nid) {
+    if (seen.has(nid)) return;
+    seen.add(nid);
+    for (const c of state.conns.values()) {
+      if (c.from?.nodeId !== nid) continue;
+      if (c.lineMode === 'damaged' || c.lineMode === 'disabled') continue;
+      const to = state.nodes.get(c.to?.nodeId);
+      if (!to) continue;
+      if (to.type === 'consumer') {
+        const Pnom = consumerTotalDemandKw(to); // P_ном × count или Σ items
+        const Ku = Math.max(0, Math.min(1, Number(to.kUse) || 0));
+        const cosPhi = Math.max(0.1, Math.min(1, Number(to.cosPhi) || 0.92));
+        if (Pnom > 0) out.push({ Pnom, Ku, cosPhi, id: to.id });
+      } else if (to.type === 'panel' || to.type === 'channel' || to.type === 'junction-box') {
+        walk(to.id);
+      } else if (to.type === 'ups') {
+        // ИБП — учитываем downstream рекурсивно (внутри своей сферы у него
+        // ту же группу ЭП, и если вышестоящий узел запросит max через РТМ,
+        // ему тоже нужны те же ЭП).
+        walk(to.id);
+      }
+      // generator / source — пропускаем (они «сверху» и не относятся
+      // к downstream-нагрузке).
+    }
+  }
+  walk(nodeId);
+  return out;
 }
 
 // Используется для определения реальной нагрузки за конкретным UPS:
@@ -3238,6 +3276,36 @@ function recalc() {
     c._deltaUSegPct = 0;
     c._moduleResults = null;
     c._isInternalConnHidden = true;  // флаг для UI / BOM / отчётов
+  }
+
+  // v0.59.653: РТМ 36.18.32.4-92 — расчёт максимума нагрузки по упорядоченным
+  // диаграммам для всех панелей и источников. Параллельно с обычной логикой
+  // _maxLoadKw — для возможности отображать оба значения и сравнивать.
+  // Сохраняется в n._rtmMax = { Pmax, Pavg, Qmax, Qavg, Smax, ne, kuAvg, Kmax, KmaxQ, count }.
+  for (const n of state.nodes.values()) {
+    if (n.type !== 'panel' && n.type !== 'source' && n.type !== 'generator' && n.type !== 'ups') continue;
+    try {
+      const consumers = collectDownstreamConsumers(n.id);
+      n._rtmMax = _rtmComputeMax(consumers);
+      // Если включён режим РТМ глобально — используем Pmax_РТМ как _maxLoadKw.
+      // По умолчанию (calcMaxMethod !== 'rtm') — оставляем существующий
+      // _maxLoadKw как есть (сумма прямая), РТМ только для отображения.
+      if (GLOBAL.calcMaxMethod === 'rtm' && n._rtmMax.Pmax > 0) {
+        n._maxLoadKw = n._rtmMax.Pmax;
+        if (nodeCalcVoltage(n)) {
+          n._maxLoadA = computeCurrentA(
+            n._rtmMax.Pmax,
+            nodeCalcVoltage(n),
+            n._cosPhi || GLOBAL.defaultCosPhi,
+            isThreePhase(n),
+          );
+        }
+      }
+    } catch (e) {
+      // не валим recalc если что-то не так с РТМ
+      n._rtmMax = null;
+      console.warn('[rtm-load]', n.id, e);
+    }
   }
 }
 
