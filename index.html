@@ -644,30 +644,29 @@
 
         <h3>Основная марка кабеля по проекту</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="field"><label>Силовой кабель (LV)</label>
+          <div class="field"><label>Силовой кабель (LV)<span class="help-icon" title="Марка кабеля по умолчанию для линий низкого напряжения (до 1 кВ). Выбранная марка автоматически предвыбирается в инспекторе новых линий. Типичные: ВВГнг(А)-LS, NYM, КГ. Выбор влияет на материал/изоляцию (заполняются автоматически). Справочник марок — в модуле Каталог." tabindex="0">?</span></label>
             <select id="pp-mainCableLv"></select></div>
-          <div class="field"><label>Высоковольтный (MV/HV)</label>
+          <div class="field"><label>Высоковольтный (MV/HV)<span class="help-icon" title="Марка кабеля по умолчанию для линий среднего и высокого напряжения (от 6 кВ). Типичные: АПвПуг, ПвПу, СПЭ. Применяется только к линиям, где U ≥ 1000 В. Минимальное сечение для ВН — 25 мм² (механическая прочность по IEC 60502-2)." tabindex="0">?</span></label>
             <select id="pp-mainCableHv"></select></div>
         </div>
-        <p class="muted" style="font-size:11px;margin-top:-2px">Выбранные марки становятся предвыбранными в инспекторе линий. Справочник кабелей — в <a href="catalog/" target="_blank">Каталог и библиотека</a>.</p>
 
         <h3>Умолчания проводника</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="field"><label>Материал жил</label>
+          <div class="field"><label>Материал жил<span class="help-icon" title="Cu (медь): ρ = 0.0175 Ом·мм²/м, более высокая ампасити при том же сечении. Al (алюминий): ρ = 0.028 Ом·мм²/м, дешевле, но сечение больше для той же нагрузки. По умолчанию проекта применяется ко всем новым линиям; конкретную линию можно переопределить в инспекторе." tabindex="0">?</span></label>
             <select id="pp-material"><option value="Cu">Медь</option><option value="Al">Алюминий</option></select></div>
-          <div class="field"><label>Изоляция</label>
+          <div class="field"><label>Изоляция<span class="help-icon" title="PVC (ПВХ): рабочая температура жилы +70°C, дешевле, при горении выделяет токсичный дым. XLPE (сшитый ПЭ): +90°C, выше ампасити при том же сечении, дороже. Огнестойкие/LSZH варианты — отдельные марки в каталоге." tabindex="0">?</span></label>
             <select id="pp-insulation"><option value="PVC">ПВХ</option><option value="XLPE">СПЭ (XLPE)</option></select></div>
-          <div class="field"><label>Тип конструкции</label>
+          <div class="field"><label>Тип конструкции<span class="help-icon" title="Многожильный — несколько изолированных жил в одной оболочке (наиболее распространён). Одножильный многопроволочный — гибкий, классы 5/6 по IEC 60228. Цельная жила (rigid, классы 1/2) — для сечений до 10 мм². Шинопровод — медные/алюминиевые шины в коробе, для In ≥ 200 А." tabindex="0">?</span></label>
             <select id="pp-cableType"><option value="multi">Многожильный</option><option value="single">Одножильный</option><option value="solid">Цельная жила</option><option value="busbar">Шинопровод</option></select></div>
-          <div class="field"><label>Макс. сечение, мм²</label>
+          <div class="field"><label>Макс. сечение, мм²<span class="help-icon" title="Лимит максимального сечения, выше которого engine переходит к параллельной прокладке. По умолчанию 240 мм². Для очень больших нагрузок (>1000 А) можно увеличить до 300/400/500 — но обычно проще использовать параллельные кабели меньшего сечения для удобства монтажа и охлаждения." tabindex="0">?</span></label>
             <select id="pp-maxCableSize"><option value="10">10</option><option value="16">16</option><option value="25">25</option><option value="35">35</option><option value="50">50</option><option value="70">70</option><option value="95">95</option><option value="120">120</option><option value="150">150</option><option value="185">185</option><option value="240" selected>240</option><option value="300">300</option><option value="400">400</option><option value="500">500</option></select></div>
         </div>
 
         <h3>Прокладка по умолчанию</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="field"><label>Способ прокладки</label>
+          <div class="field"><label>Способ прокладки<span class="help-icon" title="Метод прокладки по IEC 60364-5-52 (или ПУЭ для 'pue'/'rtm' методики). Влияет на ампасити Iz_табл и группирующий коэффициент. Открытая прокладка — выше Iz; в трубе/коробе — ниже из-за ухудшенного теплоотвода. В земле — отдельная таблица. Применяется по умолчанию ко всем новым линиям." tabindex="0">?</span></label>
             <select id="pp-installMethod"></select></div>
-          <div class="field"><label>Температура среды, °C</label>
+          <div class="field"><label>Температура среды, °C<span class="help-icon" title="Температура окружающего воздуха или грунта по умолчанию для всех линий проекта. Влияет на коэффициент Kt (IEC 60364-5-52 табл. B.52.14). При +30°C для PVC Kt=1.0; +40°C для PVC Kt≈0.87. Для жарких помещений (серверные, бойлерные) — задать выше." tabindex="0">?</span></label>
             <input type="number" id="pp-ambient" min="10" max="70" step="5" value="30"></div>
         </div>
       </div>
