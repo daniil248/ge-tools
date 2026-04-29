@@ -399,22 +399,41 @@ function sectionPanels() {
   const _mid = GLOBAL.calcMethod || 'iec';
   const _ksimShort = getTerm('simultaneity', _mid).short || 'Ксим';
   const _cosShort = getTerm('powerFactor', _mid).short || 'cos φ';
+  // v0.59.682: добавлены колонки «Свободно, А» (резерв на вводе щита)
+  // и «Статус» — сразу видно где есть запас и где входной автомат
+  // зафиксирован и не справляется.
   const cols = [
     { label: 'Обозн.',      width: 18 },
-    { label: 'Имя',         width: 35 },
+    { label: 'Имя',         width: 32 },
     { label: 'Iном, А',     align: 'right', width: 14 },
-    { label: 'Вх/Вых',      align: 'center', width: 14 },
-    { label: 'Pрасч, кВт',  align: 'right', width: 18 },
-    { label: 'Iрасч, А',    align: 'right', width: 14 },
-    { label: _ksimShort,    align: 'right', width: 12 },
+    { label: 'Вх/Вых',      align: 'center', width: 12 },
+    { label: 'Pрасч, кВт',  align: 'right', width: 16 },
+    { label: 'Iрасч, А',    align: 'right', width: 12 },
+    { label: _ksimShort,    align: 'right', width: 10 },
     { label: _cosShort,     align: 'right', width: 12 },
-    { label: 'Режим' },
+    { label: 'Свободно, А', align: 'right', width: 13 },
+    { label: 'Режим',       align: 'center', width: 10 },
+    { label: 'Статус' },
   ];
+  let totalFreeKwPanels = 0;
+  let panelOverloadCount = 0;
   const rows = items.map(p => {
     const mode = p.switchMode === 'manual' ? 'РУЧН'
                : p.switchMode === 'parallel' ? 'ЩИТ'
                : (p.inputs || 1) <= 1 ? 'ЩИТ'
                : 'АВР';
+    const freeA = (Number.isFinite(p._freeA) && p._freeA > 0) ? fmt(p._freeA) : '—';
+    if (Number.isFinite(p._freeKw) && p._freeKw > 0) totalFreeKwPanels += p._freeKw;
+    let st;
+    if (p._breakerOverload) {
+      const info = p._breakerOverloadInfo || {};
+      st = `⚠ ПЕРЕГРУЗ (${fmt(info.designA || 0)} > ${info.breakerIn || 0} А)`;
+      panelOverloadCount++;
+    } else if (p._marginWarn === 'low') {
+      st = '⚠ запас < 0';
+    } else {
+      st = 'ок';
+    }
     return [
       fullTag(p), decorateName(p),
       String(p.capacityA || 0),
@@ -423,7 +442,9 @@ function sectionPanels() {
       fmt(p._loadA || 0),
       (p.kSim || 1).toFixed(2),
       p._cosPhi ? p._cosPhi.toFixed(2) : '—',
+      freeA,
       mode,
+      st,
     ];
   });
 
@@ -440,12 +461,22 @@ function sectionPanels() {
   if (rows.length) {
     text.push(...textTable(cols, rows));
     text.push('');
+    text.push('ИТОГО свободно (резерв) по вводам щитов: ' + fmt(totalFreeKwPanels) + ' кВт');
+    if (panelOverloadCount > 0) {
+      text.push(`⚠ ПЕРЕГРУЖЕНО ВВОДОВ ЩИТОВ: ${panelOverloadCount}`);
+    }
+    text.push('');
     blocks.push(B.h2('Состав щитов'));
     blocks.push(B.table(blockCols(cols), rows));
     blocks.push(B.paragraph(
       `${_ksimShort} — ${getTerm('simultaneity', _mid).explain || 'коэффициент одновременности'}. ` +
-      'Режим: ЩИТ — обычный ввод, АВР — автоматическое включение резерва, РУЧН — ручное переключение.'
+      'Режим: ЩИТ — обычный ввод, АВР — автоматическое включение резерва, РУЧН — ручное переключение. ' +
+      'Свободно, А — резерв пропускной способности входной линии щита (limit_max − Iрасч).'
     ));
+    blocks.push(B.paragraph('ИТОГО свободно (резерв) по вводам щитов: ' + fmt(totalFreeKwPanels) + ' кВт.'));
+    if (panelOverloadCount > 0) {
+      blocks.push(B.paragraph(`⚠ Перегружено вводов щитов: ${panelOverloadCount}. Расчётный ток ввода превышает зафиксированный автомат — авто-пересчёт отключён, требуется ручная корректировка автомата ввода или увеличение сечения входного кабеля. Подробности — в разделе «Проверки и предупреждения».`));
+    }
   } else {
     text.push('В схеме нет распределительных щитов.');
     blocks.push(B.paragraph('В схеме нет распределительных щитов.'));
