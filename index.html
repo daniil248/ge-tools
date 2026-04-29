@@ -692,23 +692,23 @@
 
         <h3>Методика и защита</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="field"><label>Методика расчёта</label>
+          <div class="field"><label>Методика расчёта<span class="help-icon" title="IEC 60364-5-52 — международный стандарт. ПУЭ 7 — российский нормативный документ. РТМ 36.18.32.4-92 — методика расчёта максимума по упорядоченным диаграммам Каялова (для Tier-сертификации Uptime Institute и расчётов на ТУ); для подбора кабеля в этом режиме используется ПУЭ 7." tabindex="0">?</span></label>
             <select id="set-calcMethod"><option value="iec">IEC 60364-5-52</option><option value="pue">ПУЭ 7</option><option value="rtm">РТМ 36.18.32.4-92</option></select></div>
-          <div class="field"><label>Защита парал. линий</label>
+          <div class="field"><label>Защита парал. линий<span class="help-icon" title="Индивидуальная (рекомендуется): на каждую параллельную жилу свой автомат + общий вводной. Гарантирует отключение повреждённой жилы. Общая: один автомат на все жилы — допустимо для идентичных линий с симметричной нагрузкой." tabindex="0">?</span></label>
             <select id="set-parallelProtection"><option value="individual">Индивидуальная</option><option value="common">Общая</option></select></div>
-          <div class="field"><label>Мин. запас по In автомата, %</label>
+          <div class="field"><label>Мин. запас по In автомата, %<span class="help-icon" title="Минимальный запас (In − Iрасч) / Iрасч на любой линии проекта. Если запас ниже — выводится предупреждение в инспекторе кабеля. По умолчанию 0% (точное соответствие). Для проектов с возможностью расширения нагрузки рекомендуется 10–25%." tabindex="0">?</span></label>
             <input type="number" id="set-breakerMinMarginPct" min="0" max="100" step="1" value="0"></div>
-          <div class="field"><label>Макс. параллельных линий</label>
+          <div class="field"><label>Макс. параллельных линий<span class="help-icon" title="Лимит на автоматическое количество параллельных кабелей при подборе сечения. Если расчёт требует больше — engine выдаст предупреждение «overflow». По умолчанию 4. Для крупных нагрузок (выше 1000 А) можно увеличить до 6–10." tabindex="0">?</span></label>
             <input type="number" id="set-maxParallelAuto" min="1" max="10" step="1" value="4"></div>
         </div>
 
         <h3>Электрические параметры проекта</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div class="field"><label>Макс. падение напряжения, %</label>
+          <div class="field"><label>Макс. падение напряжения, %<span class="help-icon" title="Допустимое падение напряжения от источника до самой удалённой нагрузки (накопительное по всем участкам линии). По IEC 60364-5-52 §525: 5% для освещения, 8% для прочих нагрузок. По ПУЭ: типично 5%. Превышение → engine помечает линию как требующую увеличения сечения." tabindex="0">?</span></label>
             <input type="number" id="set-maxVdropPct" min="0.5" max="15" step="0.5" value="5"></div>
-          <div class="field"><label>cos φ по умолчанию</label>
+          <div class="field"><label>cos φ по умолчанию<span class="help-icon" title="Дефолтное значение cos φ для нагрузок без явно заданного. Применяется при расчёте тока I = P × 1000 / (U × cos φ × √3 для 3ф). Стандартное промышленное значение 0.92; для офисных/коммерческих помещений 0.85; для ЦОД/ИТ 0.95–0.99." tabindex="0">?</span></label>
             <input type="number" id="set-cosPhi" min="0.1" max="1" step="0.01" value="0.92"></div>
-          <div class="field" style="grid-column:span 2"><label>Система заземления (IEC 60364-4-41)</label>
+          <div class="field" style="grid-column:span 2"><label>Система заземления (IEC 60364-4-41)<span class="help-icon" title="TN-S: отдельные N и PE — стандарт для жилых/коммерческих зданий. TN-C: совмещённый PEN — устаревшая система. TN-C-S: PEN до здания, далее N+PE — наиболее распространена в РФ. TT: локальный PE через заземляющее устройство — для удалённых объектов. IT: изолированная нейтраль — для медицины, шахт, наливных линий." tabindex="0">?</span></label>
             <select id="set-earthingSystem">
               <option value="TN-S">TN-S (3L+N+PE, 5 жил)</option>
               <option value="TN-C">TN-C (3L+PEN, 4 жилы)</option>
@@ -723,19 +723,15 @@
         <h3>Интерфейс</h3>
         <div class="field check">
           <input type="checkbox" id="set-showHelp">
-          <label>Показывать справочную информацию (пояснения под авто-расчётом автомата и кабеля)</label>
+          <label>Показывать справочную информацию <span class="help-icon" title="Включает блоки «Как подбирался кабель» и «Как получено» под авто-расчётом автомата и кабеля в инспекторе линии. Полезно при обучении и аудите расчёта; можно выключить для опытных пользователей." tabindex="0">?</span></label>
         </div>
         <div class="field check">
           <input type="checkbox" id="set-allowReducedNeutral">
-          <label>Использовать уменьшенную нулевую жилу (IEC 60364-5-52 §524.2 / ГОСТ Р 50571.5.52)<br>
-            <span class="muted" style="font-size:11px">Для сбалансированной 3ф-системы при фазе &gt; 16 мм² (Cu) / 25 мм² (Al): N = phase/2 (не менее 16/25). Экономит на кабеле больших сечений — 4×95 + 1×50 вместо 5×95.</span>
-          </label>
+          <label>Уменьшенная нулевая жила (IEC 60364-5-52 §524.2)<span class="help-icon" title="Для сбалансированной 3ф-системы при фазе > 16 мм² (Cu) / 25 мм² (Al) разрешено N = phase/2 (но не менее 16/25). По умолчанию ВЫКЛ (консервативно, кабель остаётся симметричным). Включение экономит сечение N для больших кабелей — 4×95 + 1×50 вместо 5×95. Не применять при значительной нелинейной нагрузке (3-я гармоника)." tabindex="0">?</span></label>
         </div>
         <div class="field check">
           <input type="checkbox" id="set-autoCenterOnSelect">
-          <label>Панорамировать и масштабировать схему при переходе к линии<br>
-            <span class="muted" style="font-size:11px">Клик по обозначению линии в таблице кабелей (W-… ↗) или в отчётах центрирует холст на линии и устанавливает зум, чтобы оба конца были видны. Если выключено — только подсветка выделения без изменения вида.</span>
-          </label>
+          <label>Авто-центрирование при переходе к линии<span class="help-icon" title="Клик по обозначению линии в таблице кабелей (W-… ↗) или в отчётах центрирует холст на линии и устанавливает зум так, чтобы оба конца были видны. Если выключено — только подсветка выделения без изменения текущего вида." tabindex="0">?</span></label>
         </div>
 
         <h3>Библиотека элементов</h3>
