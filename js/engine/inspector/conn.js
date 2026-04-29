@@ -719,7 +719,22 @@ export function renderInspectorConn(c) {
       }
       // Warning 2: автомат < Iрасч (сработает при нормальной нагрузке, нагрузка будет отключена)
       if (_Imax > 0 && effectiveIn > 0 && effectiveIn < _Imax * 0.95) {
-        h.push(`<div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:4px;padding:6px;font-size:11px;color:#c62828;margin-top:4px">⚠ In (${effectiveIn} А) &lt; Iрасч (${fmt(_Imax)} А) — автомат будет срабатывать при штатной нагрузке! Нагрузка будет отключена.</div>`);
+        // v0.59.720: быстрое действие — выбрать следующий стандартный
+        // номинал из ряда, способный выдержать Iрасч с запасом 25%.
+        const _series = SERIES;
+        const _curIdx = _series.indexOf(effectiveIn);
+        const _target = _Imax * 1.25;
+        let _suggested = null;
+        for (const v of _series) {
+          if (v >= _target) { _suggested = v; break; }
+        }
+        // Также alternative — следующий за текущим в ряду
+        const _next = (_curIdx >= 0 && _curIdx < _series.length - 1) ? _series[_curIdx + 1] : null;
+        const _bumpTo = _suggested || _next;
+        h.push(`<div style="background:#ffebee;border:1px solid #ef9a9a;border-radius:4px;padding:6px;font-size:11px;color:#c62828;margin-top:4px">
+          ⚠ In (${effectiveIn} А) &lt; Iрасч (${fmt(_Imax)} А) — автомат будет срабатывать при штатной нагрузке! Нагрузка будет отключена.
+          ${_bumpTo ? `<button type="button" id="brk-bump" data-brk-to="${_bumpTo}" data-brk-prop="${manualProp}" style="margin-left:6px;padding:2px 8px;font-size:11px;border:1px solid #b91c1c;background:#fee2e2;color:#7f1d1d;border-radius:3px;cursor:pointer" title="Увеличить номинал автомата до ближайшего стандартного, способного выдержать Iрасч с запасом 25%">↑ Увеличить до ${_bumpTo} А</button>` : ''}
+        </div>`);
       }
     } else {
       // Для общего автомата на параллельные линии предупреждение
@@ -1081,6 +1096,23 @@ export function renderInspectorConn(c) {
       renderInspector();
       notifyChange();
       flash(`Сечение увеличено: ${cur} → ${next} мм²`);
+    });
+  }
+  // v0.59.720: быстрое «Увеличить номинал автомата» для устранения
+  // In < Iрасч. Применяет manualBreakerIn / manualFuseIn.
+  const brkBumpBtn = document.getElementById('brk-bump');
+  if (brkBumpBtn) {
+    brkBumpBtn.addEventListener('click', () => {
+      const to = Number(brkBumpBtn.getAttribute('data-brk-to')) || 0;
+      const prop = brkBumpBtn.getAttribute('data-brk-prop') || 'manualBreakerIn';
+      if (!to) return;
+      const prev = c[prop] || c._breakerIn || 0;
+      snapshot('breaker-bump:' + c.id);
+      c[prop] = to;
+      render();
+      renderInspector();
+      notifyChange();
+      flash(`Автомат увеличен: ${prev} → ${to} А`);
     });
   }
 
