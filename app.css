@@ -56,6 +56,17 @@ input, select { font: inherit; }
   outline: none;
 }
 
+/* v0.59.713: кликабельные строки чеклиста проектирования */
+.checklist-row {
+  border-radius: 3px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  transition: background 0.1s;
+}
+.checklist-row:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 /* ================= Header ================= */
 #header {
   flex: none;

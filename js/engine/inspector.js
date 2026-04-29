@@ -300,24 +300,29 @@ function renderInspectorPage() {
         return !!ps;
       } catch { return false; }
     })();
-    const _row = (icon, color, label, count, total) => {
+    // v0.59.713: некоторые строки делаем кликабельными — клик
+    // выделяет ПЕРВЫЙ проблемный узел на схеме (data-checklist-jump
+    // attribute, обработчик ниже).
+    const _row = (icon, color, label, count, total, jumpId) => {
       const txt = total != null ? `${count}/${total}` : (count != null ? String(count) : '');
-      return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;line-height:1.6">
+      const _clickable = jumpId ? ` data-checklist-jump="${jumpId}" style="cursor:pointer" title="Кликните, чтобы перейти к первому проблемному узлу"` : '';
+      return `<div${_clickable ? ' class="checklist-row"' : ''}${_clickable} style="display:flex;justify-content:space-between;align-items:center;font-size:11px;line-height:1.6${jumpId ? ';cursor:pointer' : ''}">
         <span><span style="color:${color}">${icon}</span> ${label}</span>
         <b style="color:${color}">${txt}</b>
       </div>`;
     };
     const isOk = (v) => v === 0 || v === true;
+    const _firstId = (arr) => (arr && arr[0] ? arr[0].id : null);
     h.push(`<div class="inspector-section" style="margin-top:12px;padding:8px 10px;background:#f9fafb;border-radius:4px">
       <h4 style="margin:0 0 6px;font-size:13px">📐 Состояние проектирования</h4>
       ${_row(sources.length ? '✓' : '⚠', sources.length ? '#15803d' : '#ca8a04', 'Источников питания', sources.length)}
       ${_row(upses.length ? '✓' : 'ℹ', upses.length ? '#15803d' : '#6b7280', 'ИБП', upses.length)}
       ${_row(panels.length ? '✓' : 'ℹ', panels.length ? '#15803d' : '#6b7280', 'Распределительных щитов', panels.length)}
       ${_row(consumers.length ? '✓' : '⚠', consumers.length ? '#15803d' : '#ca8a04', 'Потребителей', consumers.length)}
-      ${_row(isOk(unpoweredConsumers.length) ? '✓' : '⚠', isOk(unpoweredConsumers.length) ? '#15803d' : '#ca8a04', 'Без питания', unpoweredConsumers.length)}
-      ${_row(isOk(overloaded.length) ? '✓' : '⛔', isOk(overloaded.length) ? '#15803d' : '#b91c1c', 'Перегруженных узлов', overloaded.length)}
-      ${_row(isOk(vdropOver5.length) ? '✓' : '⚠', isOk(vdropOver5.length) ? '#15803d' : '#ca8a04', 'ΔU > 5%', vdropOver5.length)}
-      ${vdropOver10.length > 0 ? _row('⛔', '#b91c1c', 'из них ΔU > 10%', vdropOver10.length) : ''}
+      ${_row(isOk(unpoweredConsumers.length) ? '✓' : '⚠', isOk(unpoweredConsumers.length) ? '#15803d' : '#ca8a04', 'Без питания', unpoweredConsumers.length, null, _firstId(unpoweredConsumers))}
+      ${_row(isOk(overloaded.length) ? '✓' : '⛔', isOk(overloaded.length) ? '#15803d' : '#b91c1c', 'Перегруженных узлов', overloaded.length, null, _firstId(overloaded))}
+      ${_row(isOk(vdropOver5.length) ? '✓' : '⚠', isOk(vdropOver5.length) ? '#15803d' : '#ca8a04', 'ΔU > 5%', vdropOver5.length, null, _firstId(vdropOver5))}
+      ${vdropOver10.length > 0 ? _row('⛔', '#b91c1c', 'из них ΔU > 10%', vdropOver10.length, null, _firstId(vdropOver10)) : ''}
       ${_row(tuFilled ? '✓' : 'ℹ', tuFilled ? '#15803d' : '#6b7280', 'Информация о проекте', tuFilled ? 'есть' : 'не заполнена')}
     </div>`);
   }
@@ -430,6 +435,20 @@ function renderInspectorPage() {
   // v0.59.702: запрос на ТУ из свойств страницы.
   const tuPgBtn = document.getElementById('pg-open-tu-request');
   if (tuPgBtn) tuPgBtn.addEventListener('click', () => openTuRequestModal(null));
+  // v0.59.713: клик по проблемной строке чеклиста — переход к первому
+  // проблемному узлу. Выделение узла + перерисовка инспектора.
+  inspectorBody.querySelectorAll('[data-checklist-jump]').forEach(el => {
+    el.addEventListener('click', () => {
+      const id = el.getAttribute('data-checklist-jump');
+      if (!id) return;
+      const tgt = state.nodes.get(id);
+      if (!tgt) return;
+      state.selectedKind = 'node';
+      state.selectedId = id;
+      try { _render(); } catch {}
+      try { renderInspector(); } catch {}
+    });
+  });
 }
 
 export function renderInspectorNode(n) {
