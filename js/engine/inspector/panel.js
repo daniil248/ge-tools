@@ -7,7 +7,7 @@ import { effectiveTag } from '../zones.js';
 import { snapshot, notifyChange } from '../history.js';
 import { render } from '../render.js';
 import { isTagUnique } from '../graph.js';
-import { consumerGroupItems } from '../electrical.js';
+import { consumerGroupItems, nodeVoltage } from '../electrical.js';
 import { getTerm, getTermTooltip } from '../../methods/terms.js';
 import { rtmInfoBlock } from './rtm-block.js';
 // Фаза 1.19.7: panel-catalog / panel-picker больше не используются в
