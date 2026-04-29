@@ -2089,19 +2089,28 @@ export function renderNodes() {
       // recalc.js как min(c._maxA, c._breakerIn). Юзер: «для потребителя
       // можно добавить доступную мощность, которая вычисляется по
       // длительному допустимому току кабеля и его защитному автомату».
-      // Для uniform-группы _availableKw / _availableA уже на 1 ед. (кабель
-      // привязан к одному потребителю в схеме), поэтому показываются как
-      // есть. Для individual-группы скрываем (см. v0.59.659).
+      // v0.59.662: для uniform-группы кабель в схеме подобран на ВСЮ группу
+      // (под суммарный ток N × I_per_unit), поэтому _availableA в state —
+      // это ток ОДНОГО общего кабеля, который обслуживает всю группу.
+      // Юзер: «про кабель тоже нужно на 1 потребитель». Делим на cnt чтобы
+      // показать долю на 1 ед. (как и текущая/номин). Для individual-группы
+      // строка скрыта (нет смысла усреднять).
       const _availLabel = n._availableLimit === 'cable'
         ? 'доступно (кабель)'
         : n._availableLimit === 'breaker'
           ? 'доступно (автомат)'
           : 'доступно';
+      const _availKw = _isUniformGroup
+        ? (Number.isFinite(n._availableKw) ? n._availableKw / cnt : null)
+        : n._availableKw;
+      const _availA = _isUniformGroup
+        ? (Number.isFinite(n._availableA) ? n._availableA / cnt : null)
+        : n._availableA;
       loadLines = [
         _fmtRow('текущая', Pcur, Icur),
         _fmtRow('номин', Pnom, Inom),
-        (!_isIndivGroup && Number.isFinite(n._availableA) && n._availableA > 0)
-          ? _fmtRow(_availLabel, n._availableKw, n._availableA)
+        (!_isIndivGroup && Number.isFinite(_availA) && _availA > 0)
+          ? _fmtRow(_availLabel, _availKw, _availA)
           : null,
       ].filter(Boolean);
     } else if (n.type === 'channel') {
