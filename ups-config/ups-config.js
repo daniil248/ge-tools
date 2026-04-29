@@ -816,6 +816,58 @@ async function _saveWizardConfiguration() {
   }
 }
 
+// v0.59.735: bidirectional sync для wiz-loadKw ↔ wiz-loadA. cos φ из
+// wiz-cosPhi, фаза из wiz-phases. Напряжение: 3ф 400В / 1ф 230В.
+function _ucKwToA(kw) {
+  if (!(kw > 0)) return 0;
+  const cos = Number(document.getElementById('wiz-cosPhi')?.value) || 0.9;
+  const ph = Number(document.getElementById('wiz-phases')?.value) || 3;
+  const U = ph === 1 ? 230 : 400;
+  const k = ph === 1 ? 1 : Math.sqrt(3);
+  return (kw * 1000) / (k * U * cos);
+}
+function _ucAToKw(a) {
+  if (!(a > 0)) return 0;
+  const cos = Number(document.getElementById('wiz-cosPhi')?.value) || 0.9;
+  const ph = Number(document.getElementById('wiz-phases')?.value) || 3;
+  const U = ph === 1 ? 230 : 400;
+  const k = ph === 1 ? 1 : Math.sqrt(3);
+  return (a * k * U * cos) / 1000;
+}
+function _ucSyncLoadAFromKw() {
+  const kwEl = document.getElementById('wiz-loadKw');
+  const aEl = document.getElementById('wiz-loadA');
+  if (!kwEl || !aEl) return;
+  const a = _ucKwToA(Number(kwEl.value) || 0);
+  aEl.value = a > 0 ? a.toFixed(2).replace(/\.00$/, '') : '';
+}
+let _ucWizFieldsWired = false;
+function _ucWireWizLoadFields() {
+  if (_ucWizFieldsWired) { _ucSyncLoadAFromKw(); return; }
+  const kwEl = document.getElementById('wiz-loadKw');
+  const aEl = document.getElementById('wiz-loadA');
+  if (!kwEl || !aEl) return;
+  _ucWizFieldsWired = true;
+  let _syncing = false;
+  kwEl.addEventListener('input', () => {
+    if (_syncing) return;
+    _syncing = true;
+    try { _ucSyncLoadAFromKw(); } finally { _syncing = false; }
+  });
+  aEl.addEventListener('input', () => {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      const kw = _ucAToKw(Number(aEl.value) || 0);
+      kwEl.value = kw > 0 ? kw.toFixed(2).replace(/\.00$/, '') : '';
+    } finally { _syncing = false; }
+  });
+  // Смена cos φ или фаз → пересчитать I из текущей P.
+  document.getElementById('wiz-cosPhi')?.addEventListener('change', _ucSyncLoadAFromKw);
+  document.getElementById('wiz-cosPhi')?.addEventListener('input', _ucSyncLoadAFromKw);
+  document.getElementById('wiz-phases')?.addEventListener('change', _ucSyncLoadAFromKw);
+}
+
 function _fillWizStep1Fields() {
   const rq = wizState.requirements;
   document.getElementById('wiz-loadKw').value = rq.loadKw;
@@ -842,6 +894,8 @@ function _fillWizStep1Fields() {
   if (mlActiveEl) mlActiveEl.checked = !!rq.maxLoadFactorActive;
   const mlFactorEl = document.getElementById('wiz-maxLoadFactor');
   if (mlFactorEl) mlFactorEl.value = rq.maxLoadFactor || 0.80;
+  // v0.59.735: связь wiz-loadKw ↔ wiz-loadA (двунаправленная).
+  _ucWireWizLoadFields();
 }
 
 function _showStep(n) {
