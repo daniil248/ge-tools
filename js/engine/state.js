@@ -117,6 +117,15 @@ export function getCurrentPage() {
 // Если pageIds отсутствует — считаем что узел на всех страницах (legacy-миграция).
 export function isOnCurrentPage(obj) {
   if (!obj) return false;
+  // v0.59.776: alias-связанные узлы не отображаются на canvas — групповой
+  // потребитель является контейнером, alias-источник доступен только
+  // через Группа-tab. Юзер: «при связи не должно оставаться исходной
+  // карточки». Этот guard также покрывает ранее связанные узлы (до
+  // v0.59.776), которые были видимы на canvas — теперь они автоматически
+  // скрываются как только их target существует в state.nodes.
+  if (obj.linkedAlias && state.nodes && state.nodes.get && state.nodes.get(obj.linkedAlias)) {
+    return false;
+  }
   const pids = obj.pageIds;
   // v0.59.331: разделяем два случая:
   //  - pageIds === undefined — legacy-узел, в миграции до pages, показываем везде;

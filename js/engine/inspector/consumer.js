@@ -4,7 +4,7 @@ import { GLOBAL, DEFAULTS, CONSUMER_CATALOG, CONSUMER_CATEGORIES, NODE_H, STARTE
 import { state, uid } from '../state.js';
 import { escHtml, escAttr, fmt, field, flash, helpIcon } from '../utils.js';
 import { effectiveTag } from '../zones.js';
-import { nextFreeTag } from '../graph.js';
+import { nextFreeTag, hideAliasSourceFromCanvas } from '../graph.js';
 import { snapshot, notifyChange } from '../history.js';
 import { setEffectiveLoadFactor } from '../modes.js';
 import { render } from '../render.js';
@@ -1099,7 +1099,17 @@ export function openConsumerParamsModal(n) {
         if (Array.isArray(n.linkedMembers)) {
           n.linkedMembers = n.linkedMembers.filter(m => n.linkedAliases.includes(m.originalId));
         }
-        try { flash(`Слот #${slotIdx + 1} разъединён (узел «${tgt?.tag || aliasId}» остался)`, 'success'); } catch {}
+        // v0.59.776: после разрыва связи узел остался unplaced (так как при
+        // связи мы скрыли его с canvas). Подсказываем юзеру что он попал
+        // в «Неразмещённые» — оттуда его можно перетащить на схему.
+        try {
+          const tgtPids = (tgt && Array.isArray(tgt.pageIds)) ? tgt.pageIds.length : 0;
+          if (tgt && tgtPids === 0) {
+            flash(`Слот #${slotIdx + 1} разъединён — «${tgt.tag || aliasId}» в «Неразмещённые», перетащите на схему`, 'success');
+          } else {
+            flash(`Слот #${slotIdx + 1} разъединён (узел «${tgt?.tag || aliasId}» остался)`, 'success');
+          }
+        } catch {}
         notifyChange();
         openConsumerParamsModal(n);
       });
@@ -1165,6 +1175,9 @@ export function openConsumerParamsModal(n) {
         if (oldSlot >= 0 && oldSlot !== slotIdx) n.linkedAliases[oldSlot] = null;
         n.linkedAliases[slotIdx] = src.id;
         src.linkedAlias = n.id;
+        // v0.59.776: спрятать src с canvas (групповой потребитель = контейнер).
+        // Юзер: «при связи не должно оставаться исходной карточки».
+        hideAliasSourceFromCanvas(src);
         try { flash(`Слот #${slotIdx + 1} ← ${src.tag || src.id}`, 'success'); } catch {}
         notifyChange();
         openConsumerParamsModal(n);

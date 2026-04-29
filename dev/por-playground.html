@@ -89,6 +89,9 @@
     </select>
     <button class="ghost" id="cleanup-dups" title="Удалить дубликаты POR-объектов type=rack этого проекта (та же tag/kW/габариты)">🧹 Удалить дубликаты</button>
     <button class="ghost" id="cleanup-stale" title="Удалить «фантомные» POR-стойки: записи с legacyRackId='tpl-…/scheme-…/por-group-…' (корпус-шаблоны и виртуалы, попавшие сюда из-за legacy-миграции)">🗑 Удалить фантомы</button>
+    <label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px" title="Показать сгруппированные/связанные объекты (родители групп с linkedAliases). По умолчанию они скрыты — отображаются только реальные экземпляры (SR01-SR08), а не их группа SR1.">
+      <input type="checkbox" id="show-linked-parents"/> Показать связанные/групповые
+    </label>
     <span class="muted" id="rack-count"></span>
   </div>
   <table id="racks-table">
@@ -247,10 +250,46 @@ async function renderRacks() {
     const por = await import('../shared/por.js');
     list = filterType ? por.getObjects(_currentPid, { type: filterType }) : por.getObjects(_currentPid);
   }
-  $('rack-count').textContent = `(${list.length} POR-объектов)`;
+  // v0.59.776: фильтр родителей групп (consumer-узлы с linkedAliases).
+  // Юзер: «сгруппированные или связанные элементы должны удалятся из
+  // списка отдельных элементов. Например мы связали SR01-SR08 c SR01,
+  // группа автоматически переименовалась по первому потребителю в SR01,
+  // и из списка удалили SR1 — должны остаться только SR01-SR08».
+  // Источник: engine.scheme.v1 → ищем consumer-узлы с непустым linkedAliases,
+  // их n.tag попадает в _hideTags. POR-объекты с такими tag скрываются
+  // (если чекбокс «Показать связанные/групповые» снят).
+  const showLinkedParents = $('show-linked-parents') && $('show-linked-parents').checked;
+  const _hideTags = new Set();
+  if (_currentPid && !showLinkedParents) {
+    try {
+      const schemeKey = `raschet.project.${_currentPid}.engine.scheme.v1`;
+      const raw = localStorage.getItem(schemeKey);
+      if (raw) {
+        const scheme = JSON.parse(raw);
+        if (scheme && Array.isArray(scheme.nodes)) {
+          for (const n of scheme.nodes) {
+            if (Array.isArray(n.linkedAliases) && n.linkedAliases.some(Boolean)) {
+              if (n.tag) _hideTags.add(String(n.tag));
+            }
+          }
+        }
+      }
+    } catch (e) { console.warn('[scheme load for filter]', e); }
+  }
+  const _origCount = list.length;
+  let _hiddenCount = 0;
+  if (_hideTags.size > 0) {
+    list = list.filter(r => {
+      if (_hideTags.has(String(r.tag || ''))) { _hiddenCount++; return false; }
+      return true;
+    });
+  }
+  $('rack-count').textContent = _hiddenCount > 0
+    ? `(${list.length} POR-объектов, скрыто ${_hiddenCount} групп-родителей)`
+    : `(${list.length} POR-объектов)`;
 
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="muted">Нет POR-объектов с фильтром «${filterType||'все'}».</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="muted">Нет POR-объектов с фильтром «${filterType||'все'}»${_hiddenCount > 0 ? ' (скрыто '+_hiddenCount+' групп-родителей — снимите чекбокс выше)' : ''}.</td></tr>`;
     return;
   }
   // Также покажем consumer-group в таблице (если фильтр «rack» или «все»).
@@ -402,6 +441,11 @@ $('clear-log').addEventListener('click', () => { $('event-log').textContent = ''
 // ─── Filter type + cleanup duplicates ────────────────────────────────
 if ($('filter-type')) {
   $('filter-type').addEventListener('change', () => renderRacks());
+}
+// v0.59.776: чекбокс «Показать связанные/групповые» — re-render с новым
+// фильтром.
+if ($('show-linked-parents')) {
+  $('show-linked-parents').addEventListener('change', () => renderRacks());
 }
 if ($('cleanup-dups')) {
   $('cleanup-dups').addEventListener('click', async () => {

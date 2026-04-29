@@ -68,6 +68,12 @@ export function loadSchemeVirtualRacks(pid) {
     const total = Math.max(1, parseInt(n.count, 10) || 1);
     const baseTag = baseTagOf(n);
     const baseName = baseNameOf(n);
+    // v0.59.776: alias-привязанные слоты не выдают свой виртуал — alias-узел
+    // (тот, на который указывает linkedAliases[i-1]) сам является отдельным
+    // consumer-узлом схемы и обрабатывается на этой же итерации цикла,
+    // выдавая собственный виртуал. Юзер: «сгруппированные или связанные
+    // элементы должны удалятся из списка отдельных элементов».
+    const aliases = Array.isArray(n.linkedAliases) ? n.linkedAliases : [];
     // Поля u/occupied — если у узла есть rackTemplate с этими данными,
     // подставляем; иначе дефолт 42U.
     const tpl = n.rackTemplate && typeof n.rackTemplate === 'object' ? n.rackTemplate : null;
@@ -84,6 +90,9 @@ export function loadSchemeVirtualRacks(pid) {
     const voltageV = Number(n.voltageV) || 400;
 
     for (let i = 1; i <= total; i++) {
+      // v0.59.776: skip linked slot — alias-узел отдельный consumer-node
+      // и эмитит свой виртуал самостоятельно.
+      if (aliases[i - 1]) continue;
       const tag = total > 1 ? `${baseTag}-${i}` : baseTag;
       out.push({
         id: `scheme-${n.id}-${i}`,

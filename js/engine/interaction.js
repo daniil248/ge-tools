@@ -6,7 +6,7 @@ import { nodeInputCount, nodeOutputCount, nodeWidth, nodeHeight, portPos, getNod
 import { snapshot, notifyChange } from './history.js';
 import { selectNode, selectConn, renderInspector, clientToSvg } from './inspector.js';
 import { render, updateViewBox, el, bezier } from './render.js';
-import { createNode, deleteNode, deleteConn, tryConnect, wouldCreateCycle, nextFreeTag } from './graph.js';
+import { createNode, deleteNode, deleteConn, tryConnect, wouldCreateCycle, nextFreeTag, hideAliasSourceFromCanvas } from './graph.js';
 import { tryAttachToZone, detachFromZones, findZoneForMember, findParentZone, isNodeFullyInside, nodesInZone, copyZoneWithMembers } from './zones.js';
 import { flash } from './utils.js';
 import { rsToast, rsConfirm } from '../../shared/dialog.js';
@@ -119,6 +119,8 @@ function _aliasConsumerToGroup(target, source) {
     target.linkedAliases[slot] = source.id;
   }
   source.linkedAlias = target.id;
+  // v0.59.776: спрятать source с canvas (групповой потребитель = контейнер).
+  hideAliasSourceFromCanvas(source);
   return { linked: true, slotIdx: slot, overflow };
 }
 

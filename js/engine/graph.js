@@ -9,6 +9,35 @@ export function bindGraphDeps({ snapshot, render, renderInspector, notifyChange,
   _notifyChange = notifyChange; _selectNode = selectNode; _findZoneForMember = findZoneForMember;
 }
 
+// v0.59.776: спрятать source-узел с canvas после установки alias-связи.
+// Юзер: «при связи не должно оставаться исходной карточки, она должна
+// быть внутри, в группе и доступная для редактирования, по сути групповой
+// потребитель это просто контейнер».
+// Очищает pageIds, positionsByPage и удаляет все connections с участием
+// source. Узел остаётся в state.nodes (редактируется через Группа-tab
+// связанной группы).
+export function hideAliasSourceFromCanvas(source) {
+  if (!source) return;
+  source.pageIds = [];
+  if (source.positionsByPage) source.positionsByPage = {};
+  const connsToDel = [];
+  for (const c of state.conns.values()) {
+    if (c.from?.nodeId === source.id || c.to?.nodeId === source.id) {
+      connsToDel.push(c.id);
+    }
+  }
+  for (const cid of connsToDel) state.conns.delete(cid);
+  if (state.sysConns) {
+    const sysToDel = [];
+    for (const c of state.sysConns.values()) {
+      if (c.from?.nodeId === source.id || c.to?.nodeId === source.id) {
+        sysToDel.push(c.id);
+      }
+    }
+    for (const cid of sysToDel) state.sysConns.delete(cid);
+  }
+}
+
 // Поиск наименьшего свободного обозначения с заданным префиксом (TR1, TR2, …)
 export function nextFreeTag(type) {
   const prefix = TAG_PREFIX[type] || 'X';
