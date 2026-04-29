@@ -256,17 +256,42 @@ export function openConsumerParamsModal(n) {
     }
   }
   // ===== Установленная (номинальная) мощность — паспорт =====
-  h.push(`<div id="cp-demandKw-wrap" class="field" style="${_groupMode === 'individual' && _cpCount > 1 ? 'display:none' : ''}">
-    <label id="cp-demandKw-label">${_demandLabel}${_lkIcon}</label>
-    <input type="number" id="cp-demandKw" min="0" step="0.1" value="${_displayDemand}"${_lk}>
-  </div>`);
-  // Парный ввод тока — производное от мощности через U/cos φ/фазу.
-  const _nomIlabel = (_cpCount > 1)
-    ? (_isTotalDisplay ? 'Номинальный ток группы I, А' : 'Номинальный ток (на единицу) I, А')
-    : 'Номинальный ток I, А';
-  h.push(`<div id="cp-demandA-wrap" class="field" style="${_groupMode === 'individual' && _cpCount > 1 ? 'display:none' : ''}">
-    <label>${_nomIlabel}${_lkIcon}${helpIcon(`Связан с «${_demandLabel.replace(', kW','')}» через U/cos φ/фазу: I = P × 1000 / (U × cos φ × √3 для 3ф). При изменении одного поля автоматически пересчитывается другое.`)}</label>
-    <input type="number" id="cp-demandA" min="0" step="0.1" value=""${_lk}>
+  // v0.59.738: парные поля Мощность + Ток в одной строке (как в cable-calc /
+  // panel-config). При количестве > 1 + uniform добавляется ВТОРАЯ строка
+  // выше с групповыми значениями (группа = на единицу × count). Каждое из
+  // 4 полей синхронизировано двунаправленно (см. _wireGroupSync ниже).
+  // _displayDemand теперь ВСЕГДА per-unit — n.demandKw хранится per-unit
+  // (см. save-логику ниже), а group-row показывает n.demandKw × count.
+  const _isGroupUniform = (_cpCount > 1 && _groupMode === 'uniform');
+  const _perUnitKw = Number(n.demandKw || 0);
+  const _hideDemand = (_groupMode === 'individual' && _cpCount > 1);
+  const _ipTip = `Связан с мощностью через U/cos φ/фазу: I = P × 1000 / (U × cos φ × √3 для 3ф). При изменении одного поля автоматически пересчитывается другое.`;
+  const _gridStyle = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end';
+  if (_isGroupUniform) {
+    // Верхняя строка — на всю группу (P + I)
+    h.push(`<div id="cp-demandGroup-wrap" class="field" style="${_gridStyle}">
+      <div>
+        <label>Мощность всей группы, kW${_lkIcon}${helpIcon('Суммарная мощность группы = «Мощность каждого» × «Количество». Редактирование пересчитывает «Мощность каждого» = группа / N.')}</label>
+        <input type="number" id="cp-demandKwGroup" min="0" step="0.1" value="${_perUnitKw * _cpCount}"${_lk}>
+      </div>
+      <div>
+        <label>Ток всей группы, А${_lkIcon}${helpIcon(_ipTip + ' Группа = ток одного × N (для параллельных потребителей).')}</label>
+        <input type="number" id="cp-demandAGroup" min="0" step="0.1" value=""${_lk}>
+      </div>
+    </div>`);
+  }
+  // Нижняя строка — на единицу (P + I) — она же единственная при count=1
+  const _perUnitLabel = _isGroupUniform ? 'Мощность каждого, kW' : 'Установленная мощность, kW';
+  const _perUnitIlabel = _isGroupUniform ? 'Ток каждого, А' : 'Номинальный ток I, А';
+  h.push(`<div id="cp-demandKw-wrap" class="field" style="${_hideDemand ? 'display:none' : _gridStyle}">
+    <div>
+      <label id="cp-demandKw-label">${_perUnitLabel}${_lkIcon}</label>
+      <input type="number" id="cp-demandKw" min="0" step="0.1" value="${_perUnitKw}"${_lk}>
+    </div>
+    <div>
+      <label id="cp-demandA-label">${_perUnitIlabel}${_lkIcon}${helpIcon(_ipTip)}</label>
+      <input type="number" id="cp-demandA" min="0" step="0.1" value=""${_lk}>
+    </div>
   </div>`);
   // v0.59.91: групповой потребитель (individual) = оболочка над N членами.
   // Каждый член = «обычный потребитель» со своими параметрами (не только
@@ -388,11 +413,12 @@ export function openConsumerParamsModal(n) {
   //     (юзер ввёл сумму), справочный per-unit не нужен.
   //   - Для single-consumer (count=1) — без изменений (всё одна штука).
   // Заголовок и хинт переписаны соответственно.
-  const _calcPerUnit = (_cpCount > 1) && !_isTotalDisplay; // = (loadSpec === 'per-unit')
+  // v0.59.738: cp-demandKw (Pnom) теперь ВСЕГДА per-unit, поэтому Pcalc
+  // тоже всегда per-unit; справочный группа-итог P_calc_group выводится
+  // ниже. Заголовок «(на 1 ед.)» при count>1.
+  const _calcPerUnit = (_cpCount > 1);
   const _calcHeader = (_cpCount > 1)
-    ? (_isTotalDisplay
-        ? 'P_ном × Ки × множитель (на всю группу)'
-        : 'P_ном × Ки × множитель (на 1 ед.)')
+    ? 'P_ном × Ки × множитель (на 1 ед.)'
     : 'P_ном × Ки × множитель';
   // v0.59.685: подсказки расчётной нагрузки вынесены в «?» иконку.
   const _calcMainTip = `Расчётная нагрузка = P_ном × Ки × множитель сценария. I_расч = P_расч × 1000 / (U × cos φ × √3 для 3ф). При изменении расчётной P или I — пересчитается Ки. При изменении Ки / множителя / P_ном — пересчитается расчётная.${_calcPerUnit ? ' Для группы суммарная Pрасч и Iрасч показываются справочно ниже.' : ''}`;
@@ -761,44 +787,28 @@ export function openConsumerParamsModal(n) {
   const loadSpecWrap = document.getElementById('cp-loadSpec-wrap');
   const demandInput = document.getElementById('cp-demandKw');
   const demandLabel = document.getElementById('cp-demandKw-label');
+  const demandALabel = document.getElementById('cp-demandA-label');
   const countInput = document.getElementById('cp-count');
-  // v0.59.381: loadSpec независим от serialMode. Показываем поле всегда
-  // при count>1; пересчёт total↔per-unit срабатывает по смене loadSpec
-  // и/или count (без участия serialMode).
-  const updateDemandUi = (prevLoadSpec) => {
+  // v0.59.738: cp-demandKw / cp-demandA ВСЕГДА хранят per-unit-значения.
+  // Группа показывается отдельной парой полей выше (cp-demandKwGroup /
+  // cp-demandAGroup) и пересчитывается из per-unit × count в _wireGroupSync.
+  // loadSpec-селектор больше не переключает значение (no multiply/divide
+  // on change) — он лишь подсказывает, какую строку юзеру удобнее править.
+  const updateDemandUi = () => {
     const cnt = Math.max(1, Number(countInput?.value) || 1);
-    const ls = (loadSpecSel?.value === 'total') ? 'total' : 'per-unit';
     if (loadSpecWrap) loadSpecWrap.style.display = (cnt > 1) ? '' : 'none';
-    if (demandLabel) {
-      demandLabel.textContent = (cnt > 1)
-        ? ((ls === 'total') ? 'Мощность всей группы, kW' : 'Мощность каждого, kW')
-        : 'Установленная мощность, kW';
-    }
-    if (demandInput) {
-      const cur = Number(demandInput.value) || 0;
-      const wasTotal = prevLoadSpec === 'total' && cnt > 1;
-      const isTotal  = ls === 'total' && cnt > 1;
-      if (wasTotal !== isTotal) {
-        if (isTotal) demandInput.value = (cur * cnt).toFixed(2).replace(/\.00$/, '');
-        else demandInput.value = (cur / cnt).toFixed(2).replace(/\.00$/, '');
-      }
+    if (demandLabel) demandLabel.textContent = (cnt > 1) ? 'Мощность каждого, kW' : 'Установленная мощность, kW';
+    if (demandALabel) {
+      // Заменить только текстовый префикс лейбла, сохранив helpIcon.
+      const helpEl = demandALabel.querySelector('.help-icon, [data-help-icon]');
+      const prefix = (cnt > 1) ? 'Ток каждого, А' : 'Номинальный ток I, А';
+      // Перестроить через innerHTML чтобы сохранить helpIcon.
+      const helpHtml = helpEl ? helpEl.outerHTML : '';
+      demandALabel.innerHTML = prefix + helpHtml;
     }
   };
-  let _prevLS = loadSpecSel?.value || 'per-unit';
-  if (loadSpecSel) {
-    loadSpecSel.addEventListener('change', () => {
-      updateDemandUi(_prevLS);
-      _prevLS = loadSpecSel.value || 'per-unit';
-    });
-  }
-  if (countInput) {
-    countInput.addEventListener('change', () => {
-      // При изменении count просто обновляем лейбл/видимость; пересчёт
-      // не делаем — пользователь сам решит что у него в поле (на единицу
-      // или на группу), переключив loadSpec.
-      updateDemandUi(_prevLS);
-    });
-  }
+  if (loadSpecSel) loadSpecSel.addEventListener('change', updateDemandUi);
+  if (countInput) countInput.addEventListener('change', updateDemandUi);
   if (serialCb) {
     serialCb.addEventListener('change', () => {
       // Только переключаем видимость serial-зависимых меток (если будут).
@@ -852,44 +862,93 @@ export function openConsumerParamsModal(n) {
     const k = _is3ph() && !_isDC() ? Math.sqrt(3) : 1;
     return (a * U * cos * k) / 1000;
   };
-  // Инициализация поля I — посчитать из текущего P.
+  // v0.59.738: 4-way двунаправленный sync. Per-unit P (cp-demandKw) —
+  // канонический источник. Поля cp-demandA / cp-demandKwGroup /
+  // cp-demandAGroup — производные.
+  // Per-unit:    P_unit ↔ I_unit  через _PtoI / _ItoP
+  // Group:       P_group = P_unit × N
+  //              I_group = I_unit × N (параллельные потребители — суммарный
+  //                                    ток равен сумме токов)
+  // Любая правка → пересчёт всех остальных полей.
+  const demandKwGroupInput = document.getElementById('cp-demandKwGroup');
+  const demandAGroupInput  = document.getElementById('cp-demandAGroup');
   if (demandInput && demandAInput) {
-    const initI = _PtoI(Number(demandInput.value) || 0);
-    demandAInput.value = initI > 0 ? initI.toFixed(2).replace(/\.00$/, '') : '';
-    // P → I (юзер ввёл мощность)
+    const _readCount = () => Math.max(1, Number(countInput?.value) || 1);
+    const _fmt = (v) => v > 0 ? v.toFixed(2).replace(/\.00$/, '') : '';
     let _syncing = false;
+    // Распространение от per-unit P (канонического значения) на 3 остальных.
+    const _propFromUnitP = () => {
+      const pUnit = Number(demandInput.value) || 0;
+      const iUnit = _PtoI(pUnit);
+      demandAInput.value = _fmt(iUnit);
+      const cnt = _readCount();
+      if (demandKwGroupInput) demandKwGroupInput.value = _fmt(pUnit * cnt);
+      if (demandAGroupInput)  demandAGroupInput.value  = _fmt(iUnit * cnt);
+    };
+    // Инициализация: посчитать I_unit + group-поля из текущего P_unit.
+    _propFromUnitP();
+    // P_unit введён — пересчитать I_unit, group P, group I.
     demandInput.addEventListener('input', () => {
       if (_syncing) return;
       _syncing = true;
-      try {
-        const p = Number(demandInput.value) || 0;
-        const i = _PtoI(p);
-        demandAInput.value = i > 0 ? i.toFixed(2).replace(/\.00$/, '') : '';
-      } finally { _syncing = false; }
+      try { _propFromUnitP(); } finally { _syncing = false; }
     });
-    // I → P (юзер ввёл ток)
+    // I_unit введён — обратная P_unit, затем пропагация.
     demandAInput.addEventListener('input', () => {
       if (_syncing) return;
       _syncing = true;
       try {
         const a = Number(demandAInput.value) || 0;
         const p = _ItoP(a);
-        demandInput.value = p > 0 ? p.toFixed(2).replace(/\.00$/, '') : '';
+        demandInput.value = _fmt(p);
+        const cnt = _readCount();
+        if (demandKwGroupInput) demandKwGroupInput.value = _fmt(p * cnt);
+        if (demandAGroupInput)  demandAGroupInput.value  = _fmt(a * cnt);
       } finally { _syncing = false; }
     });
-    // При смене U/cos/phase — пересчитать I из текущего P.
-    const _refreshI = () => {
+    // P_group введён — обратная P_unit = P_group / N, затем пропагация.
+    if (demandKwGroupInput) {
+      demandKwGroupInput.addEventListener('input', () => {
+        if (_syncing) return;
+        _syncing = true;
+        try {
+          const cnt = _readCount();
+          const pGroup = Number(demandKwGroupInput.value) || 0;
+          const pUnit = cnt > 0 ? pGroup / cnt : 0;
+          demandInput.value = _fmt(pUnit);
+          const iUnit = _PtoI(pUnit);
+          demandAInput.value = _fmt(iUnit);
+          if (demandAGroupInput) demandAGroupInput.value = _fmt(iUnit * cnt);
+        } finally { _syncing = false; }
+      });
+    }
+    // I_group введён — обратная I_unit = I_group / N, затем пропагация.
+    if (demandAGroupInput) {
+      demandAGroupInput.addEventListener('input', () => {
+        if (_syncing) return;
+        _syncing = true;
+        try {
+          const cnt = _readCount();
+          const iGroup = Number(demandAGroupInput.value) || 0;
+          const iUnit = cnt > 0 ? iGroup / cnt : 0;
+          demandAInput.value = _fmt(iUnit);
+          const pUnit = _ItoP(iUnit);
+          demandInput.value = _fmt(pUnit);
+          if (demandKwGroupInput) demandKwGroupInput.value = _fmt(pUnit * cnt);
+        } finally { _syncing = false; }
+      });
+    }
+    // При смене U/cos/phase/count — пересчитать всё из канонического P_unit.
+    const _refreshAll = () => {
       if (_syncing) return;
       _syncing = true;
-      try {
-        const p = Number(demandInput.value) || 0;
-        const i = _PtoI(p);
-        demandAInput.value = i > 0 ? i.toFixed(2).replace(/\.00$/, '') : '';
-      } finally { _syncing = false; }
+      try { _propFromUnitP(); } finally { _syncing = false; }
     };
-    if (cosInput) cosInput.addEventListener('input', _refreshI);
-    if (phaseSel) phaseSel.addEventListener('change', _refreshI);
-    if (voltSel) voltSel.addEventListener('change', _refreshI);
+    if (cosInput) cosInput.addEventListener('input', _refreshAll);
+    if (phaseSel) phaseSel.addEventListener('change', _refreshAll);
+    if (voltSel) voltSel.addEventListener('change', _refreshAll);
+    if (countInput) countInput.addEventListener('input', _refreshAll);
+    if (countInput) countInput.addEventListener('change', _refreshAll);
   }
 
   // v0.59.652: блок «Расчётная нагрузка» — двунаправленный пересчёт
@@ -929,7 +988,7 @@ export function openConsumerParamsModal(n) {
         if (calcAInput) calcAInput.value = Icalc > 0 ? Icalc.toFixed(2).replace(/\.00$/, '') : '';
         // Справочно для группы — только если режим per-unit и count > 1.
         const cnt = _readCount();
-        if (cnt > 1 && !_isLoadSpecTotal() && _calcGroupKwSpan) {
+        if (cnt > 1 && _calcGroupKwSpan) {
           const PcalcGroup = Pcalc * cnt;
           const IcalcGroup = _PtoI(PcalcGroup);
           _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
@@ -955,7 +1014,7 @@ export function openConsumerParamsModal(n) {
         if (calcAInput) calcAInput.value = Icalc > 0 ? Icalc.toFixed(2).replace(/\.00$/, '') : '';
         // Справочно для группы (только если per-unit)
         const cnt = _readCount();
-        if (cnt > 1 && !_isLoadSpecTotal() && _calcGroupKwSpan) {
+        if (cnt > 1 && _calcGroupKwSpan) {
           const PcalcGroup = Pcalc * cnt;
           const IcalcGroup = _PtoI(PcalcGroup);
           _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
@@ -979,7 +1038,7 @@ export function openConsumerParamsModal(n) {
         }
         // Справочно для группы (только если per-unit)
         const cnt = _readCount();
-        if (cnt > 1 && !_isLoadSpecTotal() && _calcGroupKwSpan) {
+        if (cnt > 1 && _calcGroupKwSpan) {
           const PcalcGroup = Pcalc * cnt;
           const IcalcGroup = _PtoI(PcalcGroup);
           _calcGroupKwSpan.textContent = PcalcGroup > 0 ? PcalcGroup.toFixed(2).replace(/\.00$/, '') : '—';
@@ -1071,11 +1130,10 @@ export function openConsumerParamsModal(n) {
       if (Array.isArray(n.items)) delete n.items;
       const demandEl = document.getElementById('cp-demandKw');
       if (demandEl && String(demandEl.value ?? '').trim() !== '') {
-        const _rawDemand = Number(demandEl.value) || 0;
-        // v0.59.381: total↔per-unit независим от serialMode.
-        n.demandKw = (n.loadSpec === 'total' && n.count > 1)
-          ? (_rawDemand / n.count)
-          : _rawDemand;
+        // v0.59.738: cp-demandKw ВСЕГДА хранит per-unit (см. рендер выше).
+        // Группа отображается отдельным полем cp-demandKwGroup, которое
+        // sync-логика автоматически пересчитывает в per-unit / count.
+        n.demandKw = Number(demandEl.value) || 0;
       }
     }
     const vEl = document.getElementById('cp-voltage');
