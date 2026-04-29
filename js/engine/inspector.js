@@ -304,12 +304,15 @@ function renderInspectorPage() {
         return !!ps;
       } catch { return false; }
     })();
-    // v0.59.713: некоторые строки делаем кликабельными — клик
-    // выделяет ПЕРВЫЙ проблемный узел на схеме (data-checklist-jump
-    // attribute, обработчик ниже).
-    const _row = (icon, color, label, count, total, jumpId) => {
+    // v0.59.713/717: некоторые строки делаем кликабельными — клик
+    // выделяет ПЕРВЫЙ проблемный узел/связь на схеме (data-checklist-jump
+    // + опциональный data-checklist-kind='node'|'conn').
+    const _row = (icon, color, label, count, total, jumpId, jumpKind) => {
       const txt = total != null ? `${count}/${total}` : (count != null ? String(count) : '');
-      const _clickable = jumpId ? ` data-checklist-jump="${jumpId}" style="cursor:pointer" title="Кликните, чтобы перейти к первому проблемному узлу"` : '';
+      const _kind = jumpKind || 'node';
+      const _clickable = jumpId
+        ? ` data-checklist-jump="${jumpId}" data-checklist-kind="${_kind}" style="cursor:pointer" title="Кликните, чтобы перейти к первой проблемной ${_kind === 'conn' ? 'линии' : 'узлу'}"`
+        : '';
       return `<div${_clickable ? ' class="checklist-row"' : ''}${_clickable} style="display:flex;justify-content:space-between;align-items:center;font-size:11px;line-height:1.6${jumpId ? ';cursor:pointer' : ''}">
         <span><span style="color:${color}">${icon}</span> ${label}</span>
         <b style="color:${color}">${txt}</b>
@@ -327,8 +330,8 @@ function renderInspectorPage() {
       ${_row(isOk(overloaded.length) ? '✓' : '⛔', isOk(overloaded.length) ? '#15803d' : '#b91c1c', 'Перегруженных узлов', overloaded.length, null, _firstId(overloaded))}
       ${_row(isOk(vdropOver5.length) ? '✓' : '⚠', isOk(vdropOver5.length) ? '#15803d' : '#ca8a04', 'ΔU > 5%', vdropOver5.length, null, _firstId(vdropOver5))}
       ${vdropOver10.length > 0 ? _row('⛔', '#b91c1c', 'из них ΔU > 10%', vdropOver10.length, null, _firstId(vdropOver10)) : ''}
-      ${_row(isOk(cableOverflow.length) ? '✓' : '⛔', isOk(cableOverflow.length) ? '#15803d' : '#b91c1c', 'Кабелей переполнено', cableOverflow.length)}
-      ${_row(isOk(breakerUndersize.length) ? '✓' : '⛔', isOk(breakerUndersize.length) ? '#15803d' : '#b91c1c', 'Автоматов: In < Iрасч', breakerUndersize.length)}
+      ${_row(isOk(cableOverflow.length) ? '✓' : '⛔', isOk(cableOverflow.length) ? '#15803d' : '#b91c1c', 'Кабелей переполнено', cableOverflow.length, null, _firstId(cableOverflow), 'conn')}
+      ${_row(isOk(breakerUndersize.length) ? '✓' : '⛔', isOk(breakerUndersize.length) ? '#15803d' : '#b91c1c', 'Автоматов: In < Iрасч', breakerUndersize.length, null, _firstId(breakerUndersize), 'conn')}
       ${_row(tuFilled ? '✓' : 'ℹ', tuFilled ? '#15803d' : '#6b7280', 'Информация о проекте', tuFilled ? 'есть' : 'не заполнена')}
       <div style="margin-top:6px;padding-top:6px;border-top:1px dashed #d7dde5">
         <button type="button" id="pg-open-reports-checks" class="full-btn" style="font-size:11px;padding:4px 8px">📊 Подробный отчёт «Проверки и предупреждения»</button>
@@ -452,25 +455,38 @@ function renderInspectorPage() {
     });
   }
 
-  // v0.59.713/714: клик по проблемной строке чеклиста — переход к первому
-  // проблемному узлу. Выделение узла + центрирование холста (если включено
-  // GLOBAL.autoCenterOnSelect или Ctrl+клик) + перерисовка инспектора.
+  // v0.59.713/714/717: клик по проблемной строке чеклиста — переход к
+  // первому проблемному узлу или связи. data-checklist-kind=
+  //   'node' (default) → state.nodes + centerOnNode
+  //   'conn'           → state.conns + centerOnConn
   inspectorBody.querySelectorAll('[data-checklist-jump]').forEach(el => {
-    el.addEventListener('click', async (ev) => {
+    el.addEventListener('click', async () => {
       const id = el.getAttribute('data-checklist-jump');
       if (!id) return;
-      const tgt = state.nodes.get(id);
-      if (!tgt) return;
-      state.selectedKind = 'node';
-      state.selectedId = id;
-      // Центрировать холст на узле (всегда при клике из чеклиста —
-      // это явное действие навигации, не случайный select).
-      try {
-        const expMod = await import('./export.js');
-        if (expMod && typeof expMod.centerOnNode === 'function') {
-          expMod.centerOnNode(tgt);
-        }
-      } catch {}
+      const kind = el.getAttribute('data-checklist-kind') || 'node';
+      if (kind === 'conn') {
+        const c = state.conns.get(id);
+        if (!c) return;
+        state.selectedKind = 'conn';
+        state.selectedId = id;
+        try {
+          const expMod = await import('./export.js');
+          if (expMod && typeof expMod.centerOnConn === 'function') {
+            expMod.centerOnConn(c);
+          }
+        } catch {}
+      } else {
+        const tgt = state.nodes.get(id);
+        if (!tgt) return;
+        state.selectedKind = 'node';
+        state.selectedId = id;
+        try {
+          const expMod = await import('./export.js');
+          if (expMod && typeof expMod.centerOnNode === 'function') {
+            expMod.centerOnNode(tgt);
+          }
+        } catch {}
+      }
       try { _render(); } catch {}
       try { renderInspector(); } catch {}
     });
