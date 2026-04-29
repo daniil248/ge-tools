@@ -89,6 +89,48 @@ function _findConsumerOverlapAt(dragged) {
   return bestNode;
 }
 
+// v0.59.769: новая helper для IDENTIFY-AS (slot-based alias). Используется
+// при mouseup-merge (drag канвас→канвас) и drop unplaced→canvas-consumer.
+// Заменяет старый _mergeConsumersIntoGroup, который удалял source.
+// Возвращает {linked: bool, slotIdx, overflow: bool} или null.
+function _aliasConsumerToGroup(target, source) {
+  if (!target || !source || target.id === source.id) return null;
+  if (source.type !== 'consumer' || target.type !== 'consumer') return null;
+  if (source.linkedAlias && source.linkedAlias !== target.id) return null;
+  if (!Array.isArray(target.linkedAliases)) target.linkedAliases = [];
+  if (!Array.isArray(target.linkedMembers)) target.linkedMembers = [];
+  // Padding до текущего count
+  const tCount = Math.max(1, Number(target.count) || 1);
+  while (target.linkedAliases.length < tCount) target.linkedAliases.push(null);
+  // Уже связан с этой группой?
+  if (target.linkedAliases.includes(source.id)) return null;
+  // Найти первый anonymous-слот; если их нет, добавить новый (count++)
+  let slot = target.linkedAliases.indexOf(null);
+  let overflow = false;
+  if (slot < 0) {
+    target.linkedAliases.push(source.id);
+    target.count = (Number(target.count) || 1) + 1;
+    slot = target.linkedAliases.length - 1;
+    overflow = true;
+  } else {
+    target.linkedAliases[slot] = source.id;
+  }
+  source.linkedAlias = target.id;
+  // Snapshot metadata для отображения
+  target.linkedMembers.push({
+    originalId: source.id,
+    tag: source.tag || '',
+    name: source.name || '',
+    demandKw: Number(source.demandKw) || 0,
+    cosPhi: Number(source.cosPhi) || null,
+    phase: source.phase || null,
+    consumerSubtype: source.consumerSubtype || '',
+    voltageLevelIdx: Number.isFinite(Number(source.voltageLevelIdx)) ? Number(source.voltageLevelIdx) : null,
+    linkedAt: Date.now(),
+  });
+  return { linked: true, slotIdx: slot, overflow };
+}
+
 function _mergeConsumersIntoGroup(target, source) {
   // target поглощает source. Возвращает targetId.
   if (!target || !source || target.id === source.id) return null;
@@ -765,18 +807,25 @@ export function initInteraction() {
         n.y = Math.round(p.y - 50);
         if (!n.positionsByPage) n.positionsByPage = {};
         n.positionsByPage[state.currentPageId] = { x: n.x, y: n.y };
-        // v0.59.760: после drop'а из «Неразмещённых» — проверка auto-merge
-        // (ROADMAP 1.28.9). Если drop попал на совместимого consumer'а —
-        // n абсорбируется в target, count++.
+        // v0.59.769: drop unplaced на consumer-узел — IDENTIFY-AS (alias).
+        // Юзер пожаловался ранее, что переподключение через MERGE стирает
+        // SCS-узлы — теперь они остаются как linked alias. ROADMAP 1.28.10.
         if (n.type === 'consumer') {
           const target = _findConsumerOverlapAt(n);
-          if (target && _isCompatibleConsumer(n, target)) {
+          if (target) {
             const tagBefore = target.tag || target.name || target.id;
-            const newCount = (Number(target.count) || 1) + (Number(n.count) || 1);
-            _mergeConsumersIntoGroup(target, n);
-            state.selectedKind = 'node';
-            state.selectedId = target.id;
-            try { flash(`Объединено в группу ${tagBefore} (×${newCount})`, 'success'); } catch {}
+            const result = _aliasConsumerToGroup(target, n);
+            if (result) {
+              // unplaced источник остаётся unplaced (pageIds не нужно
+              // добавлять — он представлен через target). Уберём добавление
+              // на текущую страницу, которое сделал стандартный drop-handler.
+              if (Array.isArray(n.pageIds)) {
+                n.pageIds = n.pageIds.filter(p => p !== state.currentPageId);
+              }
+              state.selectedKind = 'node';
+              state.selectedId = target.id;
+              try { flash(`«${n.tag || n.id}» связан с группой ${tagBefore} (слот #${result.slotIdx + 1})`, 'success'); } catch {}
+            }
           }
         }
         notifyChange();
@@ -1720,25 +1769,26 @@ export function initInteraction() {
           render();
         }
       }
-      // v0.59.758: auto-merge при drop'е consumer-ноды поверх другой совместимой
-      // consumer-ноды (ROADMAP 1.28.9). Целевая нода (target) поглощает
-      // dragged-source: target.count += source.count, source удаляется со всеми
-      // связями. Совместимость = subtype/phase/voltage/cosPhi±0.05/demandKw±5%.
+      // v0.59.769: drop consumer-ноды поверх consumer'а — IDENTIFY-AS (alias),
+      // НЕ удаляем source (юзер может потом разорвать связь). ROADMAP 1.28.10.
+      // Если source несовместим electrically (subtype/phase/etc) — линкуем
+      // тем не менее (cross-discipline сценарий: технолог и электрик имеют
+      // разные параметры одного объекта). Юзер: «именно связать ... не
+      // соединить а заменить по факту».
       if (wasNodeDrag && draggedNodeId) {
         const dragged = state.nodes.get(draggedNodeId);
         if (dragged && dragged.type === 'consumer') {
           const target = _findConsumerOverlapAt(dragged);
-          if (target && _isCompatibleConsumer(dragged, target)) {
-            // snapshot перед merge для Ctrl+Z
-            try { snapshot('consumer-merge:' + target.id + '←' + dragged.id); } catch {}
+          if (target) {
+            try { snapshot('consumer-alias:' + target.id + '←' + dragged.id); } catch {}
             const tagBefore = target.tag || target.name || target.id;
-            const newCount = (Number(target.count) || 1) + (Number(dragged.count) || 1);
-            _mergeConsumersIntoGroup(target, dragged);
-            // Перевыбрать target после удаления dragged
-            state.selectedKind = 'node';
-            state.selectedId = target.id;
-            try { flash(`Объединено в группу ${tagBefore} (×${newCount})`, 'success'); } catch {}
-            render();
+            const result = _aliasConsumerToGroup(target, dragged);
+            if (result) {
+              state.selectedKind = 'node';
+              state.selectedId = target.id;
+              try { flash(`«${dragged.tag || dragged.id}» связан с группой ${tagBefore} (слот #${result.slotIdx + 1}${result.overflow ? ', count → ' + target.count : ''})`, 'success'); } catch {}
+              render();
+            }
           }
         }
       }

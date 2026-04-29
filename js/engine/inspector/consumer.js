@@ -699,7 +699,10 @@ export function openConsumerParamsModal(n) {
             }
           }).join('')}
         </div>
-        <div class="muted" style="font-size:10px;margin-top:4px;color:#6b7280">Каждый слот #N может быть связан с конкретным реальным узлом проекта (picker ниже) или оставаться анонимным (учитывается просто как «один из count»).</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <button type="button" id="cp-slot-add" style="padding:3px 10px;border:1px dashed #4f46e5;background:#fff;color:#4f46e5;border-radius:3px;cursor:pointer;font-size:11px">➕ Добавить пустой слот</button>
+          <span class="muted" style="font-size:10px;color:#6b7280">Каждый слот #N может быть связан с конкретным реальным узлом проекта или оставаться анонимным.</span>
+        </div>
       </div>`);
 
       // v0.59.761: picker одиночных потребителей для связи с группой
@@ -1109,6 +1112,23 @@ export function openConsumerParamsModal(n) {
         openConsumerParamsModal(n);
       });
     });
+  }
+
+  // v0.59.769: «+ Добавить пустой слот» — count++, новый anonymous-слот в
+  // конце списка. Юзер просил для резервирования слотов под будущее.
+  {
+    const addSlotBtn = document.getElementById('cp-slot-add');
+    if (addSlotBtn) {
+      addSlotBtn.addEventListener('click', () => {
+        try { snapshot('group-slot-add:' + n.id); } catch {}
+        n.count = (Number(n.count) || 1) + 1;
+        if (!Array.isArray(n.linkedAliases)) n.linkedAliases = [];
+        n.linkedAliases.push(null);
+        try { flash(`Добавлен пустой слот #${n.count}`, 'success'); } catch {}
+        notifyChange();
+        openConsumerParamsModal(n);
+      });
+    }
   }
 
   // v0.59.768: picker-rows теперь draggable. Юзер: «убери чек боксы и
