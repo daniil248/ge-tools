@@ -157,15 +157,18 @@ export function openConsumerParamsModal(n) {
       _aliasCandidates.push(m);
     }
     if (linkedIsGroup) {
-      // Этот узел — экземпляр группы
+      // Этот узел — экземпляр группы. v0.59.778: используем effectiveTag
+      // для группы (= обозначение первого экземпляра по сортировке),
+      // не raw .tag.
+      const _grpDisplayTag = effectiveTag(linkedNode) || linkedNode.tag || linkedNode.id;
       h.push(`<div class="field" style="margin-top:8px;padding:8px 10px;background:#dbeafe;border:1px solid #93c5fd;border-radius:4px">
         <label style="font-size:11px;font-weight:600;color:#1e40af;margin-bottom:4px;display:block">↪ Экземпляр группы</label>
         <div class="muted" style="font-size:10.5px;margin-bottom:6px;color:#1e3a8a;line-height:1.4">
-          Этот узел числится как ${linkedSlotIdx >= 0 ? `<b>слот #${linkedSlotIdx + 1}</b>` : 'экземпляр'} группы <b>${escHtml(linkedNode.tag || linkedNode.id)}</b> (${linkedNode.count} ×). На схеме отображается через группу; в «Неразмещённые» не попадает.
+          Этот узел числится как ${linkedSlotIdx >= 0 ? `<b>слот #${linkedSlotIdx + 1}</b>` : 'экземпляр'} группы <b>${escHtml(_grpDisplayTag)}</b> (${linkedNode.count} ×). На схеме отображается через группу; в «Неразмещённые» не попадает.
         </div>
-        <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #93c5fd;border-radius:3px">
+        <div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #93c5fd;border-radius:3px;cursor:pointer" id="cp-alias-back-to-group" title="Вернуться к параметрам группы">
           <span style="font-size:13px">↪</span>
-          <span style="font-weight:600">${escHtml(linkedNode.tag || linkedNode.id)}</span>
+          <span style="font-weight:600">${escHtml(_grpDisplayTag)}</span>
           <span class="muted">${escHtml(linkedNode.name || '')}</span>
           ${linkedSlotIdx >= 0 ? `<span class="muted" style="font-size:10px">слот #${linkedSlotIdx + 1}</span>` : ''}
           <span class="muted" style="margin-left:auto;font-size:10px">×${linkedNode.count}</span>
@@ -1089,6 +1092,19 @@ export function openConsumerParamsModal(n) {
         if (tgt) openConsumerParamsModal(tgt);
       });
     });
+    // v0.59.778: клик по строке «↪ Экземпляр группы X» — вернуться к
+    // параметрам группы (контейнера). Юзер: «Внутри любой экземпляр
+    // можно открывать и редактировать одиночные свойства» — обратный
+    // переход к группе тоже должен быть в один клик.
+    const aliasBackBtn = document.getElementById('cp-alias-back-to-group');
+    if (aliasBackBtn) {
+      aliasBackBtn.addEventListener('click', (e) => {
+        if (e.target.closest('#cp-alias-unlink')) return; // не перехватывать unlink
+        const targetId = n.linkedAlias;
+        const target = targetId ? state.nodes.get(targetId) : null;
+        if (target) openConsumerParamsModal(target);
+      });
+    }
     if (aliasLinkBtn && aliasSel) {
       aliasLinkBtn.addEventListener('click', () => {
         const targetId = aliasSel.value;
@@ -1387,10 +1403,12 @@ export function openConsumerParamsModal(n) {
         try { flash(`→ ${tgt.tag || tgt.id}`, 'success'); } catch {}
       });
     });
-    // Клик по строке linked-слота (вне ✂ и 🔗) — открыть свойства узла
+    // Клик по строке linked-слота (вне кнопок) — открыть свойства узла
     document.querySelectorAll('.cp-group-slot[data-slot-state="linked"]').forEach(row => {
       row.addEventListener('click', e => {
-        if (e.target.closest('.cp-slot-unlink, .cp-slot-locate')) return;
+        // v0.59.778: исключения расширены — кнопки split-out (↗) и
+        // прочие кнопки внутри строки не должны триггерить open-modal.
+        if (e.target.closest('.cp-slot-unlink, .cp-slot-locate, .cp-slot-splitout, .cp-slot-materialize, .cp-slot-remove, button')) return;
         const linkId = row.dataset.linkId;
         if (!linkId) return;
         const tgt = state.nodes.get(linkId);
