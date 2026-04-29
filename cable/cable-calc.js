@@ -18,12 +18,10 @@ const $ = id => document.getElementById(id);
 const els = {
   methodStandard:    $('in-method-standard'),
   methodLabel:       $('method-label'),
-  inputMode:         $('input-mode'),
-  fieldsCurrent:     $('fields-current'),
-  fieldsPower:       $('fields-power'),
   current:           $('in-current'),
   power:             $('in-power'),
   voltageLevel:      $('in-voltage-level'),
+  phase:             $('in-phase'),
   cosphi:            $('in-cosphi'),
   material:          $('in-material'),
   insulation:        $('in-insulation'),
@@ -42,6 +40,9 @@ const els = {
   resultArea:        $('result-area'),
 };
 
+// v0.59.729: режим ввода больше не toggle — оба поля видны и связаны
+// двунаправленно. mode определяет ВЕДУЩЕЕ поле для расчёта (то, что
+// юзер последним редактировал). Сохраняется неявно через input listeners.
 let mode = 'current';
 let currentMethod = null;
 let currentEcoMethod = null;
@@ -92,14 +93,76 @@ function init() {
 
   // Events
   els.methodStandard.addEventListener('change', () => switchMethod(els.methodStandard.value));
-  els.inputMode.addEventListener('click', e => {
-    const lbl = e.target.closest('label');
-    if (!lbl) return;
-    mode = lbl.dataset.mode;
-    els.inputMode.querySelectorAll('label').forEach(l => l.classList.toggle('active', l === lbl));
-    els.fieldsCurrent.style.display = mode === 'current' ? '' : 'none';
-    els.fieldsPower.style.display   = mode === 'power'   ? '' : 'none';
+
+  // v0.59.729: двунаправленный пересчёт P ↔ I через U/cos φ/фазу.
+  // I = P × 1000 / (U × cos φ × √3 для 3ф); P = I × U × cos φ × √3 / 1000.
+  // Mode сохраняется по последнему редактируемому полю (для расчёта).
+  let _syncing = false;
+  const _getU = () => {
+    const idx = Number(els.voltageLevel?.value) || 0;
+    const lv = (GLOBAL.voltageLevels || [])[idx];
+    if (!lv) return 400;
+    const ph = els.phase ? els.phase.value : '3ph';
+    if (ph === '1ph') return Number(lv.vLN) || (Number(lv.vLL) / Math.sqrt(3));
+    return Number(lv.vLL) || 400;
+  };
+  const _getCos = () => Math.max(0.1, Math.min(1, Number(els.cosphi?.value) || 0.92));
+  const _is3ph = () => (els.phase ? els.phase.value : '3ph') === '3ph';
+  const _PtoI = (kw) => {
+    const U = _getU();
+    if (!U || U <= 0 || !(kw > 0)) return 0;
+    const k = _is3ph() ? Math.sqrt(3) : 1;
+    return (kw * 1000) / (U * _getCos() * k);
+  };
+  const _ItoP = (a) => {
+    const U = _getU();
+    if (!U || U <= 0 || !(a > 0)) return 0;
+    const k = _is3ph() ? Math.sqrt(3) : 1;
+    return (a * U * _getCos() * k) / 1000;
+  };
+  // I → P
+  els.current.addEventListener('input', () => {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      mode = 'current';
+      const a = Number(els.current.value) || 0;
+      const p = _ItoP(a);
+      els.power.value = p > 0 ? p.toFixed(2).replace(/\.00$/, '') : '';
+    } finally { _syncing = false; }
   });
+  // P → I
+  els.power.addEventListener('input', () => {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      mode = 'power';
+      const p = Number(els.power.value) || 0;
+      const i = _PtoI(p);
+      els.current.value = i > 0 ? i.toFixed(2).replace(/\.00$/, '') : '';
+    } finally { _syncing = false; }
+  });
+  // При смене U / cos φ / phase — пересчитать ведомое поле
+  const _refreshDerived = () => {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      if (mode === 'current') {
+        const a = Number(els.current.value) || 0;
+        const p = _ItoP(a);
+        els.power.value = p > 0 ? p.toFixed(2).replace(/\.00$/, '') : '';
+      } else {
+        const p = Number(els.power.value) || 0;
+        const i = _PtoI(p);
+        els.current.value = i > 0 ? i.toFixed(2).replace(/\.00$/, '') : '';
+      }
+    } finally { _syncing = false; }
+  };
+  if (els.voltageLevel) els.voltageLevel.addEventListener('change', _refreshDerived);
+  if (els.cosphi) els.cosphi.addEventListener('input', _refreshDerived);
+  if (els.phase) els.phase.addEventListener('change', _refreshDerived);
+  // Инициализация — пересчитать P из дефолтного I при загрузке
+  setTimeout(_refreshDerived, 50);
   els.btnCalc.addEventListener('click', calculate);
   if (els.btnReport) els.btnReport.addEventListener('click', exportReport);
   document.addEventListener('keydown', e => {
