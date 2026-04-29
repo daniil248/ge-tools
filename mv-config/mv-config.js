@@ -163,6 +163,21 @@ function _fillStep1() {
   // 3ф: P[МВт] = √3 × U[кВ] × I[А] × cos φ / 1000.
   // P в МВт удобнее для MV — типичные нагрузки сотни киловатт ~ единицы МВт.
   _wireMvLoadFields();
+
+  // Phase 1.19.13: если lockedId — блокируем выбор типа РУ и показываем
+  // плашку «Зафиксировано производителем/серией из проекта».
+  if (wizState.lockedManufacturer || wizState.lockedSeries) {
+    const sel = document.getElementById('mv-type');
+    if (sel) sel.disabled = true;
+    const parent = sel?.parentElement;
+    if (parent && !parent.querySelector('.mv-locked-hint')) {
+      const hint = document.createElement('div');
+      hint.className = 'mv-locked-hint muted';
+      hint.style.cssText = 'font-size:11px;color:#c67300;margin-top:4px';
+      hint.textContent = `🔒 Зафиксировано из проекта: ${wizState.lockedManufacturer || '—'}${wizState.lockedSeries ? ' / ' + wizState.lockedSeries : ''}. Альтернативные РУ не предлагаются.`;
+      parent.appendChild(hint);
+    }
+  }
 }
 
 let _mvLoadWired = false;
@@ -210,21 +225,6 @@ function _syncMvFromA() {
   const COS = 0.9;
   const mw = a > 0 ? (Math.sqrt(3) * u * a * COS) / 1000 : 0;
   mwEl.value = mw > 0 ? mw.toFixed(3).replace(/\.?0+$/, '') : '';
-}
-  // Phase 1.19.13: если lockedId — блокируем выбор типа РУ и показываем
-  // плашку «Зафиксировано производителем/серией из проекта».
-  if (wizState.lockedManufacturer || wizState.lockedSeries) {
-    const sel = document.getElementById('mv-type');
-    if (sel) sel.disabled = true;
-    const parent = sel?.parentElement;
-    if (parent && !parent.querySelector('.mv-locked-hint')) {
-      const hint = document.createElement('div');
-      hint.className = 'mv-locked-hint muted';
-      hint.style.cssText = 'font-size:11px;color:#c67300;margin-top:4px';
-      hint.textContent = `🔒 Зафиксировано из проекта: ${wizState.lockedManufacturer || '—'}${wizState.lockedSeries ? ' / ' + wizState.lockedSeries : ''}. Альтернативные РУ не предлагаются.`;
-      parent.appendChild(hint);
-    }
-  }
 }
 
 function _readStep1() {

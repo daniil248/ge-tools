@@ -2311,6 +2311,16 @@ export const CHANGELOGS = {
   ],
 
   'mv-config': [
+    { version: '0.59.737', date: '2026-04-29', items: [
+      '🩹 КРИТИЧЕСКИЙ ФИКС: восстановлена функция _fillStep1() — в v0.59.732 при добавлении парных полей mv-loadA ↔ mv-loadMW я по ошибке закрыл `}` функции до блока «Phase 1.19.13» (lockedManufacturer), оставив этот блок осиротевшим на уровне модуля + лишний `}` в конце. Из-за SyntaxError модуль mv-config.js не загружался → мастер РУ СН не открывался начиная с v0.59.732.',
+      'Исправлено: блок lockedManufacturer возвращён внутрь _fillStep1(), helpers _wireMvLoadFields / _syncMvFromA вынесены ПОСЛЕ закрывающего `}` функции.',
+      'Файлы: mv-config/mv-config.js (рефакторинг порядка функций).',
+    ] },
+    { version: '0.59.732', date: '2026-04-29', items: [
+      '⚖️ Парные поля «Нагрузка, А» ↔ «Нагрузка, МВт» в шаге 1 мастера РУ СН с двусторонним пересчётом. 3ф: P[МВт] = √3·U[кВ]·I[А]·cos φ / 1000, cos φ = 0.9. Смена U_n → автопересчёт. Единый паттерн с panel-config (v0.59.731), rack-config (v0.59.733), mdc-config (v0.59.734), ups-config (v0.59.735), transformer-config (v0.59.736).',
+      'ВАЖНО: содержит регрессию (см. v0.59.737) — мастер не открывался из-за SyntaxError. Для актуальной работы требуется ≥ v0.59.737.',
+      'Файлы: mv-config/index.html (+<input id="mv-loadMW">), mv-config/mv-config.js (_wireMvLoadFields / _syncMvFromA).',
+    ] },
     { version: '0.59.188', date: '2026-04-22', items: [
       'Левый сайдбар standalone-режима: «Основные настройки» / «Свойства» / «Конфигурации РУ СН» через shared/config-sidebar.js. В embedded-режиме (body.mvc-embed) скрывается.',
       'Файлы: mv-config/index.html (main.mvc-layout + aside + mount); mv-config/mv-config.css (grid-layout).',
