@@ -614,18 +614,65 @@ export function openConsumerParamsModal(n) {
         </div>
       </div>`);
     } else {
-      // uniform mode — placeholder для 1.28.10 (cross-discipline reconciliation)
-      // и 1.28.13 (split-out). Пока показываем только информационный блок;
-      // полноценная реализация — в следующих коммитах.
+      // uniform mode. Реализован picker для 1.28.10 (link existing) v0.59.761;
+      // 1.28.13 (split-out) пока placeholder.
       h.push(`<div id="cp-items-wrap" class="field" style="display:none"><div id="cp-items-body"></div><span id="cp-items-sum" class="muted"></span></div>`);
-      h.push(`<div class="muted" style="font-size:11px;margin-top:8px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;color:#92400e">
-        🔗 <b>Связь с существующими POR-инстансами</b> — в разработке (ROADMAP 1.28.10).
-        В будущем здесь будет список ${escHtml(n.consumerSubtype === 'rack' ? 'стоек' : 'потребителей')}, на которые ссылается эта группа,
-        с возможностью «связать» уже существующие orphan-узлы (например SR01-SR08 → группа SR1).
-      </div>`);
+      // v0.59.761: Список совместимых одиночных потребителей (count=1) на схеме,
+      // которых можно слить в текущую группу. Совместимость по subtype/phase/
+      // voltage/cosPhi±0.05/demandKw±5%. Юзер: «8 в группе SR1 это те же
+      // SR01-SR08, как их сопоставить» (ROADMAP 1.28.10).
+      const _grpSubtype = (n.consumerSubtype || '');
+      const _grpPhase = n.phase || '3ph';
+      const _grpV = Number(n.voltageLevelIdx);
+      const _grpCos = Number(n.cosPhi) || 0.92;
+      const _grpKw = Number(n.demandKw) || 0;
+      const _grpGm = n.groupMode || 'uniform';
+      const _candidates = [];
+      if (_grpKw > 0) {
+        for (const m of state.nodes.values()) {
+          if (m.id === n.id) continue;
+          if (m.type !== 'consumer') continue;
+          if ((Number(m.count) || 1) !== 1) continue; // только одиночные
+          if ((m.consumerSubtype || '') !== _grpSubtype) continue;
+          if ((m.phase || '3ph') !== _grpPhase) continue;
+          const mV = Number(m.voltageLevelIdx);
+          if (Number.isFinite(_grpV) && Number.isFinite(mV) && _grpV !== mV) continue;
+          const mCos = Number(m.cosPhi) || 0.92;
+          if (Math.abs(mCos - _grpCos) > 0.05) continue;
+          const mKw = Number(m.demandKw) || 0;
+          if (mKw <= 0) continue;
+          if (Math.abs(mKw - _grpKw) / Math.max(mKw, _grpKw) > 0.05) continue;
+          if (m.groupMode === 'individual') continue;
+          _candidates.push(m);
+        }
+      }
+      if (_candidates.length > 0) {
+        h.push(`<div class="field" style="margin-top:8px;padding:8px 10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px">
+          <label style="font-size:11px;font-weight:600;color:#15803d;margin-bottom:6px;display:block">🔗 Связать с существующими ${_grpSubtype === 'rack' ? 'стойками' : 'потребителями'} (${_candidates.length})</label>
+          <div class="muted" style="font-size:10.5px;margin-bottom:6px;color:#166534;line-height:1.4">
+            На схеме найдены одиночные ${_grpSubtype === 'rack' ? 'стойки' : 'потребители'} с такими же параметрами (${_grpKw} кВт, cos φ ${_grpCos.toFixed(2)}). Отметьте их и нажмите «Объединить» — каждый увеличит счётчик группы на 1, а сам исчезнет со схемы (связи также удаляются).
+          </div>
+          <div id="cp-link-candidates" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;font-size:11.5px">
+            ${_candidates.map(m => `<label style="display:flex;align-items:center;gap:6px;padding:4px 6px;background:#fff;border:1px solid #d4d4d4;border-radius:3px;cursor:pointer">
+              <input type="checkbox" class="cp-link-cb" data-link-id="${escAttr(m.id)}">
+              <span style="font-weight:600">${escHtml(m.tag || m.id)}</span>
+              <span class="muted">${escHtml(m.name || '')}</span>
+              <span class="muted" style="margin-left:auto;font-size:10px">${(Number(m.demandKw)||0).toFixed(2)} кВт</span>
+            </label>`).join('')}
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
+            <button type="button" id="cp-link-apply" style="padding:4px 12px;border:1px solid #15803d;background:#15803d;color:#fff;border-radius:3px;cursor:pointer;font-size:11px">🔗 Объединить отмеченные</button>
+            <button type="button" id="cp-link-all" style="padding:4px 10px;border:1px solid #999;background:#fff;color:#555;border-radius:3px;cursor:pointer;font-size:11px">Выделить все</button>
+            <span id="cp-link-status" class="muted" style="font-size:10.5px"></span>
+          </div>
+        </div>`);
+      } else {
+        h.push(`<div class="muted" style="font-size:11px;margin-top:8px;padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;color:#6b7280">
+          🔗 На схеме нет одиночных ${_grpSubtype === 'rack' ? 'стоек' : 'потребителей'} с совместимыми параметрами (${_grpKw} кВт, ${_grpPhase}, cos φ ${_grpCos.toFixed(2)}, subtype «${_grpSubtype || '—'}»). Связывать нечего.
+        </div>`);
+      }
       h.push(`<div class="muted" style="font-size:11px;margin-top:6px;padding:8px 10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:4px;color:#92400e">
         ✂ <b>Исключение экземпляра</b> — в разработке (ROADMAP 1.28.13).
-        Кнопка «Исключить» рядом с каждым связанным экземпляром: уменьшит count группы на 1 и создаст одиночного потребителя со скопированными параметрами.
       </div>`);
     }
     h.push(`</div>`); // /panel group
@@ -807,6 +854,52 @@ export function openConsumerParamsModal(n) {
     _wireCard(card);
     refreshItemsSum();
   };
+  // v0.59.761: handlers для picker «🔗 Связать с существующими» (ROADMAP 1.28.10).
+  // Объединяет выбранные одиночные consumer-узлы в текущую группу: count += 1
+  // на каждого, узел и его связи удаляются.
+  {
+    const linkApplyBtn = document.getElementById('cp-link-apply');
+    const linkAllBtn = document.getElementById('cp-link-all');
+    const linkStatus = document.getElementById('cp-link-status');
+    if (linkAllBtn) {
+      linkAllBtn.addEventListener('click', () => {
+        document.querySelectorAll('.cp-link-cb').forEach(cb => { cb.checked = true; });
+      });
+    }
+    if (linkApplyBtn) {
+      linkApplyBtn.addEventListener('click', () => {
+        const checked = [...document.querySelectorAll('.cp-link-cb:checked')];
+        if (!checked.length) {
+          if (linkStatus) linkStatus.textContent = 'Не выбрано ни одного потребителя.';
+          return;
+        }
+        const ids = checked.map(cb => cb.dataset.linkId).filter(Boolean);
+        try { snapshot('group-link:' + n.id + '←' + ids.join(',')); } catch {}
+        let merged = 0;
+        for (const id of ids) {
+          const src = state.nodes.get(id);
+          if (!src) continue;
+          // увеличиваем count группы и удаляем источник со связями
+          n.count = (Number(n.count) || 1) + (Number(src.count) || 1);
+          // снести входящие/исходящие связи источника
+          const connsToDel = [];
+          for (const c of state.conns.values()) {
+            if (c.from?.nodeId === src.id || c.to?.nodeId === src.id) connsToDel.push(c.id);
+          }
+          for (const cid of connsToDel) state.conns.delete(cid);
+          state.nodes.delete(src.id);
+          merged++;
+        }
+        if (merged > 0) {
+          try { flash(`Объединено ${merged} ${merged === 1 ? 'потребитель' : 'потребителя/-ей'} в группу ${n.tag || n.id} (×${n.count})`, 'success'); } catch {}
+          notifyChange();
+          // Перерисовать модалку с обновлённым списком
+          openConsumerParamsModal(n);
+        }
+      });
+    }
+  }
+
   // Навесить обработчики на уже отрисованные карточки
   if (itemsBody) {
     itemsBody.querySelectorAll('.cp-it-card').forEach(_wireCard);
