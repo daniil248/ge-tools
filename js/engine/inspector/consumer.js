@@ -693,6 +693,51 @@ export function openConsumerParamsModal(n) {
       while (_aliases.length < _totalCount) _aliases.push(null);
       _aliases.length = _totalCount; // truncate если стало меньше
       const _perUnitKw = Number(n.demandKw) || 0;
+      // v0.59.777 ROADMAP 1.28.14: банер уведомления электрика об
+      // изменении параметров связанных экземпляров. Показывается когда
+      // есть НОВОЕ (с момента последнего ack) расхождение хотя бы у
+      // одного alias'а. Юзер: «Если после размещения, технолог изменит
+      // мощность отдельных стоек, то нужно уведомить электрика об этом».
+      {
+        const _ack = n._acknowledgedAliasState || {};
+        const _diverged = [];
+        for (const aid of _aliases) {
+          if (!aid) continue;
+          const a = state.nodes.get(aid);
+          if (!a) continue;
+          const kw = Number(a.demandKw) || 0;
+          if (Object.prototype.hasOwnProperty.call(_ack, aid) && Number(_ack[aid]) === kw) continue;
+          if (kw === 0 && _perUnitKw > 0) {
+            _diverged.push({ id: aid, tag: a.tag || aid, was: _ack[aid], now: 0, type: 'empty' });
+            continue;
+          }
+          if (_perUnitKw > 0 && Math.abs(kw - _perUnitKw) / _perUnitKw > 0.05) {
+            _diverged.push({ id: aid, tag: a.tag || aid, was: _ack[aid] != null ? _ack[aid] : _perUnitKw, now: kw, type: 'diff' });
+          }
+        }
+        if (_diverged.length > 0) {
+          const _maxKw = Math.max(_perUnitKw, ..._diverged.map(d => d.now).filter(v => v > 0));
+          h.push(`<div id="cp-diverge-banner" class="field" style="margin-top:8px;padding:8px 10px;background:#fef3c7;border:1.5px solid #f59e0b;border-radius:4px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#92400e;margin-bottom:6px">
+              ⚠ Технолог обновил параметры ${_diverged.length} экземпляр${_diverged.length === 1 ? 'а' : (_diverged.length < 5 ? 'ов' : 'ов')}
+            </div>
+            <div style="font-size:10.5px;color:#78350f;margin-bottom:6px;max-height:80px;overflow-y:auto;line-height:1.5">
+              ${_diverged.map(d => {
+                if (d.type === 'empty') {
+                  return `<div>• <b>${escHtml(d.tag)}</b>: ${d.was != null ? d.was.toFixed(2) + ' кВт' : 'было не зафиксировано'} → <b>не задано</b></div>`;
+                }
+                const dirArrow = d.now > d.was ? '↑' : '↓';
+                const pct = d.was > 0 ? Math.abs(d.now - d.was) / d.was * 100 : 0;
+                return `<div>• <b>${escHtml(d.tag)}</b>: ${d.was.toFixed(2)} → <b>${d.now.toFixed(2)} кВт</b> (${dirArrow} ${pct.toFixed(0)}%)</div>`;
+              }).join('')}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" id="cp-diverge-accept" data-max-kw="${_maxKw}" title="Установить group.demandKw = ${_maxKw.toFixed(2)} кВт (макс. среди связанных) и зафиксировать текущие значения как принятые" style="padding:4px 10px;border:1px solid #16a34a;background:#dcfce7;color:#166534;font-size:11px;border-radius:3px;cursor:pointer;font-weight:600">📥 Принять (group.demandKw = ${_maxKw.toFixed(2)} кВт)</button>
+              <button type="button" id="cp-diverge-ignore" title="Зафиксировать текущие значения как принятые без изменения group.demandKw — баннер исчезнет до следующего изменения" style="padding:4px 10px;border:1px solid #6b7280;background:#fff;color:#374151;font-size:11px;border-radius:3px;cursor:pointer">🚫 Игнорировать</button>
+            </div>
+          </div>`);
+        }
+      }
       h.push(`<div class="field" style="margin-top:8px">
         <label style="font-size:11px;font-weight:600;color:#37474f;margin-bottom:4px;display:block">Список приборов в группе (${_totalCount})</label>
         <div style="display:flex;flex-direction:column;gap:3px;font-size:11.5px;max-height:280px;overflow-y:auto">
@@ -730,14 +775,20 @@ export function openConsumerParamsModal(n) {
                 ${!exists ? `<span class="muted" style="font-size:9.5px;color:#92400e">⚠ узел удалён</span>` : ''}
                 ${divergeBadge}
                 <span class="muted" style="margin-left:auto;font-size:10px">${kw > 0 ? kw.toFixed(2) + ' кВт' : '— кВт'}</span>
-                <button type="button" class="cp-slot-unlink" data-slot-idx="${slotIdx}" title="Разорвать связь — слот вернётся в anonymous" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">✂</button>
+                <button type="button" class="cp-slot-splitout" data-slot-idx="${slotIdx}" title="Извлечь из группы — узел станет отдельным, count группы уменьшится на 1" style="background:none;border:none;color:#0369a1;cursor:pointer;font-size:13px;padding:0 4px">↗</button>
+                <button type="button" class="cp-slot-unlink" data-slot-idx="${slotIdx}" title="Разорвать связь — слот вернётся в anonymous (count не меняется)" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">✂</button>
               </div>`;
             } else {
+              // v0.59.777 ROADMAP 1.28.13: для анонимного слота —
+              // материализовать (➕) в standalone consumer-узел или
+              // удалить (─) из группы.
               return `<div class="cp-group-slot" data-slot-idx="${slotIdx}" data-slot-state="anon" style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:3px;color:#6b7280" title="Перетащите сюда узел из «Неразмещённые» или со схемы для связи">
                 <span style="font-size:10px;font-weight:600;min-width:28px;text-align:right">#${slotNo}</span>
                 <span style="font-size:10px;min-width:14px">·</span>
                 <span style="font-style:italic">аноним <span class="muted" style="font-size:9.5px">(перетащите узел сюда)</span></span>
                 <span class="muted" style="margin-left:auto;font-size:10px">${_perUnitKw > 0 ? _perUnitKw.toFixed(2) + ' кВт' : '— кВт'}</span>
+                <button type="button" class="cp-slot-materialize" data-slot-idx="${slotIdx}" title="Материализовать слот в отдельный consumer-узел с параметрами группы" style="background:none;border:none;color:#0369a1;cursor:pointer;font-size:13px;padding:0 4px">↗</button>
+                <button type="button" class="cp-slot-remove" data-slot-idx="${slotIdx}" title="Удалить пустой слот (count группы уменьшится на 1)" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">─</button>
               </div>`;
             }
           }).join('')}
@@ -1114,6 +1165,113 @@ export function openConsumerParamsModal(n) {
         openConsumerParamsModal(n);
       });
     });
+    // v0.59.777 ROADMAP 1.28.13: Split-out (↗) на linked-слоте — извлечь
+    // экземпляр в standalone (count--, slot убран из linkedAliases),
+    // alias-узел восстанавливается на canvas (pageIds=[currentPage],
+    // позиция рядом с группой). Юзер: «Добавить исключение конкретного
+    // экземпляра из группы».
+    const slotSplitoutBtns = document.querySelectorAll('.cp-slot-splitout');
+    slotSplitoutBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slotIdx = Number(btn.dataset.slotIdx);
+        if (!Array.isArray(n.linkedAliases) || slotIdx < 0 || slotIdx >= n.linkedAliases.length) return;
+        const aliasId = n.linkedAliases[slotIdx];
+        if (!aliasId) return;
+        const tgt = state.nodes.get(aliasId);
+        if (!tgt) return;
+        try { snapshot('group-slot-splitout:' + n.id + '#' + (slotIdx + 1)); } catch {}
+        // 1. Снять linkedAlias
+        if (tgt.linkedAlias === n.id) delete tgt.linkedAlias;
+        // 2. Удалить slot из массива (не null'ить — splice, чтобы count
+        //    действительно уменьшился)
+        n.linkedAliases.splice(slotIdx, 1);
+        n.count = Math.max(1, (Number(n.count) || 1) - 1);
+        // 3. Чистим linkedMembers
+        if (Array.isArray(n.linkedMembers)) {
+          n.linkedMembers = n.linkedMembers.filter(m => m.originalId !== aliasId);
+        }
+        // 4. Восстановить tgt на canvas: pageIds=[currentPage], позиция
+        //    рядом с группой
+        if (state.currentPageId) {
+          tgt.pageIds = [state.currentPageId];
+          const offsetX = (Number(n.width) || 200) + 30;
+          tgt.x = (Number(n.x) || 0) + offsetX;
+          tgt.y = Number(n.y) || 0;
+          if (!tgt.positionsByPage) tgt.positionsByPage = {};
+          tgt.positionsByPage[state.currentPageId] = { x: tgt.x, y: tgt.y };
+        }
+        try { flash(`«${tgt.tag || aliasId}» извлечён из группы — count=${n.count}`, 'success'); } catch {}
+        notifyChange();
+        if (typeof render === 'function') { try { render(); } catch {} }
+        openConsumerParamsModal(n);
+      });
+    });
+    // v0.59.777 ROADMAP 1.28.13: Materialize (↗) на anonymous-слоте —
+    // создать новый consumer-узел с параметрами группы и привязать его
+    // к этому слоту (slot становится linked). count не меняется.
+    // Юзер может потом split-out для извлечения в standalone.
+    const slotMaterializeBtns = document.querySelectorAll('.cp-slot-materialize');
+    slotMaterializeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slotIdx = Number(btn.dataset.slotIdx);
+        if (!Array.isArray(n.linkedAliases) || slotIdx < 0 || slotIdx >= n.linkedAliases.length) return;
+        if (n.linkedAliases[slotIdx]) return; // уже linked
+        try { snapshot('group-slot-materialize:' + n.id + '#' + (slotIdx + 1)); } catch {}
+        // Копируем электрические параметры группы в новый consumer-узел
+        const newId = uid();
+        const newTag = nextFreeTag('consumer');
+        const tplKw = Number(n.demandKw) || 0;
+        const newNode = {
+          id: newId,
+          type: 'consumer',
+          tag: newTag,
+          name: `${n.name || 'Потребитель'} #${slotIdx + 1}`,
+          consumerSubtype: n.consumerSubtype || '',
+          consumerKind: n.consumerKind || '',
+          phase: n.phase || '3ph',
+          phases: n.phases,
+          voltageLevelIdx: n.voltageLevelIdx,
+          voltageV: n.voltageV,
+          cosPhi: n.cosPhi,
+          demandKw: tplKw,
+          count: 1,
+          groupMode: 'individual',
+          x: 0, y: 0,
+          width: n.width || 200,
+          height: n.height || 120,
+          pageIds: [],   // unplaced — связан через alias
+          systems: Array.isArray(n.systems) ? [...n.systems] : ['electrical'],
+          linkedAlias: n.id,
+        };
+        state.nodes.set(newId, newNode);
+        n.linkedAliases[slotIdx] = newId;
+        try { flash(`Слот #${slotIdx + 1} материализован: создан узел «${newTag}»`, 'success'); } catch {}
+        notifyChange();
+        if (typeof render === 'function') { try { render(); } catch {} }
+        openConsumerParamsModal(n);
+      });
+    });
+    // v0.59.777 ROADMAP 1.28.13: Remove anon slot (─) — count--, slot
+    // удаляется из linkedAliases, никаких новых узлов не создаётся.
+    const slotRemoveBtns = document.querySelectorAll('.cp-slot-remove');
+    slotRemoveBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slotIdx = Number(btn.dataset.slotIdx);
+        if (!Array.isArray(n.linkedAliases) || slotIdx < 0 || slotIdx >= n.linkedAliases.length) return;
+        if (n.linkedAliases[slotIdx]) return; // только anon
+        if ((Number(n.count) || 1) <= 1) {
+          try { flash('Нельзя удалить последний слот — измените count или удалите узел целиком', 'warn'); } catch {}
+          return;
+        }
+        try { snapshot('group-slot-remove-anon:' + n.id + '#' + (slotIdx + 1)); } catch {}
+        n.linkedAliases.splice(slotIdx, 1);
+        n.count = Math.max(1, (Number(n.count) || 1) - 1);
+        try { flash(`Пустой слот #${slotIdx + 1} удалён — count=${n.count}`, 'success'); } catch {}
+        notifyChange();
+        if (typeof render === 'function') { try { render(); } catch {} }
+        openConsumerParamsModal(n);
+      });
+    });
     // Drag-drop на slot: позволяем притащить узел и привязать к слоту
     const slotEls = document.querySelectorAll('.cp-group-slot');
     slotEls.forEach(slotEl => {
@@ -1240,6 +1398,50 @@ export function openConsumerParamsModal(n) {
         openConsumerParamsModal(tgt);
       });
     });
+  }
+
+  // v0.59.777 ROADMAP 1.28.14: handlers «📥 Принять» / «🚫 Игнорировать»
+  // для диверже-банера. Принять — group.demandKw = max(alias kw),
+  // _acknowledgedAliasState ← текущий снапшот. Игнорировать — только
+  // обновить _acknowledgedAliasState без изменения group.demandKw.
+  // В обоих случаях баннер исчезает до следующего изменения.
+  {
+    const acceptBtn = document.getElementById('cp-diverge-accept');
+    const ignoreBtn = document.getElementById('cp-diverge-ignore');
+    const _snapshotAck = () => {
+      const ack = {};
+      const aliases = Array.isArray(n.linkedAliases) ? n.linkedAliases : [];
+      for (const aid of aliases) {
+        if (!aid) continue;
+        const a = state.nodes.get(aid);
+        if (!a) continue;
+        ack[aid] = Number(a.demandKw) || 0;
+      }
+      n._acknowledgedAliasState = ack;
+      n._lastAcknowledgedAt = Date.now();
+    };
+    if (acceptBtn) {
+      acceptBtn.addEventListener('click', () => {
+        try { snapshot('group-diverge-accept:' + n.id); } catch {}
+        const maxKw = Number(acceptBtn.dataset.maxKw) || 0;
+        if (maxKw > 0) n.demandKw = maxKw;
+        _snapshotAck();
+        try { flash(`Параметры приняты — group.demandKw = ${maxKw.toFixed(2)} кВт`, 'success'); } catch {}
+        notifyChange();
+        if (typeof render === 'function') { try { render(); } catch {} }
+        openConsumerParamsModal(n);
+      });
+    }
+    if (ignoreBtn) {
+      ignoreBtn.addEventListener('click', () => {
+        try { snapshot('group-diverge-ignore:' + n.id); } catch {}
+        _snapshotAck();
+        try { flash('Расхождение зафиксировано как принятое без изменений', 'success'); } catch {}
+        notifyChange();
+        if (typeof render === 'function') { try { render(); } catch {} }
+        openConsumerParamsModal(n);
+      });
+    }
   }
 
   // v0.59.769: «+ Добавить пустой слот» — count++, новый anonymous-слот в

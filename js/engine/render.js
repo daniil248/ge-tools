@@ -2485,6 +2485,47 @@ export function renderNodes() {
       g.appendChild(plusG);
     }
 
+    // v0.59.777: ROADMAP 1.28.14 — badge на canvas-карточке группы
+    // когда параметры связанного экземпляра отличаются от проектных
+    // (технолог обновил мощность). Юзер: «Если после размещения,
+    // технолог изменит мощность отдельных стоек, то нужно уведомить
+    // электрика об этом». Учитывается _acknowledgedAliasState — повторно
+    // не показываем уже принятые/игнорированные расхождения.
+    if (n.type === 'consumer' && Array.isArray(n.linkedAliases) && n.linkedAliases.some(Boolean)) {
+      const ack = n._acknowledgedAliasState || {};
+      const _perUnitKw = Number(n.demandKw) || 0;
+      let newDiverged = 0;
+      for (const aid of n.linkedAliases) {
+        if (!aid) continue;
+        const a = state.nodes.get(aid);
+        if (!a) continue;
+        const kw = Number(a.demandKw) || 0;
+        // Если уже зафиксировали именно это значение — пропускаем
+        if (Object.prototype.hasOwnProperty.call(ack, aid) && Number(ack[aid]) === kw) continue;
+        if (kw === 0 && _perUnitKw > 0) { newDiverged++; continue; }
+        if (_perUnitKw > 0 && Math.abs(kw - _perUnitKw) / _perUnitKw > 0.05) {
+          newDiverged++;
+        }
+      }
+      if (newDiverged > 0) {
+        // Маленький значок-кружок с ⚠ слева от иконки (24×24 px). Не
+        // конфликтует с margin-warn-tri (она у panel'ов).
+        const cx = 14, cy = 14, r = 10;
+        const circle = el('circle', { class: 'alias-diverge-badge', cx, cy, r,
+          fill: '#fde68a', stroke: '#92400e', 'stroke-width': 1.5 });
+        g.appendChild(circle);
+        const exc = text(cx, cy + 4, '!', 'alias-diverge-bang');
+        exc.setAttribute('text-anchor', 'middle');
+        exc.setAttribute('font-weight', '700');
+        exc.setAttribute('font-size', '13');
+        exc.setAttribute('fill', '#92400e');
+        g.appendChild(exc);
+        const title = el('title', {});
+        title.textContent = `⚠ ${newDiverged} связанн${newDiverged === 1 ? 'ый' : 'ых'} экземпляр${newDiverged === 1 ? '' : 'а'} с расхождением мощности — откройте Группа-tab для подтверждения`;
+        circle.appendChild(title);
+      }
+    }
+
     // Жёлтый треугольник с «!» — предупреждение о номинале шкафа
     if (n.type === 'panel' && n._marginWarn) {
       const tx = w - 22, ty = 8;
