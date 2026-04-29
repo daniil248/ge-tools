@@ -220,6 +220,41 @@ export function openConsumerParamsModal(n) {
     <label>${escHtml(_cosTerm.label)}${_lkIcon}${_cosTip ? helpIcon(_cosTip) : ''}</label>
     <input type="number" id="cp-cosPhi" min="0.1" max="1" step="0.01" value="${n.cosPhi ?? 0.92}"${_lk}>
   </div>`);
+  // v0.59.704: рабочее напряжение на клеммах с учётом падения напряжения
+  // от источника. Пользователь ранее: «нужно проверять допустимое напряжение
+  // (пределы из справочника, например 100-280В) и ток фактический пересчитывать
+  // исходя из падения напряжения». Шаг 1 — отображение фактического U
+  // на клеммах с проверкой диапазона.
+  // U_term = U_nominal × (1 - deltaUPct/100); deltaUPct накапливается в
+  // recalc.js по всем участкам линии от источника.
+  {
+    const _uNom = (levels[curIdx]?.vLL) || 0;
+    const _isPh1 = (ph === '1ph' || ph === 'A' || ph === 'B' || ph === 'C');
+    const _uNomPhase = _isPh1 ? Math.round(_uNom / Math.sqrt(3)) : _uNom;
+    const _drop = Number(n._deltaUPct) || 0;
+    const _uTerm = _uNomPhase * (1 - _drop / 100);
+    // Допустимый диапазон: ±10% по ГОСТ 32144-2013 (норма качества
+    // электроэнергии). Для расширенного диапазона ±15% — отдельная
+    // категория электроприёмников.
+    const _devPct = _uNomPhase > 0 ? (_uTerm - _uNomPhase) / _uNomPhase * 100 : 0;
+    const _color = Math.abs(_devPct) <= 5 ? '#15803d'
+      : Math.abs(_devPct) <= 10 ? '#ca8a04'
+      : '#b91c1c';
+    const _badge = Math.abs(_devPct) <= 5 ? '✓ норма (ГОСТ 32144)'
+      : Math.abs(_devPct) <= 10 ? '⚠ на границе ±10%'
+      : '⛔ вне ±10% (вне допустимых пределов)';
+    const _uTermTip = 'Фактическое напряжение на клеммах потребителя с учётом накопленного падения напряжения по линии от источника. Считается как U_ном × (1 − ΔU%/100), где ΔU% — сумма падений на всех участках кабелей в цепи от источника до этого потребителя. Допустимый диапазон ±10% по ГОСТ 32144-2013 (нормально допустимое отклонение). Если выходит за ±10% — нагрузка может работать ненадёжно или с пониженным КПД, требуется увеличить сечение питающих кабелей или повысить уровень напряжения.';
+    if (_uNomPhase > 0) {
+      h.push(`<div class="field" style="padding:6px 10px;background:#f9fafb;border-left:3px solid ${_color};border-radius:3px">
+        <label style="font-size:11px;color:#475569">⚡ Рабочее напряжение на клеммах${helpIcon(_uTermTip)}</label>
+        <div style="font-size:13px;line-height:1.4">
+          <b style="color:${_color}">${_uTerm.toFixed(1)} В</b>
+          <span class="muted" style="font-size:11px">(${_devPct >= 0 ? '+' : ''}${_devPct.toFixed(1)}% от ${_uNomPhase} В)</span>
+        </div>
+        <div style="font-size:10.5px;color:${_color};margin-top:2px">${_badge}</div>
+      </div>`);
+    }
+  }
   // ===== Установленная (номинальная) мощность — паспорт =====
   h.push(`<div id="cp-demandKw-wrap" class="field" style="${_groupMode === 'individual' && _cpCount > 1 ? 'display:none' : ''}">
     <label id="cp-demandKw-label">${_demandLabel}${_lkIcon}</label>
