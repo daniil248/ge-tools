@@ -6,7 +6,7 @@ import { listCableTypes, getCableType } from '../../../shared/cable-types-catalo
 // открывает инспектор линии с автоматом/кабелем)
 let _tccChartMod = null;
 import { state, inspectorBody } from '../state.js';
-import { escHtml, escAttr, fmt, field, flash } from '../utils.js';
+import { escHtml, escAttr, fmt, field, flash, helpIcon } from '../utils.js';
 import { effectiveTag } from '../zones.js';
 import { cableVoltageClass } from '../electrical.js';
 import { snapshot, notifyChange } from '../history.js';
@@ -325,8 +325,10 @@ export function renderInspectorConn(c) {
         markOpts += '</optgroup>';
       }
     }
-    h.push(field('Марка кабеля (из справочника)', `<select data-conn-prop="cableMark">${markOpts}</select>`));
-    h.push(`<div class="muted" style="font-size:10px;margin-top:-4px;margin-bottom:4px">Класс линии: <b>${classLabel}</b>. На электрической принципиальной схеме показаны только совместимые категории (силовые/высоковольтные/DC). Слаботочные и информационные — на соответствующих страницах (Фаза 2).</div>`);
+    h.push(`<div class="field">
+      <label>Марка кабеля (из справочника)${helpIcon(`Класс линии: ${classLabel}. На электрической принципиальной схеме показаны только совместимые категории (силовые / ВН / DC). Слаботочные и информационные — на соответствующих страницах. При выборе марки автоматически подставляются материал, изоляция и стандарт.`)}</label>
+      <select data-conn-prop="cableMark">${markOpts}</select>
+    </div>`);
     if (curMark) {
       const sel = getCableType(curMark);
       if (sel) {
@@ -342,22 +344,29 @@ export function renderInspectorConn(c) {
     }
   } catch (e) { /* каталог опционален */ }
 
-  h.push(field('Длина, м', `<input type="number" min="0" max="10000" step="0.5" data-conn-prop="lengthM" value="${c.lengthM ?? 1}">`));
+  h.push(`<div class="field">
+    <label>Длина, м${helpIcon('Физическая длина кабеля. Используется для расчёта падения напряжения и сопротивления линии. Для расчёта токов КЗ — Z_кабеля = ρ × L / S.')}</label>
+    <input type="number" min="0" max="10000" step="0.5" data-conn-prop="lengthM" value="${c.lengthM ?? 1}">
+  </div>`);
 
   if (!isBusbar) {
     // Кабельные параметры — только для кабелей
     const material = c.material || GLOBAL.defaultMaterial;
-    h.push(field('Материал жил',
-      `<select data-conn-prop="material">
+    h.push(`<div class="field">
+      <label>Материал жил${helpIcon('Cu (медь): ρ = 0.0175 Ом·мм²/м, более высокая ампасити при том же сечении. Al (алюминий): ρ = 0.028 Ом·мм²/м, дешевле, но сечение больше для той же нагрузки. Для In > 16 мм² (Cu) или 25 мм² (Al) разрешено N = phase/2 (IEC 60364-5-52 §524.2).')}</label>
+      <select data-conn-prop="material">
         <option value="Cu"${material === 'Cu' ? ' selected' : ''}>Медь</option>
         <option value="Al"${material === 'Al' ? ' selected' : ''}>Алюминий</option>
-      </select>`));
+      </select>
+    </div>`);
     const insulation = c.insulation || GLOBAL.defaultInsulation;
-    h.push(field('Изоляция',
-      `<select data-conn-prop="insulation">
+    h.push(`<div class="field">
+      <label>Изоляция${helpIcon('PVC (ПВХ): рабочая температура жилы до +70°C, дешевле, выделяет токсичный дым при горении. XLPE (сшитый ПЭ): до +90°C, выше ампасити при том же сечении, дороже. Для огнестойкости — отдельно отмечается флагом «огнестойкий».')}</label>
+      <select data-conn-prop="insulation">
         <option value="PVC"${insulation === 'PVC' ? ' selected' : ''}>ПВХ</option>
         <option value="XLPE"${insulation === 'XLPE' ? ' selected' : ''}>СПЭ (XLPE)</option>
-      </select>`));
+      </select>
+    </div>`);
     // Экономическая плотность тока — per-connection toggle
     const ecoChecked = !!c.economicDensity;
     h.push(`<div class="field" style="margin-top:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-conn-prop="economicDensity" ${ecoChecked ? 'checked' : ''}> Экон. плотность тока</label></div>`);
@@ -367,8 +376,12 @@ export function renderInspectorConn(c) {
     // (например ПвПу vs ПвПуг — с/без бронирования).
     if (c._isHV) {
       const hasArmour = !!c.hasArmour;
-      h.push(`<div class="field" style="margin-top:4px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" data-conn-prop="hasArmour" ${hasArmour ? 'checked' : ''}> Кабель с бронёй (заземлённой)</label></div>`);
-      h.push(`<div class="muted" style="font-size:11px;margin-top:-2px;margin-bottom:8px">На ВН: 3 жилы (3 фазы). Броня (если есть) — экран, заземлённый на обоих концах. В числе жил не учитывается.</div>`);
+      h.push(`<div class="field" style="margin-top:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" data-conn-prop="hasArmour" ${hasArmour ? 'checked' : ''}>
+          Кабель с бронёй (заземлённой)${helpIcon('На ВН-кабелях: 3 жилы (3 фазы). Броня — экран, заземляется на обоих концах. В числе жил не учитывается, но влияет на BOM (выбор марки: например, ПвПу vs ПвПуг).')}
+        </label>
+      </div>`);
     }
   }
   // Секция сечения — ВНУТРИ details "Проводник"
