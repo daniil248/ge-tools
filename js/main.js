@@ -1263,6 +1263,39 @@ async function openProject(id) {
         const mod = await import('../shared/project-bootstrap.js');
         mod.bootstrapProject(porPid);
         console.info(`[main] POR pid resolved to ${porPid} (${data.projectId ? 'projectId / контейнер' : 'scheme.id / fallback'})`);
+        // v0.59.742: синхронизируем локальный активный проект (используется
+        // suppression-config / scs-config / catalog scoping и file-badge в
+        // sidebar'е) с cloud-схемой. Раньше при открытии схемы Qarmet
+        // активный проект мог остаться от предыдущего mini-проекта (СКС-
+        // проекта или пр.) — top-bar показывал «Qarmet», а sidebar-бейдж
+        // — «🧪 Мини-проект: СКС-проект», что вводило юзера в ступор.
+        // Sync ТОЛЬКО если cloud-projectId реально существует в локальном
+        // project-storage (cloud и local — разные namespaces, мог быть
+        // импорт-маппинг: cloud-id == local-id). Иначе — показываем
+        // предупреждение, что контекст рассинхронизирован.
+        try {
+          const ps = await import('../shared/project-storage.js');
+          const prevActive = ps.getActiveProjectId();
+          const localProjects = ps.listProjects() || [];
+          const matchedLocal = localProjects.find(p => p && p.id === porPid);
+          if (matchedLocal) {
+            if (prevActive !== porPid) {
+              ps.setActiveProjectId(porPid);
+              try { window.dispatchEvent(new StorageEvent('storage', { key: 'raschet.activeProjectId.v1', newValue: porPid })); } catch {}
+              const prev = localProjects.find(p => p.id === prevActive);
+              const prevName = prev?.name || (prevActive ? prevActive.slice(0, 8) : '— нет —');
+              flash(`Активный проект синхронизирован со схемой: «${matchedLocal.name}» (был: ${prevName})`, 'info');
+            }
+          } else if (prevActive) {
+            const prev = localProjects.find(p => p.id === prevActive);
+            const prevName = prev?.name || prevActive.slice(0, 8);
+            const prevKind = prev?.kind || 'full';
+            // Mismatch: local active project ≠ cloud scheme's projectId.
+            // Не подменяем локальный активный (cloud-id может не быть в
+            // локальной БД), но предупреждаем юзера и предлагаем действие.
+            flash(`⚠ Контекст: схема «${data.name || ''}» (cloud), локальный активный — «${prevName}»${prevKind === 'sketch' ? ' (мини-проект)' : ''}. Если нужно сводить — Файл → выбрать полноценный.`, 'warn');
+          }
+        } catch (eSync) { console.warn('[main] active-project sync failed:', eSync); }
       }
     } catch (e) { console.warn('[main] bootstrapProject failed:', e); }
 
