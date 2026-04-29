@@ -1313,9 +1313,26 @@ export function decorateRemoteLocks() {
   const locks = (typeof window !== 'undefined' && window.__remoteLocks) || {};
   const keys = Object.keys(locks);
   if (!keys.length) return;
+  // v0.59.739: fallback-цепочка для имени владельца лока:
+  //   1. lock.name | lock.email
+  //   2. presence по uid (свежее имя из presence-документа)
+  //   3. префикс uid (для отладки)
+  //   4. '?'
+  const _presenceMap = (typeof window !== 'undefined' && window.__presenceByUid) || {};
+  const _ownerLabel = (lock) => {
+    const lockBased = (lock.name && String(lock.name).trim()) || (lock.email && String(lock.email).trim());
+    if (lockBased) return lockBased;
+    const pres = lock.uid ? _presenceMap[lock.uid] : null;
+    if (pres) {
+      const presBased = (pres.name && String(pres.name).trim()) || (pres.email && String(pres.email).trim());
+      if (presBased) return presBased;
+    }
+    if (lock.uid) return `${String(lock.uid).slice(0, 6)}…`;
+    return '?';
+  };
   for (const key of keys) {
     const lock = locks[key];
-    const owner = (lock.name || lock.email || '?').trim();
+    const owner = _ownerLabel(lock);
     const ownerShort = '🔒 ' + (owner.length > 12 ? owner.slice(0, 12) + '…' : owner);
     // v0.57.76: conn locks имеют ключ вида "conn:xxx"
     if (key.startsWith('conn:')) {

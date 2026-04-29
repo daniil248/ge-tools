@@ -194,18 +194,35 @@ function _startCollab(project, initialUpdatedAtMs) {
         state.myLockNodeId = null;
         try { await window.Storage.releaseLock(project.id, releaseKey, uid); } catch {}
       }
+      // v0.59.739: цепочка fallback для отображения владельца лока, чтобы
+      // даже если в lock-doc нет name/email, юзер видел КОГО ждать:
+      //   1. lock.name | lock.email
+      //   2. presence по uid (presence-документ хранит свежее имя)
+      //   3. префикс uid (для отладки — администратор найдёт по логам)
+      //   4. 'другой участник' (последний резерв)
+      const _ownerLabel = (lockUid, lockName, lockEmail) => {
+        const lockBased = (lockName && String(lockName).trim()) || (lockEmail && String(lockEmail).trim());
+        if (lockBased) return lockBased;
+        const pres = lockUid && state.presenceByUid ? state.presenceByUid[lockUid] : null;
+        if (pres) {
+          const presBased = (pres.name && String(pres.name).trim()) || (pres.email && String(pres.email).trim());
+          if (presBased) return presBased;
+        }
+        if (lockUid) return `пользователь ${String(lockUid).slice(0, 6)}…`;
+        return 'другой участник';
+      };
       // Берём новый лок для node или conn
       if (newKey) {
         // Проверка: не заблокирован ли кем-то другим
         const remote = state.remoteLocks?.[newKey];
         if (remote && remote.uid !== uid) {
-          const owner = remote.name || remote.email || 'другой участник';
+          const owner = _ownerLabel(remote.uid, remote.name, remote.email);
           flash(`🔒 Объект редактирует ${owner}`, 'info');
           return false; // отменить выделение
         }
         const r = await window.Storage.acquireLock(project.id, newKey, uid, info, state.sessionId);
         if (r && r.ok === false && r.owner) {
-          const owner = r.owner.name || r.owner.email || 'другой участник';
+          const owner = _ownerLabel(r.owner.uid, r.owner.name, r.owner.email);
           flash(`🔒 Объект редактирует ${owner}`, 'info');
           return false;
         }
@@ -225,6 +242,15 @@ function _startCollab(project, initialUpdatedAtMs) {
   state.unsubPresence = window.Storage.subscribePresence(project.id, (list) => {
     const others = list.filter(u => u.uid !== uid);
     _renderPresenceBar(others);
+    // v0.59.739: кэшируем presence-данные по uid для перекрёстной идентификации
+    // владельца лока (если в lock-doc name/email пусты — берём из presence).
+    state.presenceByUid = Object.create(null);
+    for (const u of list) {
+      if (u && u.uid) state.presenceByUid[u.uid] = u;
+    }
+    // Делаем доступным render.js через window — оверлей лока на canvas
+    // тоже подхватит свежие имена.
+    window.__presenceByUid = state.presenceByUid;
     // v0.57.78 Collaboration C.6: собираем курсоры, передаём в рендер-оверлей
     const cursors = {};
     for (const u of others) {
