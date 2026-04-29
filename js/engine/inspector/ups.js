@@ -130,30 +130,47 @@ export function openUpsParamsModal(n) {
   const _typeOpts = listUpsTypes().map(t =>
     `<option value="${t.id}"${t.id === _curType.id ? ' selected' : ''}>${t.label}</option>`
   ).join('');
-  h.push(field('Тип ИБП', `<select id="up-upsType"${_lockSelAttr}>${_typeOpts}</select>`));
+  // v0.59.691: подсказки в helpIcon рядом с лейблом.
+  h.push(`<div class="field">
+    <label>Тип ИБП${helpIcon('Моноблок (monolithic) — фиксированная мощность; вся электроника в одном корпусе. Модульный (modular) — frame со слотами под силовые модули, мощность складывается из установленных. Для модульного — мощность считается автоматически (frame/модули/резерв).')}</label>
+    <select id="up-upsType"${_lockSelAttr}>${_typeOpts}</select>
+  </div>`);
   // Для моноблока — прямое поле мощности. Для модульного — вычисляется ниже.
   if (n.upsType !== 'modular') {
-    h.push(field('Выходная мощность, kW', `<input type="number" id="up-capKw" min="0" step="0.1" value="${n.capacityKw}"${_lockAttr}>`));
+    h.push(`<div class="field">
+      <label>Выходная мощность, kW${helpIcon('Активная (kW) выходная мощность ИБП по паспорту. Для подбора учитывайте также Snom (kVA = kW / cos φ_out). При работе на нагрузке с cos φ < 1 ИБП ограничен меньшим из двух пределов: kW (тепловой) или kVA (по току).')}</label>
+      <input type="number" id="up-capKw" min="0" step="0.1" value="${n.capacityKw}"${_lockAttr}>
+    </div>`);
   } else {
     h.push(`<div class="muted" style="font-size:11px;margin:-4px 0 8px;padding:6px 8px;background:#fff8e1;border-radius:4px;border:1px solid #ffe0a0">
       Для модульного ИБП мощность считается автоматически из frame/модулей/резерва (см. блок «Модули и резервирование» ниже). Чтобы ввести мощность вручную — переключите тип на «Моноблок».
     </div>`);
   }
-  h.push(field('КПД DC–AC, %', `<input type="number" id="up-eff" min="30" max="100" step="1" value="${n.efficiency}"${_lockAttr}>`));
-  h.push(field('Входов', `<input type="number" id="up-inputs" min="1" max="2" step="1" value="${Math.min(2, Math.max(1, Number(n.inputs) || 1))}"${_lockAttr}>`));
-  h.push(field('Выходов', `<input type="number" id="up-outputs" min="1" max="20" step="1" value="${n.outputs}"${_lockAttr}>`));
+  h.push(`<div class="field">
+    <label>КПД DC–AC, %${helpIcon('Эффективность инвертора при преобразовании постоянного тока АКБ в переменный на выходе. Типично 92–96% для современных ИБП. Влияет на: 1) потребление от сети при работе от АКБ через зарядное устройство (вход = выход / КПД + ток заряда), 2) реальное время автономии (емкость АКБ × КПД).')}</label>
+    <input type="number" id="up-eff" min="30" max="100" step="1" value="${n.efficiency}"${_lockAttr}>
+  </div>`);
+  h.push(`<div class="field">
+    <label>Входов${helpIcon('1 вход — простая схема. 2 входа — раздельные сеть + байпас (рекомендуется для Tier III/IV): вход сети + вход на статический байпас от резервного источника.')}</label>
+    <input type="number" id="up-inputs" min="1" max="2" step="1" value="${Math.min(2, Math.max(1, Number(n.inputs) || 1))}"${_lockAttr}>
+  </div>`);
+  h.push(`<div class="field">
+    <label>Выходов${helpIcon('Количество выходных автоматов / групп. Для распределения нагрузки между PDM-секциями (распределительными секциями ИБП). Каждый выход обычно защищён своим автоматом QF3.')}</label>
+    <input type="number" id="up-outputs" min="1" max="20" step="1" value="${n.outputs}"${_lockAttr}>
+  </div>`);
 
   // Параметры DC-входа (батарейной цепи): диапазон напряжения инвертора.
   // Используется при каталожном подборе АКБ для расчёта min/max числа
   // блоков в цепочке (см. UPS battery modal, каталожный режим).
-  h.push('<h4 style="margin:16px 0 8px">Параметры DC-входа (батарейная цепь)</h4>');
+  // v0.59.691: пояснение про DC-диапазон в helpIcon.
+  const _vdcTip = 'Рабочий диапазон напряжения инвертора на стороне АКБ. Определяет допустимое число блоков в цепочке при подборе АКБ из справочника. Vmin (end-of-discharge) — нижний предел, при котором инвертор ещё работает; Vmax — верхний предел заряда (обычно 2.27 В/элемент для VRLA).';
+  h.push(`<h4 style="margin:16px 0 8px">Параметры DC-входа (батарейная цепь)${helpIcon(_vdcTip)}</h4>`);
   h.push('<div style="display:flex;gap:8px">');
   h.push(`<div style="flex:1">${field('V<sub>DC</sub> min, В',
     `<input type="number" id="up-vdcMin" min="24" max="1200" step="1" value="${Number(n.batteryVdcMin ?? 340)}"${_lockAttr}>`)}</div>`);
   h.push(`<div style="flex:1">${field('V<sub>DC</sub> max, В',
     `<input type="number" id="up-vdcMax" min="24" max="1200" step="1" value="${Number(n.batteryVdcMax ?? 480)}"${_lockAttr}>`)}</div>`);
   h.push('</div>');
-  h.push('<div class="muted" style="font-size:11px;margin-top:-6px;margin-bottom:8px">Рабочий диапазон напряжения инвертора на стороне АКБ. Определяет допустимое число блоков в цепочке при подборе АКБ из справочника.</div>');
 
   // Параметры модульного ИБП: frame + installed + redundancy N+X
   if (n.upsType === 'modular') {

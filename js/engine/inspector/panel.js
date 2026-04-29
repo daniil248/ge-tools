@@ -530,15 +530,25 @@ export function openPanelParamsModal(n) {
           opts += `<option value="${v}"${v === curA ? ' selected' : ''}>${v} А</option>`;
         }
         if (!hasCur) opts = `<option value="${curA}" selected>${curA} А</option>` + opts;
-        h.push('<div style="flex:1">' + field('In, А', `<select id="pp-capacityA">${opts}</select>`) + '</div>');
+        // v0.59.691: helpIcon с подсказкой по In щита.
+        h.push(`<div style="flex:1"><div class="field">
+          <label>In, А${helpIcon('Номинальный ток вводного автомата щита (A). Лимитирует пропускную способность шин и определяет «запас» по току для downstream-нагрузки. Для In > 125 А — обычно MCCB; для ≥ 1000 А — ACB. Должен быть ≥ Iрасч_ввода с учётом запаса.')}</label>
+          <select id="pp-capacityA">${opts}</select>
+        </div></div>`);
       }
       h.push('</div>');
       if (n._capacityKwFromA) {
         h.push(`<div class="muted" style="font-size:11px;margin-top:-8px;margin-bottom:10px">Эквивалент: <b>${fmt(n._capacityKwFromA)} kW</b></div>`);
       }
       h.push('<div style="display:flex;gap:12px">');
-      h.push('<div style="flex:1">' + field('Мин. запас, %', `<input type="number" id="pp-marginMin" min="0" max="50" step="1" value="${n.marginMinPct ?? 2}">`) + '</div>');
-      h.push('<div style="flex:1">' + field('Макс. запас, %', `<input type="number" id="pp-marginMax" min="5" max="500" step="1" value="${n.marginMaxPct ?? 30}">`) + '</div>');
+      h.push(`<div style="flex:1"><div class="field">
+        <label>Мин. запас, %${helpIcon('Минимальный запас по току щита: (In − Iрасч) / Iрасч ≥ N%. Если запас ниже — щит помечается «⚠ запас < 0» в инспекторе и отчёте. По умолчанию 2% (минимально различимо от точного попадания).')}</label>
+        <input type="number" id="pp-marginMin" min="0" max="50" step="1" value="${n.marginMinPct ?? 2}">
+      </div></div>`);
+      h.push(`<div style="flex:1"><div class="field">
+        <label>Макс. запас, %${helpIcon('Максимальный «приемлемый» запас по току щита. Если запас выше — щит помечается «избыточен» (oversized): возможно стоит уменьшить In или увеличить нагрузку. По умолчанию 30% — стандартный коммерческий запас.')}</label>
+        <input type="number" id="pp-marginMax" min="5" max="500" step="1" value="${n.marginMaxPct ?? 30}">
+      </div></div>`);
       h.push('</div>');
     } else {
       // v0.59.328: клеммная коробка — редактор цепей и перемычек.
