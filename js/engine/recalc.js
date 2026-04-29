@@ -269,10 +269,33 @@ export function collectDownstreamConsumers(nodeId) {
       const to = state.nodes.get(c.to?.nodeId);
       if (!to) continue;
       if (to.type === 'consumer') {
-        const Pnom = consumerTotalDemandKw(to); // P_ном × count или Σ items
+        // v0.59.759: РТМ требует считать КАЖДЫЙ электроприёмник отдельно (n_э
+        // зависит от распределения P_ном по штукам). Раньше для группы count=N
+        // отправлялась одна запись с Pnom = P × N — и n_э = N²/N² = 1, то есть
+        // группа из 8 одинаковых стоек считалась как один большой ЭП.
+        // Теперь раскрываем: uniform-группа → N записей × Pnom = P_ном (per-unit);
+        // individual-группа → по записи на каждый item.demandKw.
+        // Юзер: «электроприёмников в группе указано 4 но не учтено что есть
+        // групповые потребители, это нужно учитывать».
         const Ku = Math.max(0, Math.min(1, Number(to.kUse) || 0));
         const cosPhi = Math.max(0.1, Math.min(1, Number(to.cosPhi) || 0.92));
-        if (Pnom > 0) out.push({ Pnom, Ku, cosPhi, id: to.id });
+        if (to.groupMode === 'individual' && Array.isArray(to.items) && to.items.length > 0) {
+          for (const it of to.items) {
+            const itemP = Number(it?.demandKw) || 0;
+            if (itemP <= 0) continue;
+            const itemKu = (it?.kUse != null && it?.kUse !== '') ? Math.max(0, Math.min(1, Number(it.kUse))) : Ku;
+            const itemCos = (it?.cosPhi != null && it?.cosPhi !== '') ? Math.max(0.1, Math.min(1, Number(it.cosPhi))) : cosPhi;
+            out.push({ Pnom: itemP, Ku: itemKu, cosPhi: itemCos, id: to.id + ':' + (it.id || it.name || itemP) });
+          }
+        } else {
+          const perUnit = Number(to.demandKw) || 0;
+          const count = consumerCountEffective(to);
+          if (perUnit > 0) {
+            for (let i = 0; i < count; i++) {
+              out.push({ Pnom: perUnit, Ku, cosPhi, id: to.id + (count > 1 ? ('#' + (i + 1)) : '') });
+            }
+          }
+        }
       } else if (to.type === 'panel' || to.type === 'channel' || to.type === 'junction-box') {
         walk(to.id);
       } else if (to.type === 'ups') {

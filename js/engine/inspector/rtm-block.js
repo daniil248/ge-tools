@@ -29,12 +29,15 @@ import { fmt } from '../utils.js';
 export function rtmInfoBlock(n) {
   const rtm = n && n._rtmMax;
   if (!rtm || !Number.isFinite(rtm.Pmax) || !(rtm.count > 0)) return '';
+  // v0.59.759: блок показывается ТОЛЬКО когда РТМ — активная методика
+  // расчёта. Юзер: «Сам РТМ указывать только если выбран метод расчета
+  // по РТМ». При IEC/ПУЭ блок прятался — для отчётов всё ещё доступен
+  // n._rtmMax из state.
   const isActive = (GLOBAL.calcMethod === 'rtm');
-  const bg = isActive ? '#e8f5e9' : '#f5f5f5';
-  const border = isActive ? '#4caf50' : '#cfd6df';
-  const head = isActive
-    ? '✓ РТМ 36.18.32.4-92 (активная методика)'
-    : 'ℹ РТМ 36.18.32.4-92 (справочно)';
+  if (!isActive) return '';
+  const bg = '#e8f5e9';
+  const border = '#4caf50';
+  const head = '✓ РТМ 36.18.32.4-92 (активная методика)';
   return `<div class="inspector-section">
     <div style="font-size:11px;padding:6px 8px;background:${bg};border-left:3px solid ${border};border-radius:3px;line-height:1.7">
       <b style="font-size:11px;color:#37474f">${head}</b><br>
