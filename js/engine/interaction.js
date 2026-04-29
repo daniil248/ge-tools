@@ -98,7 +98,10 @@ function _aliasConsumerToGroup(target, source) {
   if (source.type !== 'consumer' || target.type !== 'consumer') return null;
   if (source.linkedAlias && source.linkedAlias !== target.id) return null;
   if (!Array.isArray(target.linkedAliases)) target.linkedAliases = [];
-  if (!Array.isArray(target.linkedMembers)) target.linkedMembers = [];
+  // v0.59.772: linkedMembers метаданные больше не пушим — read-on-demand из
+  // state.nodes.get(aliasId). Снижает размер save-payload (после quota
+  // exhaustion 2026-04-29). Старые записи остаются как fallback для
+  // удалённых узлов.
   // Padding до текущего count
   const tCount = Math.max(1, Number(target.count) || 1);
   while (target.linkedAliases.length < tCount) target.linkedAliases.push(null);
@@ -116,18 +119,6 @@ function _aliasConsumerToGroup(target, source) {
     target.linkedAliases[slot] = source.id;
   }
   source.linkedAlias = target.id;
-  // Snapshot metadata для отображения
-  target.linkedMembers.push({
-    originalId: source.id,
-    tag: source.tag || '',
-    name: source.name || '',
-    demandKw: Number(source.demandKw) || 0,
-    cosPhi: Number(source.cosPhi) || null,
-    phase: source.phase || null,
-    consumerSubtype: source.consumerSubtype || '',
-    voltageLevelIdx: Number.isFinite(Number(source.voltageLevelIdx)) ? Number(source.voltageLevelIdx) : null,
-    linkedAt: Date.now(),
-  });
   return { linked: true, slotIdx: slot, overflow };
 }
 

@@ -1016,10 +1016,23 @@ export function openConsumerParamsModal(n) {
     refreshItemsSum();
   };
   // v0.59.764: IDENTIFY-AS handlers (ROADMAP 1.28.10 B). Двусторонний alias.
+  // v0.59.772: добавлен click-to-open для alias-row (юзер может правым кликом
+  // или просто кликом по строке открыть модалку связанного узла, чтобы там
+  // изменить параметры).
   {
     const aliasLinkBtn = document.getElementById('cp-alias-link');
     const aliasUnlinkBtn = document.getElementById('cp-alias-unlink');
     const aliasSel = document.getElementById('cp-alias-select');
+    // Click-to-open linked node — открывает его модалку (для редактирования)
+    document.querySelectorAll('.cp-alias-open').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return; // не перехватывать клики по кнопкам
+        const tgtId = row.dataset.aliasOpenId;
+        if (!tgtId) return;
+        const tgt = state.nodes.get(tgtId);
+        if (tgt) openConsumerParamsModal(tgt);
+      });
+    });
     if (aliasLinkBtn && aliasSel) {
       aliasLinkBtn.addEventListener('click', () => {
         const targetId = aliasSel.value;
@@ -1130,33 +1143,23 @@ export function openConsumerParamsModal(n) {
         }
         try { snapshot('group-slot-link:' + n.id + '#' + (slotIdx + 1) + '←' + src.id); } catch {}
         if (!Array.isArray(n.linkedAliases)) n.linkedAliases = [];
-        if (!Array.isArray(n.linkedMembers)) n.linkedMembers = [];
         while (n.linkedAliases.length < (Number(n.count) || 1)) n.linkedAliases.push(null);
+        // v0.59.772: linkedMembers метаданные не сохраняем (read-on-demand
+        // из state.nodes). Только чистим если уже есть для backward-compat.
+        if (Array.isArray(n.linkedMembers)) {
+          n.linkedMembers = n.linkedMembers.filter(m => n.linkedAliases.includes(m.originalId));
+        }
         // Если в этом слоте уже что-то — разорвём старую связь
         const prevId = n.linkedAliases[slotIdx];
         if (prevId && prevId !== src.id) {
           const prev = state.nodes.get(prevId);
           if (prev && prev.linkedAlias === n.id) delete prev.linkedAlias;
-          n.linkedMembers = n.linkedMembers.filter(m => m.originalId !== prevId);
         }
         // Если src уже в другом слоте — выкинем оттуда
         const oldSlot = n.linkedAliases.indexOf(src.id);
         if (oldSlot >= 0 && oldSlot !== slotIdx) n.linkedAliases[oldSlot] = null;
         n.linkedAliases[slotIdx] = src.id;
         src.linkedAlias = n.id;
-        // Сохраняем metadata snapshot
-        n.linkedMembers = n.linkedMembers.filter(m => m.originalId !== src.id);
-        n.linkedMembers.push({
-          originalId: src.id,
-          tag: src.tag || '',
-          name: src.name || '',
-          demandKw: Number(src.demandKw) || 0,
-          cosPhi: Number(src.cosPhi) || null,
-          phase: src.phase || null,
-          consumerSubtype: src.consumerSubtype || '',
-          voltageLevelIdx: Number.isFinite(Number(src.voltageLevelIdx)) ? Number(src.voltageLevelIdx) : null,
-          linkedAt: Date.now(),
-        });
         try { flash(`Слот #${slotIdx + 1} ← ${src.tag || src.id}`, 'success'); } catch {}
         notifyChange();
         openConsumerParamsModal(n);
