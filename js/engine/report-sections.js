@@ -572,6 +572,8 @@ function sectionConsumers() {
     { label: 'Статус' },
   ];
   let total = 0;
+  let totalFreeKw = 0;
+  let overloadCount = 0;
   const rows = items.map(c => {
     const per = Number(c.demandKw) || 0;
     const cnt = Math.max(1, Number(c.count) || 1);
@@ -580,6 +582,13 @@ function sectionConsumers() {
     const k = ku * factor;
     const sum = per * cnt * k;
     if (c._powered) total += sum;
+    // v0.59.681: накапливаем суммарный резерв и счётчик перегруженных линий
+    // для итоговой строки. Резерв per-line × cnt — общая «куда ещё можно
+    // догрузить» по всему перечню потребителей.
+    if (Number.isFinite(c._freeKw) && c._freeKw > 0) {
+      totalFreeKw += c._freeKw * cnt;
+    }
+    if (c._breakerOverload) overloadCount++;
     const freeA = (Number.isFinite(c._freeA) && c._freeA > 0) ? fmt(c._freeA) : '—';
     // v0.59.678: статус — «ПЕРЕГРУЗ» если фиксированный автомат/кабель не
     // справляется, иначе «без пит» / «ок».
@@ -617,10 +626,18 @@ function sectionConsumers() {
     text.push(...textTable(cols, rows));
     text.push('');
     text.push('ИТОГО расчётная активная мощность: ' + fmt(total) + ' кВт');
+    text.push('ИТОГО свободно (резерв) по линиям потребителей: ' + fmt(totalFreeKw) + ' кВт');
+    if (overloadCount > 0) {
+      text.push(`⚠ ПЕРЕГРУЖЕНО ЛИНИЙ: ${overloadCount} (расчётный ток превышает зафиксированный автомат — см. колонку «Статус»)`);
+    }
     text.push('');
     blocks.push(B.h2('Потребители'));
     blocks.push(B.table(blockCols(cols), rows));
     blocks.push(B.paragraph('ИТОГО расчётная активная мощность подключённых потребителей: ' + fmt(total) + ' кВт.'));
+    blocks.push(B.paragraph('ИТОГО свободно (резерв) по линиям потребителей: ' + fmt(totalFreeKw) + ' кВт. Это сумма свободной пропускной способности по каждой питающей линии — можно догрузить без замены кабелей и автоматов.'));
+    if (overloadCount > 0) {
+      blocks.push(B.paragraph(`⚠ Перегружено линий: ${overloadCount}. На этих линиях расчётный ток превышает номинал зафиксированного автомата — авто-пересчёт отключён, требуется ручная корректировка автомата/сечения или снижение нагрузки. Подробности — в колонке «Статус» и в разделе «Проверки и предупреждения».`));
+    }
   } else {
     text.push('В схеме нет потребителей.');
     blocks.push(B.paragraph('В схеме нет потребителей.'));
