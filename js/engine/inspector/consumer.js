@@ -133,6 +133,47 @@ export function openConsumerParamsModal(n) {
 
   h.push(field('Количество в группе', `<input type="number" id="cp-count" min="1" max="999" step="1" value="${n.count || 1}">`));
   const _cpCount = Math.max(1, Number(n.count) || 1);
+  // v0.59.764: IDENTIFY-AS (ROADMAP 1.28.10 сценарий B) — связь 1:1 для
+  // одиночных потребителей. Юзер: «как связать размещенную стойку с
+  // стойкой из СКС CR1 и CR01 именно не соединить а заменить по факту».
+  // Двусторонняя ссылка n.linkedAlias = target.id (без удаления узлов).
+  // Атрибуты не сливаются — каждый сохраняет свои domain-параметры.
+  if (_cpCount === 1) {
+    const linkedAliasId = n.linkedAlias || null;
+    const linkedNode = linkedAliasId ? state.nodes.get(linkedAliasId) : null;
+    const _aliasCandidates = [];
+    for (const m of state.nodes.values()) {
+      if (m.id === n.id) continue;
+      if (m.type !== 'consumer') continue;
+      if ((Number(m.count) || 1) !== 1) continue;
+      if (m.linkedAlias && m.linkedAlias !== n.id) continue; // already linked elsewhere
+      _aliasCandidates.push(m);
+    }
+    h.push(`<div class="field" style="margin-top:8px;padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:4px">
+      <label style="font-size:11px;font-weight:600;color:#3730a3;margin-bottom:4px;display:block">🔗 Это тот же объект, что:</label>
+      <div class="muted" style="font-size:10.5px;margin-bottom:6px;color:#3730a3;line-height:1.4">
+        Если на схеме и в неразмещённых (POR / СКС) есть один и тот же физический объект (например, размещённая <code>CR1</code> и неразмещённая <code>CR01</code>) — отметьте их как alias друг друга. Атрибуты остаются раздельными по доменам, но движок понимает, что это один объект.
+      </div>
+      ${linkedNode ? `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #c7d2fe;border-radius:3px">
+        <span style="font-size:13px">🔗</span>
+        <span style="font-weight:600">${escHtml(linkedNode.tag || linkedNode.id)}</span>
+        <span class="muted">${escHtml(linkedNode.name || '')}</span>
+        <span class="muted" style="margin-left:auto;font-size:10px">${(Number(linkedNode.demandKw)||0).toFixed(2)} кВт</span>
+        <button type="button" id="cp-alias-unlink" title="Разорвать связь" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">🔓</button>
+      </div>` : (_aliasCandidates.length > 0 ? `<div style="display:flex;gap:6px;align-items:center">
+        <select id="cp-alias-select" style="flex:1;padding:4px 6px;border:1px solid #c7d2fe;border-radius:3px;font:inherit;font-size:11.5px">
+          <option value="">— выбрать узел —</option>
+          ${_aliasCandidates.map(m => {
+            const pids = Array.isArray(m.pageIds) ? m.pageIds : [];
+            const onPg = pids.includes(state.currentPageId);
+            const placement = pids.length === 0 ? '🧪 не размещён' : (onPg ? 'на этой стр.' : '📄 на другой стр.');
+            return `<option value="${escAttr(m.id)}">${escHtml(m.tag || m.id)} ${escHtml(m.name || '')} (${placement}, ${(Number(m.demandKw)||0).toFixed(2)} кВт)</option>`;
+          }).join('')}
+        </select>
+        <button type="button" id="cp-alias-link" style="padding:4px 12px;border:1px solid #4f46e5;background:#4f46e5;color:#fff;border-radius:3px;cursor:pointer;font-size:11px">🔗 Связать</button>
+      </div>` : `<div class="muted" style="font-size:11px;color:#6b7280;font-style:italic">В проекте нет других одиночных потребителей для связи.</div>`)}
+    </div>`);
+  }
   // v0.59.747: _loadSpec / _isTotalDisplay удалены — после ввода парных
   // полей (v0.59.738) и отказа от селектора loadSpec (v0.59.744) эти
   // переменные больше нигде не используются. n.loadSpec в данных
@@ -913,6 +954,39 @@ export function openConsumerParamsModal(n) {
     _wireCard(card);
     refreshItemsSum();
   };
+  // v0.59.764: IDENTIFY-AS handlers (ROADMAP 1.28.10 B). Двусторонний alias.
+  {
+    const aliasLinkBtn = document.getElementById('cp-alias-link');
+    const aliasUnlinkBtn = document.getElementById('cp-alias-unlink');
+    const aliasSel = document.getElementById('cp-alias-select');
+    if (aliasLinkBtn && aliasSel) {
+      aliasLinkBtn.addEventListener('click', () => {
+        const targetId = aliasSel.value;
+        if (!targetId) { try { flash('Выберите узел из списка', 'warn'); } catch {} return; }
+        const target = state.nodes.get(targetId);
+        if (!target) return;
+        try { snapshot('alias-link:' + n.id + '↔' + target.id); } catch {}
+        n.linkedAlias = target.id;
+        target.linkedAlias = n.id;
+        try { flash(`Связаны: ${n.tag || n.id} ↔ ${target.tag || target.id}`, 'success'); } catch {}
+        notifyChange();
+        openConsumerParamsModal(n);
+      });
+    }
+    if (aliasUnlinkBtn) {
+      aliasUnlinkBtn.addEventListener('click', () => {
+        const targetId = n.linkedAlias;
+        const target = targetId ? state.nodes.get(targetId) : null;
+        try { snapshot('alias-unlink:' + n.id); } catch {}
+        delete n.linkedAlias;
+        if (target && target.linkedAlias === n.id) delete target.linkedAlias;
+        try { flash('Связь снята', 'success'); } catch {}
+        notifyChange();
+        openConsumerParamsModal(n);
+      });
+    }
+  }
+
   // v0.59.763: handlers «✂ Исключить» (split-out, ROADMAP 1.28.13). Восстанавливает
   // отдельный consumer-узел по метаданным linkedMembers[idx], уменьшает n.count.
   {
