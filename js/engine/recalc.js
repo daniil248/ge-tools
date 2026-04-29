@@ -3278,24 +3278,32 @@ function recalc() {
     c._isInternalConnHidden = true;  // флаг для UI / BOM / отчётов
   }
 
-  // v0.59.657: «доступная мощность» потребителя — фактический максимум,
-  // который ЭП может потребить без срабатывания защиты или превышения
-  // длительно допустимого тока кабеля. Юзер: «для потребителя можно
+  // v0.59.657: «доступная мощность» — фактический максимум, который узел
+  // может потребить без срабатывания защиты или превышения длительно
+  // допустимого тока питающего кабеля. Юзер: «для потребителя можно
   // добавить доступную мощность, которая вычисляется по длительному
   // допустимому току кабеля его питающего и его защитному автомату».
   //   I_доступ = min(c._maxA, c._breakerIn)  — берётся узкое место
   //   P_доступ = I_доступ × U × cos φ × (√3 если 3ф) / 1000
-  // Если у питающей линии нет ни кабеля ни автомата (или _maxA / _breakerIn
-  // не заданы) — поле остаётся null и UI его не показывает.
+  // v0.59.659: расширено на panel / ups / generator / source — там тоже
+  // питающая линия имеет ампасити и защитный автомат сверху (для source —
+  // только если он не «корневой» источник без входа).
   for (const n of state.nodes.values()) {
-    if (n.type !== 'consumer') continue;
+    if (n.type !== 'consumer' && n.type !== 'panel' && n.type !== 'ups'
+        && n.type !== 'generator' && n.type !== 'source') continue;
     n._availableKw = null;
     n._availableA = null;
     n._availableLimit = null; // 'cable' | 'breaker' — что именно ограничивает
     const ins = (edgesIn.get(n.id) || []).filter(c => !c._virtual);
     if (!ins.length) continue;
-    // Берём первую реальную входящую — у потребителя обычно один ввод
-    const c = ins[0];
+    // Берём первую реальную входящую — обычно один силовой ввод.
+    // Для генератора может быть auxInput на порту 0 (СН) — пропускаем,
+    // если есть силовой вход на другом порту.
+    let c = ins[0];
+    if (n.type === 'generator' && n.auxInput) {
+      const power = ins.find(x => x.to.port !== 0);
+      if (power) c = power;
+    }
     const cableA = Number.isFinite(c._maxA) && c._maxA > 0 ? c._maxA : Infinity;
     const brkA   = Number.isFinite(c._breakerIn) && c._breakerIn > 0 ? c._breakerIn : Infinity;
     if (!Number.isFinite(cableA) && !Number.isFinite(brkA)) continue;
@@ -3304,7 +3312,7 @@ function recalc() {
     const limit = (cableA <= brkA) ? 'cable' : 'breaker';
     const U = nodeCalcVoltage(n);
     if (!U || U <= 0) { n._availableA = Iavail; n._availableLimit = limit; continue; }
-    const cos = Math.max(0.1, Math.min(1, Number(n.cosPhi) || 0.92));
+    const cos = Math.max(0.1, Math.min(1, Number(n._cosPhi) || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 0.92));
     const phaseK = isThreePhase(n) ? Math.sqrt(3) : 1;
     const Pavail = (Iavail * U * cos * phaseK) / 1000;
     n._availableKw = Pavail;

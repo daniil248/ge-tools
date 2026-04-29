@@ -1944,6 +1944,20 @@ export function renderNodes() {
       return `${label}: ${parts.join(' · ')}`;
     };
 
+    // v0.59.659: «доступно» — общий хелпер для всех типов узлов с входящим
+    // кабелем (consumer / panel / ups / generator / source). Считается в
+    // recalc.js как min(c._maxA, c._breakerIn). Лейбл указывает, что именно
+    // лимитирует — кабель или автомат.
+    const _availRowFor = (nn) => {
+      if (!Number.isFinite(nn._availableA) || nn._availableA <= 0) return null;
+      const lbl = nn._availableLimit === 'cable'
+        ? 'доступно (кабель)'
+        : nn._availableLimit === 'breaker'
+          ? 'доступно (автомат)'
+          : 'доступно';
+      return _fmtRow(lbl, nn._availableKw, nn._availableA);
+    };
+
     if (n.type === 'source') {
       const cos = Number(n._cosPhi) || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 1.0;
       const capA = (n.capacityKw && nodeVoltage(n))
@@ -1960,6 +1974,7 @@ export function renderNodes() {
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
         _fmtRow('номин', n.capacityKw, capA, SnomNameplate),
+        _availRowFor(n),
       ].filter(Boolean);
     } else if (n.type === 'generator') {
       const hasTrigger = (Array.isArray(n.triggerGroups) && n.triggerGroups.length) || n.triggerNodeId;
@@ -1984,6 +1999,7 @@ export function renderNodes() {
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
         _fmtRow('номин', n.capacityKw, capA, SnomNameplate),
+        _availRowFor(n),
       ].filter(Boolean);
     } else if (n.type === 'panel') {
       if (n.maintenance) { statusLine = 'Обслуживание'; loadCls += ' off'; }
@@ -2006,6 +2022,7 @@ export function renderNodes() {
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
         _fmtRow('номин', PnomSum, InomSum, SnomSum),
+        _availRowFor(n),
       ].filter(Boolean);
       // Таймер АВР — добавляем к статусу
       if (n._avrSwitchCountdown > 0) {
@@ -2036,6 +2053,7 @@ export function renderNodes() {
         _fmtRow('текущая', n._loadKw, n._loadA),
         _fmtRow('макс.расч', n._maxLoadKw, n._maxLoadA),
         _fmtRow('номин', n.capacityKw, capA, SnomNameplate),
+        _availRowFor(n),
       ].filter(Boolean);
     } else if (n.type === 'consumer') {
       // v0.59.651: для потребителей такой же формат — текущая + номинальная
@@ -2056,6 +2074,13 @@ export function renderNodes() {
       // recalc.js как min(c._maxA, c._breakerIn). Юзер: «для потребителя
       // можно добавить доступную мощность, которая вычисляется по
       // длительному допустимому току кабеля и его защитному автомату».
+      // v0.59.659: для ГРУППЫ потребителей «доступно» НЕ показываем —
+      // юзер: «для групповой испортил, здесь должны быть данные только
+      // для одного потребителя, так как кабель у каждого свой». Кабель
+      // в схеме — на 1 ед., а текущая/номин — на всю группу. Смешивать
+      // эти величины в одной карточке нельзя. Для group case данные
+      // на 1 ед. доступны через инспектор каждого члена.
+      const _isGroup = (cnt > 1) || (n.groupMode === 'individual' && Array.isArray(n.items) && n.items.length > 1);
       const _availLabel = n._availableLimit === 'cable'
         ? 'доступно (кабель)'
         : n._availableLimit === 'breaker'
@@ -2064,7 +2089,7 @@ export function renderNodes() {
       loadLines = [
         _fmtRow('текущая', Pcur, Icur),
         _fmtRow('номин', Pnom, Inom),
-        (Number.isFinite(n._availableA) && n._availableA > 0)
+        (!_isGroup && Number.isFinite(n._availableA) && n._availableA > 0)
           ? _fmtRow(_availLabel, n._availableKw, n._availableA)
           : null,
       ].filter(Boolean);
