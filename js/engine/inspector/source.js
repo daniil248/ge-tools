@@ -10,6 +10,7 @@ import { escHtml, escAttr, fmt, field, flash } from '../utils.js';
 import { effectiveTag } from '../zones.js';
 import { effectiveOn } from '../modes.js';
 import { nodeVoltage, sourceImpedance, formatVoltageLevelLabel } from '../electrical.js';
+import { getTerm, getTermTooltip } from '../../methods/terms.js';
 import { snapshot, notifyChange } from '../history.js';
 import { render } from '../render.js';
 // Ленивая привязка чтобы избежать цикла на этапе загрузки. Связывается
@@ -420,8 +421,15 @@ function _renderGenIsoBlock(n) {
   const curHint = (GEN_RATING_MODES.find(m => m.id === curMode) || {}).hint || '';
   h.push(`<div class="muted" id="gr-mode-hint" style="font-size:11px;margin-top:-4px;margin-bottom:8px;line-height:1.4;color:#475569">${escHtml(curHint)}</div>`);
 
-  h.push(field('Номинальный cos φ ДГУ',
-    `<input type="number" id="gr-cosPhi" min="0.5" max="1.0" step="0.01" value="${cosNom}">`));
+  // v0.59.665: methodology-aware label для номинального cos φ ДГУ.
+  {
+    const _cosT = getTerm('powerFactor', GLOBAL.calcMethod || 'iec');
+    const _cosTip = getTermTooltip('powerFactor', GLOBAL.calcMethod || 'iec');
+    h.push(`<div class="field" title="${escAttr(_cosTip)}">
+      <label>Номинальный ${escHtml(_cosT.label)} ДГУ<span class="muted" style="font-size:10px;font-weight:400;margin-left:4px">${escHtml(_cosT.aliases)}</span></label>
+      <input type="number" id="gr-cosPhi" min="0.5" max="1.0" step="0.01" value="${cosNom}">
+    </div>`);
+  }
   h.push('<div class="muted" style="font-size:10px;margin-top:-4px;margin-bottom:6px">По умолчанию 0.80 (ISO 8528-1 §7.2.2). Если задано только одно из kW/kVA — другое посчитается через cos φ на Apply.</div>');
 
   // v0.59.632: проверка — пустой ли активный режим (когда другие заполнены).

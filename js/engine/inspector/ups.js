@@ -11,6 +11,7 @@ import { snapshot, notifyChange } from '../history.js';
 import { render } from '../render.js';
 import { mountBatteryPicker } from '../../../shared/battery-picker.js';
 import { readUpsDcParams, mountUpsPicker, applyUpsModel } from '../../../shared/ups-picker.js';
+import { getTerm, getTermTooltip } from '../../methods/terms.js';
 import { listUpses } from '../../../shared/ups-catalog.js';
 // v0.59.386: реестр типов ИБП-плагинов (см. shared/ups-types/).
 import { listUpsTypes, getUpsType, detectUpsType, getUpsTypeOrFallback } from '../../../shared/ups-types/index.js';
@@ -419,7 +420,17 @@ export function openUpsParamsModal(n) {
     vOpts += `<option value="${i}"${i === curIdx ? ' selected' : ''}>${escHtml(formatVoltageLevelLabel(levels[i]))}</option>`;
   }
   h.push(field('Уровень напряжения', `<select id="up-voltage">${vOpts}</select>`));
-  h.push(field('cos φ', `<input type="number" id="up-cosPhi" min="0.1" max="1" step="0.01" value="${n.cosPhi || 1.0}"${_lockAttr}>`));
+  // v0.59.665: methodology-aware label для cos φ — название/tooltip берутся
+  // из таблицы терминов соответствующей методики (см. js/methods/terms.js).
+  {
+    const _cosT = getTerm('powerFactor', GLOBAL.calcMethod || 'iec');
+    const _cosTip = getTermTooltip('powerFactor', GLOBAL.calcMethod || 'iec');
+    h.push(`<div class="field" title="${escAttr(_cosTip)}">
+      <label>${escHtml(_cosT.label)}<span class="muted" style="font-size:10px;font-weight:400;margin-left:4px">${escHtml(_cosT.aliases)}</span></label>
+      <input type="number" id="up-cosPhi" min="0.1" max="1" step="0.01" value="${n.cosPhi || 1.0}"${_lockAttr}>
+      ${_cosT.explain ? `<div class="muted" style="font-size:10px;margin-top:2px">${escHtml(_cosT.explain)}</div>` : ''}
+    </div>`);
+  }
 
   // Блок «Батарея (АКБ)» полностью перенесён в отдельную модалку
   // «🔋 АКБ» (кнопка в инспекторе ИБП). Здесь — только короткая ссылка.
