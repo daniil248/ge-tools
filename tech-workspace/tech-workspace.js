@@ -918,19 +918,184 @@ function _bindModel(domain, refId, element) {
   renderActiveVariant();
 }
 
-// ─── Handoff
+// ─── Handoff (Phase 20.11): генерируем engine.scheme.v1 из concept
+//
+// MVP: создаём ноды (без connections) на одной странице, пользователь сам
+// проводит линии. Это сильно проще чем правильно строить port-топологию,
+// и оставляет electrical-detail (автоматы, кабели) за электриком.
+//
+// Узлы:
+//   - source (utility / transformer) — если concept.feed.tp.needed
+//   - generator (ДГУ) — если concept.feed.dgu.needed
+//   - panel — 1 ГРЩ
+//   - consumer-group — по 1 на rackGroup, count = group.count
+//   - ups — по 1 на upsSystem
+//   - cooling consumer — по 1 на coolingUnit
+function _buildSchemeFromConcept(concept, variantName) {
+  const nodes = [];
+  let nextId = 1;
+  const newId = () => 'n' + (nextId++);
+  const newTag = (() => {
+    const used = new Set();
+    return (prefix) => {
+      let i = 1;
+      while (used.has(prefix + i)) i++;
+      const t = prefix + i;
+      used.add(t);
+      return t;
+    };
+  })();
+
+  let curY = 100;
+  const colX = { source: 100, mid: 500, end: 900 };
+  const pageId = 'p1';
+
+  // Source: TP или Utility
+  if (concept.feed?.tp?.needed) {
+    nodes.push({
+      id: newId(), type: 'source', tag: newTag('TP'),
+      name: 'Ввод ТП', x: colX.source, y: curY,
+      sourceSubtype: 'transformer',
+      snomKva: Number(concept.feed.tp.kva) || 1000,
+      voltage: 400, voltageLevelIdx: 0, phase: '3ph', cosPhi: 0.95,
+      ukPct: 4.5, sscMva: 250,
+      pageIds: [pageId],
+      positionsByPage: { [pageId]: { x: colX.source, y: curY } },
+    });
+  } else {
+    nodes.push({
+      id: newId(), type: 'source', tag: newTag('U'),
+      name: 'Городская сеть', x: colX.source, y: curY,
+      sourceSubtype: 'utility',
+      voltage: 10000, voltageLevelIdx: 3, phase: '3ph', cosPhi: 1,
+      ikKA: 10, sscMva: 250,
+      pageIds: [pageId],
+      positionsByPage: { [pageId]: { x: colX.source, y: curY } },
+    });
+  }
+  curY += 200;
+  if (concept.feed?.dgu?.needed) {
+    nodes.push({
+      id: newId(), type: 'generator', tag: newTag('G'),
+      name: 'ДГУ', x: colX.source, y: curY,
+      capacityKw: Number(concept.feed.dgu.kw) || 100,
+      backupMode: concept.feed.dgu.mode === 'esp',
+      phase: '3ph', voltage: 400, cosPhi: 0.85,
+      pageIds: [pageId],
+      positionsByPage: { [pageId]: { x: colX.source, y: curY } },
+    });
+    curY += 200;
+  }
+  // ГРЩ (главный распределительный щит)
+  const panelY = 100;
+  nodes.push({
+    id: newId(), type: 'panel', tag: newTag('ГРЩ'),
+    name: 'ГРЩ', x: colX.mid, y: panelY,
+    inputs: 2, outputs: Math.max(2, (concept.upsSystems || []).length + (concept.coolingUnits || []).length),
+    capacityA: 800,
+    pageIds: [pageId],
+    positionsByPage: { [pageId]: { x: colX.mid, y: panelY } },
+  });
+  // ИБП-узлы
+  let upsY = panelY;
+  for (const us of (concept.upsSystems || [])) {
+    nodes.push({
+      id: newId(), type: 'ups', tag: newTag(us.purpose === 'cooling' ? 'ИБПК' : 'ИБП'),
+      name: us.name, x: colX.mid + 250, y: upsY,
+      kva: Number(us.ratedKva) || 0,
+      autonomyMin: Number(us.autonomyMin) || 15,
+      pageIds: [pageId],
+      positionsByPage: { [pageId]: { x: colX.mid + 250, y: upsY } },
+    });
+    upsY += 200;
+  }
+  // Consumer-group узлы для стоек
+  let rackY = panelY;
+  for (const rg of (concept.rackGroups || [])) {
+    nodes.push({
+      id: newId(), type: 'consumer', tag: newTag('SR'),
+      name: rg.name || 'Стойки',
+      consumerSubtype: 'rack', consumerKind: 'rack',
+      x: colX.end, y: rackY,
+      count: Number(rg.count) || 1,
+      demandKw: Number(rg.kwPerRack) || 0,
+      cosPhi: 0.95, phase: '3ph', voltage: 400,
+      width: 250, height: 120,
+      pageIds: [pageId],
+      positionsByPage: { [pageId]: { x: colX.end, y: rackY } },
+      _fromTechWorkspace: true,
+      _profile: rg.profile,
+    });
+    rackY += 200;
+  }
+  // Cooling consumers (как просто потребители)
+  for (const cu of (concept.coolingUnits || [])) {
+    const kwTot = (Number(cu.count) || 0) * (Number(cu.kwPerUnit) || 0);
+    nodes.push({
+      id: newId(), type: 'consumer', tag: newTag('K'),
+      name: cu.name || 'Кондиционеры',
+      consumerSubtype: 'outdoor_unit',
+      x: colX.end, y: rackY,
+      count: Number(cu.count) || 1,
+      demandKw: Number(cu.kwPerUnit) || 0,
+      cosPhi: 0.85, phase: '3ph', voltage: 400,
+      width: 250, height: 120,
+      pageIds: [pageId],
+      positionsByPage: { [pageId]: { x: colX.end, y: rackY } },
+      _fromTechWorkspace: true,
+    });
+    rackY += 200;
+  }
+
+  return {
+    version: 4,
+    nextId: nextId,
+    nodes,
+    conns: [],
+    sysConns: [],
+    pages: [{
+      id: pageId,
+      name: variantName || 'Главная схема',
+      type: 'independent',
+      kind: 'schematic',
+      view: { x: 0, y: 0, zoom: 0.7 },
+    }],
+    currentPageId: pageId,
+    project: { name: variantName || 'Концепция' },
+    modes: [],
+    activeModeId: null,
+    view: { x: 0, y: 0, zoom: 0.7 },
+    globalSettings: {},
+  };
+}
+
 function bindHandoff() {
   const btn = $('tw-handoff');
   if (!btn) return;
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     const v = _variants.find(x => x.id === _activeId);
     if (!v || v.readOnly) return;
-    if (!confirm(`📤 Передать вариант «${v.name}» в детальное проектирование?\n\nПосле передачи variant станет read-only. Продолжить?`)) return;
-    v.readOnly = true;
-    v.handoffAt = Date.now();
-    persistVariants();
-    renderVariantsList(); renderActiveVariant();
-    alert(`✓ Вариант передан. Handoff в schematic/scs-design — в разработке (Phase 20.11).`);
+    if (!confirm(`📤 Передать вариант «${v.name}» в детальное проектирование?\n\nБудет создана схема в Конструкторе с предзаполненными узлами:\n• Источник (${v.concept.feed?.tp?.needed ? 'ТП' : 'Utility'})\n• ГРЩ\n• ${v.concept.upsSystems?.length || 0} ИБП-узлов\n• ${v.concept.rackGroups?.length || 0} групп стоек\n• ${v.concept.coolingUnits?.length || 0} кондиционеров\n\nСвязи между узлами вы проведёте вручную в Конструкторе.\n\nПосле handoff variant станет read-only. Продолжить?`)) return;
+    try {
+      const scheme = _buildSchemeFromConcept(v.concept, v.name);
+      // Записываем в engine.scheme.v1 проекта
+      const key = projectKey(_pid, 'engine', 'scheme.v1');
+      const existing = localStorage.getItem(key);
+      if (existing) {
+        if (!confirm(`Внимание! В проекте уже есть схема. Заменить её на сгенерированную из концепции?\n\nСтарая схема будет потеряна (Ctrl+Z в Конструкторе не поможет).`)) return;
+      }
+      localStorage.setItem(key, JSON.stringify(scheme));
+      v.readOnly = true;
+      v.handoffAt = Date.now();
+      persistVariants();
+      renderVariantsList(); renderActiveVariant();
+      if (confirm(`✓ Схема создана. Открыть Конструктор?`)) {
+        location.href = '../index.html';
+      }
+    } catch (e) {
+      console.error('[handoff]', e);
+      alert(`Ошибка handoff: ${e.message || e}`);
+    }
   });
 }
 
