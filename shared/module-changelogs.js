@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.890', date: '2026-04-30', items: [
+      '🐛 <b>Корень дубликатов SR01-SR08 в Qarmet найден</b>. Через MCP-debug в браузере: 8 «реальных» узлов в контейнере (porId=por_xxx, kw=8.2) + 8 фантомных вне контейнера (porId=por_legacy_por_xxx, kw=0).',
+      '• <b>Корень бага</b>: <code>shared/engine-por-mirror.js::pullPorRacksToEngine</code> создавал engine-узел для каждого POR-объекта без linked engine-узла. После legacy-rack-migration в POR появляется второй объект (id=<code>por_legacy_&lt;rackId&gt;</code>) рядом с оригиналом — две POR-записи на одну стойку. linkedOids проверял только por-id, не tag → второй POR без linked engine-узла → создавался дубль consumer-узла (kw=0, name="Стойка SRxx", не в контейнере).',
+      '• <b>Fix #1 (превентивный)</b>: <code>pullPorRacksToEngine</code> теперь дедуплицирует по tag — если уже есть engine rack-consumer с этим tag, пропускает создание дубля. console.info про skipped count.',
+      '• <b>Fix #2 (cleanup существующих)</b>: новая кнопка «🧬 Удалить дубли в engine» в <code>/dev/por-playground.html</code> — для текущего проекта находит все consumer.subtype=rack узлы с дубль-tag, и удаляет тех у кого <code>porId=por_legacy_*</code>, нет pageIds и нет containerId. Confirm-диалог с preview списком. Также чистит conns с этими node-id.',
+      '• <b>Использование</b>: для Qarmet — открыть /dev/por-playground.html, ввести pid, нажать «🧬 Удалить дубли в engine», затем Ctrl+Shift+R на конструкторе — фантомы пропадут из неразмещённых/реестра/POR.',
+      'Файлы: <code>shared/engine-por-mirror.js::pullPorRacksToEngine</code> (tagsByRack dedup, skippedDups counter), <code>dev/por-playground.html</code> (новая кнопка cleanup-engine-dups + handler с LS-mutation engine.scheme.v1).',
+    ] },
     { version: '0.59.889', date: '2026-04-30', items: [
       '🎯 <b>Click по члену контейнера в реестре → переход на контейнер с центрированием</b>. По репорту: «при клике для перехода, переходить к группе с центрирование по центру экрана».',
       '• Раньше click открывал свойства, но не центрировал — пользователю приходилось искать контейнер на канвасе вручную.',

@@ -274,11 +274,28 @@ function pullPorRacksToEngine() {
     const porRacks = getObjects(_activePid, { type: 'rack' }) || [];
     if (!porRacks.length) return 0;
     const linkedOids = new Set();
+    // v0.59.890: дедуп по tag — если engine-узел с этим tag и rack-subtype
+    // уже существует (любой источник: handoff, legacy-migration, ручное
+    // создание), НЕ создаём дубль. Раньше этого не было — после legacy-
+    // rack-migration POR содержит и оригинальный `por_xxx` и `por_legacy_`-
+    // mirror. linkedOids проверял только por-id, не tag → создавался
+    // фантомный дубль с kw=0 в Неразмещённых.
+    const tagsByRack = new Set();
     for (const n of state.nodes.values()) {
       if (n.porObjectId) linkedOids.add(n.porObjectId);
+      if (n.type === 'consumer' && (n.subtype === 'rack' || n.consumerKind === 'rack') && n.tag) {
+        tagsByRack.add(String(n.tag).trim().toLowerCase());
+      }
     }
+    let skippedDups = 0;
     for (const obj of porRacks) {
       if (linkedOids.has(obj.id)) continue;
+      // Skip если уже есть engine rack с таким же tag.
+      const objTag = String(obj.tag || '').trim().toLowerCase();
+      if (objTag && tagsByRack.has(objTag)) {
+        skippedDups++;
+        continue;
+      }
       const m = (obj.domains && obj.domains.mechanical) || {};
       const e = (obj.domains && obj.domains.electrical) || {};
       const nid = engineUid('n');
@@ -304,7 +321,11 @@ function pullPorRacksToEngine() {
       };
       state.nodes.set(nid, node);
       pulled++;
+      tagsByRack.add(objTag); // v0.59.890: добавляем чтобы следующий же дубль с тем же tag тоже пропустился
       console.info(`[engine-por-mirror] pulled POR rack ${obj.id} (${obj.tag||''}) → unplaced engine node ${nid}`);
+    }
+    if (skippedDups > 0) {
+      console.info(`[engine-por-mirror] skipped ${skippedDups} duplicate POR-rack(s) — already have engine rack with same tag`);
     }
     if (pulled > 0 && typeof window !== 'undefined' && window.Raschet) {
       try { window.Raschet.rerender && window.Raschet.rerender(); } catch {}

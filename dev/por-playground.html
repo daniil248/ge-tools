@@ -89,6 +89,7 @@
     </select>
     <button class="ghost" id="cleanup-dups" title="Удалить дубликаты POR-объектов type=rack этого проекта (та же tag/kW/габариты)">🧹 Удалить дубликаты</button>
     <button class="ghost" id="cleanup-stale" title="Удалить «фантомные» POR-стойки: записи с legacyRackId='tpl-…/scheme-…/por-group-…' (корпус-шаблоны и виртуалы, попавшие сюда из-за legacy-миграции)">🗑 Удалить фантомы</button>
+    <button class="ghost" id="cleanup-engine-dups" title="Удалить дубликаты engine-узлов consumer (subtype=rack), у которых porId='por_legacy_*' и есть другой engine-узел с тем же tag (без legacy-префикса). Эти дубликаты появляются от legacy-rack-migration POR-mirror.">🧬 Удалить дубли в engine</button>
     <label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px" title="Показать сгруппированные/связанные объекты (родители групп с linkedAliases). По умолчанию они скрыты — отображаются только реальные экземпляры (SR01-SR08), а не их группа SR1.">
       <input type="checkbox" id="show-linked-parents"/> Показать связанные/групповые
     </label>
@@ -496,6 +497,67 @@ if ($('cleanup-stale')) {
     } else {
       log('cleanup-stale: фантомов не найдено');
     }
+    renderRacks();
+  });
+}
+
+// v0.59.890: dedup engine-узлов consumer (subtype=rack) с porId='por_legacy_*'
+// если есть другой engine rack с тем же tag (без legacy-префикса).
+// Сценарий: legacy-rack-migration создаёт второй POR-объект (с id
+// por_legacy_<rackId>), а engine-por-mirror.pullPorRacksToEngine видит этот
+// POR без linked engine-узла → создаёт фантомный consumer-узел (kw=0,
+// pageIds=[], не в контейнере). Юзер видит дубль в реестре «нигде».
+if ($('cleanup-engine-dups')) {
+  $('cleanup-engine-dups').addEventListener('click', async () => {
+    if (!_currentPid) {
+      alert('Cleanup работает только когда выбран проект (project ID применён).');
+      return;
+    }
+    // Читаем engine scheme из LS этого проекта.
+    const schemeKey = `raschet.project.${_currentPid}.engine.scheme.v1`;
+    const raw = localStorage.getItem(schemeKey);
+    if (!raw) { alert('Engine-схема для этого проекта не найдена.'); return; }
+    let scheme;
+    try { scheme = JSON.parse(raw); } catch { alert('Engine-схема повреждена.'); return; }
+    const nodes = scheme.nodes || [];
+    // Группируем racks по lower-tag.
+    const byTag = new Map();
+    for (const n of nodes) {
+      if (n.type !== 'consumer') continue;
+      if (n.subtype !== 'rack' && n.consumerKind !== 'rack') continue;
+      const tag = String(n.tag || '').trim().toLowerCase();
+      if (!tag) continue;
+      if (!byTag.has(tag)) byTag.set(tag, []);
+      byTag.get(tag).push(n);
+    }
+    // Для каждой группы — если >1, удаляем те у которых porId='por_legacy_*'
+    // И НЕТ pageIds И НЕТ containerId. Оставляем «реальный» узел.
+    const toRemove = [];
+    for (const [tag, group] of byTag) {
+      if (group.length < 2) continue;
+      for (const n of group) {
+        const isLegacy = String(n.porObjectId || '').startsWith('por_legacy_');
+        const placed = (n.pageIds || []).length > 0;
+        const inContainer = !!n.containerId;
+        if (isLegacy && !placed && !inContainer) {
+          toRemove.push({ id: n.id, tag: n.tag, name: n.name, porId: n.porObjectId });
+        }
+      }
+    }
+    if (!toRemove.length) {
+      log('cleanup-engine-dups: дубликатов не найдено');
+      return;
+    }
+    if (!confirm(`Найдено ${toRemove.length} engine-узлов-дубликатов с porId="por_legacy_*". Удалить?\n\n${toRemove.slice(0, 10).map(d => `${d.tag} (${d.id})`).join('\n')}${toRemove.length > 10 ? '\n…' : ''}`)) return;
+    const removeIds = new Set(toRemove.map(d => d.id));
+    scheme.nodes = nodes.filter(n => !removeIds.has(n.id));
+    // Также чистим conns которые ссылаются на удалённые узлы (orphan-prevention).
+    if (Array.isArray(scheme.conns)) {
+      scheme.conns = scheme.conns.filter(c => !removeIds.has(c.from?.nodeId) && !removeIds.has(c.to?.nodeId));
+    }
+    localStorage.setItem(schemeKey, JSON.stringify(scheme));
+    log(`cleanup-engine-dups: removed ${toRemove.length} duplicate engine racks: ${toRemove.map(d => d.tag).join(', ')}`);
+    alert(`Удалено ${toRemove.length} дубликатов. Перезагрузите конструктор схем (Ctrl+Shift+R), чтобы изменения применились.`);
     renderRacks();
   });
 }
