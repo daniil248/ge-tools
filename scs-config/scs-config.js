@@ -1946,6 +1946,120 @@ function addMatrixRow() {
   renderMatrix();
 }
 
+/* v0.59.870: модалка «Управление портами устройства» — открывается дблкликом
+   по полосе устройства. Показывает все порты с их состоянием (свободен / занят
+   таким-то линком), позволяет разорвать связь и узнать какой кабель подключён.
+   Пользователь: «click-on-equipment modal с port-management». */
+function openDevicePortsModal(devId) {
+  const devices = currentContents();
+  const dev = devices.find(d => d.id === devId);
+  if (!dev) return;
+  const type = state.catalog.find(c => c.id === dev.typeId);
+  const portCount = Math.max(0, +(type?.ports) || 0);
+  if (portCount === 0) {
+    scToast(`У устройства «${dev.label}» нет портов в каталоге (type.ports=0)`, 'warn');
+    return;
+  }
+  // Текущая внутри-шкафная матрица + вычисляем привязки port↔target.
+  const links = currentMatrix();
+  const label = String(dev.label || '').trim().toLowerCase();
+  const portToLink = new Map();
+  for (const l of links) {
+    [['a','b'], ['b','a']].forEach(([self, other]) => {
+      const s = String(l[self] || '').trim().toLowerCase();
+      if (!s.startsWith(label)) return;
+      const rest = s.slice(label.length);
+      const m = rest.match(/^[\s\/\-:]*p?(\d+)/);
+      if (!m) return;
+      const port = +m[1];
+      if (port < 1 || port > portCount) return;
+      portToLink.set(port, { other: l[other] || '', cable: l.cable || '', color: l.color || '', id: l.id });
+    });
+  }
+  const host = scUiHost();
+  const back = document.createElement('div');
+  back.className = 'sc-modal-back';
+  const tag = deviceTag(dev) || '';
+  const portKindLabel = (() => {
+    const k = type?.kind || '';
+    if (k === 'patch-panel') return 'RJ45 / LC keystone';
+    if (k === 'switch')      return 'RJ45';
+    if (k === 'pdu')         return 'C13 / C19 / Schuko';
+    if (k === 'server' || k === 'server-1U' || k === 'server-2U' || k === 'server-gpu') return 'Mixed (Eth/IPMI/Power)';
+    return '—';
+  })();
+  const rows = [];
+  let usedCount = 0;
+  for (let i = 1; i <= portCount; i++) {
+    const link = portToLink.get(i);
+    if (link) usedCount++;
+    const state = link
+      ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">занят</span>
+         <span style="margin-left:8px">→ ${escape(link.other)}</span>
+         ${link.cable ? `<span class="muted" style="margin-left:8px;font-size:11px">${escape(link.cable)}</span>` : ''}`
+      : `<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">свободен</span>`;
+    const action = link
+      ? `<button type="button" class="sc-btn sc-btn-danger" data-act="unlink" data-link-id="${escape(link.id)}" style="font-size:11px;padding:3px 8px">✕ Разорвать</button>`
+      : '';
+    rows.push(`<tr>
+      <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9"><b>p${i}</b></td>
+      <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9">${state}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${action}</td>
+    </tr>`);
+  }
+  back.innerHTML = `
+    <div class="sc-modal-card" role="dialog" aria-modal="true" style="max-width:640px;width:96vw">
+      <div class="sc-modal-title">🔌 Порты устройства${tag ? ' · ' + escape(tag) : ''}</div>
+      <div class="sc-modal-msg" style="padding:0">
+        <div style="padding:10px 14px;background:#f5f7fa;border-radius:4px;margin-bottom:10px;font-size:12px;line-height:1.6">
+          <b>${escape(dev.label || '(без имени)')}</b> · ${escape(type?.label || type?.kind || '—')}<br>
+          Тип портов: <b>${escape(portKindLabel)}</b> · Всего: <b>${portCount}</b> · Занято: <b>${usedCount}</b> (${Math.round(usedCount/portCount*100)}%)
+        </div>
+        <div style="max-height:50vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:4px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead style="background:#f1f5f9;position:sticky;top:0">
+              <tr>
+                <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1;width:60px">Порт</th>
+                <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Состояние</th>
+                <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1;width:140px"></th>
+              </tr>
+            </thead>
+            <tbody>${rows.join('')}</tbody>
+          </table>
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:8px">Внутри-шкафные патчкорды (матрица). Меж-шкафные связи — во вкладке «Проектирование СКС».</div>
+      </div>
+      <div class="sc-modal-actions">
+        <button type="button" class="sc-btn sc-btn-primary" data-v="close">Закрыть</button>
+      </div>
+    </div>`;
+  host.appendChild(back);
+  const close = () => {
+    back.classList.remove('sc-modal-open');
+    setTimeout(() => back.remove(), 150);
+  };
+  back.querySelector('[data-v="close"]').addEventListener('click', close);
+  back.addEventListener('click', ev => { if (ev.target === back) close(); });
+  back.querySelectorAll('[data-act="unlink"]').forEach(b => {
+    b.addEventListener('click', () => {
+      const lid = b.dataset.linkId;
+      if (!lid) return;
+      const m = currentMatrix();
+      const idx = m.findIndex(l => l.id === lid);
+      if (idx < 0) return;
+      m.splice(idx, 1);
+      saveMatrix();
+      renderMatrix && renderMatrix();
+      renderUnitMap && renderUnitMap();
+      close();
+      scToast('Связь разорвана', 'ok');
+      setTimeout(() => openDevicePortsModal(devId), 50);
+    });
+  });
+  back.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
+  requestAnimationFrame(() => back.classList.add('sc-modal-open'));
+}
+
 /* v0.59.302: какие порты устройства уже заняты существующими патч-кордами.
    Эндпойнты в матрице имеют свободный формат; распознаём «Label/pN» и «Label/N». */
 function portsUsedForDev(dev) {
@@ -2543,6 +2657,14 @@ function bindUnitMapDrag(svgId) {
   const rowH = +svg.dataset.rowh || 16;
   bindUnitMapDrop(svg, rowH);
   svg.querySelectorAll('g.sc-devband').forEach(g => {
+    // v0.59.870: dblclick по полосе устройства → модалка «Порты устройства».
+    g.addEventListener('dblclick', ev => {
+      if (ev.target && ev.target.classList && ev.target.classList.contains('sc-port')) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const devId = g.dataset.devid;
+      if (devId) openDevicePortsModal(devId);
+    });
     g.addEventListener('pointerdown', ev => {
       // v0.59.302: клик по порту не должен запускать drag устройства
       if (ev.target && ev.target.classList && ev.target.classList.contains('sc-port')) return;
