@@ -42,8 +42,17 @@
       "category": "modules",
       "summary": "Предпроектная стадия: концепция, IT-нагрузка, ИБП, климат, площади. Multi-variant compare и handoff в детальное проектирование.",
       "file": "module-tech-workspace.html",
-      "related": ["feature-multi-rack-groups", "feature-catalog-picker", "feature-handoff", "feature-report", "feature-multi-variant-compare"],
+      "related": ["feature-multi-rack-groups", "feature-catalog-picker", "feature-handoff", "feature-report", "feature-multi-variant-compare", "module-meteo"],
       "requiresModule": "tech-workspace"
+    },
+    {
+      "id": "module-meteo",
+      "title": "🌐 Метеоданные",
+      "category": "modules",
+      "summary": "Сбор климатических рядов (T, RH, ветер) для расчёта PUE, FreeCool-потенциала, диаграмм i-d. Plugin-архитектура источников: Open-Meteo REST + ручная rp5 CSV. Новый источник = +1 файл в meteo/sources/.",
+      "file": "module-meteo.html",
+      "related": ["module-tech-workspace"],
+      "requiresModule": "meteo"
     },
     {
       "id": "module-schematic",

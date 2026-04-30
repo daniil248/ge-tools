@@ -1,0 +1,59 @@
+<h2>Назначение</h2>
+<p><b>Метеоданные</b> — stand-alone модуль для импорта климатических рядов (температура, влажность, ветер) с привязкой к локации (lat / lon) и периоду наблюдений. Активный датасет используется в:</p>
+<ul>
+  <li><a data-article-link href="#module-tech-workspace">Технологе ЦОД</a> — расчёт PUE по доле FreeCool-часов (T &lt; 14 °C).</li>
+  <li>ID-диаграмме (психрометрия) — расчётные параметры наружного воздуха.</li>
+  <li>Климат-модулях — подбор кондиционеров по ASHRAE TC 9.9 на основе T<sub>min</sub>/T<sub>max</sub>/T<sub>99%</sub>.</li>
+</ul>
+
+<h2>Источники данных (plugin-архитектура)</h2>
+<p>Каждый источник — отдельный модуль в <code>meteo/sources/</code>. Чтобы добавить новый — создаётся файл с <code>register({ id, label, async createDataset(ctx) })</code> + одна строка <code>import './&lt;name&gt;.js'</code> в <code>sources/index.js</code>. UI-кнопка появится автоматически.</p>
+<table>
+  <thead><tr><th>ID</th><th>Метод</th><th>Файл</th></tr></thead>
+  <tbody>
+    <tr><td><code>open-meteo</code></td><td>🌐 Open-Meteo Historical Weather REST (бесплатно по координатам)</td><td><code>meteo/sources/open-meteo.js</code></td></tr>
+    <tr><td><code>rp5</code></td><td>📥 Ручная загрузка CSV-архива rp5.kz / rp5.ru</td><td><code>meteo/sources/rp5.js</code></td></tr>
+  </tbody>
+</table>
+
+<h3>Open-Meteo REST</h3>
+<p>Бесплатный публичный API без авторизации (<code>archive-api.open-meteo.com</code>). Вы вводите широту, долготу, период (до года) — получаете почасовой ряд температуры (T2m), относительной влажности (RH), скорости ветра (Ff). Запрос обычно занимает ≤2 секунд.</p>
+
+<h3>rp5 CSV</h3>
+<p>На rp5.ru/rp5.kz: «Архив погоды → Скачать», получаете файл CSV (semicolon-separated, UTF-8). Парсер автоматически распознаёт столбцы: «Местное время в...», T (температура), U (влажность), Ff (ветер). Время в формате <code>DD.MM.YYYY HH:MM</code>.</p>
+
+<h2>UI</h2>
+<ul>
+  <li><b>Левый sidebar</b>: список загруженных датасетов, кнопки импорта (генерируются динамически из реестра источников).</li>
+  <li><b>Правая панель</b>: KPI (T средн / min / max / 99% / FreeCool ч / Записей), гистограмма распределения T (бины по 1 °C, зелёная подложка для T &lt; 14 °C — это зона прямого FreeCool), таблица сводки HDD / CDD / T 1%.</li>
+</ul>
+
+<h2>Активный датасет</h2>
+<p>В списке датасетов кнопка ⭐ помечает текущий датасет как «активный для проекта». Активный используется другими модулями через <code>meteo/meteo-api.js::getActiveDataset(pid)</code>.</p>
+
+<h2>Хранилище</h2>
+<ul>
+  <li><code>raschet.project.&lt;pid&gt;.meteo.datasets.v1</code> — массив датасетов</li>
+  <li><code>raschet.project.&lt;pid&gt;.meteo.activeId.v1</code> — id активного датасета</li>
+  <li><code>raschet.meteo.last-loc.v1</code> — последняя введённая локация (для удобства)</li>
+</ul>
+
+<h2>Расширение</h2>
+<p>Чтобы добавить новый источник (NOAA, Росгидромет, Meteostat, Excel-импорт и т.п.), создайте файл <code>meteo/sources/&lt;name&gt;.js</code> по образцу:</p>
+<pre><code>import { register } from './registry.js';
+
+register({
+  id: 'noaa',
+  label: '🌎 NOAA Climate Data',
+  description: '...',
+  async createDataset(ctx) {
+    const { computeStats, modalOpen, toast } = ctx.util;
+    return modalOpen('&lt;h3&gt;NOAA&lt;/h3&gt;', '...', async () =&gt; {
+      // выполнить fetch / парсинг
+      const hourly = [...]; // [{ t: ISO, T: °C, RH, wind }, ...]
+      return { name, source: 'noaa', lat, lon, locationName,
+               dateFrom, dateTo, hourly, stats: computeStats(hourly) };
+    });
+  },
+});</code></pre>
+<p>И добавьте <code>import './noaa.js'</code> в <code>meteo/sources/index.js</code>. Кнопка появится в UI автоматически.</p>

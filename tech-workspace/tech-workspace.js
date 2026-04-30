@@ -1094,6 +1094,22 @@ function _collectBomItems(c) {
       qty: c.feed.dgu.redundancy === '2N' ? 2 : (c.feed.dgu.redundancy === 'N+1' ? 2 : 1),
     });
   }
+  // v0.59.897: МЦОД-здания в BOM. Здание целиком (не разворачивая на модули —
+  // BOM модулей лежит внутри mdc-config sub-проекта). На цену МЦОД-здания
+  // элемента в каталоге обычно нет — юзер вводит вручную или цена приходит
+  // через mdc-config (на следующих этапах будет интеграция).
+  for (const b of (c.mdcBuildings || [])) {
+    const s = _readMdcSummary(b.mdcSubProjectId);
+    out.push({
+      key: 'mdc:' + b.id,
+      elementId: null,  // у МЦОД нет catalog-id; цена вручную или из сметы mdc-config
+      label: `МЦОД — ${b.name || ''}`,
+      subLabel: s
+        ? `${b.configurator.toUpperCase()} · ${s.totalRacks} стоек × ${s.rackKw} кВт`
+        : `${b.configurator.toUpperCase()} · не сконфигурирован`,
+      qty: Number(b.count) || 1,
+    });
+  }
   return out;
 }
 
@@ -1175,12 +1191,25 @@ function renderActiveVariant() {
     // Top summary bar — ключевые KPI
     const upsItOk = (itKw > 0 && upsItKw >= itKw);
     const coolOk = (itKw > 0 && coolKw >= itKw);
+    // v0.59.897: МЦОД-итоги в summary-bar (если хотя бы одно здание сконфигурировано)
+    const mdcStats = (c.mdcBuildings || []).reduce((acc, b) => {
+      const s = _readMdcSummary(b.mdcSubProjectId);
+      if (!s) return acc;
+      const cnt = Number(b.count) || 1;
+      acc.racks += s.totalRacks * cnt;
+      acc.kw += s.itKw * cnt;
+      acc.buildings += cnt;
+      return acc;
+    }, { racks: 0, kw: 0, buildings: 0 });
+    const meteoSum = _readMeteoSummary();
+    const pueVal = calcPue(c, meteoSum);
     const summaryBar = `<div class="tw-summary-bar">
-      <div class="tw-kpi"><span class="tw-kpi-lbl">Стоек</span><span class="tw-kpi-val">${totalRacks}</span></div>
-      <div class="tw-kpi"><span class="tw-kpi-lbl">IT-нагрузка</span><span class="tw-kpi-val">${itKw.toFixed(1)} <small>кВт</small></span></div>
+      <div class="tw-kpi"><span class="tw-kpi-lbl">Стоек</span><span class="tw-kpi-val">${totalRacks}${mdcStats.racks > 0 ? `<small>+${mdcStats.racks}МЦОД</small>` : ''}</span></div>
+      <div class="tw-kpi"><span class="tw-kpi-lbl">IT-нагрузка</span><span class="tw-kpi-val">${(itKw + mdcStats.kw).toFixed(1)} <small>кВт</small></span></div>
       <div class="tw-kpi ${itKw > 0 ? (upsItOk ? 'ok' : 'bad') : ''}"><span class="tw-kpi-lbl">⚡ ИБП IT</span><span class="tw-kpi-val">${upsItKw.toFixed(1)} <small>кВт</small></span></div>
       <div class="tw-kpi ${itKw > 0 ? (coolOk ? 'ok' : 'bad') : ''}"><span class="tw-kpi-lbl">❄ Холод</span><span class="tw-kpi-val">${coolKw.toFixed(1)} <small>кВт</small></span></div>
       <div class="tw-kpi"><span class="tw-kpi-lbl">Σ Принятая</span><span class="tw-kpi-val">${feedKw.toFixed(1)} <small>кВт</small></span></div>
+      <div class="tw-kpi"><span class="tw-kpi-lbl">📊 PUE</span><span class="tw-kpi-val">${pueVal.toFixed(2)}</span></div>
       <div class="tw-kpi"><span class="tw-kpi-lbl">Площадь</span><span class="tw-kpi-val">${sumM2} <small>м²</small></span></div>
     </div>`;
 
