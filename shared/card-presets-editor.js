@@ -29,6 +29,27 @@ import {
 } from './card-presets.js';
 import { CARD_FIELDS, listCardFields, requiredFieldIds, shortLabel as registryShortLabel, fieldUnit } from './card-fields-registry.js';
 
+// v0.59.876: маленький toast внутри модалки — feedback для действий
+// (drag, ×, 🔗). Появляется в правом нижнем углу модалки на ~2 сек.
+function cpeToast(msg, kind = 'ok') {
+  try {
+    const modal = document.querySelector('.cpe-modal');
+    if (!modal) return;
+    let host = modal.querySelector('.cpe-toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.className = 'cpe-toast-host';
+      modal.appendChild(host);
+    }
+    const el = document.createElement('div');
+    el.className = 'cpe-toast cpe-toast-' + kind;
+    el.textContent = msg;
+    host.appendChild(el);
+    setTimeout(() => el.classList.add('cpe-toast-leave'), 1800);
+    setTimeout(() => el.remove(), 2200);
+  } catch {}
+}
+
 // ─── Helpers
 function escHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -678,7 +699,7 @@ function wire(host) {
       const sel = getPresetById(_state.selectedPresetId);
       if (!sel) return;
       if (sel.system) {
-        try { console.warn('[card-presets] системный пресет нельзя редактировать — нажмите 📋 Скопировать'); } catch {}
+        cpeToast('🔒 Системный пресет — нажмите 📋 Скопировать', 'warn');
         return;
       }
       const kind = _state.activeModeTab, type = _state.activeTypeTab;
@@ -700,6 +721,7 @@ function wire(host) {
       }
       saveZoneLayout(sel, kind, type, layout);
       render(host); wire(host);
+      cpeToast('✕ «' + fid + '» удалено', 'ok');
     });
   }
   // v0.59.875: delegated handler для кнопки 🔗 группировки.
@@ -718,13 +740,13 @@ function wire(host) {
       if (!layout.rowGroups) layout.rowGroups = {};
       const rg = layout.rowGroups;
       // Если уже primary — разгруппировать.
-      if (rg[fid]) { delete rg[fid]; saveZoneLayout(sel, kind, type, layout); render(host); wire(host); return; }
+      if (rg[fid]) { delete rg[fid]; saveZoneLayout(sel, kind, type, layout); render(host); wire(host); cpeToast('🔗 Группа разорвана', 'ok'); return; }
       // Если secondary — отвязать (удалить запись где value === fid).
       let wasSecondary = false;
       for (const [pid, sid] of Object.entries(rg)) {
         if (sid === fid) { delete rg[pid]; wasSecondary = true; break; }
       }
-      if (wasSecondary) { saveZoneLayout(sel, kind, type, layout); render(host); wire(host); return; }
+      if (wasSecondary) { saveZoneLayout(sel, kind, type, layout); render(host); wire(host); cpeToast('🔗 «' + fid + '» отвязано от группы', 'ok'); return; }
       // Иначе — открываем popup со списком кандидатов в той же зоне.
       _openGroupPickerPopup(b, sel, kind, type, fid, host);
     });
@@ -830,16 +852,27 @@ function _openGroupPickerPopup(anchorBtn, sel, kind, type, primaryFid, host) {
       saveZoneLayout(sel, kind, type, lay);
       popup.remove();
       render(host); wire(host);
+      cpeToast('🔗 Объединено: «' + primaryFid + ' / ' + secondaryFid + '»', 'ok');
     });
   });
-  // Закрытие при клике вне
+  // Закрытие при клике вне или Esc
   setTimeout(() => {
     const close = (ev) => {
       if (popup.contains(ev.target)) return;
       popup.remove();
       document.removeEventListener('click', close, true);
+      document.removeEventListener('keydown', onKey);
+    };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        popup.remove();
+        document.removeEventListener('click', close, true);
+        document.removeEventListener('keydown', onKey);
+      }
     };
     document.addEventListener('click', close, true);
+    document.addEventListener('keydown', onKey);
   }, 0);
 }
 
@@ -919,6 +952,7 @@ function _wireDragDrop(modal, host) {
       layout.order.push(fid);
       saveZoneLayout(sel, kind, type, layout);
       render(host); wire(host);
+      cpeToast('✓ «' + fid + '» → ' + (z.querySelector('.cpe-zone-label')?.value || targetZoneId), 'ok');
     });
   });
   // v0.59.830: drop на конкретный chip — вставить ПЕРЕД ним в order
@@ -1248,6 +1282,27 @@ const CPE_CSS = `
   font-size: 12px; color: #1f2937;
 }
 .cpe-group-popup-item:hover { background: #eef2ff; color: #1e40af; }
+/* v0.59.876: in-modal toast — feedback для drag/×/🔗 */
+.cpe-toast-host {
+  position: absolute; bottom: 12px; right: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  pointer-events: none; z-index: 100;
+}
+.cpe-toast {
+  background: #10b981; color: #fff;
+  padding: 6px 12px; border-radius: 6px;
+  font-size: 12px; font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: cpe-toast-in 180ms ease-out;
+  pointer-events: auto;
+}
+.cpe-toast-warn { background: #f59e0b; }
+.cpe-toast-err  { background: #ef4444; }
+.cpe-toast-leave { opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s; }
+@keyframes cpe-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 .cpe-dragging { opacity: 0.5; }
 .cpe-preview-legend { font-size: 11px; line-height: 1.4; padding: 6px 8px; background: #f9fafb; border-radius: 3px; margin-top: 8px; }
 
