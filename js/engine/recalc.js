@@ -1798,6 +1798,30 @@ function recalc() {
     //   к каналу → GLOBAL default
     let cos;
     if (toN.type === 'consumer') cos = Number(toN.cosPhi) || GLOBAL.defaultCosPhi;
+    else if (toN.type === 'consumer-container') {
+      // v0.59.823 (1.28.20 Phase 6 ext): cos линии в контейнер — взвешенный
+      // средний по слотам (linked: реальный consumer.cosPhi; placeholder:
+      // slot.cosPhi). Если слотов нет — default.
+      let sumW = 0, sumP = 0;
+      if (Array.isArray(toN.slots)) {
+        for (const s of toN.slots) {
+          if (!s) continue;
+          if (s.kind === 'linked' && s.nodeId) {
+            const a = state.nodes.get(s.nodeId);
+            if (a) {
+              const p = (Number(a.demandKw) || 0) * Math.max(1, Number(a.count) || 1);
+              const c = Number(a.cosPhi) || GLOBAL.defaultCosPhi;
+              if (p > 0) { sumW += p; sumP += p * c; }
+            }
+          } else if (s.kind === 'placeholder') {
+            const p = Number(s.demandKw) || 0;
+            const c = Number(s.cosPhi) || GLOBAL.defaultCosPhi;
+            if (p > 0) { sumW += p; sumP += p * c; }
+          }
+        }
+      }
+      cos = sumW > 0 ? (sumP / sumW) : GLOBAL.defaultCosPhi;
+    }
     else if (toN.type === 'panel') cos = panelCosPhi(toN.id) || GLOBAL.defaultCosPhi;
     else if (toN.type === 'ups') cos = 1.0; // ИБП = чисто активная нагрузка для сети
     else cos = GLOBAL.defaultCosPhi;

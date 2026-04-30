@@ -30,9 +30,35 @@ export function cableVoltageClass(U) {
   return `${fmt(pick[1])}/${fmt(pick[2])} (${fmt(pick[3])}) кВ`;
 }
 
+// v0.59.823 (1.28.20 Phase 6 ext): для consumer-container — fallback к
+// первому linked-члену. Контейнер сам не имеет voltage/phase/voltageLevelIdx
+// — эти параметры наследуются от членов. Используется в nodeVoltage,
+// nodeVoltageLN, isThreePhase.
+function _firstLinkedMember(n) {
+  if (!n || n.type !== 'consumer-container' || !Array.isArray(n.slots)) return null;
+  for (const s of n.slots) {
+    if (s && s.kind === 'linked' && s.nodeId) {
+      const a = state.nodes && state.nodes.get && state.nodes.get(s.nodeId);
+      if (a) return a;
+    }
+  }
+  return null;
+}
+
 // Напряжение потребителя по фазе
 // Возвращает межфазное напряжение (V_LL) для узла
 export function nodeVoltage(n) {
+  // v0.59.823: контейнер берёт voltage от первого linked-члена
+  if (n && n.type === 'consumer-container') {
+    const m = _firstLinkedMember(n);
+    if (m) return nodeVoltage(m);
+    // Если члены только placeholders — берём voltage первого placeholder'а
+    if (Array.isArray(n.slots)) {
+      for (const s of n.slots) {
+        if (s && s.kind === 'placeholder' && Number(s.voltage) > 0) return Number(s.voltage);
+      }
+    }
+  }
   // Если задан voltageLevel — берём из справочника
   if (typeof n.voltageLevelIdx === 'number' && GLOBAL.voltageLevels[n.voltageLevelIdx]) {
     return GLOBAL.voltageLevels[n.voltageLevelIdx].vLL;
@@ -43,6 +69,11 @@ export function nodeVoltage(n) {
 
 // Фазное напряжение (V_LN) для однофазных расчётов
 export function nodeVoltageLN(n) {
+  // v0.59.823: контейнер → первый linked-член
+  if (n && n.type === 'consumer-container') {
+    const m = _firstLinkedMember(n);
+    if (m) return nodeVoltageLN(m);
+  }
   if (typeof n.voltageLevelIdx === 'number' && GLOBAL.voltageLevels[n.voltageLevelIdx]) {
     return GLOBAL.voltageLevels[n.voltageLevelIdx].vLN;
   }
@@ -64,6 +95,17 @@ export function nodeCalcVoltage(n) {
 // Фазность: из n.phase, затем voltage level, затем дефолт 3ph.
 // 3ph → true, 2ph/1ph/A/B/C → false (для расчёта тока и жил)
 export function isThreePhase(n) {
+  // v0.59.823: контейнер → первый linked-член (или первый placeholder)
+  if (n && n.type === 'consumer-container') {
+    const m = _firstLinkedMember(n);
+    if (m) return isThreePhase(m);
+    if (Array.isArray(n.slots)) {
+      for (const s of n.slots) {
+        if (s && s.kind === 'placeholder') return (s.phase || '3ph') === '3ph';
+      }
+    }
+    return true; // дефолт 3ph если совсем пусто
+  }
   const ph = n.phase || '3ph';
   if (ph !== '3ph') return false;
   if (typeof n.voltageLevelIdx === 'number' && GLOBAL.voltageLevels[n.voltageLevelIdx]) {

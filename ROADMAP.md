@@ -1,6 +1,6 @@
 # Raschet — Roadmap архитектурного развития платформы
 
-> **Статус:** v0.59.822 (2026-04-30). Фаза 1.27 — «Проекты» полностью закрыта (1.27.1–5: scs-design/schema/scs-config/inventory неймспейс + status filter + export). Фаза 1.28 — POR-registry, cross-discipline reconciliation закрыта (1.28.7/10–19); 1.28.20 (новый node-type `consumer-container` как организационная обёртка) — Phase 1 (foundation) + Phase 2 (render) сделаны. Фаза 19 (пресеты карточек) полностью закрыта (19.1–6 + v2 редактор с draggable-modal/zones/editable-labels/sample-preview). 1.24.18 (collapsible tables в scs-config) закрыто. Фаза 20 (Технолог ЦОД): базовый скелет + nav + catalog-picker + multi-variant compare + handoff в schematic + ПЗ, открыто 20.7 (план зала). Local/Online switcher. Центр помощи с 21 статьёй + кнопка ❓ в общей шапке.
+> **Статус:** v0.59.823 (2026-04-30). Фаза 1.27 — «Проекты» полностью закрыта (1.27.1–5: scs-design/schema/scs-config/inventory неймспейс + status filter + export). Фаза 1.28 — POR-registry, cross-discipline reconciliation закрыта (1.28.7/10–19); 1.28.20 (новый node-type `consumer-container` как организационная обёртка) — Phase 1 (foundation) + Phase 2 (render) сделаны. Фаза 19 (пресеты карточек) полностью закрыта (19.1–6 + v2 редактор с draggable-modal/zones/editable-labels/sample-preview). 1.24.18 (collapsible tables в scs-config) закрыто. Фаза 20 (Технолог ЦОД): базовый скелет + nav + catalog-picker + multi-variant compare + handoff в schematic + ПЗ, открыто 20.7 (план зала). Local/Online switcher. Центр помощи с 21 статьёй + кнопка ❓ в общей шапке.
 
 > **Правило ведения:** roadmap обновляется ПОСТОЯННО — при появлении новой фичи / задачи и при закрытии любого этапа. Hotfix'ы (regressions, мелкие правки UX) НЕ попадают в roadmap, только содержательная функциональность. Это правило зафиксировано пользователем 2026-04-29.
 
@@ -383,6 +383,13 @@ in-tab Map + cross-tab через storage event.
       в двух call-sites (drop unplaced→canvas, mouseup-merge).
     - Старый _aliasConsumerToGroup остаётся в файле как dead code до
       Phase 5 enable + Phase 4 manual link picker.
+  - **Phase 6 ext — voltage/phase fallback (закрыто v0.59.823):**
+    - electrical.js: `nodeVoltage`, `nodeVoltageLN`, `isThreePhase`
+      возвращают значения от первого linked-члена для consumer-container.
+      Если linked нет — fallback на placeholder.
+    - recalc.js per-line cos: `toN.type === 'consumer-container'` → cos
+      взвешенный средний по слотам (linked × demandKw + placeholder ×
+      demandKw). Это правильно для подбора кабеля линии panel→container.
   - **Phase 6 baseline — Recalc (закрыто v0.59.819):**
     - electrical.js: `isConsumerLike(n)` + `expandConsumerLike(n)` —
       хелперы для агрегации нагрузки контейнера.
