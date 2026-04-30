@@ -333,7 +333,15 @@ function _wireAuthWidget(header) {
 // и sync (push local→cloud / pull cloud→local).
 function openStorageModeModal() {
   const Storage = window.Storage;
-  if (!Storage) return;
+  // v0.59.839: window.Storage может быть встроенным браузерным конструктором
+  // (если js/projects.js не загружен на этой странице) — у него нет наших
+  // методов. Показываем графовый info-toast вместо нерабочей модалки.
+  // Пользователь: «синхронизация не работает».
+  if (!Storage || typeof Storage.setUserMode !== 'function'
+      || typeof Storage.syncLocalToCloud !== 'function') {
+    rsToast('Режим хранения и синхронизация доступны только на странице «Проекты». Откройте список проектов и кликните на иконку режима в заголовке.', 'warn');
+    return;
+  }
   const userMode = Storage.userMode || 'auto';
   const effective = Storage.effectiveMode || 'local';
   const fbReady = !!(window.Auth && window.Auth.isFirebaseReady);
