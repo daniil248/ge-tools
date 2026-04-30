@@ -52,12 +52,18 @@ export const SYSTEM_PRESETS = [
     id: 'electrician',
     name: 'Электрик',
     system: true,
-    description: 'Электрические параметры: kW/A/автомат/кабель/ΔU.',
+    description: 'Электрические параметры: kW/A/автомат/кабель/ΔU/Свободно.',
     perMode: _buildPresetFields((kind, type) => {
       if (kind !== 'schematic') return null;
-      const elFields = ['demandKw', 'currentA', 'breakerIn', 'cableSpec', 'deltaUPct',
-                        'voltage', 'phase', 'cosPhi', 'count', 'capacityA', 'marginPct',
-                        'snomKva', 'kva', 'kw', 'currentA'];
+      const elFields = ['demandKw', 'currentA', 'maxKw', 'maxA',
+                        'freeKw', 'freeA',
+                        'breakerIn', 'cableSpec', 'deltaUPct',
+                        'voltage', 'phase', 'cosPhi', 'count',
+                        'capacityA', 'marginPct',
+                        'snomKva', 'sscMva', 'ukPct',
+                        'kva', 'kw', 'autonomyMin', 'redundancy',
+                        'sourceSubtype', 'switchMode',
+                        'icon', 'subtitle'];
       return [...requiredFieldIds(kind, type), ...listCardFields(kind, type)
         .filter(f => !f.required && elFields.includes(f.id)).map(f => f.id)];
     }),
@@ -66,10 +72,12 @@ export const SYSTEM_PRESETS = [
     id: 'technologist',
     name: 'Технолог',
     system: true,
-    description: 'Параметры технолога: мощность, габариты, тип охлаждения.',
+    description: 'Параметры технолога: мощность, кВА, габариты, охлаждение.',
     perMode: _buildPresetFields((kind, type) => {
-      const techFields = ['demandKw', 'count', 'cosPhi', 'voltage', 'rackUnits',
-                          'widthMm', 'depthMm', 'cooling', 'occupied'];
+      const techFields = ['demandKw', 'kvAOrVA', 'count', 'cosPhi', 'voltage',
+                          'rackUnits', 'widthMm', 'depthMm', 'cooling',
+                          'occupied', 'icon', 'subtitle',
+                          'capacityKw', 'snomKva', 'kva', 'kw'];
       return [...requiredFieldIds(kind, type), ...listCardFields(kind, type)
         .filter(f => !f.required && techFields.includes(f.id)).map(f => f.id)];
     }),
