@@ -6,25 +6,29 @@
 // Расширение: добавляйте записи свободно. Для локаций без ICAO — оставьте id пустым.
 
 export const STATIONS = [
-  // ========== Казахстан ==========
-  { id: 'UAAA', name: 'Алматы', country: 'KZ', region: 'Алматы', lat: 43.352, lon: 77.040, elev: 681 },
-  { id: 'UACC', name: 'Астана', country: 'KZ', region: 'Астана', lat: 51.022, lon: 71.467, elev: 355 },
-  { id: 'UACK', name: 'Караганда', country: 'KZ', region: 'Караганда', lat: 49.671, lon: 73.334, elev: 526 },
-  { id: 'UATT', name: 'Актобе', country: 'KZ', region: 'Актобе', lat: 50.246, lon: 57.207, elev: 226 },
-  { id: 'UATE', name: 'Атырау', country: 'KZ', region: 'Атырау', lat: 47.121, lon: 51.821, elev: -22 },
-  { id: 'UAOO', name: 'Кызылорда', country: 'KZ', region: 'Кызылорда', lat: 44.706, lon: 65.592, elev: 132 },
-  { id: 'UASS', name: 'Усть-Каменогорск', country: 'KZ', region: 'ВКО', lat: 50.036, lon: 82.494, elev: 286 },
-  { id: 'UAII', name: 'Шымкент', country: 'KZ', region: 'Туркестан', lat: 42.364, lon: 69.479, elev: 411 },
-  { id: 'UATG', name: 'Уральск', country: 'KZ', region: 'ЗКО', lat: 51.151, lon: 51.543, elev: 38 },
-  { id: 'UAKD', name: 'Жезказган', country: 'KZ', region: 'Улытау', lat: 47.708, lon: 67.733, elev: 380 },
-  { id: 'UAUU', name: 'Костанай', country: 'KZ', region: 'Костанай', lat: 53.207, lon: 63.551, elev: 168 },
-  { id: 'UAOL', name: 'Кокшетау', country: 'KZ', region: 'Акмолинская', lat: 53.329, lon: 69.595, elev: 274 },
-  { id: 'UASP', name: 'Павлодар', country: 'KZ', region: 'Павлодар', lat: 52.195, lon: 77.074, elev: 124 },
-  { id: 'UASB', name: 'Балхаш', country: 'KZ', region: 'Карагандинская', lat: 46.894, lon: 75.005, elev: 450 },
-  { id: 'UATR', name: 'Семей', country: 'KZ', region: 'ВКО', lat: 50.351, lon: 80.234, elev: 200 },
-  { id: 'UATA', name: 'Актау', country: 'KZ', region: 'Мангистау', lat: 43.860, lon: 51.092, elev: 22 },
-  { id: 'UAOH', name: 'Тараз', country: 'KZ', region: 'Жамбылская', lat: 42.853, lon: 71.303, elev: 654 },
-  { id: 'UAKK', name: 'Темиртау', country: 'KZ', region: 'Карагандинская', lat: 50.058, lon: 72.953, elev: 460 },
+  // ========== Казахстан (с дублями: аэропорт + город там, где WMO sync station есть) ==========
+  { id: 'UAAA', wmo: '36974', name: 'Алматы (Аэропорт)', country: 'KZ', region: 'Алматы', lat: 43.352, lon: 77.040, elev: 681 },
+  { wmo: '36870',           name: 'Алматы (Город)',     country: 'KZ', region: 'Алматы', lat: 43.236, lon: 76.945, elev: 850 },
+  { id: 'UACC', wmo: '35188', name: 'Астана',             country: 'KZ', region: 'Астана', lat: 51.022, lon: 71.467, elev: 355 },
+  { id: 'UACK', wmo: '35394', name: 'Караганда',          country: 'KZ', region: 'Караганда', lat: 49.671, lon: 73.334, elev: 526 },
+  { id: 'UATT', wmo: '35108', name: 'Актобе',             country: 'KZ', region: 'Актобе', lat: 50.246, lon: 57.207, elev: 226 },
+  { id: 'UATE', wmo: '35700', name: 'Атырау',             country: 'KZ', region: 'Атырау', lat: 47.121, lon: 51.821, elev: -22 },
+  { id: 'UAOO', wmo: '38198', name: 'Кызылорда',          country: 'KZ', region: 'Кызылорда', lat: 44.706, lon: 65.592, elev: 132 },
+  { id: 'UASS', wmo: '36177', name: 'Усть-Каменогорск',   country: 'KZ', region: 'ВКО', lat: 50.036, lon: 82.494, elev: 286 },
+  { id: 'UAII', wmo: '38328', name: 'Шымкент',            country: 'KZ', region: 'Туркестан', lat: 42.364, lon: 69.479, elev: 411 },
+  { id: 'UATG', wmo: '35085', name: 'Уральск',            country: 'KZ', region: 'ЗКО', lat: 51.151, lon: 51.543, elev: 38 },
+  { id: 'UAKD',              name: 'Жезказган',          country: 'KZ', region: 'Улытау', lat: 47.708, lon: 67.733, elev: 380 },
+  { id: 'UAUU', wmo: '28952', name: 'Костанай',           country: 'KZ', region: 'Костанай', lat: 53.207, lon: 63.551, elev: 168 },
+  { id: 'UAOL',              name: 'Кокшетау',           country: 'KZ', region: 'Акмолинская', lat: 53.329, lon: 69.595, elev: 274 },
+  { id: 'UASP', wmo: '36003', name: 'Павлодар',           country: 'KZ', region: 'Павлодар', lat: 52.195, lon: 77.074, elev: 124 },
+  { id: 'UASB',              name: 'Балхаш',             country: 'KZ', region: 'Карагандинская', lat: 46.894, lon: 75.005, elev: 450 },
+  { id: 'UATR', wmo: '36177', name: 'Семей',              country: 'KZ', region: 'ВКО', lat: 50.351, lon: 80.234, elev: 200 },
+  { id: 'UATA', wmo: '38001', name: 'Актау',              country: 'KZ', region: 'Мангистау', lat: 43.860, lon: 51.092, elev: 22 },
+  { id: 'UAOH',              name: 'Тараз',              country: 'KZ', region: 'Жамбылская', lat: 42.853, lon: 71.303, elev: 654 },
+  { id: 'UAKK',              name: 'Темиртау',           country: 'KZ', region: 'Карагандинская', lat: 50.058, lon: 72.953, elev: 460 },
+  { wmo: '36859',            name: 'Талдыкорган',        country: 'KZ', region: 'Алматинская', lat: 45.018, lon: 78.387, elev: 602 },
+  { wmo: '36096',            name: 'Петропавловск',      country: 'KZ', region: 'СКО', lat: 54.875, lon: 69.156, elev: 138 },
+  { wmo: '38062',            name: 'Туркестан',          country: 'KZ', region: 'Туркестанская', lat: 43.279, lon: 68.234, elev: 207 },
 
   // ========== Россия (крупнейшие) ==========
   { id: 'UUEE', name: 'Москва (Шереметьево)', country: 'RU', region: 'Московская', lat: 55.973, lon: 37.415, elev: 192 },
@@ -144,6 +148,25 @@ export function findStation(query) {
 
 export function getStationById(id) {
   return STATIONS.find(s => s.id === id) || null;
+}
+
+// Расстояние между двумя точками (haversine, км).
+export function distanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Top-N ближайших станций к точке. Возвращает массив { ...station, distanceKm }.
+export function nearestStations(lat, lon, limit = 10) {
+  return STATIONS
+    .map(s => ({ ...s, distanceKm: distanceKm(lat, lon, s.lat, s.lon) }))
+    .sort((a, b) => a.distanceKm - b.distanceKm)
+    .slice(0, limit);
 }
 
 const COUNTRY_LABELS = {

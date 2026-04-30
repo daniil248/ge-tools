@@ -4,7 +4,7 @@
 //   2. Карта (Leaflet, OpenStreetMap tiles, lazy-loaded из CDN)
 // Возвращает { id, name, country, lat, lon } или null.
 
-import { STATIONS, findStation, countryLabel } from './stations/wmo-list.js';
+import { STATIONS, findStation, countryLabel, nearestStations } from './stations/wmo-list.js';
 import { escHtml, escAttr } from './util.js';
 
 let _leafletLoaded = false;
@@ -132,19 +132,38 @@ export function pickStation(opts = {}) {
                 });
               });
             });
-            // Клик по карте → выбрать произвольную точку (без confirm — pin сам говорит)
+            // Клик по карте → показать ближайшие станции (как ashrae-meteo.info)
             let clickPin = null;
             mapInstance.on('click', (e) => {
               if (clickPin) clickPin.remove();
               clickPin = L.marker([e.latlng.lat, e.latlng.lng]).addTo(mapInstance);
+              const nearest = nearestStations(e.latlng.lat, e.latlng.lng, 10);
+              const nearestRows = nearest.map((s, i) => {
+                const letter = String.fromCharCode(65 + i);
+                return `<div class="mt-sp-near-row" data-near-i="${i}">
+                  <span class="mt-sp-near-letter">${letter}</span>
+                  <span class="mt-sp-near-name"><b>${escHtml(s.name)}</b><br>${escHtml(countryLabel(s.country))} · <span class="muted">${s.distanceKm.toFixed(0)} км</span>${s.wmo ? ' · WMO ' + s.wmo : ''}${s.id ? ' · ' + s.id : ''}</span>
+                </div>`;
+              }).join('');
               clickPin.bindPopup(
-                `<b>Произвольная точка</b><br>${e.latlng.lat.toFixed(3)}, ${e.latlng.lng.toFixed(3)}<br>` +
-                `<button type="button" class="mt-sp-pick-here" style="margin-top:6px;padding:4px 10px;border:1px solid #4f46e5;background:#4f46e5;color:#fff;border-radius:4px;cursor:pointer;font-size:12px">✓ Выбрать</button>`,
-                { closeButton: true }
+                `<div class="mt-sp-near-popup">
+                  <b>📍 Ближайшие станции</b>
+                  <span class="muted" style="font-size:10.5px">от точки ${e.latlng.lat.toFixed(2)}, ${e.latlng.lng.toFixed(2)}</span>
+                  <div class="mt-sp-near-list">${nearestRows}</div>
+                  <button type="button" class="mt-sp-pick-here-btn">✓ Использовать произвольную точку</button>
+                </div>`,
+                { closeButton: true, maxWidth: 360, minWidth: 320 }
               ).openPopup();
               setTimeout(() => {
-                const btn = document.querySelector('.mt-sp-pick-here');
-                if (btn) btn.addEventListener('click', () => {
+                document.querySelectorAll('.mt-sp-near-row').forEach(row => {
+                  row.addEventListener('click', () => {
+                    const i = Number(row.dataset.nearI);
+                    const s = nearest[i];
+                    if (s) close({ id: s.id || null, name: s.name, lat: s.lat, lon: s.lon, country: s.country });
+                  });
+                });
+                const btnHere = document.querySelector('.mt-sp-pick-here-btn');
+                if (btnHere) btnHere.addEventListener('click', () => {
                   close({
                     id: null,
                     name: `Точка ${e.latlng.lat.toFixed(2)}, ${e.latlng.lng.toFixed(2)}`,

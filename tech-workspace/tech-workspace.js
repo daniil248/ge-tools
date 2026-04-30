@@ -119,6 +119,18 @@ function newVariant(name) {
     readOnly: false,
     createdAt: Date.now(),
     concept: {
+      // v0.59.900: блок «Объект» — общие данные проекта/стройплощадки
+      projectData: {
+        designation: '',
+        customer: '',
+        city: '',
+        address: '',
+        lat: null, lon: null,
+        stage: 'concept',          // concept|sketch|working|asbuilt
+        designer: '',
+        dateOfDesign: '',
+        notes: '',
+      },
       rackGroups: [newRackGroup('Стойки IT')],
       upsSystems: [newUpsSystem('ИБП IT', 'it')],
       coolingUnits: [newCoolingUnit('Климат')],
@@ -218,6 +230,11 @@ function migrateVariant(v) {
   if (!c.pue || typeof c.pue !== 'object') c.pue = { mode: 'auto', value: 1.4, manualPue: 1.4 };
   if (typeof c.pue.mode !== 'string') c.pue.mode = 'auto';
   if (typeof c.pue.manualPue !== 'number') c.pue.manualPue = 1.4;
+  // v0.59.900: миграция projectData
+  if (!c.projectData || typeof c.projectData !== 'object') {
+    c.projectData = { designation: '', customer: '', city: '', address: '',
+      lat: null, lon: null, stage: 'concept', designer: '', dateOfDesign: '', notes: '' };
+  }
   return v;
 }
 
@@ -580,7 +597,7 @@ function _ensureSelectedBlock(c) {
     if (kind === 'ups' && (c.upsSystems || []).some(us => us.id === id)) return;
     if (kind === 'cool' && (c.coolingUnits || []).some(cu => cu.id === id)) return;
     if (kind === 'mdc' && (c.mdcBuildings || []).some(b => b.id === id)) return;
-    if (kind === 'feed' || kind === 'areas' || kind === 'pue' || kind === 'bom') return;
+    if (kind === 'project' || kind === 'feed' || kind === 'areas' || kind === 'pue' || kind === 'bom') return;
   }
   if ((c.rackGroups || []).length) {
     _selectedBlock = { kind: 'rack', id: c.rackGroups[0].id };
@@ -700,7 +717,27 @@ function renderListRail(c, ro) {
   const upsItMissing = (itKw > 0 && upsItKw < itKw) ? _redChip(`−${(itKw - upsItKw).toFixed(1)} кВт`) : '';
   const coolMissing = (itKw > 0 && coolKw < itKw) ? _redChip(`−${(itKw - coolKw).toFixed(1)} кВт`) : '';
 
+  // v0.59.900: блок «Объект» сверху rail
+  const pd = c.projectData || {};
+  const STAGE_LABEL = { concept: 'концепция', sketch: 'эскиз', working: 'РД', asbuilt: 'as-built' };
+  const projectSubLine = [pd.designation, pd.customer, pd.city].filter(Boolean).join(' · ') || 'данные не заполнены';
+  const projectChip = pd.lat && pd.lon ? `${Number(pd.lat).toFixed(2)}, ${Number(pd.lon).toFixed(2)}` : '—';
+
   return `
+    <div class="tw-rail-section">
+      <div class="tw-rail-head">
+        <span class="tw-rail-title">🏷 Объект</span>
+      </div>
+      <div class="tw-rail-list">
+        <button type="button" class="tw-rail-item${_selCls('project', null)}" data-bk="project" data-bid="">
+          <span class="tw-rail-name">${escHtml(pd.designation || 'Без обозначения')}</span>
+          <span class="tw-rail-sub">${escHtml(projectSubLine)}</span>
+          <span class="tw-rail-sub muted">${STAGE_LABEL[pd.stage] || pd.stage || ''}</span>
+          <span class="tw-rail-chip">${escHtml(projectChip)}</span>
+        </button>
+      </div>
+    </div>
+
     <div class="tw-rail-section">
       <div class="tw-rail-head">
         <span class="tw-rail-title">🗄 Стойки <span class="muted">·${(c.rackGroups || []).length}</span></span>
@@ -821,6 +858,48 @@ function _readMeteoSummary() {
 
 function renderDetails(c, ro) {
   const sel = _selectedBlock || { kind: 'rack', id: null };
+  // v0.59.900: блок «Объект»
+  if (sel.kind === 'project') {
+    const pd = c.projectData || {};
+    const sub = [pd.designation, pd.customer].filter(Boolean).join(' · ') || 'не заполнено';
+    return `<div class="tw-details-head">
+        <h3>🏷 Объект (общие данные проекта)</h3>
+        <span class="muted tw-details-sub">${escHtml(sub)}</span>
+      </div>
+      <div class="tw-details-body">
+        <div class="tw-card" data-card-kind="project" data-card-id="-">
+          <div class="tw-grid">
+            <label>Обозначение проекта:<input type="text" data-field="projectData.designation" value="${escAttr(pd.designation || '')}" placeholder="напр. 25013-GEP-ENG-ELC" ${ro ? 'disabled' : ''}></label>
+            <label>Заказчик:<input type="text" data-field="projectData.customer" value="${escAttr(pd.customer || '')}" placeholder="ТОО «...»" ${ro ? 'disabled' : ''}></label>
+            <label>Стадия:
+              <select data-field="projectData.stage" ${ro ? 'disabled' : ''}>
+                <option value="concept"${pd.stage === 'concept' ? ' selected' : ''}>Концепция</option>
+                <option value="sketch"${pd.stage === 'sketch' ? ' selected' : ''}>Эскиз (П)</option>
+                <option value="working"${pd.stage === 'working' ? ' selected' : ''}>Рабочая (РД)</option>
+                <option value="asbuilt"${pd.stage === 'asbuilt' ? ' selected' : ''}>As-built / Исп.</option>
+              </select>
+            </label>
+            <label>Дата:<input type="date" data-field="projectData.dateOfDesign" value="${escAttr(pd.dateOfDesign || '')}" ${ro ? 'disabled' : ''}></label>
+            <label>Главный инженер:<input type="text" data-field="projectData.designer" value="${escAttr(pd.designer || '')}" placeholder="ФИО" ${ro ? 'disabled' : ''}></label>
+          </div>
+          <h5 class="tw-section-h5">📍 Местоположение</h5>
+          <div class="tw-grid">
+            <label>Город:<input type="text" data-field="projectData.city" value="${escAttr(pd.city || '')}" placeholder="напр. Алматы" ${ro ? 'disabled' : ''}></label>
+            <label>Адрес:<input type="text" data-field="projectData.address" value="${escAttr(pd.address || '')}" placeholder="ул./стройплощадка" ${ro ? 'disabled' : ''}></label>
+            <label>Широта (lat):<input type="number" step="0.0001" data-field="projectData.lat" value="${pd.lat != null ? pd.lat : ''}" ${ro ? 'disabled' : ''}></label>
+            <label>Долгота (lon):<input type="number" step="0.0001" data-field="projectData.lon" value="${pd.lon != null ? pd.lon : ''}" ${ro ? 'disabled' : ''}></label>
+          </div>
+          <div class="tw-mdc-actions">
+            <button type="button" class="tw-bind-btn" data-tw-action="pick-location" ${ro ? 'disabled' : ''}>🗺 Выбрать на карте…</button>
+            ${pd.lat && pd.lon ? `<button type="button" class="tw-details-btn" data-tw-action="fetch-meteo" ${ro ? 'disabled' : ''}>🌐 Загрузить метео для этой локации</button>` : ''}
+          </div>
+          <h5 class="tw-section-h5">📝 Примечания</h5>
+          <label class="tw-textarea-label">
+            <textarea rows="3" data-field="projectData.notes" placeholder="Технические условия, ограничения площадки, требования заказчика..." ${ro ? 'disabled' : ''}>${escHtml(pd.notes || '')}</textarea>
+          </label>
+        </div>
+      </div>`;
+  }
   if (sel.kind === 'rack') {
     const rg = (c.rackGroups || []).find(x => x.id === sel.id);
     if (!rg) return '<div class="tw-details-empty muted">Группа удалена. Выберите блок слева.</div>';
@@ -1276,6 +1355,17 @@ function bindListEvents() {
         renderActiveVariant();
         return;
       }
+      // v0.59.900: project-карточка хранит в concept.projectData
+      if (kind === 'project') {
+        if (!cur.concept.projectData) cur.concept.projectData = {};
+        // input type="number" возвращает 0 на пустой строке — храним null чтобы
+        // пользовательские параметры не перезаписывались случайно (sacred params правило)
+        const v = (target.type === 'number' && target.value === '') ? null : value;
+        _setNested(cur.concept, field, v);
+        persistVariants();
+        renderActiveVariant();
+        return;
+      }
       const arrName = kind === 'rack' ? 'rackGroups'
         : kind === 'ups' ? 'upsSystems'
         : kind === 'cool' ? 'coolingUnits'
@@ -1427,15 +1517,42 @@ function bindListEvents() {
       return;
     }
 
+    // 🗺 Pick location — открывает station-picker и записывает в projectData
+    const pickLoc = e.target.closest('[data-tw-action="pick-location"]');
+    if (pickLoc) {
+      try {
+        const { pickStation } = await import('../meteo/station-picker.js');
+        const picked = await pickStation({ title: '🗺 Выбор местоположения проекта' });
+        if (!picked || picked.manual) return;
+        if (!cur.concept.projectData) cur.concept.projectData = {};
+        cur.concept.projectData.lat = picked.lat;
+        cur.concept.projectData.lon = picked.lon;
+        if (!cur.concept.projectData.city) cur.concept.projectData.city = picked.name;
+        persistVariants();
+        renderActiveVariant();
+        twToast(`📍 Локация: ${picked.name} (${picked.lat.toFixed(3)}, ${picked.lon.toFixed(3)})`, 'ok');
+      } catch (e) {
+        twToast(`Ошибка: ${e.message || e}`, 'warn');
+      }
+      return;
+    }
+
     // 🌐 Auto-fetch meteo для проекта (Phase 21.3) — 1-кликовая загрузка
     const twAct = e.target.closest('[data-tw-action="fetch-meteo"]');
     if (twAct) {
       try {
-        const { pickStation } = await import('../meteo/station-picker.js');
-        const picked = await pickStation({ title: '🌐 Загрузка метеоданных для проекта' });
-        if (!picked || picked.manual) {
-          if (picked?.manual) twToast('Для авто-загрузки нужна станция из каталога. Используйте картy/список или загрузите вручную через /meteo/.', 'warn');
-          return;
+        const pd = cur.concept.projectData || {};
+        let picked;
+        // Если projectData содержит lat/lon — используем без picker
+        if (Number.isFinite(Number(pd.lat)) && Number.isFinite(Number(pd.lon))) {
+          picked = { lat: Number(pd.lat), lon: Number(pd.lon), name: pd.city || pd.designation || 'Проект', id: null };
+        } else {
+          const { pickStation } = await import('../meteo/station-picker.js');
+          picked = await pickStation({ title: '🌐 Загрузка метеоданных для проекта' });
+          if (!picked || picked.manual) {
+            if (picked?.manual) twToast('Для авто-загрузки нужна станция из каталога или укажите координаты в блоке «Объект».', 'warn');
+            return;
+          }
         }
         twToast('Загрузка 1 года почасовых данных…', 'info');
         const today = new Date().toISOString().slice(0, 10);

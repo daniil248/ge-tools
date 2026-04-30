@@ -20,7 +20,7 @@ import { ensureDefaultProject, projectKey } from '../shared/project-storage.js';
 import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
 import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, drawWindRose, renderDaysInRangeTable } from './charts.js';
-import { COLUMNS, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker } from './annual-table.js';
+import { COLUMNS, DEFAULT_CHILLER, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker, renderChillerSpecForm } from './annual-table.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -29,10 +29,12 @@ let _datasets = [];
 let _activeId = null;
 let _activeTab = 'summary';
 let _activeCols = COLUMNS.filter(c => c.default).map(c => c.id);
+let _chillerSpec = null;
 
 const KEY_DATA = ['meteo', 'datasets.v1'];
 const KEY_ACTIVE = ['meteo', 'activeId.v1'];
 const KEY_COLS = ['meteo', 'annualCols.v1'];
+const KEY_CHILLER = ['meteo', 'chillerSpec.v1'];
 
 function loadJson(suffix, fallback) {
   if (!_pid) return fallback;
@@ -47,6 +49,7 @@ function persist() {
   saveJson(KEY_DATA, _datasets);
   saveJson(KEY_ACTIVE, _activeId);
   saveJson(KEY_COLS, _activeCols);
+  saveJson(KEY_CHILLER, _chillerSpec);
 }
 
 // ─── Render: sources buttons (генерируется автоматически из registry)
@@ -162,7 +165,7 @@ function renderActiveTab() {
     const pivot = $('mt-pivot-table');
     if (pivot) pivot.innerHTML = renderDaysInRangeTable(d.hourly || []);
   } else if (_activeTab === 'annual') {
-    const rows = buildBinData(d.hourly || []);
+    const rows = buildBinData(d.hourly || [], _chillerSpec);
     const tbl = $('mt-annual-table');
     if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
   } else if (_activeTab === 'ashrae') {
@@ -266,6 +269,7 @@ function init() {
   _datasets = loadJson(KEY_DATA, []) || [];
   _activeId = loadJson(KEY_ACTIVE, null);
   _activeCols = loadJson(KEY_COLS, _activeCols);
+  _chillerSpec = loadJson(KEY_CHILLER, null);
   if (_activeId && !_datasets.some(d => d.id === _activeId)) _activeId = _datasets[0]?.id || null;
 
   renderImportButtons();
@@ -315,33 +319,69 @@ function init() {
   });
 
   // Annual hours toolbar
+  const reRenderAnnual = () => {
+    const d = _datasets.find(x => x.id === _activeId);
+    if (!d) return;
+    const rows = buildBinData(d.hourly || [], _chillerSpec);
+    const tbl = $('mt-annual-table');
+    if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
+  };
+
   const colsBtn = $('mt-cols-btn');
   if (colsBtn) {
     const wrap = $('mt-col-picker-wrap');
     colsBtn.addEventListener('click', () => {
       if (!wrap) return;
       wrap.hidden = !wrap.hidden;
-      if (!wrap.hidden && !wrap.children.length) {
+      // Очищаем-перерендериваем при каждом раскрытии (флаг hasChiller мог измениться)
+      if (!wrap.hidden) {
+        wrap.innerHTML = '';
         wrap.appendChild(renderColumnPicker(_activeCols, (next) => {
           _activeCols = next;
           persist();
-          // Re-render текущей таблицы
-          const d = _datasets.find(x => x.id === _activeId);
-          if (d) {
-            const rows = buildBinData(d.hourly || []);
-            const tbl = $('mt-annual-table');
-            if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
+          reRenderAnnual();
+        }, !!(_chillerSpec && Number(_chillerSpec.ratedCapKw) > 0)));
+      }
+    });
+  }
+
+  const chillerBtn = $('mt-chiller-btn');
+  if (chillerBtn) {
+    const wrap = $('mt-chiller-wrap');
+    chillerBtn.addEventListener('click', () => {
+      if (!wrap) return;
+      wrap.hidden = !wrap.hidden;
+      if (!wrap.hidden) {
+        wrap.innerHTML = '';
+        wrap.appendChild(renderChillerSpecForm(_chillerSpec, (next) => {
+          _chillerSpec = next;
+          // Auto-enable chiller-columns если ratedCapKw введён впервые
+          if (next && Number(next.ratedCapKw) > 0) {
+            const chillerCols = ['capacity', 'cop', 'power', 'energy'];
+            for (const c of chillerCols) if (!_activeCols.includes(c)) _activeCols.push(c);
           }
+          persist();
+          reRenderAnnual();
+        }, () => {
+          _chillerSpec = null;
+          // Также убираем chiller-cols
+          _activeCols = _activeCols.filter(c => !['capacity','cop','power','energy'].includes(c));
+          persist();
+          reRenderAnnual();
+          // Закрыть форму
+          wrap.hidden = true;
+          util.toast('Chiller spec сброшен', 'info');
         }));
       }
     });
   }
+
   const exportBtn = $('mt-export-btn');
   if (exportBtn) {
     exportBtn.addEventListener('click', () => {
       const d = _datasets.find(x => x.id === _activeId);
       if (!d) return;
-      const rows = buildBinData(d.hourly || []);
+      const rows = buildBinData(d.hourly || [], _chillerSpec);
       const fname = `meteo-annual-${(d.locationName || 'export').replace(/[^\w\dА-Яа-я-]+/g, '_')}.csv`;
       exportAnnualTableCsv(rows, _activeCols, fname);
       util.toast(`CSV сохранён: ${fname}`, 'ok');

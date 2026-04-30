@@ -267,6 +267,7 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
   margin-bottom: -1px;
 }
 .mt-tab-pane { display: flex; flex-direction: column; gap: 12px; }
+.mt-tab-pane[hidden] { display: none !important; }
 
 /* ─── Pivot table (days-in-range) */
 .mt-table-scroll {
@@ -429,7 +430,89 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 .mt-sp-hint { font-size: 11px; }
 .mt-sp-pick-here { /* injected to leaflet popup, see station-picker.js */ }
 
+/* Nearest-stations popup (на клик по карте) */
+.mt-sp-near-popup { font: 12px system-ui; max-width: 320px; }
+.mt-sp-near-popup b { font-size: 13px; color: #111827; }
+.mt-sp-near-list { display: flex; flex-direction: column; gap: 2px; margin: 8px 0; max-height: 280px; overflow-y: auto; }
+.mt-sp-near-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11.5px;
+}
+.mt-sp-near-row:hover { background: #eff6ff; border-color: #93c5fd; }
+.mt-sp-near-letter {
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: #dc2626; color: #fff;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 12px;
+}
+.mt-sp-near-name { line-height: 1.4; }
+.mt-sp-pick-here-btn {
+  width: 100%;
+  padding: 5px 10px;
+  background: #fff;
+  border: 1px solid #4f46e5;
+  color: #4f46e5;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+.mt-sp-pick-here-btn:hover { background: #eef2ff; }
+
 /* ASHRAE design table */
 .mt-ashrae-table { margin: 8px 0 14px; }
 .mt-ashrae-table th { background: #fef3c7; }
+
+/* ─── v0.59.900: chiller spec form */
+.mt-chiller-wrap {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  background: #f0f9ff;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+}
+.mt-chiller-form h4 {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e40af;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.mt-chiller-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+}
+.mt-chiller-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11.5px;
+  color: #1e3a8a;
+  font-weight: 500;
+}
+.mt-chiller-grid input, .mt-chiller-grid select {
+  padding: 5px 8px;
+  border: 1px solid #93c5fd;
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12.5px;
+  background: #fff;
+}
+.mt-chiller-grid input:focus, .mt-chiller-grid select:focus {
+  outline: none;
+  border-color: #1e40af;
+  box-shadow: 0 0 0 2px rgba(30,64,175,0.15);
+}
 

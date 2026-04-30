@@ -2117,6 +2117,65 @@ function wire() {
     S.points.push({ name:'', t:'', rh:'', x:'', h:'', V:'' });
     rerenderCycle();
   });
+
+  // v0.59.900: импорт расчётных точек из активного meteo-датасета.
+  // Создаёт две точки: «Лето расч.» (Tdb 0.4% percentile / средняя RH в этом бине)
+  // и «Зима расч.» (Tdb 99.6% percentile). Координаты берутся из meteo-api.
+  const fromMeteoBtn = $('psy-from-meteo');
+  if (fromMeteoBtn) fromMeteoBtn.addEventListener('click', async () => {
+    try {
+      const { getActiveDataset } = await import('../meteo/meteo-api.js');
+      const { ensureDefaultProject } = await import('../shared/project-storage.js');
+      const pid = ensureDefaultProject();
+      const ds = getActiveDataset(pid);
+      if (!ds) {
+        psyToast('Нет активного метео-датасета. Загрузите данные в /meteo/ и пометьте ⭐.', 'warn');
+        return;
+      }
+      const hourly = ds.hourly || [];
+      if (!hourly.length) { psyToast('Активный датасет пустой.', 'warn'); return; }
+      const sortedT = [...hourly.map(h => Number(h.T)).filter(Number.isFinite)].sort((a, b) => a - b);
+      const N = sortedT.length;
+      const idx004 = Math.min(N - 1, Math.floor(N * 0.996));
+      const idx996 = Math.max(0, Math.floor(N * 0.004));
+      const tSummer = sortedT[idx004];
+      const tWinter = sortedT[idx996];
+      const rhFor = (targetT) => {
+        const close = hourly.filter(h => Number.isFinite(Number(h.RH)) && Math.abs(Number(h.T) - targetT) < 0.5);
+        if (!close.length) return null;
+        return close.reduce((s, h) => s + Number(h.RH), 0) / close.length;
+      };
+      const rhS = rhFor(tSummer);
+      const rhW = rhFor(tWinter);
+      const locName = ds.locationName || ds.name || 'meteo';
+      S.points.push({
+        name: `Лето расч. (${locName}, 0.4%)`,
+        t: String(Math.round(tSummer * 10) / 10),
+        rh: rhS != null ? String(Math.round(rhS)) : '50',
+        x: '', h: '', V: '',
+      });
+      S.points.push({
+        name: `Зима расч. (${locName}, 99.6%)`,
+        t: String(Math.round(tWinter * 10) / 10),
+        rh: rhW != null ? String(Math.round(rhW)) : '70',
+        x: '', h: '', V: '',
+      });
+      rerenderCycle();
+      psyToast(`Импортированы 2 точки: лето ${tSummer.toFixed(1)}°C, зима ${tWinter.toFixed(1)}°C`, 'ok');
+    } catch (e) {
+      console.error('[psy-from-meteo]', e);
+      psyToast(`Ошибка: ${e.message || e}`, 'warn');
+    }
+  });
+
+  function psyToast(msg, kind = 'info') {
+    const el = document.createElement('div');
+    el.style.cssText = `position:fixed;top:16px;right:16px;z-index:10001;padding:10px 14px;border-radius:5px;font:13px system-ui;color:#f9fafb;box-shadow:0 4px 16px rgba(0,0,0,0.15);max-width:360px;background:${kind==='warn'?'#b45309':kind==='ok'?'#15803d':'#1f2937'};opacity:0;transform:translateY(-8px);transition:opacity .2s,transform .2s`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, 2800);
+  }
   const btnAddEdge = $('psy-add-edge');
   if (btnAddEdge) btnAddEdge.addEventListener('click', () => {
     // По умолчанию: ребро из последнего узла в предыдущий (образует последовательность)
