@@ -213,6 +213,7 @@ function _renderFieldsTabSplit(sel, isSystem) {
         <div class="cpe-fields-toolbar">
           <button class="cpe-btn-sm" data-action="select-all">☑ Все</button>
           <button class="cpe-btn-sm" data-action="select-none">☐ Только обязательные</button>
+          <button class="cpe-btn-sm" data-action="reset-type" title="Сбросить пользовательские подписи и зоны для типа «${escAttr(type)}» в этом пресете. Поля остаются как есть.">↺ Сбросить зоны/подписи</button>
         </div>
         <div class="cpe-info muted" style="font-size:10.5px;margin:6px 0">
           Слева — все доступные поля. Чекбокс включает в пресет; перетащите поле в нужную <b>зону</b> карточки справа.
@@ -467,6 +468,18 @@ function wire(host) {
         }
       } else if (action === 'select-all') { _bulkSetFields(true); render(host); wire(host); }
       else if (action === 'select-none') { _bulkSetFields(false); render(host); wire(host); }
+      else if (action === 'reset-type') {
+        const sel = getPresetById(_state.selectedPresetId);
+        if (!sel || sel.system) return;
+        const kind = _state.activeModeTab, type = _state.activeTypeTab;
+        if (!confirm(`Сбросить пользовательские подписи и зоны для типа «${type}» в пресете «${sel.name}»?`)) return;
+        if (sel.fieldLabels?.[kind]?.[type]) delete sel.fieldLabels[kind][type];
+        if (sel.zoneLayout?.[kind]?.[type]) delete sel.zoneLayout[kind][type];
+        const all = loadUserPresets();
+        const idx = all.findIndex(p => p.id === sel.id);
+        if (idx >= 0) { all[idx] = sel; saveUserPresets(all); }
+        render(host); wire(host);
+      }
       else if (action === 'export') { _exportJson(); }
     });
   });
