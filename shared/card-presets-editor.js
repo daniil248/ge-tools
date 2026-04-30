@@ -62,11 +62,16 @@ function getZoneLayout(preset, kind, type) {
       zones: JSON.parse(JSON.stringify(DEFAULT_ZONES)),
       assignments: {},
       order: [],   // v0.59.830: явный порядок field-id для отображения чипов
+      rowGroups: {}, // v0.59.875: user-controlled группировка в строки
     };
   }
   // Backward-compat: layout без order
   if (!Array.isArray(layouts[kind][type].order)) {
     layouts[kind][type].order = [];
+  }
+  // v0.59.875: backward-compat — добавляем rowGroups если его нет
+  if (!layouts[kind][type].rowGroups || typeof layouts[kind][type].rowGroups !== 'object') {
+    layouts[kind][type].rowGroups = {};
   }
   return layouts[kind][type];
 }
@@ -426,12 +431,32 @@ function _renderCardPreview(sel, kind, type, fields, activeIds, required, layout
           // v0.59.802: использовать custom label если есть в пресете
           const _customLabel = sel.fieldLabels?.[_state.activeModeTab]?.[_state.activeTypeTab]?.[f.id];
           const _displayLabel = _customLabel || f.label;
-          // v0.59.873: draggable=true теперь ТОЛЬКО на grip-span. Сам chip
-          // не draggable — клик по labelу/×-кнопке не провоцирует
-          // browser-drag и × надёжно отрабатывает.
-          return `<span class="cpe-chip${required.has(f.id) ? ' cpe-chip-req' : ''}" data-field-id="${escAttr(f.id)}" data-from-zone="${escAttr(z.id)}" data-chip-pos="${idx}" title="${escAttr(f.id)}">
+          // v0.59.873: draggable=true теперь ТОЛЬКО на grip-span.
+          // v0.59.875: 🔗 кнопка для группировки в одну строку с другим полем.
+          //   Если f.id — primary группы → бэйдж «🔗→ secondary», клик разгруппирует.
+          //   Если f.id — secondary в чужой группе → бэйдж «🔗← primary», клик отвяжет.
+          //   Иначе — кнопка «🔗» (присоединить к primary в этой зоне).
+          const _rowGroups = layout.rowGroups || {};
+          const _isPrimary = !!_rowGroups[f.id];
+          let _secondaryOf = null;
+          for (const [pid, sid] of Object.entries(_rowGroups)) {
+            if (sid === f.id) { _secondaryOf = pid; break; }
+          }
+          const _groupedClass = (_isPrimary || _secondaryOf) ? ' cpe-chip-grouped' : '';
+          let _groupBtnHtml = '';
+          if (!required.has(f.id)) {
+            if (_isPrimary) {
+              _groupBtnHtml = `<button type="button" class="cpe-chip-group cpe-chip-grouped-primary" data-field-id="${escAttr(f.id)}" title="В одной строке с «${escAttr(_rowGroups[f.id])}». Клик — разгруппировать.">🔗→</button>`;
+            } else if (_secondaryOf) {
+              _groupBtnHtml = `<button type="button" class="cpe-chip-group cpe-chip-grouped-secondary" data-field-id="${escAttr(f.id)}" title="В строке с «${escAttr(_secondaryOf)}». Клик — отвязать.">🔗←</button>`;
+            } else {
+              _groupBtnHtml = `<button type="button" class="cpe-chip-group" data-field-id="${escAttr(f.id)}" title="Объединить с другим полем зоны в одну строку через «/». Открывает меню выбора.">🔗</button>`;
+            }
+          }
+          return `<span class="cpe-chip${required.has(f.id) ? ' cpe-chip-req' : ''}${_groupedClass}" data-field-id="${escAttr(f.id)}" data-from-zone="${escAttr(z.id)}" data-chip-pos="${idx}" title="${escAttr(f.id)}">
             <span class="cpe-chip-grip" draggable="true" data-field-id="${escAttr(f.id)}" data-from-zone="${escAttr(z.id)}" title="Перетащите в другую зону">⋮⋮</span>
             ${escHtml(_displayLabel)}
+            ${_groupBtnHtml}
             ${!required.has(f.id) ? `<button type="button" class="cpe-chip-x" data-field-id="${escAttr(f.id)}" title="Удалить поле из карточки">×</button>` : ''}
           </span>`;
         }).join('')}
@@ -663,11 +688,45 @@ function wire(host) {
       current.delete(fid);
       for (const r of required) current.add(r);
       setUserPresetFields(sel.id, kind, type, Array.from(current));
-      // Remove from layout assignments
+      // Remove from layout assignments + rowGroups
       const layout = getZoneLayout(sel, kind, type);
       delete layout.assignments[fid];
+      // v0.59.875: чистим rowGroups — поле могло быть primary или secondary.
+      if (layout.rowGroups) {
+        delete layout.rowGroups[fid];
+        for (const [pid, sid] of Object.entries(layout.rowGroups)) {
+          if (sid === fid) delete layout.rowGroups[pid];
+        }
+      }
       saveZoneLayout(sel, kind, type, layout);
       render(host); wire(host);
+    });
+  }
+  // v0.59.875: delegated handler для кнопки 🔗 группировки.
+  if (!root._cpeChipGroupBound) {
+    root._cpeChipGroupBound = true;
+    root.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('button.cpe-chip-group');
+      if (!b || !root.contains(b)) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const fid = b.dataset.fieldId;
+      const sel = getPresetById(_state.selectedPresetId);
+      if (!sel || sel.system) return;
+      const kind = _state.activeModeTab, type = _state.activeTypeTab;
+      const layout = getZoneLayout(sel, kind, type);
+      if (!layout.rowGroups) layout.rowGroups = {};
+      const rg = layout.rowGroups;
+      // Если уже primary — разгруппировать.
+      if (rg[fid]) { delete rg[fid]; saveZoneLayout(sel, kind, type, layout); render(host); wire(host); return; }
+      // Если secondary — отвязать (удалить запись где value === fid).
+      let wasSecondary = false;
+      for (const [pid, sid] of Object.entries(rg)) {
+        if (sid === fid) { delete rg[pid]; wasSecondary = true; break; }
+      }
+      if (wasSecondary) { saveZoneLayout(sel, kind, type, layout); render(host); wire(host); return; }
+      // Иначе — открываем popup со списком кандидатов в той же зоне.
+      _openGroupPickerPopup(b, sel, kind, type, fid, host);
     });
   }
 
@@ -723,6 +782,65 @@ function _wireDraggable(modal, host) {
   document.addEventListener('mouseup', onUp);
   // Cleanup на close — использован modal removal через host.remove(),
   // global listeners не удаляем (изолированы)
+}
+
+// v0.59.875: popup-меню «🔗 Объединить с …» — список других chip'ов в той же
+// зоне (не required, не уже primary, не уже secondary), которые можно сделать
+// secondary под текущим chip.
+function _openGroupPickerPopup(anchorBtn, sel, kind, type, primaryFid, host) {
+  // Удалить старый popup если есть
+  document.querySelectorAll('.cpe-group-popup').forEach(x => x.remove());
+  const layout = getZoneLayout(sel, kind, type);
+  const zoneId = layout.assignments?.[primaryFid] || defaultZoneAssignment(primaryFid);
+  const requiredSet = new Set(requiredFieldIds(kind, type));
+  const fields = listCardFields(kind, type);
+  const activeIds = new Set(sel.perMode?.[kind]?.perType?.[type] || fields.map(f => f.id));
+  const used = new Set();
+  for (const [pid, sid] of Object.entries(layout.rowGroups || {})) { used.add(pid); used.add(sid); }
+  const candidates = fields.filter(f => {
+    if (f.id === primaryFid) return false;
+    if (!activeIds.has(f.id)) return false;
+    if (requiredSet.has(f.id)) return false;
+    if (used.has(f.id)) return false;
+    const fz = layout.assignments?.[f.id] || defaultZoneAssignment(f.id);
+    return fz === zoneId;
+  });
+  const popup = document.createElement('div');
+  popup.className = 'cpe-group-popup';
+  if (!candidates.length) {
+    popup.innerHTML = `<div class="cpe-group-popup-empty">Нет других полей в этой зоне для объединения.</div>`;
+  } else {
+    popup.innerHTML = `<div class="cpe-group-popup-head">🔗 Объединить «${escHtml(primaryFid)}» с …</div>`
+      + candidates.map(f => `<button type="button" class="cpe-group-popup-item" data-secondary="${escAttr(f.id)}">${escHtml(f.label)} <code class="muted">${escHtml(f.id)}</code></button>`).join('');
+  }
+  document.body.appendChild(popup);
+  // Позиционирование рядом с anchorBtn
+  const rect = anchorBtn.getBoundingClientRect();
+  popup.style.position = 'fixed';
+  popup.style.top = (rect.bottom + 4) + 'px';
+  popup.style.left = Math.max(8, rect.left) + 'px';
+  popup.style.zIndex = 11000;
+  // Клики
+  popup.querySelectorAll('[data-secondary]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const secondaryFid = btn.dataset.secondary;
+      const lay = getZoneLayout(sel, kind, type);
+      lay.rowGroups = lay.rowGroups || {};
+      lay.rowGroups[primaryFid] = secondaryFid;
+      saveZoneLayout(sel, kind, type, lay);
+      popup.remove();
+      render(host); wire(host);
+    });
+  });
+  // Закрытие при клике вне
+  setTimeout(() => {
+    const close = (ev) => {
+      if (popup.contains(ev.target)) return;
+      popup.remove();
+      document.removeEventListener('click', close, true);
+    };
+    document.addEventListener('click', close, true);
+  }, 0);
 }
 
 // ─── Drag-drop fields → zones
@@ -1104,6 +1222,32 @@ const CPE_CSS = `
   line-height: 1;
 }
 .cpe-chip-x:hover { color: #7f1d1d; }
+/* v0.59.875: 🔗 кнопка для группировки в строку */
+.cpe-chip-group {
+  background: none; border: none; cursor: pointer;
+  color: #475569; font-size: 11px; padding: 0 2px;
+  line-height: 1; opacity: 0.6;
+}
+.cpe-chip-group:hover { opacity: 1; color: #1e40af; }
+.cpe-chip-grouped { border-color: #6366f1; box-shadow: 0 0 0 1px #6366f1; }
+.cpe-chip-grouped-primary { color: #4f46e5; opacity: 1; }
+.cpe-chip-grouped-secondary { color: #4f46e5; opacity: 1; }
+/* Popup для выбора secondary */
+.cpe-group-popup {
+  background: #fff; border: 1px solid #cbd5e1; border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  min-width: 220px; max-width: 320px; padding: 4px;
+  font-size: 12px;
+}
+.cpe-group-popup-head { padding: 4px 8px; font-weight: 600; color: #334155; border-bottom: 1px solid #f1f5f9; margin-bottom: 4px; }
+.cpe-group-popup-empty { padding: 10px; color: #94a3b8; font-style: italic; text-align: center; }
+.cpe-group-popup-item {
+  display: block; width: 100%; text-align: left;
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px 10px; border-radius: 4px;
+  font-size: 12px; color: #1f2937;
+}
+.cpe-group-popup-item:hover { background: #eef2ff; color: #1e40af; }
 .cpe-dragging { opacity: 0.5; }
 .cpe-preview-legend { font-size: 11px; line-height: 1.4; padding: 6px 8px; background: #f9fafb; border-radius: 3px; margin-top: 8px; }
 

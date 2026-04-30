@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.875', date: '2026-04-30', items: [
+      '🔗 <b>User-controlled группировка полей в строки в редакторе пресетов</b>. По репорту: «сделай чтобы можно было группировать в строки». В v0.59.868 был auto-combining для трёх известных пар (demandKw+maxKw, currentA+maxA, …); теперь — UI для произвольной группировки.',
+      '• <b>Кнопка 🔗 на чипе</b>: клик открывает popup со списком других полей в той же зоне, можно выбрать «secondary» — поле, которое будет в одной строке с этим primary через «/».',
+      '• <b>Бэйджи в редакторе</b>:',
+      '  <code>🔗</code> (нейтральный) — поле не в группе, можно объединить',
+      '  <code>🔗→</code> — поле primary, в одной строке с секондарным; клик разгруппирует',
+      '  <code>🔗←</code> — поле secondary, привязано к primary; клик отвяжет',
+      '• <b>Хранение</b>: <code>layout.rowGroups[primaryFid] = secondaryFid</code> в зоне-лэйауте пресета.',
+      '• <b>Render на канвасе</b>: user-rowGroups имеют ПРИОРИТЕТ над auto-PAIRS. Если ни user-rowGroup, ни auto-PAIR — поле рендерится как обычная per-field строка.',
+      '• <b>Очистка</b>: при удалении поля из пресета (×) автоматически чистятся записи в rowGroups (и где это поле было primary, и где было secondary).',
+      'Файлы: <code>shared/card-presets-editor.js</code> (rowGroups в getZoneLayout, 🔗 кнопка в chip-render, _openGroupPickerPopup, delegated handler, CSS для popup и grouped-chip), <code>js/engine/render.js</code> (user-rowGroups перед auto-PAIRS в per-field rendering loop).',
+    ] },
     { version: '0.59.874', date: '2026-04-30', items: [
       '🐛 <b>НАСТОЯЩИЙ корень бага «drag-drop с палитры в зону не работает»</b>. Найден через MCP-debug в браузере: race-condition между <code>setUserPresetFields()</code> и <code>saveZoneLayout()</code>.',
       '• <b>Сценарий</b>: drop на зону → handler вызывает <code>setUserPresetFields(sel.id, …)</code> (обновляет perMode в LS), затем <code>saveZoneLayout(sel, …)</code>. Старая логика saveZoneLayout: <code>all[idx] = preset</code> — полностью перезаписывала FRESH preset из LS in-memory ссылкой <code>preset</code>, у которой perMode НЕ содержит только что добавленное поле. Симптом: assignment сохранялся, но perMode тут же затирался — поле формально не в пресете, на канвасе не отображается.',
