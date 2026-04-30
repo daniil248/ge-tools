@@ -80,20 +80,22 @@ async function init() {
   initCalled = true;
 
   if (!hasValidConfig()) {
-    console.info('[auth] Firebase config пуст — локальный режим');
-    // v0.59.850 BUG-FIX: НЕ перезаписываем raschet.currentUserId на
-    // 'anonymous' в локальном режиме. Используем definitive=false —
-    // сохраняем предыдущий UID если он был. Иначе после v0.59.834
-    // (auth.js во всех модулях) каждая загрузка страницы в local-режиме
-    // обнуляла scope user-данных (пресеты, каталог, проекты привязанные
-    // к UID), и пользователь видел «всё пропало».
-    notify({ definitive: false });
+    console.info('[auth] Firebase config пуст — локальный режим (NO-OP, кеш UID не трогаем)');
+    // v0.59.851 CRITICAL: в локальном режиме auth.js — полный NO-OP.
+    // Не вызываем notify() (она шла в listeners + cacheCurrentUserId).
+    // НИЧЕГО не трогаем в localStorage. Раньше (до v0.59.850) перетирался
+    // raschet.currentUserId на 'anonymous'. После v0.59.850 — definitive=false
+    // (не перетираем). Но cacheCurrentUserId с {definitive:false} всё равно
+    // вызывался + listeners получали null — вдруг где-то кто-то делал
+    // что-то деструктивное по этому событию. Полный no-op убирает все
+    // возможные побочные эффекты.
+    // Резолвим promise (для Auth.ready()) и выходим.
+    if (!firstStateResolved) { firstStateResolved = true; _firstStateResolve(); }
     return;
   }
   if (typeof firebase === 'undefined' || !firebase.initializeApp) {
-    console.warn('[auth] Firebase SDK не загрузился (проверьте подключение к интернету)');
-    // v0.59.850 BUG-FIX: SDK не загрузился — не перетираем UID.
-    notify({ definitive: false });
+    console.warn('[auth] Firebase SDK не загрузился — NO-OP');
+    if (!firstStateResolved) { firstStateResolved = true; _firstStateResolve(); }
     return;
   }
   try {
