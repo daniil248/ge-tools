@@ -261,9 +261,16 @@ export function normalizeContainers() {
 
 // v0.59.811: эффективное имя узла. Для shell-группы с linkedAliases —
 // имя первого alias-узла (как и effectiveTag). Иначе n.name.
-// Пользователь: «обозначается по первому потребителю в группе» —
-// аналогично применяется к name, чтобы tag и name не рассинхронизировались.
+// v0.59.888: для consumer-container — если пользователь явно ввёл имя
+// (n.name отличается от дефолта «Контейнер потребителей»), отображаем
+// его. Иначе наследуем от первого linked-члена. Пользователь: «имя не
+// соответствует» — на канвасе показывалось имя slot'а вместо введённого
+// в инспекторе имени контейнера «Группа стоек».
 export function effectiveName(n) {
+  if (n && n.type === 'consumer-container') {
+    const cName = (n.name || '').trim();
+    if (cName && cName !== 'Контейнер потребителей') return cName;
+  }
   const first = _firstSortedAlias(n);
   if (first && first.name) return first.name;
   return (n && n.name) || '';
