@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.865', date: '2026-04-30', items: [
+      '⚡ <b>Fix: 5 жил кабеля до consumer-container с 1ph членами</b>. По репорту пользователя со скриншотами: контейнер из 8 потребителей 1ph 230В получал кабель 5×10мм² (как для 3ph), а одиночная стойка 1ph — корректные 3×10мм².',
+      '• <b>Корень бага</b>: в <code>electrical.js::cableWireCount</code> фазы определялись как <code>toN?.phase || \'3ph\'</code>. Для consumer-container <code>phase</code> не задано (контейнер сам фазой не управляет — она наследуется от членов через <code>_firstLinkedMember</code>). Дефолт \'3ph\' давал phases=3 → countWires вернул 3+N+PE=5 жил.',
+      '• <b>Fix</b>: используем <code>isThreePhase(toN)</code>, который для контейнера через <code>_firstLinkedMember</code> возвращает фазность первого linked-члена. Для 1ph-членов теперь правильно phases=1 → 1+N+PE=3 жилы.',
+      '• Случай 2ph (редкий) сохранён через явную проверку <code>toN?.phase === \'2ph\'</code>.',
+      'Файл: <code>js/engine/electrical.js</code> (cableWireCount, строки ~199-211).',
+    ] },
     { version: '0.59.864', date: '2026-04-30', items: [
       '🔌 <b>scs-design: Способ окончания кабеля per-link (разъём / разделка / заводская сборка)</b>. Новое поле <code>link.termination</code> с тремя значениями:',
       '• <code>jack</code> — Разъём (patch cord, factory-terminated). Default для новых связей.',

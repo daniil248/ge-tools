@@ -200,8 +200,15 @@ export function cableWireCount(fromN, toN, conn) {
   const lv = toN && typeof toN.voltageLevelIdx === 'number' ? levels[toN.voltageLevelIdx] : null;
   const dc = !!(lv && (lv.dc || (typeof lv.hz === 'number' && lv.hz === 0)));
   const dcPoles = dc && lv ? (Number(lv.dcPoles) || 2) : undefined;
-  const ph = toN?.phase || '3ph';
-  const phases = ph === '3ph' ? 3 : ph === '2ph' ? 2 : 1;
+  // v0.59.865: для consumer-container — toN.phase не задано (контейнер сам
+  // фазой не управляет), и `toN?.phase || '3ph'` давал неправильные 3 фазы
+  // (5 жил вместо 3 для 1ph-членов). Используем isThreePhase(), который
+  // для контейнера спускается к первому linked-члену через _firstLinkedMember.
+  // Для 2ph случая дополнительно проверяем явный phase узла.
+  const explicitPh = toN?.phase;
+  const phases = (explicitPh === '2ph') ? 2
+    : isThreePhase(toN) ? 3
+    : 1;
   const flags = effectiveWireFlags(fromN, toN);
   return countWires({ phases, dc, dcPoles, ...flags });
 }
