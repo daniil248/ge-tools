@@ -24,22 +24,21 @@
       title: 'Модуль метеоданных',
       usage: `
         <h4>Назначение</h4>
-        <p>Сбор климатических рядов (температура, влажность, ветер) для расчёта PUE, freecooling-потенциала, диаграмм i-d (psychrometrics) и параметров климат-системы ЦОД. Данные привязаны к конкретной локации (lat, lon) и хранятся как набор «датасетов» внутри проекта.</p>
-        <h4>Источники данных</h4>
-        <ul>
-          <li><b>🌐 Open-Meteo REST</b> — бесплатный публичный API. Достаточно ввести координаты локации и диапазон дат, скачивание занимает 1–3 секунды.</li>
-          <li><b>📥 rp5.kz / rp5.ru — ручная загрузка</b> — можно скачать архив с сайта rp5 в формате CSV/XLS и подгрузить файлом. Парсер автоматически определяет колонки температуры/влажности.</li>
-        </ul>
-        <h4>Использование</h4>
-        <p>Каждый датасет можно «активировать» как источник для других модулей (Технолог ЦОД, ID-диаграмма). Активный датасет помечен ⭐ в списке.</p>
+        <p>Сбор климатических рядов (температура, влажность, ветер) для расчёта PUE, freecooling-потенциала, диаграмм i-d и параметров климат-системы ЦОД. Plugin-арх источников: Open-Meteo REST, ASHRAE design conditions, ручная rp5 CSV.</p>
+        <h4>Tab «📋 Сводка»</h4>
+        <p>KPI + гистограмма температуры (бины 1°C, ось Y — дней/год) + сводка HDD/CDD.</p>
+        <h4>Tab «📊 Графики»</h4>
+        <p>Гистограмма влажности RH (бины 5%), линия среднемесячной T с min/max envelope, матрица «дней с T в бине × год».</p>
+        <h4>Tab «📋 Annual hours table»</h4>
+        <p>Pivot-таблица бинов температуры с настраиваемыми столбцами (часы/год, дни/год, RH avg/min/max, ветер). Экспорт в CSV/Excel.</p>
       `,
       calcs: `
         <h4>Производные показатели</h4>
         <ul>
-          <li>T<sub>min</sub>, T<sub>max</sub>, T<sub>средн</sub>, T<sub>99%</sub> — для подбора климат-системы по ASHRAE TC 9.9.</li>
-          <li>HDD/CDD (heating/cooling degree-days) — энергия отопления/охлаждения за период.</li>
-          <li>FreeCool-часы — кол-во часов в году, когда T&lt;14 °C (прямой freecooling) или T&lt;18 °C (косвенный).</li>
-          <li>Влажность абсолютная (г/кг) — для psychrometric-расчётов.</li>
+          <li>T<sub>min/max/mean/99%</sub> — для подбора климат-системы по ASHRAE TC 9.9.</li>
+          <li>HDD/CDD — heating/cooling degree-days (база 18°C).</li>
+          <li>FreeCool часы — T &lt; 14°C (прямой) / T &lt; 18°C (косвенный).</li>
+          <li>ASHRAE design conditions — heating 99.6%/99% T<sub>db</sub>, cooling 0.4%/1%/2% T<sub>db</sub> с MCWB (упрощённая Stull-формула 2011).</li>
         </ul>
       `
     });
@@ -52,9 +51,7 @@
         <div id="mt-datasets-list" class="mt-datasets-list"></div>
       </div>
       <div class="mt-section">
-        <!-- Кнопки импорта генерируются динамически из meteo/sources/index.js.
-             Чтобы добавить новый источник — создайте файл в meteo/sources/
-             и импортируйте его в sources/index.js. -->
+        <!-- Кнопки импорта генерируются динамически из meteo/sources/index.js. -->
         <h3>➕ Импорт</h3>
       </div>
     </aside>
@@ -70,28 +67,73 @@
       <div id="mt-empty" class="mt-empty">
         <div>
           <h3>Нет загруженных метеоданных</h3>
-          <p class="muted">Слева — кнопки импорта. Open-Meteo REST загружается автоматически по координатам, rp5-архив — файлом.</p>
+          <p class="muted">Слева — кнопки импорта. Open-Meteo REST загружается автоматически по координатам, ASHRAE — design-условия из 10 лет архива, rp5 — файлом.</p>
         </div>
       </div>
 
       <div id="mt-active-pane" class="mt-active-pane" hidden>
-        <div class="mt-kpi-bar">
-          <div class="mt-kpi"><span class="mt-kpi-lbl">T средн</span><span class="mt-kpi-val" id="mt-kpi-tmean">—</span></div>
-          <div class="mt-kpi"><span class="mt-kpi-lbl">T min</span><span class="mt-kpi-val" id="mt-kpi-tmin">—</span></div>
-          <div class="mt-kpi"><span class="mt-kpi-lbl">T max</span><span class="mt-kpi-val" id="mt-kpi-tmax">—</span></div>
-          <div class="mt-kpi"><span class="mt-kpi-lbl">T 99%</span><span class="mt-kpi-val" id="mt-kpi-t99">—</span></div>
-          <div class="mt-kpi"><span class="mt-kpi-lbl">FreeCool ч</span><span class="mt-kpi-val" id="mt-kpi-fc">—</span></div>
-          <div class="mt-kpi"><span class="mt-kpi-lbl">Записей</span><span class="mt-kpi-val" id="mt-kpi-n">—</span></div>
+        <div class="mt-tabs">
+          <button type="button" class="mt-tab active" data-tab="summary">📋 Сводка</button>
+          <button type="button" class="mt-tab" data-tab="charts">📊 Графики</button>
+          <button type="button" class="mt-tab" data-tab="annual">📐 Annual hours</button>
+          <button type="button" class="mt-tab" data-tab="ashrae">🌡 ASHRAE design</button>
         </div>
 
-        <div class="mt-section-card">
-          <h3>📈 Распределение температуры (бины по 1 °C)</h3>
-          <canvas id="mt-hist-canvas" width="900" height="220"></canvas>
+        <div class="mt-tab-pane" data-pane="summary">
+          <div class="mt-kpi-bar">
+            <div class="mt-kpi"><span class="mt-kpi-lbl">T средн</span><span class="mt-kpi-val" id="mt-kpi-tmean">—</span></div>
+            <div class="mt-kpi"><span class="mt-kpi-lbl">T min</span><span class="mt-kpi-val" id="mt-kpi-tmin">—</span></div>
+            <div class="mt-kpi"><span class="mt-kpi-lbl">T max</span><span class="mt-kpi-val" id="mt-kpi-tmax">—</span></div>
+            <div class="mt-kpi"><span class="mt-kpi-lbl">T 99%</span><span class="mt-kpi-val" id="mt-kpi-t99">—</span></div>
+            <div class="mt-kpi"><span class="mt-kpi-lbl">FreeCool ч</span><span class="mt-kpi-val" id="mt-kpi-fc">—</span></div>
+            <div class="mt-kpi"><span class="mt-kpi-lbl">Записей</span><span class="mt-kpi-val" id="mt-kpi-n">—</span></div>
+          </div>
+
+          <div class="mt-section-card">
+            <h3>📈 Распределение температуры (бины по 1 °C, ось Y — дней / год)</h3>
+            <canvas id="mt-hist-canvas" width="900" height="240"></canvas>
+          </div>
+
+          <div class="mt-section-card">
+            <h3>📋 Сводка</h3>
+            <div id="mt-summary"></div>
+          </div>
         </div>
 
-        <div class="mt-section-card">
-          <h3>📋 Сводка</h3>
-          <div id="mt-summary"></div>
+        <div class="mt-tab-pane" data-pane="charts" hidden>
+          <div class="mt-section-card">
+            <h3>💧 Распределение относительной влажности (бины 5 %, ось Y — дней / год)</h3>
+            <canvas id="mt-rh-canvas" width="900" height="220"></canvas>
+          </div>
+          <div class="mt-section-card">
+            <h3>🗓 Среднемесячная температура (с диапазоном min…max)</h3>
+            <canvas id="mt-monthly-canvas" width="900" height="240"></canvas>
+          </div>
+          <div class="mt-section-card">
+            <h3>📅 Дней с T в бине × год</h3>
+            <p class="muted" style="font-size:11.5px;margin:0 0 8px">Каждая ячейка — кол-во дней (по среднесуточной T) при данном бине T в данном году. Последняя колонка — среднее по годам.</p>
+            <div id="mt-pivot-table" class="mt-table-scroll"></div>
+          </div>
+        </div>
+
+        <div class="mt-tab-pane" data-pane="annual" hidden>
+          <div class="mt-section-card">
+            <div class="mt-annual-toolbar">
+              <h3 style="margin:0">📐 Annual hours table</h3>
+              <span class="muted" style="flex:1;font-size:11.5px">Бины Ambient T °C × часы/дни в году. Включите нужные столбцы и экспортируйте в CSV.</span>
+              <button type="button" class="mt-btn-ghost" id="mt-cols-btn">🔧 Столбцы</button>
+              <button type="button" class="mt-btn-primary" id="mt-export-btn">📥 Экспорт CSV</button>
+            </div>
+            <div class="mt-col-picker-wrap" id="mt-col-picker-wrap" hidden></div>
+            <div id="mt-annual-table" class="mt-table-scroll"></div>
+          </div>
+        </div>
+
+        <div class="mt-tab-pane" data-pane="ashrae" hidden>
+          <div class="mt-section-card">
+            <h3>🌡 ASHRAE Design Conditions (HoF гл. 14)</h3>
+            <div id="mt-ashrae-block"></div>
+          </div>
         </div>
       </div>
     </section>

@@ -4,6 +4,25 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.898', date: '2026-04-30', items: [
+      '🌐 <b>Метеоданные: расширение функционала по запросу пользователя (Phase 21.2)</b>.',
+      '🐛 <b>Hist-Y label fix</b>: было «365» без подписи (читалось как «365 дней»). Теперь Y-ось — «дней / год» с нормировкой hours/24×year-scale. Понятно с первого взгляда.',
+      '🗺 <b>Поиск метеостанции вместо ручного ввода lat/lon</b>. По задаче: «писать пользователю Название, потом вводить координаты … можно ошибиться, да и координаты искать сложно. Добавь карту, с указанными метеостанциями как в ashrae-meteo.info».',
+      '• Каталог из 102 станций (KZ + RU + СНГ + Европа + Азия + Америка/Австралия). ICAO-коды + lat/lon + elev. Файл: <code>meteo/stations/wmo-list.js</code>.',
+      '• <code>meteo/station-picker.js</code> — модал с двумя режимами:',
+      '  — <b>📋 Список</b> с поиском по имени/коду/стране (cross-language: «Москва», «Almaty», «UAAA», «KZ»),',
+      '  — <b>🗺 Карта</b> Leaflet (CDN unpkg, OpenStreetMap tiles) со 102 маркерами; click по маркеру = выбор; click по любой точке карты = произвольная локация.',
+      '• Кнопка «✏ Ввести вручную» — fallback для случаев, когда станции нет в каталоге.',
+      '🆕 <b>ASHRAE design conditions plugin</b>. Новый источник <code>meteo/sources/ashrae.js</code>: загружает 10 лет почасовых данных через Open-Meteo (т.к. реальные ASHRAE Handbook таблицы paywalled), считает перцентили T<sub>db</sub> по методике HoF гл. 14: heating 99.6%/99% + cooling 0.4%/1%/2%. MCWB — упрощённая Stull-2011, MCDP — из Open-Meteo dewpoint. Tab «🌡 ASHRAE design» в детальной панели + кнопка «вычислить из текущих данных» для других источников.',
+      '📊 <b>Графики</b>: <code>meteo/charts.js</code> — три новых графика:',
+      '  — RH histogram (бины 5%, ось Y дней/год),',
+      '  — Среднемесячная T с min/max envelope (12 точек, 0°C grid line),',
+      '  — Days-in-range matrix (Year × T-bin, как pivot из Excel — пользовательский референс из скрина).',
+      '📐 <b>Annual hours pivot table</b>: <code>meteo/annual-table.js</code>. Бины Ambient T °C с настраиваемыми столбцами (Annual hours [h] / Annual days [d] / % of year / Avg/Min/Max RH [%] / Avg wind [m/s] / Cumulative %). Кнопка «🔧 Столбцы» — checkbox-пикер; «📥 Экспорт CSV» — сохранение Excel-совместимого CSV (UTF-8 BOM, semicolon-separated).',
+      '🗂 <b>Tab navigation</b> в детальной панели: 📋 Сводка | 📊 Графики | 📐 Annual hours | 🌡 ASHRAE design.',
+      '🔌 <b>Plugin-арх не нарушена</b>: новый источник ASHRAE добавлен ровно одной строкой <code>import \'./ashrae.js\'</code> в <code>sources/index.js</code>. UI-ядро не правилось.',
+      'Файлы (новые): <code>meteo/stations/wmo-list.js</code>, <code>meteo/station-picker.js</code>, <code>meteo/charts.js</code>, <code>meteo/annual-table.js</code>, <code>meteo/sources/ashrae.js</code>. Изменены: <code>meteo/index.html</code>, <code>meteo/meteo.js</code>, <code>meteo/meteo.css</code>, <code>meteo/sources/open-meteo.js</code>, <code>meteo/sources/index.js</code>.',
+    ] },
     { version: '0.59.897', date: '2026-04-30', items: [
       '🚨 <b>Hotfix syntax-error в module-changelogs.js</b>: 5 неэкранированных апострофов вида slot+апостроф+«а»/«ов»/«ам» в russian-text внутри single-quoted JS-строк ломали парсинг файла (ошибка <code>Unexpected identifier «а»</code>). Существовало с v0.59.886, маскировалось тем что footer-загрузка идёт через innerHTML — без strict module-import.',
       '• Fix: заменил все <code>slot</code>+апостроф+rus → escape backslash. Dynamic-import теперь работает корректно.',

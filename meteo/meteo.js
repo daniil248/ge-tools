@@ -1,40 +1,38 @@
 // =========================================================================
-// meteo.js — v0.59.894 (Etap C, plugin-arch)
+// meteo.js — v0.59.898 (Etap C, plugin-arch + tabs/charts/annual-table)
 //
 // Stand-alone модуль метеоданных. Хранит набор «датасетов» (наборов
 // почасовых метеоизмерений) внутри активного проекта.
 //
 // Архитектура:
-//   meteo.js              — UI-ядро: список датасетов, активный, гистограмма.
+//   meteo.js              — UI-ядро + tab orchestration.
 //   meteo/util.js         — общие утилиты (computeStats, modalOpen, toast).
+//   meteo/charts.js       — графики (T-histogram, RH-histogram, monthly-T,
+//                           days-in-range matrix).
+//   meteo/annual-table.js — annual hours pivot table с column-config + CSV.
+//   meteo/station-picker.js — picker метеостанции (список + Leaflet карта).
+//   meteo/stations/wmo-list.js — каталог станций.
 //   meteo/sources/        — плагины источников. Каждый файл = отдельный
-//                           источник, регистрирующийся через registry. Чтобы
-//                           добавить новый — кладёте файл, импортируете в
-//                           sources/index.js, и кнопка появляется в UI.
-//
-// Data shape (dataset):
-//   { id, name, source, lat, lon, locationName, dateFrom, dateTo,
-//     hourly: [{ t: ISO, T: °C, RH: %, wind: m/s }],
-//     stats: { tmin, tmax, tmean, t99, freecoolHours, n },
-//     activeForProject: bool, createdAt }
-//
-// LS keys:
-//   raschet.project.<pid>.meteo.datasets.v1
-//   raschet.project.<pid>.meteo.activeId.v1
+//                           источник, регистрирующийся через registry.
 // =========================================================================
 
 import { ensureDefaultProject, projectKey } from '../shared/project-storage.js';
 import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
+import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, renderDaysInRangeTable } from './charts.js';
+import { COLUMNS, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker } from './annual-table.js';
 
 const $ = (id) => document.getElementById(id);
 
 let _pid = null;
 let _datasets = [];
 let _activeId = null;
+let _activeTab = 'summary';
+let _activeCols = COLUMNS.filter(c => c.default).map(c => c.id);
 
 const KEY_DATA = ['meteo', 'datasets.v1'];
 const KEY_ACTIVE = ['meteo', 'activeId.v1'];
+const KEY_COLS = ['meteo', 'annualCols.v1'];
 
 function loadJson(suffix, fallback) {
   if (!_pid) return fallback;
@@ -48,14 +46,13 @@ function saveJson(suffix, value) {
 function persist() {
   saveJson(KEY_DATA, _datasets);
   saveJson(KEY_ACTIVE, _activeId);
+  saveJson(KEY_COLS, _activeCols);
 }
 
 // ─── Render: sources buttons (генерируется автоматически из registry)
 function renderImportButtons() {
   const aside = document.querySelector('.mt-sidebar');
   if (!aside) return;
-  // Найдём секцию «Импорт» — она содержит mt-import-* кнопки. Очистим всё,
-  // что было в HTML по умолчанию, и сгенерим из плагинов.
   const importSection = aside.querySelector('.mt-section:nth-child(2)');
   if (!importSection) return;
   const sources = getSources();
@@ -75,7 +72,6 @@ async function importViaSource(srcId) {
   const ctx = { util };
   const ds = await src.createDataset(ctx);
   if (!ds) return;
-  // Финализируем
   const dataset = {
     id: util.newId('ds'),
     activeForProject: !_datasets.some(d => d.activeForProject),
@@ -98,9 +94,7 @@ function renderDatasetsList() {
     root.innerHTML = '<div class="mt-empty-list">Нет датасетов.<br>Используйте кнопки ➕ Импорт.</div>';
     return;
   }
-  const SRC_ICONS = {
-    'open-meteo': '🌐', 'rp5': '📥', 'manual': '✏',
-  };
+  const SRC_ICONS = { 'open-meteo': '🌐', 'rp5': '📥', 'ashrae': '📐', 'manual': '✏' };
   root.innerHTML = _datasets.map(d => {
     const star = d.activeForProject ? '⭐ ' : '';
     const cls = d.id === _activeId ? 'mt-dataset-row active' : 'mt-dataset-row';
@@ -118,7 +112,7 @@ function renderDatasetsList() {
   }).join('');
 }
 
-// ─── Render: активный датасет (правая панель)
+// ─── Render: активный датасет
 function renderActive() {
   const d = _datasets.find(x => x.id === _activeId);
   const empty = $('mt-empty');
@@ -134,7 +128,7 @@ function renderActive() {
   if (pane) pane.hidden = false;
   const star = d.activeForProject ? ' ⭐' : '';
   $('mt-active-name').textContent = d.name + star;
-  $('mt-active-meta').textContent = `${d.locationName || ''} · ${d.lat ? d.lat.toFixed(3) : '—'}, ${d.lon ? d.lon.toFixed(3) : '—'} · ${d.dateFrom || ''}—${d.dateTo || ''} · ${(d.hourly || []).length} записей`;
+  $('mt-active-meta').textContent = `${d.locationName || ''} · ${d.lat ? d.lat.toFixed(3) : '—'}, ${d.lon ? d.lon.toFixed(3) : '—'}${d.stationId ? ' · ICAO ' + d.stationId : ''} · ${d.dateFrom || ''}—${d.dateTo || ''} · ${(d.hourly || []).length} записей`;
 
   const s = d.stats || util.computeStats(d.hourly || []);
   $('mt-kpi-tmean').textContent = `${s.tmean} °C`;
@@ -144,59 +138,34 @@ function renderActive() {
   $('mt-kpi-fc').textContent = `${s.freecoolHours} ч`;
   $('mt-kpi-n').textContent = `${s.n}`;
 
-  drawHistogram(d);
-  drawSummary(d, s);
+  // Сразу рендерим текущий tab
+  renderActiveTab();
 }
 
-function drawHistogram(d) {
-  const cvs = $('mt-hist-canvas');
-  if (!cvs) return;
-  const ctx = cvs.getContext('2d');
-  const W = cvs.width, H = cvs.height;
-  ctx.clearRect(0, 0, W, H);
-  const temps = (d.hourly || []).map(h => Number(h.T)).filter(Number.isFinite);
-  if (!temps.length) return;
-  const tmin = Math.floor(Math.min(...temps));
-  const tmax = Math.ceil(Math.max(...temps));
-  const bins = [];
-  for (let t = tmin; t <= tmax; t++) bins.push({ t, count: 0 });
-  for (const v of temps) {
-    const idx = Math.min(bins.length - 1, Math.max(0, Math.floor(v - tmin)));
-    bins[idx].count++;
+function renderActiveTab() {
+  const d = _datasets.find(x => x.id === _activeId);
+  if (!d) return;
+  document.querySelectorAll('.mt-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === _activeTab));
+  document.querySelectorAll('.mt-tab-pane').forEach(p => p.hidden = (p.dataset.pane !== _activeTab));
+
+  if (_activeTab === 'summary') {
+    const cvs = $('mt-hist-canvas');
+    if (cvs) drawTempHistogram(cvs, d.hourly || []);
+    drawSummary(d, d.stats || util.computeStats(d.hourly || []));
+  } else if (_activeTab === 'charts') {
+    const cvsRH = $('mt-rh-canvas');
+    if (cvsRH) drawHumidityHistogram(cvsRH, d.hourly || []);
+    const cvsM = $('mt-monthly-canvas');
+    if (cvsM) drawMonthlyTempChart(cvsM, d.hourly || []);
+    const pivot = $('mt-pivot-table');
+    if (pivot) pivot.innerHTML = renderDaysInRangeTable(d.hourly || []);
+  } else if (_activeTab === 'annual') {
+    const rows = buildBinData(d.hourly || []);
+    const tbl = $('mt-annual-table');
+    if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
+  } else if (_activeTab === 'ashrae') {
+    renderAshraeBlock(d);
   }
-  const maxCount = Math.max(...bins.map(b => b.count));
-  const padL = 40, padR = 10, padT = 10, padB = 26;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-  const bw = plotW / bins.length;
-  // FreeCool zone (T<14°C) — зелёная подложка
-  const fc14idx = bins.findIndex(b => b.t > 14);
-  if (fc14idx > 0) {
-    ctx.fillStyle = 'rgba(22, 163, 74, 0.08)';
-    ctx.fillRect(padL, padT, fc14idx * bw, plotH);
-  }
-  ctx.fillStyle = '#3b82f6';
-  bins.forEach((b, i) => {
-    const x = padL + i * bw;
-    const h = (b.count / maxCount) * plotH;
-    ctx.fillRect(x + 1, padT + plotH - h, Math.max(1, bw - 2), h);
-  });
-  ctx.fillStyle = '#6b7280';
-  ctx.font = '11px system-ui';
-  ctx.textAlign = 'center';
-  for (let i = 0; i < bins.length; i++) {
-    if (bins[i].t % 5 === 0) {
-      const x = padL + i * bw + bw / 2;
-      ctx.fillText(bins[i].t + '°', x, H - 6);
-    }
-  }
-  ctx.textAlign = 'right';
-  ctx.fillText(maxCount, padL - 4, padT + 10);
-  ctx.fillText('0', padL - 4, padT + plotH);
-  ctx.strokeStyle = '#e5e7eb';
-  ctx.beginPath();
-  ctx.moveTo(padL, padT + plotH); ctx.lineTo(W - padR, padT + plotH);
-  ctx.moveTo(padL, padT); ctx.lineTo(padL, padT + plotH);
-  ctx.stroke();
 }
 
 function drawSummary(d, s) {
@@ -219,11 +188,82 @@ function drawSummary(d, s) {
   </table>`;
 }
 
+function renderAshraeBlock(d) {
+  const block = $('mt-ashrae-block');
+  if (!block) return;
+  const ash = d.stats?.ashraeDesign;
+  if (!ash) {
+    block.innerHTML = `<p class="muted">ASHRAE design conditions для этого датасета не вычислены. Загружайте данные через источник <b>📐 ASHRAE</b> (10 лет архива по выбранной станции) — расчёт делается автоматически.</p>
+      <p class="muted" style="font-size:11.5px">Текущий датасет: <code>${util.escHtml(d.source)}</code> (${(d.hourly || []).length} записей). Если данных ≥ 5 лет, можно выполнить расчёт прямо сейчас:</p>
+      <button type="button" class="mt-btn-primary" id="mt-ashrae-compute">📐 Вычислить design-условия из текущих данных</button>`;
+    const btn = block.querySelector('#mt-ashrae-compute');
+    if (btn) btn.addEventListener('click', async () => {
+      const m = await import('./sources/ashrae.js');
+      // ashrae.js не экспортирует computeAshraeDesign публично — для inline-расчёта
+      // вызываем общий percentile-помощник из ниже:
+      const ds = computeAshraeFromHourly(d.hourly);
+      d.stats.ashraeDesign = ds;
+      persist();
+      renderActiveTab();
+    });
+    return;
+  }
+  block.innerHTML = `
+    <p class="muted">Расчётные условия по ASHRAE HoF гл. 14, рассчитаны из ${ash.nYears || '?'} лет почасовых данных. MCWB — coincident wet-bulb, MCDP — coincident dew-point.</p>
+    <h4>Heating (зимний расчёт)</h4>
+    <table class="mt-ashrae-table">
+      <thead><tr><th>Перцентиль</th><th class="num">T<sub>db</sub>, °C</th><th class="num">MCWB, °C</th><th class="num">MCDP, °C</th></tr></thead>
+      <tbody>
+        <tr><td><b>99.6%</b> (extreme)</td><td class="num">${fmt(ash.heating?.pct99_6?.Tdb)}</td><td class="num">${fmt(ash.heating?.pct99_6?.MCWB)}</td><td class="num">${fmt(ash.heating?.pct99_6?.MCDP)}</td></tr>
+        <tr><td><b>99%</b> (typical)</td><td class="num">${fmt(ash.heating?.pct99_0?.Tdb)}</td><td class="num">${fmt(ash.heating?.pct99_0?.MCWB)}</td><td class="num">${fmt(ash.heating?.pct99_0?.MCDP)}</td></tr>
+      </tbody>
+    </table>
+    <h4>Cooling (летний расчёт)</h4>
+    <table class="mt-ashrae-table">
+      <thead><tr><th>Перцентиль</th><th class="num">T<sub>db</sub>, °C</th><th class="num">MCWB, °C</th><th class="num">MCDP, °C</th></tr></thead>
+      <tbody>
+        <tr><td><b>0.4%</b> (peak)</td><td class="num">${fmt(ash.cooling?.pct0_4?.Tdb)}</td><td class="num">${fmt(ash.cooling?.pct0_4?.MCWB)}</td><td class="num">${fmt(ash.cooling?.pct0_4?.MCDP)}</td></tr>
+        <tr><td><b>1%</b></td><td class="num">${fmt(ash.cooling?.pct1_0?.Tdb)}</td><td class="num">${fmt(ash.cooling?.pct1_0?.MCWB)}</td><td class="num">${fmt(ash.cooling?.pct1_0?.MCDP)}</td></tr>
+        <tr><td><b>2%</b></td><td class="num">${fmt(ash.cooling?.pct2_0?.Tdb)}</td><td class="num">${fmt(ash.cooling?.pct2_0?.MCWB)}</td><td class="num">${fmt(ash.cooling?.pct2_0?.MCDP)}</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:11.5px;margin-top:10px">⚠ Значения вычислены по public Open-Meteo historical data (1940→present), не из официальных ASHRAE Handbook таблиц (paywalled). Методика — стандартные перцентили T<sub>db</sub> по ряду; MCWB — упрощённая Stull 2011.</p>`;
+
+  function fmt(v) { return v == null ? '—' : Number(v).toFixed(1); }
+}
+
+function computeAshraeFromHourly(hourly) {
+  // Inline-копия из sources/ashrae.js для on-demand расчёта на любых данных
+  const validIdx = hourly.map((h, i) => Number.isFinite(Number(h.T)) ? i : -1).filter(i => i >= 0);
+  if (!validIdx.length) return null;
+  const sortedByT = [...validIdx].sort((a, b) => hourly[a].T - hourly[b].T);
+  const N = sortedByT.length;
+  const at = (frac) => hourly[sortedByT[Math.max(0, Math.min(N - 1, Math.floor(N * frac)))]];
+  const wetBulb = (T, RH) => {
+    if (!Number.isFinite(T) || !Number.isFinite(RH)) return null;
+    const Tw = T * Math.atan(0.151977 * Math.sqrt(RH + 8.313659))
+      + Math.atan(T + RH) - Math.atan(RH - 1.676331)
+      + 0.00391838 * Math.pow(RH, 1.5) * Math.atan(0.023101 * RH) - 4.686035;
+    return Math.round(Tw * 10) / 10;
+  };
+  const fmt = (h) => h ? {
+    Tdb: Math.round(h.T * 10) / 10,
+    MCWB: wetBulb(h.T, h.RH),
+    MCDP: Number.isFinite(Number(h.dewPoint)) ? Math.round(h.dewPoint * 10) / 10 : null,
+  } : null;
+  return {
+    nYears: Math.round(N / (24 * 365)),
+    heating: { pct99_6: fmt(at(0.004)), pct99_0: fmt(at(0.010)) },
+    cooling: { pct0_4: fmt(at(0.996)), pct1_0: fmt(at(0.990)), pct2_0: fmt(at(0.980)) },
+  };
+}
+
 // ─── Init
 function init() {
   _pid = ensureDefaultProject();
   _datasets = loadJson(KEY_DATA, []) || [];
   _activeId = loadJson(KEY_ACTIVE, null);
+  _activeCols = loadJson(KEY_COLS, _activeCols);
   if (_activeId && !_datasets.some(d => d.id === _activeId)) _activeId = _datasets[0]?.id || null;
 
   renderImportButtons();
@@ -263,6 +303,48 @@ function init() {
       renderDatasetsList(); renderActive();
     }
   });
+
+  // Tab navigation
+  document.querySelectorAll('.mt-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _activeTab = btn.dataset.tab;
+      renderActiveTab();
+    });
+  });
+
+  // Annual hours toolbar
+  const colsBtn = $('mt-cols-btn');
+  if (colsBtn) {
+    const wrap = $('mt-col-picker-wrap');
+    colsBtn.addEventListener('click', () => {
+      if (!wrap) return;
+      wrap.hidden = !wrap.hidden;
+      if (!wrap.hidden && !wrap.children.length) {
+        wrap.appendChild(renderColumnPicker(_activeCols, (next) => {
+          _activeCols = next;
+          persist();
+          // Re-render текущей таблицы
+          const d = _datasets.find(x => x.id === _activeId);
+          if (d) {
+            const rows = buildBinData(d.hourly || []);
+            const tbl = $('mt-annual-table');
+            if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
+          }
+        }));
+      }
+    });
+  }
+  const exportBtn = $('mt-export-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const d = _datasets.find(x => x.id === _activeId);
+      if (!d) return;
+      const rows = buildBinData(d.hourly || []);
+      const fname = `meteo-annual-${(d.locationName || 'export').replace(/[^\w\dА-Яа-я-]+/g, '_')}.csv`;
+      exportAnnualTableCsv(rows, _activeCols, fname);
+      util.toast(`CSV сохранён: ${fname}`, 'ok');
+    });
+  }
 }
 
 function mtConfirm(msg, title = 'Подтверждение') {

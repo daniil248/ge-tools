@@ -9,6 +9,7 @@
 
 import './open-meteo.js';
 import './rp5.js';
+import './ashrae.js';
 // import './noaa.js';        ← пример: будущий источник NOAA Climate Data
 // import './roshydromet.js'; ← пример: будущий Росгидромет API
 
