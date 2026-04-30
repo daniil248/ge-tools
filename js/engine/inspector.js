@@ -1043,7 +1043,8 @@ export function renderInspectorNode(n) {
       }
     }
     h.push('<div class="inspector-section"><h4>Контейнер потребителей</h4>');
-    h.push(`<div class="muted" style="font-size:11px;margin-bottom:8px">Σ нагрузка: <b>${totalKw.toFixed(2)} кВт</b> · слотов: <b>${slots.length}</b>. Контейнер сам не считается потребителем — нагрузка считается по составу slot'ов.</div>`);
+    h.push(`<div class="muted" style="font-size:11px;margin-bottom:6px">Σ нагрузка: <b>${totalKw.toFixed(2)} кВт</b> · слотов: <b>${slots.length}</b>. Контейнер сам не считается потребителем — нагрузка считается по составу slot'ов.</div>`);
+    h.push(`<button type="button" id="btn-open-container-members" class="full-btn" style="margin-bottom:8px;padding:6px 10px;background:#dbeafe;color:#1e40af;border:1px solid #2563eb;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500">📋 Открыть состав в модалке (или dblclick на канвасе)</button>`);
     if (!slots.length) {
       h.push('<div class="muted" style="font-size:12px;padding:6px 0">Контейнер пуст. Drop потребителя на канвасе сюда — добавится как слот. Или нажмите кнопку «➕ Placeholder» внизу.</div>');
     } else {
@@ -1236,6 +1237,8 @@ export function renderInspectorNode(n) {
   // v0.59.822 (1.28.20 Phase 4): wire для consumer-container slot-actions.
   if (n.type === 'consumer-container') {
     _wireContainerSlots(n);
+    const openBtn = document.getElementById('btn-open-container-members');
+    if (openBtn) openBtn.addEventListener('click', () => openContainerMembersModal(n));
   }
 }
 
