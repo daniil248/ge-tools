@@ -471,7 +471,9 @@ export function renderUnplacedPalette() {
     ${(filterQ || pv !== 'all') ? `<span class="muted" style="font-size:10px">${filtered.length}/${totalUnplaced}</span>` : ''}
   </div>` : '';
   if (!unplaced.length) { list.innerHTML = filterBar; return; }
-  filtered.sort((a, b) => String(a.tag || a.name || '').localeCompare(String(b.tag || b.name || '')));
+  // v0.59.845: natural-sort по обозначению (SR01<SR02<SR10).
+  filtered.sort((a, b) => String(a.tag || a.name || '').localeCompare(
+    String(b.tag || b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
   const rows = filtered.map(n => {
     const tag = effectiveTag(n) || n.tag || '';
     const name = n.name || n.type || '';
@@ -598,7 +600,9 @@ export function renderProjectRegistry() {
   );
   for (const t of types) {
     const arr = byType.get(t) || [];
-    arr.sort((a, b) => String(a.tag || a.name || '').localeCompare(String(b.tag || b.name || '')));
+    // v0.59.845: natural-sort реестра (SR01<SR02<SR10).
+    arr.sort((a, b) => String(a.tag || a.name || '').localeCompare(
+      String(b.tag || b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
     const label = REG_TYPE_LABEL[t] || t;
     const items = arr.map(n => {
       const tag = effectiveTag(n) || n.tag || '';

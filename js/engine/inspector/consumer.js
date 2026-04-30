@@ -160,6 +160,9 @@ export function openConsumerParamsModal(n) {
       if (m.linkedAlias && m.linkedAlias !== n.id) continue;
       _aliasCandidates.push(m);
     }
+    // v0.59.845: natural-sort кандидатов merge'а по обозначению.
+    _aliasCandidates.sort((a, b) => String(a.tag || a.name || '').localeCompare(
+      String(b.tag || b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
     if (linkedIsGroup) {
       // Этот узел — экземпляр группы. v0.59.778: используем effectiveTag
       // для группы (= обозначение первого экземпляра по сортировке),
@@ -939,6 +942,9 @@ export function openConsumerParamsModal(n) {
           _otherGroups.push(m);
         }
       }
+      // v0.59.845: natural-sort similar-groups list by tag.
+      _otherGroups.sort((a, b) => String(a.tag || a.name || '').localeCompare(
+        String(b.tag || b.name || ''), undefined, { numeric: true, sensitivity: 'base' }));
       if (_otherGroups.length > 0) {
         h.push(`<div class="field" style="margin-top:8px;padding:8px 10px;background:#fef3c7;border:1px solid #fcd34d;border-radius:4px">
           <label style="font-size:11px;font-weight:600;color:#78350f;margin-bottom:4px;display:block">🔀 Похожие группы в проекте (${_otherGroups.length})</label>

@@ -596,13 +596,14 @@ export function openAutomationModal(n) {
     }
   }
 
+  // v0.59.845: natural-sort (PNL01<PNL02<PNL10).
   const panels = [...state.nodes.values()]
     .filter(nn => nn.type === 'panel' && nn.inputs > 0)
-    .sort((a, b) => (effectiveTag(a) || '').localeCompare(effectiveTag(b) || '', 'ru'));
+    .sort((a, b) => (effectiveTag(a) || '').localeCompare(effectiveTag(b) || '', 'ru', { numeric: true, sensitivity: 'base' }));
 
   const switchPanels = [...state.nodes.values()]
     .filter(nn => nn.type === 'panel' && nn.outputs > 0)
-    .sort((a, b) => (effectiveTag(a) || '').localeCompare(effectiveTag(b) || '', 'ru'));
+    .sort((a, b) => (effectiveTag(a) || '').localeCompare(effectiveTag(b) || '', 'ru', { numeric: true, sensitivity: 'base' }));
 
   let switchPanelId = n.switchPanelId || null;
   if (!switchPanelId) {
@@ -654,7 +655,7 @@ export function openAutomationModal(n) {
         allInputs.push({ panelId: p.id, port, panelTag, feederTag });
       }
     }
-    allInputs.sort((a, b) => a.panelTag.localeCompare(b.panelTag, 'ru') || a.port - b.port);
+    allInputs.sort((a, b) => a.panelTag.localeCompare(b.panelTag, 'ru', { numeric: true, sensitivity: 'base' }) || a.port - b.port);
 
     for (const inp of allInputs) {
       const isChecked = watches.some(w => w.panelId === inp.panelId && w.inputPort === inp.port);
