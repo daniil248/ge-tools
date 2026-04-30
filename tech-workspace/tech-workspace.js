@@ -571,7 +571,13 @@ function persistActive() { saveJson(KEY_ACTIVE, _activeId); }
 
 // ─── Field bindings via event delegation
 // Каждая card имеет data-card-kind + data-card-id + data-field на input/select.
-// Контейнер #tw-mode-list слушает input/change events.
+// Контейнер #tw-mode-list слушает только `change` event (НЕ `input`).
+//
+// ВАЖНО (MEMORY.md → feedback_input_event.md): при re-render через
+// innerHTML на каждый keystroke (input event) браузер теряет фокус ввода
+// — пользователь набирает 1 символ за раз. Решение: использовать `change`
+// (fires on blur / Enter) — после ввода полного значения. Юзер просил
+// дважды: «символы можно вводить только по одному так как теряется фокус».
 function bindListEvents() {
   const root = $('tw-mode-list');
   if (!root) return;
@@ -600,7 +606,7 @@ function bindListEvents() {
     persistVariants();
     renderActiveVariant();
   };
-  root.addEventListener('input', handle);
+  // ТОЛЬКО change — НЕ input. Иначе фокус теряется на каждом keystroke.
   root.addEventListener('change', handle);
   // Кнопки add/delete card
   root.addEventListener('click', (e) => {
