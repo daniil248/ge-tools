@@ -1105,20 +1105,21 @@ function renderLinksTab() {
   // v0.59.577: POR-стойки (_source='por') считаются «в проекте» по умолчанию —
   // они приходят из POR родителя (с моим fallback v0.59.575). Без этого
   // 16 POR-стоек SR01-08, MR01, CR01 не попадали в picker.
-  const inProject  = racks.filter(r => projIds.has(r.id) || r._source === 'por').filter(matches);
+  // v0.59.848: natural-sort применён сразу к inProject (defensive),
+  // плюс к sub-buckets. Пользователь: «всегда сортировка должна быть по
+  // порядку обозначения».
+  const _byTag = (a, b) => {
+    const ta = String((getRackTag(a.id) || '').trim() || a.id || '');
+    const tb = String((getRackTag(b.id) || '').trim() || b.id || '');
+    return ta.localeCompare(tb, 'ru', { numeric: true, sensitivity: 'base' });
+  };
+  const inProject  = racks.filter(r => projIds.has(r.id) || r._source === 'por').filter(matches).sort(_byTag);
   const library    = []; // v0.59.295: библиотека шаблонов убрана из мастера связей
   // v0.59.550: разделяем real / virtual / draft. Виртуал = fromScheme или
   // fromPorGroup. Draft = нет тега и не виртуал.
-  // v0.59.844: natural-sort стоек по обозначению (SR01<SR02<SR10).
-  // Пользователь: «всегда сортировка должна быть по порядку обозначения».
-  const _byTag = (a, b) => {
-    const ta = getRackTag(a.id) || a.id || '';
-    const tb = getRackTag(b.id) || b.id || '';
-    return ta.localeCompare(tb, undefined, { numeric: true, sensitivity: 'base' });
-  };
-  const real       = inProject.filter(r => (getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup)).sort(_byTag);
-  const virtuals   = inProject.filter(r => r && (r.fromScheme || r.fromPorGroup)).sort(_byTag);
-  const drafts     = inProject.filter(r => !(getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup)).sort(_byTag);
+  const real       = inProject.filter(r => (getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup));
+  const virtuals   = inProject.filter(r => r && (r.fromScheme || r.fromPorGroup));
+  const drafts     = inProject.filter(r => !(getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup));
   const chipHtml = r => {
     const on = selected.has(r.id);
     const fullLabel = rackLabel(r);
