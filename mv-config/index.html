@@ -8,6 +8,13 @@
   <link rel="stylesheet" href="../shared/app-header.css">
   <link rel="stylesheet" href="../panel-config/panel-config.css">
   <link rel="stylesheet" href="mv-config.css">
+  <!-- v0.59.834: единая авторизация Firebase. Если firebase-config.js
+       пуст или SDK не загрузился — shared/auth.js работает в локальном
+       режиме, кнопка «Войти» в header'е показывает соответствующий toast. -->
+  <script src="../firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="../shared/auth.js"></script>
 </head>
 <body>
   <div id="rs-header-mount"></div>
