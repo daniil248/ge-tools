@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.885', date: '2026-04-30', items: [
+      '⚡ <b>Инспектор контейнера-группы — равноправен с групповым потребителем</b>. По репортам:',
+      '  «в простом групповом потребителе отображается пункт 7, а на втором скрине кабель к группе, пункта 7 нет. Добавь»',
+      '  «на группе сделай такую же сводку»',
+      '  «и сторону подключения тоже добавь для группы, сделай один в один»',
+      '• <b>Пункт 7 «Свободно (резерв)»</b> в блоке «Как подбирался кабель» теперь появляется и для линии к контейнеру. Раньше recalc.js пропускал consumer-container при вычислении n._freeA/_freeKw/_freeLimit.',
+      '• <b>Расчётные величины (группа)</b> — для контейнера теперь вычисляются <code>_powerP/Q/S</code>, <code>_nominalA</code>, <code>_ratedA</code> через сумму по slot'ам. Inspector показывает блок 1:1 как для consumer count=N, включая «На единицу (1 из N)».',
+      '• <b>Расположение входов</b> — кнопки «↑ Сверху / ← Слева / → Справа / ↔ По бокам» добавлены в инспектор контейнера. Логика сохранения через data-input-side handlers (см. inputSide handler в _wireContainerSlots).',
+      'Файлы: <code>js/engine/recalc.js</code> (consumer-container в _free* loop + new powerP/Q/S/nominalA/ratedA блок), <code>js/engine/inspector.js</code> (consumerCurrentsBlock — slot count, container block — inputSide buttons + consumerCurrentsBlock call).',
+    ] },
     { version: '0.59.884', date: '2026-04-30', items: [
       '📊 <b>Табличный вид в модалке состава контейнера</b>. По репорту: «для этого окна нужно еще одно представление в форме таблицы для быстрого изменения параметра всех потребителей, включая групповое изменение свойств и фильтра по полям».',
       '• <b>Toggle</b> в шапке модалки: «📋 Карточки» / «📊 Таблица». Сохраняется в LS (<code>raschet.container-members.view.v1</code>).',

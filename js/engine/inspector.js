@@ -1028,9 +1028,23 @@ export function renderInspectorNode(n) {
     h.push(statusBlock(n));
   } else if (n.type === 'consumer-container') {
     // v0.59.822 (1.28.20 Phase 4): полный инспектор contaier-узла.
-    // Слоты редактируются: open (click → инспектор члена), извлечь
-    // (split-out из контейнера в standalone), unlink (slot → placeholder),
-    // materialize (placeholder → реальный consumer-узел), add placeholder.
+    // v0.59.885: добавлены «Расположение входов» и «Расчётные величины»
+    // (через consumerCurrentsBlock + inputSide buttons) — пользователь:
+    // «и сторону подключения тоже добавь для группы, сделай один в один».
+    // inputSide (top/left/right/split) — наследуется от consumer.
+    {
+      const inputSide = n.inputSide || 'top';
+      h.push('<div class="inspector-section"><h4>Расположение входов</h4>');
+      h.push('<div style="display:flex;gap:6px;flex-wrap:wrap">');
+      const _sideBtn = (val, label) => `<button type="button" class="cside-btn${inputSide === val ? ' active' : ''}" data-input-side="${val}" style="padding:4px 10px;font-size:11px;border:1px solid ${inputSide === val ? '#2563eb' : '#cbd5e1'};background:${inputSide === val ? '#dbeafe' : '#fff'};color:${inputSide === val ? '#1e40af' : '#475569'};border-radius:4px;cursor:pointer;font-weight:${inputSide === val ? '600' : '400'}">${label}</button>`;
+      h.push(_sideBtn('top', '↑ Сверху'));
+      h.push(_sideBtn('left', '← Слева'));
+      h.push(_sideBtn('right', '→ Справа'));
+      h.push(_sideBtn('split', '↔ По бокам'));
+      h.push('</div></div>');
+    }
+    // Расчётные величины (агрегированные через consumerCurrentsBlock).
+    h.push(consumerCurrentsBlock(n));
     const slots = Array.isArray(n.slots) ? n.slots : [];
     let totalKw = 0;
     for (const s of slots) {
@@ -4015,7 +4029,11 @@ export function phaseFieldConsumer(n) {
 // Блок статуса для щита
 // Блок расчётных токов для потребителя
 export function consumerCurrentsBlock(n) {
-  const cnt = Math.max(1, Number(n.count) || 1);
+  // v0.59.885: для consumer-container — count = число slot'ов,
+  // чтобы блок «На единицу» корректно делил суммы на slot.length.
+  const cnt = (n.type === 'consumer-container' && Array.isArray(n.slots))
+    ? Math.max(1, n.slots.length)
+    : Math.max(1, Number(n.count) || 1);
   const isGroup = cnt > 1;
   const parts = [];
 

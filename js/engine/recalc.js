@@ -3195,6 +3195,47 @@ function recalc() {
       n._powerP = p;
       n._powerQ = p * tan;
       n._powerS = Math.sqrt(p * p + (p * tan) * (p * tan));
+    } else if (n.type === 'consumer-container') {
+      // v0.59.885: агрегированные P/Q/S и токи для контейнера — чтобы
+      // инспектор контейнера показывал блок «Расчётные величины» как
+      // у обычного группового потребителя. Пользователь: «и сторону
+      // подключения тоже добавь для группы, сделай один в один».
+      // cos φ — от первого linked-члена (или дефолт).
+      let cos = GLOBAL.defaultCosPhi || 0.92;
+      let firstU = 0;
+      let nomA = 0, ratA = 0;
+      const slots = Array.isArray(n.slots) ? n.slots : [];
+      for (const s of slots) {
+        if (!s) continue;
+        if (s.kind === 'linked' && s.nodeId) {
+          const a = state.nodes.get(s.nodeId);
+          if (a) {
+            if (firstU === 0) {
+              firstU = nodeCalcVoltage(a) || 0;
+              cos = Math.max(0.1, Math.min(1, Number(a.cosPhi) || cos));
+            }
+            nomA += Number(a._nominalA) || 0;
+            ratA += Number(a._ratedA) || 0;
+          }
+        } else if (s.kind === 'placeholder') {
+          const sP = Number(s.demandKw) || 0;
+          const sCos = Math.max(0.1, Math.min(1, Number(s.cosPhi) || 0.95));
+          const sPh3 = (s.phase || '3ph') === '3ph';
+          const sV = Number(s.voltage) || (sPh3 ? 400 : 230);
+          const sKu = (s.kUse != null) ? Number(s.kUse) : 1;
+          if (firstU === 0) { firstU = sV; cos = sCos; }
+          nomA += computeCurrentA(sP, sV, sCos, sPh3);
+          ratA += computeCurrentA(sP * sKu, sV, sCos, sPh3);
+        }
+      }
+      n._cosPhi = cos;
+      n._nominalA = nomA;
+      n._ratedA = ratA;
+      const pTot = consumerCalcDemandKw(n); // Pрасч с Ки
+      const tan = Math.sqrt(1 - cos * cos) / cos;
+      n._powerP = pTot;
+      n._powerQ = pTot * tan;
+      n._powerS = Math.sqrt(pTot * pTot + (pTot * tan) * (pTot * tan));
     }
   }
 
@@ -3539,7 +3580,12 @@ function recalc() {
   // больший номинал — флаг _breakerUndersize в этом случае не появится
   // (engine увеличит сечение/автомат на следующей итерации).
   for (const n of state.nodes.values()) {
-    if (n.type !== 'consumer' && n.type !== 'panel' && n.type !== 'ups'
+    // v0.59.885: добавлен consumer-container — _freeA/_freeKw/_freeLimit
+    // теперь вычисляются и для контейнера, чтобы пункт 7 «Свободно
+    // (резерв)» появлялся в блоке «Как подбирался кабель» в инспекторе
+    // линии к группе, как для обычного группового потребителя.
+    if (n.type !== 'consumer' && n.type !== 'consumer-container'
+        && n.type !== 'panel' && n.type !== 'ups'
         && n.type !== 'generator' && n.type !== 'source') continue;
     n._breakerOverload = false;
     n._breakerOverloadInfo = null;
@@ -3590,7 +3636,12 @@ function recalc() {
   // n._freeLimit — что именно лимитирует ('cable' | 'breaker'). Хранится
   // только для информации в инспекторе / справке отчёта.
   for (const n of state.nodes.values()) {
-    if (n.type !== 'consumer' && n.type !== 'panel' && n.type !== 'ups'
+    // v0.59.885: добавлен consumer-container — _freeA/_freeKw/_freeLimit
+    // теперь вычисляются и для контейнера, чтобы пункт 7 «Свободно
+    // (резерв)» появлялся в блоке «Как подбирался кабель» в инспекторе
+    // линии к группе, как для обычного группового потребителя.
+    if (n.type !== 'consumer' && n.type !== 'consumer-container'
+        && n.type !== 'panel' && n.type !== 'ups'
         && n.type !== 'generator' && n.type !== 'source') continue;
     n._freeKw = null;
     n._freeA = null;
