@@ -288,8 +288,21 @@ function pullPorRacksToEngine() {
       }
     }
     let skippedDups = 0;
+    let skippedLegacy = 0;
     for (const obj of porRacks) {
       if (linkedOids.has(obj.id)) continue;
+      // v0.59.891: жёсткий skip для POR-объектов с id='por_legacy_*'.
+      // Эти объекты — артефакты legacy-rack-migration (зеркало шаблонов
+      // корпусов и rack-instances из LS). Они НЕ должны создавать
+      // engine-узлы. Реальные стойки в схеме либо уже есть в engine,
+      // либо приходят из tech-workspace handoff с por_<random> id.
+      // pull создавал ФАНТОМОВ (kw=0, name="Стойка SRxx") при каждой
+      // загрузке схемы, и они появлялись в Неразмещённых даже после
+      // удаления — POR-объект persisted в LS возрождал их.
+      if (String(obj.id || '').startsWith('por_legacy_')) {
+        skippedLegacy++;
+        continue;
+      }
       // Skip если уже есть engine rack с таким же tag.
       const objTag = String(obj.tag || '').trim().toLowerCase();
       if (objTag && tagsByRack.has(objTag)) {
@@ -326,6 +339,9 @@ function pullPorRacksToEngine() {
     }
     if (skippedDups > 0) {
       console.info(`[engine-por-mirror] skipped ${skippedDups} duplicate POR-rack(s) — already have engine rack with same tag`);
+    }
+    if (skippedLegacy > 0) {
+      console.info(`[engine-por-mirror] skipped ${skippedLegacy} POR-rack(s) с id=por_legacy_* (артефакты миграции, не материализуем)`);
     }
     if (pulled > 0 && typeof window !== 'undefined' && window.Raschet) {
       try { window.Raschet.rerender && window.Raschet.rerender(); } catch {}

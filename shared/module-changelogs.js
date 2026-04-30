@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.891', date: '2026-04-30', items: [
+      '🔒 <b>HARD-FIX дубликатов: pullPorRacksToEngine больше не материализует POR-объекты с id=por_legacy_*</b>. v0.59.890 добавлял tag-dedup, но фантомы продолжали появляться: после reload и cleanup engine-state, POR-объекты <code>por_legacy_*</code> persisted в LS, и pullPorRacksToEngine создавал из них новые engine-узлы (с новыми ids n255-n257) ДО deserialize основной схемы — tagsByRack пустой → dedup не срабатывал.',
+      '• <b>Решение</b>: жёсткий guard в начале pull-цикла — если <code>obj.id.startsWith("por_legacy_")</code>, пропускаем без проверок. Эти POR-объекты — артефакты legacy-rack-migration (зеркало templates/instances из LS), они НЕ должны материализоваться в engine. Реальные стойки приходят из tech-workspace handoff с <code>por_&lt;random&gt;</code> id.',
+      '• <b>console.info</b>: логирует skipped count для диагностики.',
+      'Файл: <code>shared/engine-por-mirror.js::pullPorRacksToEngine</code>.',
+    ] },
     { version: '0.59.890', date: '2026-04-30', items: [
       '🐛 <b>Корень дубликатов SR01-SR08 в Qarmet найден</b>. Через MCP-debug в браузере: 8 «реальных» узлов в контейнере (porId=por_xxx, kw=8.2) + 8 фантомных вне контейнера (porId=por_legacy_por_xxx, kw=0).',
       '• <b>Корень бага</b>: <code>shared/engine-por-mirror.js::pullPorRacksToEngine</code> создавал engine-узел для каждого POR-объекта без linked engine-узла. После legacy-rack-migration в POR появляется второй объект (id=<code>por_legacy_&lt;rackId&gt;</code>) рядом с оригиналом — две POR-записи на одну стойку. linkedOids проверял только por-id, не tag → второй POR без linked engine-узла → создавался дубль consumer-узла (kw=0, name="Стойка SRxx", не в контейнере).',
