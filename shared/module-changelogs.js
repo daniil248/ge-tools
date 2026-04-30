@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.872', date: '2026-04-30', items: [
+      '🔌 <b>Модалка «Порты устройства» теперь видит меж-шкафные связи СКС</b>. Расширение v0.59.870.',
+      '• Раньше показывались только внутри-шкафные патчкорды (<code>currentMatrix</code>). Теперь дополнительно читается <code>scs-design.links.v1</code> проекта — связи где <code>fromRackId/toRackId === currentRackId</code> и <code>fromDevId/toDevId === devId</code>.',
+      '• <b>Бэйджи в таблице</b>:',
+      '  <code>🔌 патч</code> (красный) — внутри-шкафной патчкорд (можно «✕ Разорвать» здесь же)',
+      '  <code>🔗 СКС</code> (синий) — меж-шкафная связь, кнопка «↗ В СКС» открывает scs-design с пред-выбранной связью',
+      '  <code>свободен</code> (зелёный) — порт не занят',
+      '• <b>Conflict detection</b>: если порт одновременно фигурирует и в матрице (внутри-шкаф), и в scs-design (меж-шкаф) — показывается «⚠ Также назначен в СКС → …» в той же строке.',
+      'Файл: <code>scs-config/scs-config.js</code> (openDevicePortsModal — чтение scs-design.links + новый action open-scs + conflict-флаг).',
+    ] },
     { version: '0.59.871', date: '2026-04-30', items: [
       '🧹 <b>Убраны 404-ошибки в консоли браузера</b>. По репорту: «проверь ошибки из браузера».',
       '• <code>shared/battery-catalog.js</code> — модуль физически живёт в <code>battery/battery-catalog.js</code>. Раньше <code>catalog-bridge.js</code> пробовал shared-вариант первым (постоянный 404), потом battery/-вариант. Убрали несуществующий кандидат из <code>_loadBatteries()</code> и <code>_subscribeSameTab()</code>.',

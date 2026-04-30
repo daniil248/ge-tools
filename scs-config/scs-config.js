@@ -1973,9 +1973,57 @@ function openDevicePortsModal(devId) {
       if (!m) return;
       const port = +m[1];
       if (port < 1 || port > portCount) return;
-      portToLink.set(port, { other: l[other] || '', cable: l.cable || '', color: l.color || '', id: l.id });
+      portToLink.set(port, { internal: true, other: l[other] || '', cable: l.cable || '', color: l.color || '', id: l.id });
     });
   }
+  // v0.59.872: меж-шкафные связи СКС (scs-design.links.v1) — те же порты могут
+  // быть заняты внешним кабелем в другую стойку. Показываем их в этой же
+  // модалке отдельным бэйджом, чтобы пользователь видел ВСЕ подключения
+  // устройства в одном месте.
+  try {
+    const pid = getActiveProjectId();
+    if (pid && state.currentRackId) {
+      const key = projectKey(pid, 'scs-design', 'links.v1');
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          for (const l of arr) {
+            let myPort, otherRackId, otherDevId;
+            if (l.fromRackId === state.currentRackId && l.fromDevId === devId) {
+              myPort = +l.fromPort || null;
+              otherRackId = l.toRackId; otherDevId = l.toDevId;
+            } else if (l.toRackId === state.currentRackId && l.toDevId === devId) {
+              myPort = +l.toPort || null;
+              otherRackId = l.fromRackId; otherDevId = l.fromDevId;
+            } else continue;
+            if (!myPort || myPort < 1 || myPort > portCount) continue;
+            const otherTag = (state.rackTags && state.rackTags[otherRackId]) || otherRackId || '';
+            const otherDevLabel = ((state.contents && state.contents[otherRackId]) || [])
+              .find(x => x.id === otherDevId)?.label || otherDevId || '';
+            // Если этот порт уже занят внутри-шкафной связью — добавляем
+            // external info в существующую запись (порт может физически
+            // быть занят и patch-cord'ом, и быть указан как fromPort СКС
+            // — это конфликт, помечаем визуально).
+            const existing = portToLink.get(myPort);
+            if (existing) {
+              existing.conflict = true;
+              existing.externalAlso = `${otherTag} · ${otherDevLabel}`;
+            } else {
+              portToLink.set(myPort, {
+                external: true,
+                other: `${otherTag} · ${otherDevLabel}`,
+                cable: l.cableType || '',
+                color: '',
+                id: 'scs:' + l.id,
+                scsLinkId: l.id,
+              });
+            }
+          }
+        }
+      }
+    }
+  } catch (e) { console.warn('[port-modal] external links read failed', e); }
   const host = scUiHost();
   const back = document.createElement('div');
   back.className = 'sc-modal-back';
@@ -1993,17 +2041,31 @@ function openDevicePortsModal(devId) {
   for (let i = 1; i <= portCount; i++) {
     const link = portToLink.get(i);
     if (link) usedCount++;
-    const state = link
-      ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">занят</span>
+    let stateHtml;
+    if (!link) {
+      stateHtml = `<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">свободен</span>`;
+    } else if (link.external) {
+      // v0.59.872: меж-шкафная связь СКС (cross-rack)
+      stateHtml = `<span style="background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600" title="Меж-шкафная связь, управляется во вкладке «Проектирование СКС»">🔗 СКС</span>
          <span style="margin-left:8px">→ ${escape(link.other)}</span>
-         ${link.cable ? `<span class="muted" style="margin-left:8px;font-size:11px">${escape(link.cable)}</span>` : ''}`
-      : `<span style="background:#dcfce7;color:#15803d;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600">свободен</span>`;
-    const action = link
-      ? `<button type="button" class="sc-btn sc-btn-danger" data-act="unlink" data-link-id="${escape(link.id)}" style="font-size:11px;padding:3px 8px">✕ Разорвать</button>`
-      : '';
+         ${link.cable ? `<span class="muted" style="margin-left:8px;font-size:11px">${escape(link.cable)}</span>` : ''}`;
+    } else {
+      // Внутри-шкафной патчкорд + опционально conflict с external
+      stateHtml = `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600" title="Внутри-шкафной патчкорд">🔌 патч</span>
+         <span style="margin-left:8px">→ ${escape(link.other)}</span>
+         ${link.cable ? `<span class="muted" style="margin-left:8px;font-size:11px">${escape(link.cable)}</span>` : ''}
+         ${link.externalAlso ? `<div style="font-size:11px;color:#b91c1c;margin-top:2px">⚠ Также назначен в СКС → ${escape(link.externalAlso)}</div>` : ''}`;
+    }
+    let action = '';
+    if (link && !link.external) {
+      action = `<button type="button" class="sc-btn sc-btn-danger" data-act="unlink" data-link-id="${escape(link.id)}" style="font-size:11px;padding:3px 8px">✕ Разорвать</button>`;
+    } else if (link && link.external) {
+      // Внешнюю связь нельзя разорвать отсюда — отправляем во вкладку «Проектирование СКС»
+      action = `<button type="button" class="sc-btn" data-act="open-scs" data-scs-link="${escape(link.scsLinkId || '')}" style="font-size:11px;padding:3px 8px" title="Открыть связь в Проектировании СКС">↗ В СКС</button>`;
+    }
     rows.push(`<tr>
       <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9"><b>p${i}</b></td>
-      <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9">${state}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9">${stateHtml}</td>
       <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${action}</td>
     </tr>`);
   }
@@ -2054,6 +2116,20 @@ function openDevicePortsModal(devId) {
       close();
       scToast('Связь разорвана', 'ok');
       setTimeout(() => openDevicePortsModal(devId), 50);
+    });
+  });
+  // v0.59.872: «↗ В СКС» — открыть scs-design на этой связи.
+  back.querySelectorAll('[data-act="open-scs"]').forEach(b => {
+    b.addEventListener('click', () => {
+      const sid = b.dataset.scsLink;
+      try {
+        const pid = getActiveProjectId();
+        const url = '../scs-design/?project=' + encodeURIComponent(pid || '')
+          + '&from=scs-config' + (sid ? '&link=' + encodeURIComponent(sid) : '');
+        location.href = url;
+      } catch (e) {
+        scToast('Не удалось открыть СКС: ' + (e.message || e), 'err');
+      }
     });
   });
   back.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
