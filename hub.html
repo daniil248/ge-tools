@@ -56,6 +56,24 @@
     .hub-grid[data-view="rows"] .hub-card h2 { margin-bottom: 4px; font-size: 16px; }
     .hub-grid[data-view="rows"] .hub-card p { font-size: 13px; }
     .hub-grid[data-view="rows"] .hub-card .badge { margin-top: 0; margin-left: auto; flex-shrink: 0; align-self: center; }
+    /* v0.59.860: тематические группы карточек. Заголовок занимает всю ширину
+       grid-row через grid-column: 1 / -1. */
+    .hub-category {
+      grid-column: 1 / -1;
+      margin: 12px 0 -8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-left: 4px solid #6366f1;
+      background: linear-gradient(90deg, #eef2ff 0%, transparent 80%);
+      border-radius: 4px;
+    }
+    .hub-category:first-child { margin-top: 0; }
+    .hub-category .hub-cat-icon { margin-right: 8px; font-size: 18px; vertical-align: middle; }
+    .hub-category .hub-cat-hint { font-weight: 400; color: #94a3b8; font-size: 11px; text-transform: none; letter-spacing: 0; margin-left: 8px; }
     main { padding: 24px 24px 40px; flex-direction: column; align-items: stretch; justify-content: flex-start; }
     .hub-toolbar {
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
@@ -217,307 +235,137 @@
       <div class="hub-hidden-list" id="hub-hidden-list"></div>
     </div>
     <div class="hub-grid" id="hub-grid">
+      <h3 class="hub-category" data-cat="manage"><span class="hub-cat-icon">📁</span>Управление проектом<span class="hub-cat-hint">— реестр проектов, справка, навигация</span></h3>
       <a class="hub-card" href="projects/">
-        <div class="hub-card-icon purple">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-            <line x1="3" y1="11" x2="21" y2="11"/>
-          </svg>
-        </div>
+        <div class="hub-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line x1="3" y1="11" x2="21" y2="11"/></svg></div>
         <h2>Проекты</h2>
         <p>Центр управления проектами: каждый проект хранит схему, СКС, шкафы, реестры. Конфигураторы — библиотека шаблонов, данные объекта — в проекте</p>
         <span class="badge new">Новый</span>
       </a>
-
-      <a class="hub-card" href="index.html">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-            <line x1="9" y1="9" x2="9" y2="21"/>
-          </svg>
-        </div>
-        <h2>Конструктор схем</h2>
-        <p>Проектирование принципиальных схем электроснабжения с автоматическим расчётом нагрузок, подбором кабелей и защиты</p>
-        <span class="badge active">Активен</span>
-      </a>
-
       <a class="hub-card" href="help/">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-          </svg>
-        </div>
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
         <h2>Центр помощи</h2>
         <p>Справочник по платформе: модули, возможности, архитектура. Статьи с поиском, cross-references и диаграммами. Доступ к разделам зависит от подключённых модулей</p>
         <span class="badge new">Новый</span>
       </a>
-
-      <a class="hub-card" href="tech-workspace/">
-        <div class="hub-card-icon purple">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-            <line x1="10" y1="6.5" x2="14" y2="6.5"/>
-            <line x1="6.5" y1="10" x2="6.5" y2="14"/>
-          </svg>
-        </div>
-        <h2>Технолог ЦОД</h2>
-        <p>Предпроектная стадия ЦОД: концепция объекта (стойки, IT-нагрузка, ИБП, климат, ввод ТП/ДГУ, площади), multi-variant compare, handoff в детальное проектирование. Два режима входа — список параметров или план зала</p>
-        <span class="badge new">В разработке</span>
-      </a>
-
-      <a class="hub-card" href="cable/">
-        <div class="hub-card-icon orange">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2v6m0 8v6"/>
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/>
-            <path d="M19.07 4.93l-2.83 2.83m-8.48 8.48l-2.83 2.83"/>
-          </svg>
-        </div>
-        <h2>Расчёт кабельной линии</h2>
-        <p>Подбор сечения кабеля по IEC / ПУЭ с учётом температуры, группирования, способа прокладки, экономической плотности тока и падения напряжения</p>
-        <span class="badge new">Новый</span>
-      </a>
-
-      <a class="hub-card" href="schematic/">
-        <div class="hub-card-icon purple">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="16" rx="1"/>
-            <path d="M3 8h18"/>
-            <path d="M7 12h3l1 -2 2 4 1 -2h3"/>
-            <circle cx="7" cy="17" r="0.6" fill="currentColor"/>
-            <circle cx="17" cy="17" r="0.6" fill="currentColor"/>
-          </svg>
-        </div>
-        <h2>Схема принципиальная</h2>
-        <p>Редактор принципиальных электрических схем и рабочей документации. Библиотека IEC 60617-DB-12M, листы ISO 216 (A4…A0), основная надпись по ISO 7200. Используется Конструктором схем для формирования щитов</p>
-        <span class="badge new">Новый</span>
-      </a>
-
-      <a class="hub-card" href="battery/">
-        <div class="hub-card-icon green">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="7" width="16" height="10" rx="1.5"/>
-            <line x1="21" y1="10" x2="21" y2="14"/>
-            <line x1="7" y1="10" x2="7" y2="14"/>
-            <line x1="11" y1="10" x2="11" y2="14"/>
-            <line x1="15" y1="10" x2="15" y2="14"/>
-          </svg>
-        </div>
-        <h2>Расчёт АКБ</h2>
-        <p>Подбор ёмкости и конфигурации АКБ для ИБП. Загрузка таблиц разряда производителей (Kehua, Panasonic, SVC, Sonnenschein) в XLSX и точный расчёт по ним. Если данных нет — усреднённая модель по химии батареи</p>
-        <span class="badge new">Новый</span>
-      </a>
-
-      <a class="hub-card" href="ups-config/">
-        <div class="hub-card-icon purple">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4" y="5" width="16" height="14" rx="1.5"/>
-            <line x1="8" y1="9" x2="16" y2="9"/>
-            <line x1="8" y1="13" x2="16" y2="13"/>
-            <line x1="8" y1="17" x2="12" y2="17"/>
-          </svg>
-        </div>
-        <h2>Конфигуратор ИБП</h2>
-        <p>Подбор конфигурации ИБП по нагрузке: тип (моноблок / модульный), резервирование N+X, параметры входа и батарейной цепи. Результат можно применить к любому узлу ИБП в главной схеме</p>
-      </a>
-
-      <a class="hub-card" href="panel-config/">
-        <div class="hub-card-icon orange">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="4" y="4" width="16" height="16" rx="1.5"/>
-            <line x1="4" y1="9" x2="20" y2="9"/>
-            <line x1="9" y1="9" x2="9" y2="20"/>
-            <line x1="14" y1="9" x2="14" y2="20"/>
-          </svg>
-        </div>
-        <h2>Конфигуратор НКУ (LV щит)</h2>
-        <p>Низковольтные комплектные устройства до 1 кВ (<b>IEC 61439</b>): ВРУ, АВР, ЩС, ЩО, ЩК. Подбор оболочки, вводные/отходящие автоматы, секционирование, формы разделения. Для MV — отдельный «Конфигуратор РУ СН»</p>
-        <span class="badge new">Новый</span>
-      </a>
-
-      <a class="hub-card" href="reports/">
-        <div class="hub-card-icon green">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 3h9l4 4v14a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1v-17a1 1 0 0 1 1 -1z"/>
-            <path d="M14 3v4h4"/>
-            <line x1="9" y1="12" x2="16" y2="12"/>
-            <line x1="9" y1="16" x2="16" y2="16"/>
-          </svg>
-        </div>
-        <h2>Шаблоны отчётов</h2>
-        <p>Подготовка и хранение шаблонов оформления отчётов: страница, поля, логотип, колонтитулы, стили заголовков. Используются подпрограммами для экспорта в PDF и DOCX</p>
-        <span class="badge new">Новый</span>
-      </a>
-
-      <a class="hub-card" href="catalog/">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-          </svg>
-        </div>
-        <h2>Каталог и библиотека элементов</h2>
-        <p>Единый справочник оборудования платформы: ИБП, щиты, АКБ, трансформаторы, автоматы, корпуса, климат, кабели + цены по датам и контрагентам + импорт прайс-листов XLSX + аналитика. Один источник данных — никакого дублирования</p>
-        <span class="badge new">Новый</span>
-      </a>
-
-      <a class="hub-card" href="logistics/">
-        <div class="hub-card-icon green">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="1" y="8" width="14" height="9" rx="1"/>
-            <polygon points="15,11 20,11 23,14 23,17 15,17"/>
-            <circle cx="6" cy="19" r="2"/>
-            <circle cx="18" cy="19" r="2"/>
-          </svg>
-        </div>
-        <h2>Рабочее место логиста</h2>
-        <p>Расчёт доставки, маршруты, склады, тарифы перевозчиков. Интеграция с BOM проекта: оборудование + логистика = полная смета с учётом доставки до объекта</p>
-        <span class="badge new">В разработке</span>
-      </a>
-
-      <a class="hub-card" href="mv-config/">
-        <div class="hub-card-icon orange">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="5" width="18" height="14" rx="1"/>
-            <line x1="7" y1="5" x2="7" y2="19"/>
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="17" y1="5" x2="17" y2="19"/>
-            <circle cx="5" cy="12" r="1" fill="currentColor"/>
-            <circle cx="9.5" cy="12" r="1" fill="currentColor"/>
-            <circle cx="14.5" cy="12" r="1" fill="currentColor"/>
-            <circle cx="19" cy="12" r="1" fill="currentColor"/>
-          </svg>
-        </div>
-        <h2>Конфигуратор РУ СН</h2>
-        <p>Распределительные устройства 6-35 кВ: моноблоки SF6 (RM6, SafeRing) и сборные (ЩО-70). Справочник + wizard-подбор с конфигурированием ячеек (ввод, отходящая, защита ТП, измерения, секционная)</p>
-        <span class="badge new">Новый</span>
-      </a>
-
       <a class="hub-card" href="modules/">
-        <div class="hub-card-icon cyan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/>
-            <rect x="14" y="3" width="7" height="7" rx="1"/>
-            <rect x="3" y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
-            <line x1="10" y1="6.5" x2="14" y2="6.5"/>
-            <line x1="6.5" y1="10" x2="6.5" y2="14"/>
-          </svg>
-        </div>
+        <div class="hub-card-icon cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="6.5" y1="10" x2="6.5" y2="14"/></svg></div>
         <h2>Модули</h2>
         <p>Полный перечень модулей платформы — включая те, что доступны только внутри проекта (реестры), а также Roadmap и журнал изменений</p>
         <span class="badge active">Каталог</span>
       </a>
 
-<a class="hub-card" href="psychrometrics/">
-        <div class="hub-card-icon cyan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 18 L9 10 L13 14 L21 5"/>
-            <path d="M3 21 L21 21"/>
-            <circle cx="9" cy="10" r="1.2" fill="currentColor"/>
-            <circle cx="13" cy="14" r="1.2" fill="currentColor"/>
-          </svg>
-        </div>
-        <h2>ID-диаграмма Молье-Рамзина</h2>
-        <p>Психрометрический расчёт влажного воздуха по ASHRAE Fundamentals 2021 (Hyland-Wexler 1983). Состояние: t, φ, d (W), h, t<sub>р</sub>, t<sub>м</sub>, ρ, v. HVAC-процессы: нагрев, охлаждение с осушением (bypass factor), адиабатическое и паровое увлажнение, смешение с рециркуляцией. SVG-диаграмма ID с изолиниями φ, h.</p>
+      <h3 class="hub-category" data-cat="design"><span class="hub-cat-icon">🏗</span>Концепция и проектирование<span class="hub-cat-hint">— схемы, СКС, концепция ЦОД</span></h3>
+      <a class="hub-card" href="tech-workspace/">
+        <div class="hub-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="6.5" y1="10" x2="6.5" y2="14"/></svg></div>
+        <h2>Технолог ЦОД</h2>
+        <p>Предпроектная стадия ЦОД: концепция объекта (стойки, IT-нагрузка, ИБП, климат, ввод ТП/ДГУ, площади), multi-variant compare, handoff в детальное проектирование. Два режима входа — список параметров или план зала</p>
         <span class="badge new">В разработке</span>
       </a>
-
-      <a class="hub-card" href="suppression-config/">
-        <div class="hub-card-icon red">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2c1 4 4 6 4 10a4 4 0 0 1-8 0c0-2 1-3 2-4"/>
-            <path d="M8 20h8"/>
-            <path d="M10 20v-3M14 20v-3"/>
-          </svg>
-        </div>
-        <h2>Расчёт газового пожаротушения (АГПТ)</h2>
-        <p>Расчёт массы ГОТВ, подбор баллонов, диаметр трубопровода, количество форсунок. Подключаемые методики: СП РК 2.02-102-2022, СП 485.1311500.2020, NFPA 2001, ISO 14520. Каталог ГОТВ: FM-200, Novec 1230, HFC-125, CO₂, IG-541/55/100/01, SF₆. Отчёт XLSX/HTML, изометрия трубопровода, спецификация.</p>
-        <span class="badge new">В разработке</span>
+      <a class="hub-card" href="index.html">
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="9" x2="9" y2="21"/></svg></div>
+        <h2>Конструктор схем</h2>
+        <p>Проектирование принципиальных схем электроснабжения с автоматическим расчётом нагрузок, подбором кабелей и защиты</p>
+        <span class="badge active">Активен</span>
       </a>
-
-      <a class="hub-card" href="mdc-config/">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="6" width="20" height="12" rx="1"/>
-            <line x1="6" y1="6" x2="6" y2="18"/>
-            <line x1="10" y1="6" x2="10" y2="18"/>
-            <line x1="14" y1="6" x2="14" y2="18"/>
-            <line x1="18" y1="6" x2="18" y2="18"/>
-          </svg>
-        </div>
-        <h2>Конфигуратор модульного ЦОД</h2>
-        <p>Модульный ЦОД серии GDM-600: ширина 2400/3000 мм, длина ISO 20ft/40ft, сборка нескольких модулей. Опросник: IT-мощность, резервирование, ИБП+АКБ, охлаждение (inRow/perimeter/freecooling), слаботочка. Расстановка стоек, ИБП+АКБ, CRAC в отдельные зоны. Top-view планировка, BOM, выгрузка объёма поставки</p>
-        <span class="badge new">В разработке</span>
+      <a class="hub-card" href="schematic/">
+        <div class="hub-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 8h18"/><path d="M7 12h3l1 -2 2 4 1 -2h3"/><circle cx="7" cy="17" r="0.6" fill="currentColor"/><circle cx="17" cy="17" r="0.6" fill="currentColor"/></svg></div>
+        <h2>Схема принципиальная</h2>
+        <p>Редактор принципиальных электрических схем и рабочей документации. Библиотека IEC 60617-DB-12M, листы ISO 216 (A4…A0), основная надпись по ISO 7200. Используется Конструктором схем для формирования щитов</p>
+        <span class="badge new">Новый</span>
       </a>
-
-      <a class="hub-card" href="rack-config/">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="5" y="3" width="14" height="18" rx="1"/>
-            <line x1="5" y1="8" x2="19" y2="8"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-            <line x1="5" y1="16" x2="19" y2="16"/>
-            <circle cx="8" cy="6" r="0.5" fill="currentColor"/>
-            <circle cx="8" cy="10" r="0.5" fill="currentColor"/>
-          </svg>
-        </div>
-        <h2>Конфигуратор шкафа — корпус</h2>
-        <p>Типовое железо шкафа: корпус (U, ширина, глубина), двери (стекло / сетка / металл), боковые стенки, пол, кабельные вводы, заглушки пустых U, PDU-слоты (C13/C19/Schuko, 1ф/3ф, 16/32 А), заземление. Шаблоны и BOM пустого шкафа. Наполнение конкретного экземпляра — в «Компоновщике шкафа»</p>
+      <a class="hub-card" href="scs-design/">
+        <div class="hub-card-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M7 6h10M7 18h10M5 8v8M19 8v8"/></svg></div>
+        <h2>Проектирование СКС</h2>
+        <p>Структурированная кабельная система объекта: мастер меж-шкафных связей, план зала с расстановкой стоек (drag-n-drop), автоматические длины кабелей по манхэттен-расстоянию, кабельный журнал (BOM) с агрегацией по типам, CSV-экспорт. Патчкорды внутри одного шкафа — в «Компоновщике шкафа»</p>
+        <span class="badge new">Активный</span>
       </a>
-
-      <a class="hub-card" href="pdu-config/">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="9" width="20" height="6" rx="1"/>
-            <circle cx="6" cy="12" r="1"/>
-            <circle cx="10" cy="12" r="1"/>
-            <circle cx="14" cy="12" r="1"/>
-            <circle cx="18" cy="12" r="1"/>
-          </svg>
-        </div>
-        <h2>Конфигуратор PDU</h2>
-        <p>Подбор PDU по требованиям: число фаз, номинал (А), категория (basic / metered / monitored / switched / hybrid), состав розеток (C13/C19/Schuko), высота (0U/1U/2U), производитель. Результат — список подходящих артикулов от APC, Rittal, Raritan, Kehua с возможностью экспорта спецификации</p>
-      </a>
-
       <a class="hub-card" href="scs-config/">
-        <div class="hub-card-icon blue">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="8" width="18" height="8" rx="1"/>
-            <line x1="6" y1="11" x2="6" y2="13"/>
-            <line x1="9" y1="11" x2="9" y2="13"/>
-            <line x1="12" y1="11" x2="12" y2="13"/>
-            <line x1="15" y1="11" x2="15" y2="13"/>
-            <line x1="18" y1="11" x2="18" y2="13"/>
-          </svg>
-        </div>
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="8" rx="1"/><line x1="6" y1="11" x2="6" y2="13"/><line x1="9" y1="11" x2="9" y2="13"/><line x1="12" y1="11" x2="12" y2="13"/><line x1="15" y1="11" x2="15" y2="13"/><line x1="18" y1="11" x2="18" y2="13"/></svg></div>
         <h2>Компоновщик шкафа</h2>
         <p>Наполнение конкретного экземпляра шкафа: карта юнитов (коммутаторы, патч-панели, серверы 1U/2U/4U, КВМ, мониторы), вертикальные PDU, внутренние патчкорды и питание. Привязка устройств к розеткам PDU и матрица внутренних соединений. Корпус — из «Конфигуратора шкафа — корпус»</p>
         <span class="badge new">Активный</span>
       </a>
 
-      <a class="hub-card" href="scs-design/">
-        <div class="hub-card-icon orange">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="5" cy="6" r="2"/>
-            <circle cx="19" cy="6" r="2"/>
-            <circle cx="5" cy="18" r="2"/>
-            <circle cx="19" cy="18" r="2"/>
-            <path d="M7 6h10M7 18h10M5 8v8M19 8v8"/>
-          </svg>
-        </div>
-        <h2>Проектирование СКС</h2>
-        <p>Структурированная кабельная система объекта: мастер меж-шкафных связей, план зала с расстановкой стоек (drag-n-drop), автоматические длины кабелей по манхэттен-расстоянию, кабельный журнал (BOM) с агрегацией по типам, CSV-экспорт. Патчкорды внутри одного шкафа — в «Компоновщике шкафа»</p>
-        <span class="badge new">Активный</span>
+      <h3 class="hub-category" data-cat="equipment"><span class="hub-cat-icon">⚙</span>Конфигураторы оборудования<span class="hub-cat-hint">— ИБП, щиты, стойки, PDU, АГПТ, МЦОД</span></h3>
+      <a class="hub-card" href="rack-config/">
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><line x1="5" y1="8" x2="19" y2="8"/><line x1="5" y1="12" x2="19" y2="12"/><line x1="5" y1="16" x2="19" y2="16"/><circle cx="8" cy="6" r="0.5" fill="currentColor"/><circle cx="8" cy="10" r="0.5" fill="currentColor"/></svg></div>
+        <h2>Конфигуратор шкафа — корпус</h2>
+        <p>Типовое железо шкафа: корпус (U, ширина, глубина), двери (стекло / сетка / металл), боковые стенки, пол, кабельные вводы, заглушки пустых U, PDU-слоты (C13/C19/Schuko, 1ф/3ф, 16/32 А), заземление. Шаблоны и BOM пустого шкафа. Наполнение конкретного экземпляра — в «Компоновщике шкафа»</p>
+      </a>
+      <a class="hub-card" href="panel-config/">
+        <div class="hub-card-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5"/><line x1="4" y1="9" x2="20" y2="9"/><line x1="9" y1="9" x2="9" y2="20"/><line x1="14" y1="9" x2="14" y2="20"/></svg></div>
+        <h2>Конфигуратор НКУ (LV щит)</h2>
+        <p>Низковольтные комплектные устройства до 1 кВ (<b>IEC 61439</b>): ВРУ, АВР, ЩС, ЩО, ЩК. Подбор оболочки, вводные/отходящие автоматы, секционирование, формы разделения. Для MV — отдельный «Конфигуратор РУ СН»</p>
+        <span class="badge new">Новый</span>
+      </a>
+      <a class="hub-card" href="mv-config/">
+        <div class="hub-card-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><line x1="7" y1="5" x2="7" y2="19"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="17" y1="5" x2="17" y2="19"/><circle cx="5" cy="12" r="1" fill="currentColor"/><circle cx="9.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/></svg></div>
+        <h2>Конфигуратор РУ СН</h2>
+        <p>Распределительные устройства 6-35 кВ: моноблоки SF6 (RM6, SafeRing) и сборные (ЩО-70). Справочник + wizard-подбор с конфигурированием ячеек (ввод, отходящая, защита ТП, измерения, секционная)</p>
+        <span class="badge new">Новый</span>
+      </a>
+      <a class="hub-card" href="ups-config/">
+        <div class="hub-card-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1.5"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg></div>
+        <h2>Конфигуратор ИБП</h2>
+        <p>Подбор конфигурации ИБП по нагрузке: тип (моноблок / модульный), резервирование N+X, параметры входа и батарейной цепи. Результат можно применить к любому узлу ИБП в главной схеме</p>
+      </a>
+      <a class="hub-card" href="pdu-config/">
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="20" height="6" rx="1"/><circle cx="6" cy="12" r="1"/><circle cx="10" cy="12" r="1"/><circle cx="14" cy="12" r="1"/><circle cx="18" cy="12" r="1"/></svg></div>
+        <h2>Конфигуратор PDU</h2>
+        <p>Подбор PDU по требованиям: число фаз, номинал (А), категория (basic / metered / monitored / switched / hybrid), состав розеток (C13/C19/Schuko), высота (0U/1U/2U), производитель. Результат — список подходящих артикулов от APC, Rittal, Raritan, Kehua с возможностью экспорта спецификации</p>
+      </a>
+      <a class="hub-card" href="mdc-config/">
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="1"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="10" y1="6" x2="10" y2="18"/><line x1="14" y1="6" x2="14" y2="18"/><line x1="18" y1="6" x2="18" y2="18"/></svg></div>
+        <h2>Конфигуратор модульного ЦОД</h2>
+        <p>Модульный ЦОД серии GDM-600: ширина 2400/3000 мм, длина ISO 20ft/40ft, сборка нескольких модулей. Опросник: IT-мощность, резервирование, ИБП+АКБ, охлаждение (inRow/perimeter/freecooling), слаботочка. Расстановка стоек, ИБП+АКБ, CRAC в отдельные зоны. Top-view планировка, BOM, выгрузка объёма поставки</p>
+        <span class="badge new">В разработке</span>
+      </a>
+      <a class="hub-card" href="suppression-config/">
+        <div class="hub-card-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2c1 4 4 6 4 10a4 4 0 0 1-8 0c0-2 1-3 2-4"/><path d="M8 20h8"/><path d="M10 20v-3M14 20v-3"/></svg></div>
+        <h2>Расчёт газового пожаротушения (АГПТ)</h2>
+        <p>Расчёт массы ГОТВ, подбор баллонов, диаметр трубопровода, количество форсунок. Подключаемые методики: СП РК 2.02-102-2022, СП 485.1311500.2020, NFPA 2001, ISO 14520. Каталог ГОТВ: FM-200, Novec 1230, HFC-125, CO₂, IG-541/55/100/01, SF₆. Отчёт XLSX/HTML, изометрия трубопровода, спецификация.</p>
+        <span class="badge new">В разработке</span>
+      </a>
+
+      <h3 class="hub-category" data-cat="calc"><span class="hub-cat-icon">🧮</span>Точечные расчёты<span class="hub-cat-hint">— кабель, АКБ, психрометрия</span></h3>
+      <a class="hub-card" href="cable/">
+        <div class="hub-card-icon orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 8v6"/><circle cx="12" cy="12" r="4"/><path d="M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83"/><path d="M19.07 4.93l-2.83 2.83m-8.48 8.48l-2.83 2.83"/></svg></div>
+        <h2>Расчёт кабельной линии</h2>
+        <p>Подбор сечения кабеля по IEC / ПУЭ с учётом температуры, группирования, способа прокладки, экономической плотности тока и падения напряжения</p>
+        <span class="badge new">Новый</span>
+      </a>
+      <a class="hub-card" href="battery/">
+        <div class="hub-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="16" height="10" rx="1.5"/><line x1="21" y1="10" x2="21" y2="14"/><line x1="7" y1="10" x2="7" y2="14"/><line x1="11" y1="10" x2="11" y2="14"/><line x1="15" y1="10" x2="15" y2="14"/></svg></div>
+        <h2>Расчёт АКБ</h2>
+        <p>Подбор ёмкости и конфигурации АКБ для ИБП. Загрузка таблиц разряда производителей (Kehua, Panasonic, SVC, Sonnenschein) в XLSX и точный расчёт по ним. Если данных нет — усреднённая модель по химии батареи</p>
+        <span class="badge new">Новый</span>
+      </a>
+      <a class="hub-card" href="psychrometrics/">
+        <div class="hub-card-icon cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18 L9 10 L13 14 L21 5"/><path d="M3 21 L21 21"/><circle cx="9" cy="10" r="1.2" fill="currentColor"/><circle cx="13" cy="14" r="1.2" fill="currentColor"/></svg></div>
+        <h2>ID-диаграмма Молье-Рамзина</h2>
+        <p>Психрометрический расчёт влажного воздуха по ASHRAE Fundamentals 2021 (Hyland-Wexler 1983). Состояние: t, φ, d (W), h, t<sub>р</sub>, t<sub>м</sub>, ρ, v. HVAC-процессы: нагрев, охлаждение с осушением (bypass factor), адиабатическое и паровое увлажнение, смешение с рециркуляцией. SVG-диаграмма ID с изолиниями φ, h.</p>
+        <span class="badge new">В разработке</span>
+      </a>
+
+      <h3 class="hub-category" data-cat="catalog"><span class="hub-cat-icon">📦</span>Каталог, отчёты, логистика<span class="hub-cat-hint">— библиотека изделий, шаблоны, поставки</span></h3>
+      <a class="hub-card" href="catalog/">
+        <div class="hub-card-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <h2>Каталог и библиотека элементов</h2>
+        <p>Единый справочник оборудования платформы: ИБП, щиты, АКБ, трансформаторы, автоматы, корпуса, климат, кабели + цены по датам и контрагентам + импорт прайс-листов XLSX + аналитика. Один источник данных — никакого дублирования</p>
+        <span class="badge new">Новый</span>
+      </a>
+      <a class="hub-card" href="reports/">
+        <div class="hub-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1v-17a1 1 0 0 1 1 -1z"/><path d="M14 3v4h4"/><line x1="9" y1="12" x2="16" y2="12"/><line x1="9" y1="16" x2="16" y2="16"/></svg></div>
+        <h2>Шаблоны отчётов</h2>
+        <p>Подготовка и хранение шаблонов оформления отчётов: страница, поля, логотип, колонтитулы, стили заголовков. Используются подпрограммами для экспорта в PDF и DOCX</p>
+        <span class="badge new">Новый</span>
+      </a>
+      <a class="hub-card" href="logistics/">
+        <div class="hub-card-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="8" width="14" height="9" rx="1"/><polygon points="15,11 20,11 23,14 23,17 15,17"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></svg></div>
+        <h2>Рабочее место логиста</h2>
+        <p>Расчёт доставки, маршруты, склады, тарифы перевозчиков. Интеграция с BOM проекта: оборудование + логистика = полная смета с учётом доставки до объекта</p>
+        <span class="badge new">В разработке</span>
       </a>
 
     </div>

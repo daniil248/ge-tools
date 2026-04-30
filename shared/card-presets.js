@@ -42,10 +42,41 @@ function _buildPresetFields(picker) {
 /** Системные пресеты «из коробки» — нельзя удалить, можно скопировать. */
 export const SYSTEM_PRESETS = [
   {
+    id: 'compact',
+    name: 'Компактный',
+    system: true,
+    description: 'Минимальный набор полей для каждого типа узла. Пользователь добавляет нужные поля сам через настройки. Default из коробки.',
+    perMode: _buildPresetFields((kind, type) => {
+      // v0.59.860: «из коробки так показывать это перебор» — стартовый
+      // пресет показывает только ключевые поля каждого типа, остальные
+      // пользователь добавляет через card-presets-editor.
+      const compactFields = {
+        schematic: {
+          consumer:  ['subtitle', 'demandKw', 'count'],
+          panel:     ['capacityA'],
+          source:    ['sourceSubtype', 'snomKva'],
+          generator: ['capacityKw'],
+          ups:       ['kva', 'autonomyMin'],
+          zone:      ['memberCount'],
+          channel:   ['cableSpec'],
+        },
+        layout: {
+          consumer: ['widthMm', 'depthMm'],
+          panel:    ['widthMm', 'depthMm'],
+        },
+        'scs-design': {
+          rack: ['rackUnits', 'occupied'],
+        },
+      };
+      const optional = (compactFields[kind] && compactFields[kind][type]) || [];
+      return [...requiredFieldIds(kind, type), ...optional];
+    }),
+  },
+  {
     id: 'full',
     name: 'Полный',
     system: true,
-    description: 'Все поля карточки видны (текущее поведение Конструктора).',
+    description: 'Все поля карточки видны. Подходит для отладки и проверки данных.',
     perMode: _buildPresetFields(() => null),
   },
   {
@@ -93,6 +124,23 @@ export const SYSTEM_PRESETS = [
 
 const SYSTEM_PRESET_BY_ID = Object.fromEntries(SYSTEM_PRESETS.map(p => [p.id, p]));
 
+// v0.59.860: миграция стандартного default-active-preset с 'full' на 'compact'.
+// Если у пользователя в LS лежит 'full' и при этом нет user-presets и не
+// проставлен флаг миграции — это «default из коробки» прежней версии,
+// мигрируем на 'compact'. Если пользователь явно выбрал 'full' уже после
+// миграции, флаг защищает от повторного перезаписывания.
+(function _migrateDefaultPreset() {
+  try {
+    const FLAG = 'raschet.cardPresetMigrated.v860';
+    if (localStorage.getItem(FLAG)) return;
+    const active = localStorage.getItem(KEY_ACTIVE);
+    if (active === '"full"' || active === 'full' || active == null) {
+      localStorage.setItem(KEY_ACTIVE, JSON.stringify('compact'));
+    }
+    localStorage.setItem(FLAG, '1');
+  } catch {}
+})();
+
 // ─── User-level storage (LocalStorage) ───────────────────────────────────
 
 function _load(key, fallback) {
@@ -117,8 +165,10 @@ export function saveUserPresets(arr) {
   _save(KEY_PRESETS, Array.isArray(arr) ? arr : []);
   _emitChanged();
 }
-export function getUserActivePresetId() { return _load(KEY_ACTIVE, 'full'); }
-export function setUserActivePresetId(id) { _save(KEY_ACTIVE, id || 'full'); _emitChanged(); }
+// v0.59.860: default «из коробки» — 'compact' (минимальный набор полей).
+// «full» остаётся как явный выбор пользователя: «показать всё».
+export function getUserActivePresetId() { return _load(KEY_ACTIVE, 'compact'); }
+export function setUserActivePresetId(id) { _save(KEY_ACTIVE, id || 'compact'); _emitChanged(); }
 
 /** Все доступные пресеты для UI: системные + user. */
 export function listAllPresets() {
@@ -168,8 +218,8 @@ export function resolveCardPreset(ctx = {}) {
   const userId = ctx.userActive || getUserActivePresetId();
   const userPreset = getPresetById(userId);
   if (userPreset) return userPreset;
-  // 4) Fallback
-  return SYSTEM_PRESET_BY_ID.full;
+  // 4) Fallback — v0.59.860: «compact» как новый default «из коробки».
+  return SYSTEM_PRESET_BY_ID.compact || SYSTEM_PRESET_BY_ID.full;
 }
 
 /**
@@ -226,7 +276,7 @@ export function createUserPreset(name, fromPresetId = 'full') {
 export function deleteUserPreset(id) {
   const all = loadUserPresets().filter(p => p.id !== id);
   saveUserPresets(all);
-  if (getUserActivePresetId() === id) setUserActivePresetId('full');
+  if (getUserActivePresetId() === id) setUserActivePresetId('compact');
 }
 export function renameUserPreset(id, newName) {
   const all = loadUserPresets();

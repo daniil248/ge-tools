@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.860', date: '2026-04-30', items: [
+      '🪄 <b>Hub: тематические группы карточек</b>. По репорту пользователя «сгруппируй карточки в главном меню по группам»: 21 карточка реорганизована в 5 тематических групп с заголовками-разделителями, занимающими всю ширину сетки.',
+      '• <b>Группы</b>: 📁 Управление проектом (3) · 🏗 Концепция и проектирование (5) · ⚙ Конфигураторы оборудования (7) · 🧮 Точечные расчёты (3) · 📦 Каталог, отчёты, логистика (3).',
+      '• <b>CSS</b>: класс <code>.hub-category</code> с <code>grid-column: 1 / -1</code>, фиолетовая полоса слева, мягкий градиент справа.',
+      '• <b>«Из коробки» card-preset slimmed</b>. По репорту «такой вид карточек в автопресетах точно не пойдет, пользователь может так наполнить сам, но чтобы из коробки так показывать это перебор»: добавлен новый системный пресет <code>compact</code> «Компактный» — минимальный набор полей для каждого типа узла. Стал default «из коробки».',
+      '• <b>Поля compact-пресета</b>: consumer = subtitle/demandKw/count, panel = capacityA, source = sourceSubtype/snomKva, generator = capacityKw, ups = kva/autonomyMin, zone = memberCount, channel = cableSpec; layout consumer/panel = widthMm/depthMm; scs-design rack = rackUnits/occupied. Tag/name всегда добавлены (required).',
+      '• <b>Migration v860</b>: пользователи у которых KEY_ACTIVE = «full» (это бывший default) автоматически переключаются на «compact» при первой загрузке. Флаг <code>raschet.cardPresetMigrated.v860</code> предотвращает повторный перезаписывание. «full» остаётся доступным как явный выбор.',
+      'Файлы: <code>hub.html</code> (CSS .hub-category + 5 заголовков групп в hub-grid), <code>shared/card-presets.js</code> (новый SYSTEM_PRESET «compact», default-active = «compact», one-shot migration v860), <code>js/engine/constants.js</code> (APP_VERSION 0.59.860).',
+    ] },
     { version: '0.59.526', date: '2026-04-27', items: [
       '🔥 <b>НАСТОЯЩИЙ корень бага «Схем нет на карточке проекта» (через debug в браузере)</b>. Я снова подключился к браузеру, и оказалось что v0.59.525 не помог: <code>fbUser=fb-err</code>, <code>firebaseApps=0</code> — Firebase App вообще никогда не создаётся на /projects/ страницах.',
       '• <b>Корень</b>: <code>shared/auth.js::init()</code> вызывает <code>firebase.initializeApp(window.FIREBASE_CONFIG)</code>, но он НЕ автозапускается. Должен быть явный вызов <code>window.Auth.init()</code>. На главной <code>js/main.js:6929</code> делает это. На <code>projects/project.js</code> и <code>projects/projects.js</code> — НЕТ. Поэтому Storage адаптер навсегда остаётся в Local-режиме, listMyProjects возвращает 0 для cloud-юзеров.',
