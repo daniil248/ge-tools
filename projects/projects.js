@@ -701,6 +701,107 @@ function _initAfterDom() {
     }
   } catch {}
 
+  // v0.59.852: «🔧 Восстановить связи» — две задачи в одной кнопке.
+  //   1. Сканируем localStorage на orphan project-data:
+  //      ключи `raschet.project.<pid>.*` где pid НЕ в raschet.projects.v1.
+  //      Для каждого orphan-pid создаём метаданную с именем
+  //      из POR / engine.scheme / по pid.
+  //   2. Запускаем migrateOrphanSchemes — линкуем lp_*-схемы к контейнерам
+  //      по совпадению имени.
+  document.getElementById('pr-restore-links')?.addEventListener('click', async () => {
+    const log = [];
+    try {
+      // 1. Собираем все pid из ключей `raschet.project.<pid>.*`
+      const orphanPids = new Map();   // pid → bestKnownName
+      const PREFIX = 'raschet.project.';
+      const knownPids = new Set(listProjects().map(p => p.id));
+      const knownLpIds = new Set(listProjects().filter(p => typeof p.id === 'string' && p.id.startsWith('lp_')).map(p => p.id));
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(PREFIX)) continue;
+        // ключ вида raschet.project.<pid>.<rest>
+        const rest = key.slice(PREFIX.length);
+        const dotIdx = rest.indexOf('.');
+        if (dotIdx < 0) continue;
+        const pid = rest.slice(0, dotIdx);
+        if (knownPids.has(pid)) continue;
+        if (!orphanPids.has(pid)) orphanPids.set(pid, null);
+      }
+      log.push(`Найдено orphan-pid: ${orphanPids.size}`);
+
+      // 2. Для каждого orphan-pid пытаемся вытащить имя:
+      //    а) из engine.scheme.v1 (deserialize-friendly poll)
+      //    b) из POR objects (любого type)
+      //    c) fallback к pid
+      for (const pid of orphanPids.keys()) {
+        let name = null;
+        // engine.scheme.v1
+        try {
+          const raw = localStorage.getItem(`${PREFIX}${pid}.engine.scheme.v1`);
+          if (raw) {
+            const obj = JSON.parse(raw);
+            name = (obj?.project?.name || obj?.name || '').trim() || null;
+          }
+        } catch {}
+        // POR objects: ищем любой объект с tag/name полем
+        if (!name) {
+          try {
+            const raw = localStorage.getItem(`${PREFIX}${pid}.por.objects.v1`);
+            if (raw) {
+              const obj = JSON.parse(raw);
+              if (obj && typeof obj === 'object') {
+                const ids = Object.keys(obj);
+                if (ids.length) name = `Восстановленный (${ids.length} POR-объектов, ${pid})`;
+              }
+            }
+          } catch {}
+        }
+        if (!name) name = `Восстановленный проект ${pid}`;
+        orphanPids.set(pid, name);
+      }
+
+      // 3. Создаём метаданные записи. ID берём из orphan-pid (не генерируем
+      //    новый), чтобы существующие raschet.project.<pid>.* ключи остались
+      //    привязанными к этому проекту.
+      let restored = 0;
+      const fresh = listProjects();
+      for (const [pid, name] of orphanPids) {
+        const entry = {
+          id: pid,
+          name,
+          description: '🔧 Auto-восстановлено по orphan-данным в LocalStorage. Содержит ранее сохранённые POR-объекты, схему и/или СКС-данные. Если имя не подходит — переименуйте.',
+          status: 'draft',
+          kind: 'full',
+          parentProjectId: null,
+          designation: '',
+          schema: 1,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        fresh.push(entry);
+        restored++;
+      }
+      if (restored > 0) {
+        try { localStorage.setItem('raschet.projects.v1', JSON.stringify(fresh)); } catch {}
+        log.push(`Восстановлено metadata-записей: ${restored}`);
+      }
+
+      // 4. Линкуем orphan-схемы к контейнерам по имени.
+      try {
+        const r = migrateOrphanSchemes();
+        log.push(`Привязка orphan-схем: matched=${r?.matched || 0}, created=${r?.created || 0}, skipped=${r?.skipped || 0}`);
+      } catch (e) { log.push(`migrateOrphanSchemes failed: ${e.message || e}`); }
+
+      const summary = log.join('\n');
+      alert('🔧 Восстановление завершено:\n\n' + summary + '\n\nСтраница перезагрузится.');
+      console.info('[restore-links]', summary);
+      location.reload();
+    } catch (e) {
+      console.error('[restore-links] failed:', e);
+      alert('Ошибка восстановления: ' + (e.message || e) + '\n\nДанные не изменены.');
+    }
+  });
+
   document.getElementById('pr-new')?.addEventListener('click', async () => {
     const name = await prPrompt('Новый проект', 'Название проекта', '', 'напр. «ЦОД Альфа-1, Тверь»');
     if (!name) return;
