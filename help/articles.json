@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "description": "Манифест статей центра помощи Raschet. Категории + статьи с cross-references.",
   "categories": [
-    { "id": "getting-started", "name": "Начало работы", "icon": "🏁", "order": 1 },
-    { "id": "modules",         "name": "Модули",         "icon": "📦", "order": 2 },
-    { "id": "features",        "name": "Возможности",    "icon": "✨", "order": 3 },
-    { "id": "architecture",    "name": "Архитектура",    "icon": "🏗",  "order": 4 }
+    { "id": "getting-started", "name": "Начало работы",       "icon": "🏁", "order": 1 },
+    { "id": "modules",         "name": "Модули",              "icon": "📦", "order": 2 },
+    { "id": "features",        "name": "Возможности",         "icon": "✨", "order": 3 },
+    { "id": "support",         "name": "Поддержка и защита",  "icon": "🛟", "order": 4 },
+    { "id": "architecture",    "name": "Архитектура",         "icon": "🏗",  "order": 5 }
   ],
   "articles": [
     {
@@ -284,7 +285,23 @@
       "category": "features",
       "summary": "Переключение между LocalStorage (без квот) и Firebase (совместная работа). Manual sync push/pull.",
       "file": "feature-storage-mode.html",
-      "related": ["module-projects"]
+      "related": ["module-projects", "feature-backup"]
+    },
+    {
+      "id": "feature-backup",
+      "title": "💾 Резервное копирование и восстановление",
+      "category": "support",
+      "summary": "Защита от потери данных. Ручной бэкап в .json, авто-бэкап в локальную папку (File System Access API), восстановление с merge/replace стратегиями.",
+      "file": "feature-backup.html",
+      "related": ["troubleshooting", "feature-storage-mode"]
+    },
+    {
+      "id": "troubleshooting",
+      "title": "🛠 Типичные проблемы и решения",
+      "category": "support",
+      "summary": "Что делать если: проекты пустые, схемы пропали, контейнер чёрный, линии не кликаются, авторизация сбрасывается, данные исчезли.",
+      "file": "troubleshooting.html",
+      "related": ["feature-backup", "feature-storage-mode", "intro"]
     },
 
     {

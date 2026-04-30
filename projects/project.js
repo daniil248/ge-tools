@@ -344,6 +344,13 @@ function render() {
       </div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px">
+        <!-- v0.59.856: «Технолог ЦОД» добавлен в плитки модулей проекта.
+             Пользователь: «Технологию ЦОД так же добавь в проекты». -->
+        <div class="pr-art-group" data-kind="tech-workspace" style="padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+          <div style="font-weight:600;font-size:13px;color:#7c3aed;margin-bottom:8px">🧮 Технолог ЦОД <span class="muted" style="font-weight:400">· концепция</span></div>
+          <div style="font-size:12px;color:#475569;margin-bottom:8px">Концепция стоек, IT-нагрузка, ИБП, климат. Multi-variant compare и handoff в схему/СКС.</div>
+          <a href="${esc(buildModuleHref('../tech-workspace/', { projectId: p.id, fromModule: 'projects' }))}" class="pr-btn-sel" style="display:inline-block;text-decoration:none;padding:5px 10px;font-size:12px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;border-radius:4px">Открыть Технолог ЦОД →</a>
+        </div>
         <div class="pr-art-group" data-kind="schematic" style="padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
           <div style="font-weight:600;font-size:13px;color:#1d4ed8;margin-bottom:8px">⚡ Схемы <span class="muted" style="font-weight:400">· ${subSchemes.length}</span></div>
           ${renderSubList(subSchemes, '../index.html', '⚡', 'Схем нет — нажмите «+ Добавить → схему».')}
