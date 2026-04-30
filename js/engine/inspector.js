@@ -676,11 +676,16 @@ export function renderInspectorNode(n) {
   // каждой включённой (не-electrical) системы с параметрами.
   // v0.58.47: новая вкладка «📋 Общее» — tag/name/id + product/configure.
   const _extraTabs = renderExtraSystemTabs(n);
+  // v0.59.886: для контейнера скрываем «Габариты» и «Системы» — их параметры
+  // относятся к конкретному физическому экземпляру; контейнер — только
+  // организационная обёртка. Пользователь: «габариты и системы не нужно,
+  // они указываются только для конкретных потребителей».
+  const _isContainer = n.type === 'consumer-container';
   h.push(`<div class="tp-tabs" role="tablist" style="margin-bottom:8px">
     <button type="button" class="tp-tab active" data-tab="general" role="tab">📋 Общее</button>
     <button type="button" class="tp-tab" data-tab="electrical" role="tab">⚡ Электрика</button>
-    <button type="button" class="tp-tab" data-tab="geometry" role="tab">📐 Габариты</button>
-    <button type="button" class="tp-tab" data-tab="systems" role="tab">🧩 Системы${(function(){const c=(Array.isArray(n.systems)?n.systems.length:1);return c>1?` <span class="muted" style="font-size:10px">(${c})</span>`:'';})()}</button>
+    ${_isContainer ? '' : `<button type="button" class="tp-tab" data-tab="geometry" role="tab">📐 Габариты</button>`}
+    ${_isContainer ? '' : `<button type="button" class="tp-tab" data-tab="systems" role="tab">🧩 Системы${(function(){const c=(Array.isArray(n.systems)?n.systems.length:1);return c>1?` <span class="muted" style="font-size:10px">(${c})</span>`:'';})()}</button>`}
     ${_extraTabs.tabsHtml}
   </div>`);
   // Вкладка «Общее»
@@ -1287,6 +1292,18 @@ export function renderInspectorNode(n) {
     _wireContainerSlots(n);
     const openBtn = document.getElementById('btn-open-container-members');
     if (openBtn) openBtn.addEventListener('click', () => openContainerMembersModal(n));
+    // v0.59.886: вторая такая же кнопка из вкладки «Общее».
+    const openBtnGen = document.getElementById('btn-open-container-members-general');
+    if (openBtnGen) openBtnGen.addEventListener('click', () => openContainerMembersModal(n));
+    // v0.59.886: input-side кнопки для контейнера (Расположение входов).
+    document.querySelectorAll('button.cside-btn[data-input-side]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const side = btn.dataset.inputSide;
+        if (!side) return;
+        n.inputSide = side;
+        try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); window.Raschet?.renderInspector?.(); } catch {}
+      });
+    });
   }
 }
 
@@ -2417,13 +2434,21 @@ export function renderGeneralPanel(n) {
     h.push(`<div class="muted" style="font-size:11px;margin-top:-6px;margin-bottom:8px">Полное обозначение: <b>${escHtml(eff)}</b></div>`);
   }
   h.push(field('Имя', `<input type="text" data-prop="name" value="${escAttr(n.name || '')}">`));
-  h.push(field('Инв. №&nbsp;/&nbsp;паспорт', `<input type="text" data-prop="assetId" value="${escAttr(n.assetId || '')}" placeholder="например, INV-0042">`));
-  h.push(field('Серийный №', `<input type="text" data-prop="serialNo" value="${escAttr(n.serialNo || '')}" placeholder="необязательно">`));
+  // v0.59.886: контейнер потребителей не имеет инвентарного номера / S/N /
+  // модели — это организационная обёртка, а не физический экземпляр.
+  // Пользователь: «модель изделие и прочие применимое к конкретному
+  // экземпляру нужно удалить из группы».
+  const _isContainerNode = n.type === 'consumer-container';
+  if (!_isContainerNode) {
+    h.push(field('Инв. №&nbsp;/&nbsp;паспорт', `<input type="text" data-prop="assetId" value="${escAttr(n.assetId || '')}" placeholder="например, INV-0042">`));
+    h.push(field('Серийный №', `<input type="text" data-prop="serialNo" value="${escAttr(n.serialNo || '')}" placeholder="необязательно">`));
+  }
   // v0.59.351: автоматический матч с реестрами проекта по S/N или Инв.№.
   // Если узел уже описан в реестре IT (scs-config) или объекта (facility-
   // inventory) — показываем чип со ссылкой. Чисто read-only, никаких полей
   // на узле не добавляем (lookup делается каждый раз при рендере инспектора).
-  try {
+  // v0.59.886: для контейнера весь блок registry-link пропускается.
+  if (!_isContainerNode) try {
     if ((n.serialNo && n.serialNo.trim()) || (n.assetId && n.assetId.trim())) {
       const pid = _activeProjectId();
       const m = findInventoryMatch(pid, n.serialNo || '', n.assetId || '');
@@ -2474,7 +2499,9 @@ export function renderGeneralPanel(n) {
       </div>`);
     }
   } catch {}
-  h.push(`<div class="muted" style="font-size:11px;margin-top:4px">UUID: <code style="font-size:11px">${escHtml(n.id)}</code></div>`);
+  if (!_isContainerNode) {
+    h.push(`<div class="muted" style="font-size:11px;margin-top:4px">UUID: <code style="font-size:11px">${escHtml(n.id)}</code></div>`);
+  }
   h.push(`</div>`);
 
   // v0.59.835: блок «Назначение» УБРАН — ранее дублировал «Категория + Тип
@@ -2492,6 +2519,10 @@ export function renderGeneralPanel(n) {
   // вводили в заблуждение — их скрываем. Для всех остальных узлов
   // поведение прежнее.
   const isPanelNode = n.type === 'panel';
+  // v0.59.886: для контейнера блок «Модель изделия» полностью скрыт —
+  // контейнер не имеет производителя/изделия, это организационная
+  // обёртка. Параметры — у конкретных слотов внутри.
+  if (!_isContainerNode) {
   h.push(`<div class="inspector-section">`);
   h.push(`<h4>${isPanelNode ? 'Конфигурация щита' : 'Модель изделия'}</h4>`);
 
@@ -2623,6 +2654,64 @@ export function renderGeneralPanel(n) {
     h.push(`<div class="muted" style="font-size:11px">Для этого типа элемента модуль-конфигуратор пока не подключён. Параметры задаются вручную на остальных вкладках.</div>`);
   }
   h.push(`</div>`);
+  } // end if (!_isContainerNode) — блок «Модель изделия» только для конкретных экземпляров
+
+  // v0.59.886: для контейнера в Общих показываем «Состав контейнера»
+  // (раньше отображался во вкладке «Электрика»). Пользователь:
+  // «блок список потребителей внутри вынести в раздел Общие».
+  if (_isContainerNode) {
+    const slots = Array.isArray(n.slots) ? n.slots : [];
+    let totalKwSum = 0;
+    for (const s of slots) {
+      if (!s) continue;
+      if (s.kind === 'linked' && s.nodeId) {
+        const a = state.nodes.get(s.nodeId);
+        if (a) totalKwSum += (Number(a.demandKw) || 0) * Math.max(1, Number(a.count) || 1);
+      } else if (s.kind === 'placeholder') totalKwSum += Number(s.demandKw) || 0;
+    }
+    h.push('<div class="inspector-section"><h4>Контейнер потребителей</h4>');
+    h.push(`<div class="muted" style="font-size:11px;margin-bottom:6px">Σ нагрузка: <b>${totalKwSum.toFixed(2)} кВт</b> · слотов: <b>${slots.length}</b>. Контейнер — организационная обёртка; параметры (модель/ИНВ/S/N) у конкретных потребителей внутри.</div>`);
+    h.push(`<button type="button" id="btn-open-container-members-general" class="full-btn" style="margin-bottom:8px;padding:6px 10px;background:#dbeafe;color:#1e40af;border:1px solid #2563eb;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500">📋 Открыть состав в модалке (или dblclick на канвасе)</button>`);
+    if (!slots.length) {
+      h.push('<div class="muted" style="font-size:12px;padding:6px 0">Контейнер пуст. Drop потребителя на канвасе сюда — добавится как слот.</div>');
+    } else {
+      // Краткий список slot-ов — natural sort, без editable.
+      const _sorted = slots.map((s, i) => {
+        let _key = '￿';
+        if (s && s.kind === 'linked' && s.nodeId) {
+          const a = state.nodes.get(s.nodeId);
+          if (a && a.tag) _key = String(a.tag);
+        }
+        return { s, i, key: _key };
+      });
+      _sorted.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' }));
+      h.push('<div style="display:flex;flex-direction:column;gap:3px;font-size:12px">');
+      for (const entry of _sorted) {
+        const s = entry.s; const i = entry.i;
+        if (!s) continue;
+        if (s.kind === 'linked' && s.nodeId) {
+          const a = state.nodes.get(s.nodeId);
+          if (a) {
+            const tag = a.tag || a.id;
+            const name = a.name || '';
+            const kw = Number(a.demandKw) || 0;
+            h.push(`<div style="padding:5px 6px;background:#f5f7fa;border-radius:4px;display:flex;align-items:center;gap:6px;cursor:pointer" data-slot-open="${escAttr(a.id)}" title="Открыть параметры члена">
+              <span style="flex:1"><b>${escHtml(tag)}</b> ${escHtml(name)}</span>
+              <span class="muted" style="font-size:11px">#${i + 1} · ${kw} кВт</span>
+            </div>`);
+          }
+        } else if (s.kind === 'placeholder') {
+          const kw = Number(s.demandKw) || 0;
+          h.push(`<div style="padding:5px 6px;background:#fef3c7;border-radius:4px;display:flex;align-items:center;gap:6px">
+            <span style="flex:1"><i style="color:#92400e">placeholder #${i + 1}</i></span>
+            <span class="muted" style="font-size:11px">${kw} кВт</span>
+          </div>`);
+        }
+      }
+      h.push('</div>');
+    }
+    h.push('</div>');
+  }
 
   // Блок «Комментарий» — общего назначения
   h.push(`<div class="inspector-section">`);
