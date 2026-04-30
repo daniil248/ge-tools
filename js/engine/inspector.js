@@ -1495,7 +1495,7 @@ function _wireContainerMembersModal(n, body, modal) {
       // v0.59.841: tag по маске соседних linked-членов (SR07 если SR01..SR06).
       const suggestedTag = _suggestTagFromContainer(n) || nextFreeTag('consumer');
       const newConsumer = {
-        id: newId, type: 'consumer', name: 'Потребитель', tag: suggestedTag,
+        id: newId, type: 'consumer', name: _suggestNameFromContainer(n, slot.subtype) || 'Потребитель', tag: suggestedTag,
         x: Number(n.x) || 0, y: Number(n.y) || 0,
         demandKw: Number(slot.demandKw) || 0, cosPhi: Number(slot.cosPhi) || 0.95,
         phase: slot.phase || '3ph', voltage: Number(slot.voltage) || 400,
@@ -1601,6 +1601,43 @@ function _suggestTagFromContainer(container) {
     if (!used) return tag;
   }
   return candidate;
+}
+
+// v0.59.844: предлагает name для нового члена контейнера. Берёт name
+// первого linked-члена; иначе по subtype (rack→Стойка, hvac→Кондиционер,
+// motor→Двигатель и т.д.); fallback на container.name или 'Потребитель'.
+function _suggestNameFromContainer(container, subtype) {
+  if (!container) return null;
+  if (Array.isArray(container.slots)) {
+    for (const s of container.slots) {
+      if (s && s.kind === 'linked' && s.nodeId) {
+        const a = state.nodes.get(s.nodeId);
+        if (a && a.name && a.name !== 'Потребитель') return a.name;
+      }
+    }
+  }
+  // Fallback по subtype
+  const _subtypeNames = {
+    'rack':         'Стойка',
+    'server':       'Сервер',
+    'telecom':      'Телеком-стойка',
+    'lighting':     'Освещение',
+    'socket':       'Розеточная группа',
+    'motor':        'Двигатель',
+    'fan':          'Вентилятор',
+    'pump':         'Насос',
+    'heater':       'Нагреватель',
+    'conditioner':  'Кондиционер',
+    'outdoor_unit': 'Наружный блок',
+  };
+  if (subtype && _subtypeNames[subtype]) return _subtypeNames[subtype];
+  // Container.name (если задан как «Группа стоек» — возьмём «Стойка»)
+  const cName = String(container.name || '').trim();
+  if (cName) {
+    if (cName.startsWith('Группа ')) return cName.slice(7).trim() || cName;
+    return cName;
+  }
+  return null;
 }
 
 // v0.59.822: обработчики slot-actions в инспекторе consumer-container.
@@ -1715,8 +1752,8 @@ function _wireContainerSlots(n) {
       const newConsumer = {
         id: newId,
         type: 'consumer',
-        name: 'Потребитель',
-        tag: nextFreeTag('consumer'),
+        name: _suggestNameFromContainer(n, slot.subtype) || 'Потребитель',
+        tag: _suggestTagFromContainer(n) || nextFreeTag('consumer'),
         x: Number(n.x) || 0, y: Number(n.y) || 0,
         demandKw: Number(slot.demandKw) || 0,
         cosPhi: Number(slot.cosPhi) || 0.95,

@@ -1109,9 +1109,16 @@ function renderLinksTab() {
   const library    = []; // v0.59.295: библиотека шаблонов убрана из мастера связей
   // v0.59.550: разделяем real / virtual / draft. Виртуал = fromScheme или
   // fromPorGroup. Draft = нет тега и не виртуал.
-  const real       = inProject.filter(r => (getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup));
-  const virtuals   = inProject.filter(r => r && (r.fromScheme || r.fromPorGroup));
-  const drafts     = inProject.filter(r => !(getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup));
+  // v0.59.844: natural-sort стоек по обозначению (SR01<SR02<SR10).
+  // Пользователь: «всегда сортировка должна быть по порядку обозначения».
+  const _byTag = (a, b) => {
+    const ta = getRackTag(a.id) || a.id || '';
+    const tb = getRackTag(b.id) || b.id || '';
+    return ta.localeCompare(tb, undefined, { numeric: true, sensitivity: 'base' });
+  };
+  const real       = inProject.filter(r => (getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup)).sort(_byTag);
+  const virtuals   = inProject.filter(r => r && (r.fromScheme || r.fromPorGroup)).sort(_byTag);
+  const drafts     = inProject.filter(r => !(getRackTag(r.id) || '').trim() && !(r.fromScheme || r.fromPorGroup)).sort(_byTag);
   const chipHtml = r => {
     const on = selected.has(r.id);
     const fullLabel = rackLabel(r);
