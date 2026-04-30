@@ -1279,6 +1279,15 @@ export function renderInspectorNode(n) {
 // v0.59.825 (1.28.20 Phase 8): модалка состава контейнера. По двойному
 // клику на контейнере на canvas (или из инспектора) — открывает список
 // карточек членов (как обычные consumer-карточки в инспекторе).
+// v0.59.884: переключение видов (карточки / таблица) в модалке состава контейнера.
+// Пользователь: «для этого окна нужно еще одно представление в форме таблицы
+// для быстрого изменения параметра всех потребителей». Persistence в LS.
+let _containerMembersView = (() => {
+  try { return localStorage.getItem('raschet.container-members.view.v1') === 'table' ? 'table' : 'cards'; } catch { return 'cards'; }
+})();
+let _containerMembersTableFilter = { search: '', subtype: '', phase: '' };
+let _containerMembersSelected = new Set(); // bulk-edit selection (node ids)
+
 export function openContainerMembersModal(container) {
   if (!container || container.type !== 'consumer-container') return;
   const modal = document.getElementById('modal-container-members');
@@ -1299,8 +1308,12 @@ export function openContainerMembersModal(container) {
       totalKw += Number(s.demandKw) || 0; phCount++;
     }
   }
-  h.push(`<div style="padding:8px 12px;background:#f5f7fa;border-bottom:1px solid #e0e7ee;font-size:13px">
-    Σ <b>${totalKw.toFixed(2)} кВт</b> · реальных потребителей: <b>${linkedCount}</b> · placeholder-слотов: <b>${phCount}</b>
+  h.push(`<div style="padding:8px 12px;background:#f5f7fa;border-bottom:1px solid #e0e7ee;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <span>Σ <b>${totalKw.toFixed(2)} кВт</b> · реальных потребителей: <b>${linkedCount}</b> · placeholder-слотов: <b>${phCount}</b></span>
+    <span style="display:inline-flex;gap:4px">
+      <button type="button" class="cm-view-toggle" data-view="cards" style="padding:4px 10px;font-size:11px;border:1px solid #cbd5e1;background:${_containerMembersView === 'cards' ? '#dbeafe' : '#fff'};color:${_containerMembersView === 'cards' ? '#1e40af' : '#64748b'};border-radius:4px;cursor:pointer;font-weight:${_containerMembersView === 'cards' ? '600' : '400'}" title="Карточный вид (компактный обзор)">📋 Карточки</button>
+      <button type="button" class="cm-view-toggle" data-view="table" style="padding:4px 10px;font-size:11px;border:1px solid #cbd5e1;background:${_containerMembersView === 'table' ? '#dbeafe' : '#fff'};color:${_containerMembersView === 'table' ? '#1e40af' : '#64748b'};border-radius:4px;cursor:pointer;font-weight:${_containerMembersView === 'table' ? '600' : '400'}" title="Табличный вид с фильтрами и групповым редактированием">📊 Таблица</button>
+    </span>
   </div>`);
   if (!slots.length) {
     h.push('<div style="padding:24px;text-align:center;color:#778899">Контейнер пуст. Drop потребителя на канвасе сюда — добавится.</div>');
@@ -1315,6 +1328,139 @@ export function openContainerMembersModal(container) {
       return { s, i, key: _key };
     });
     _sortedM.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' }));
+    if (_containerMembersView === 'table') {
+      // v0.59.884: табличный вид. Filter row + select-all + bulk-edit toolbar.
+      const flt = _containerMembersTableFilter;
+      const subtypes = new Set();
+      const phases = new Set();
+      _sortedM.forEach(e => {
+        if (e.s.kind === 'linked' && e.s.nodeId) {
+          const a = state.nodes.get(e.s.nodeId);
+          if (a) {
+            subtypes.add(a.consumerSubtype || 'custom');
+            phases.add(a.phase || '3ph');
+          }
+        } else if (e.s.kind === 'placeholder') {
+          subtypes.add(e.s.subtype || 'custom');
+          phases.add(e.s.phase || '3ph');
+        }
+      });
+      const matchesFilter = (s) => {
+        if (s.kind === 'linked' && s.nodeId) {
+          const a = state.nodes.get(s.nodeId);
+          if (!a) return false;
+          if (flt.search) {
+            const hay = `${a.tag || ''} ${a.name || ''} ${a.consumerSubtype || ''}`.toLowerCase();
+            if (!hay.includes(flt.search.toLowerCase())) return false;
+          }
+          if (flt.subtype && (a.consumerSubtype || 'custom') !== flt.subtype) return false;
+          if (flt.phase && (a.phase || '3ph') !== flt.phase) return false;
+          return true;
+        } else if (s.kind === 'placeholder') {
+          if (flt.search) {
+            const hay = `${s.subtype || ''}`.toLowerCase();
+            if (!hay.includes(flt.search.toLowerCase())) return false;
+          }
+          if (flt.subtype && (s.subtype || 'custom') !== flt.subtype) return false;
+          if (flt.phase && (s.phase || '3ph') !== flt.phase) return false;
+          return true;
+        }
+        return false;
+      };
+      const filteredM = _sortedM.filter(e => matchesFilter(e.s));
+      // Очистим selection от удалённых ids
+      for (const id of Array.from(_containerMembersSelected)) {
+        const stillExists = filteredM.some(e => e.s.kind === 'linked' && e.s.nodeId === id);
+        if (!stillExists) _containerMembersSelected.delete(id);
+      }
+      const selCount = _containerMembersSelected.size;
+      // Filter row + bulk toolbar
+      h.push('<div style="padding:8px 12px;border-bottom:1px solid #e0e7ee;background:#fafbfc;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px">');
+      h.push(`<input type="search" id="cm-table-search" placeholder="🔍 поиск по имени/тегу/типу" value="${escAttr(flt.search)}" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:3px;width:200px">`);
+      h.push(`<select id="cm-table-subtype" title="Подтип"><option value="">все типы</option>${[...subtypes].sort().map(s => `<option value="${escAttr(s)}" ${flt.subtype === s ? 'selected' : ''}>${escHtml(s)}</option>`).join('')}</select>`);
+      h.push(`<select id="cm-table-phase" title="Фаза"><option value="">все фазы</option>${[...phases].sort().map(p => `<option value="${escAttr(p)}" ${flt.phase === p ? 'selected' : ''}>${escHtml(p)}</option>`).join('')}</select>`);
+      if (flt.search || flt.subtype || flt.phase) {
+        h.push(`<button type="button" id="cm-table-reset" style="padding:3px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer">× сброс</button>`);
+      }
+      h.push(`<span class="muted" style="margin-left:auto">Показано: ${filteredM.length} из ${_sortedM.length}</span>`);
+      h.push('</div>');
+      // Bulk-edit toolbar (если что-то выделено)
+      if (selCount > 0) {
+        h.push(`<div style="padding:8px 12px;background:#eff6ff;border-bottom:1px solid #bfdbfe;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px">
+          <b style="color:#1e3a8a">Выделено: ${selCount}</b>
+          <span style="margin-left:8px">Применить ко всем выделенным:</span>
+          <label>P (кВт): <input type="number" id="cm-bulk-kw" min="0" step="0.5" style="width:80px;padding:2px 4px;font-size:11px;border:1px solid #cbd5e1;border-radius:3px"></label>
+          <label>cos φ: <input type="number" id="cm-bulk-cos" min="0.1" max="1" step="0.01" style="width:70px;padding:2px 4px;font-size:11px;border:1px solid #cbd5e1;border-radius:3px"></label>
+          <label>Фаза: <select id="cm-bulk-phase" style="font-size:11px;padding:2px 4px;border:1px solid #cbd5e1;border-radius:3px"><option value="">—</option><option value="1ph">1ph</option><option value="3ph">3ph</option></select></label>
+          <label>U (В): <input type="number" id="cm-bulk-voltage" min="0" step="10" style="width:70px;padding:2px 4px;font-size:11px;border:1px solid #cbd5e1;border-radius:3px"></label>
+          <button type="button" id="cm-bulk-apply" style="padding:4px 10px;font-size:11px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:3px;cursor:pointer;font-weight:500">✓ Применить</button>
+          <button type="button" id="cm-bulk-clear" style="padding:4px 10px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer">✕ снять</button>
+        </div>`);
+      }
+      // Table
+      h.push('<div style="max-height:60vh;overflow-y:auto;padding:0">');
+      h.push('<table class="cm-table" style="width:100%;border-collapse:collapse;font-size:12px">');
+      h.push(`<thead style="background:#f1f5f9;position:sticky;top:0;z-index:1">
+        <tr>
+          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1;width:30px"><input type="checkbox" id="cm-table-selectall" title="Выделить всё видимое"></th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Tag</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Имя</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Подтип</th>
+          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">P (кВт)</th>
+          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">cos φ</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Фаза</th>
+          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">U (В)</th>
+          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Ки</th>
+          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1;width:90px"></th>
+        </tr>
+      </thead><tbody>`);
+      for (const entry of filteredM) {
+        const s = entry.s; const i = entry.i;
+        if (s.kind === 'linked' && s.nodeId) {
+          const a = state.nodes.get(s.nodeId);
+          if (!a) {
+            h.push(`<tr><td colspan="10" style="padding:6px 8px;color:#991b1b;background:#fef2f2;border-bottom:1px solid #f1f5f9">Слот #${i+1}: битая ссылка <button type="button" data-cm-remove="${escAttr(String(i))}" style="margin-left:8px;padding:2px 8px;font-size:11px">×</button></td></tr>`);
+            continue;
+          }
+          const tag = effectiveTag(a) || a.tag || a.id;
+          const isSel = _containerMembersSelected.has(a.id);
+          h.push(`<tr data-mid="${escAttr(a.id)}" style="${isSel ? 'background:#eff6ff' : ''}">
+            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9"><input type="checkbox" class="cm-row-sel" data-mid="${escAttr(a.id)}" ${isSel ? 'checked' : ''}></td>
+            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-weight:600">${escHtml(tag)}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9">${escHtml(a.name || '')}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;color:#64748b">${escHtml(a.consumerSubtype || 'custom')}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-kw" data-mid="${escAttr(a.id)}" value="${Number(a.demandKw) || 0}" min="0" step="0.5" style="width:70px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-cos" data-mid="${escAttr(a.id)}" value="${Number(a.cosPhi) || 0.95}" min="0.1" max="1" step="0.01" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9"><select class="cm-row-phase" data-mid="${escAttr(a.id)}" style="font-size:11px;padding:2px 4px;border:1px solid transparent;border-radius:3px"><option value="1ph" ${(a.phase||'3ph')==='1ph'?'selected':''}>1ph</option><option value="3ph" ${(a.phase||'3ph')==='3ph'?'selected':''}>3ph</option></select></td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-voltage" data-mid="${escAttr(a.id)}" value="${Number(a.voltage) || 400}" min="0" step="10" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9"><input type="number" class="cm-row-ku" data-mid="${escAttr(a.id)}" value="${(a.kUse != null) ? a.kUse : 1}" min="0" max="1" step="0.05" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap">
+              <button type="button" data-cm-edit="${escAttr(a.id)}" title="Открыть полный инспектор" style="padding:2px 6px;font-size:11px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:3px;cursor:pointer">⚙</button>
+              <button type="button" data-cm-extract="${escAttr(String(i))}" title="Извлечь" style="padding:2px 6px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:3px;cursor:pointer">↗</button>
+              <button type="button" data-cm-remove="${escAttr(String(i))}" title="Удалить" style="padding:2px 6px;font-size:11px;border:1px solid #ef4444;background:#fff;color:#b91c1c;border-radius:3px;cursor:pointer">×</button>
+            </td>
+          </tr>`);
+        } else if (s.kind === 'placeholder') {
+          h.push(`<tr style="background:#fef9c3">
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a"></td>
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a;color:#92400e;font-style:italic">placeholder #${i+1}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a">—</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a;color:#92400e">${escHtml(s.subtype || 'custom')}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #fde68a;text-align:right"><input type="number" data-cm-kw="${escAttr(String(i))}" value="${Number(s.demandKw) || 0}" min="0" step="0.5" style="width:70px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid #fde68a;background:#fff;border-radius:3px"></td>
+            <td style="padding:2px 8px;border-bottom:1px solid #fde68a;text-align:right"><input type="number" data-cm-cos="${escAttr(String(i))}" value="${Number(s.cosPhi) || 0.95}" min="0.1" max="1" step="0.01" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid #fde68a;background:#fff;border-radius:3px"></td>
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a">${escHtml(s.phase || '3ph')}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a;text-align:right">${Number(s.voltage) || 400}</td>
+            <td style="padding:4px 8px;border-bottom:1px solid #fde68a">${(s.kUse != null) ? s.kUse : '—'}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #fde68a;text-align:right;white-space:nowrap">
+              <button type="button" data-cm-materialize="${escAttr(String(i))}" title="Материализовать" style="padding:2px 6px;font-size:11px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;border-radius:3px;cursor:pointer">⊕</button>
+              <button type="button" data-cm-remove="${escAttr(String(i))}" title="Удалить slot" style="padding:2px 6px;font-size:11px;border:1px solid #ef4444;background:#fff;color:#b91c1c;border-radius:3px;cursor:pointer">×</button>
+            </td>
+          </tr>`);
+        }
+      }
+      h.push('</tbody></table>');
+      h.push('</div>');
+    } else {
     h.push('<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:12px">');
     for (const entry of _sortedM) {
       const s = entry.s; const i = entry.i;
@@ -1377,7 +1523,8 @@ export function openContainerMembersModal(container) {
       }
     }
     h.push('</div>');
-  }
+    } // end inner else (cards view)
+  } // end outer else (slots.length > 0)
   h.push('<div style="padding:12px;border-top:1px solid #e0e7ee;display:flex;gap:8px;justify-content:flex-end">');
   h.push('<button type="button" id="cm-add-placeholder" style="padding:6px 14px;font-size:12px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:4px;cursor:pointer">➕ Добавить placeholder-слот</button>');
   h.push('</div>');
@@ -1387,6 +1534,132 @@ export function openContainerMembersModal(container) {
   _wireContainerMembersModal(container, body, modal);
 }
 function _wireContainerMembersModal(n, body, modal) {
+  // v0.59.884: toggle между cards/table view + table inputs/bulk-edit.
+  body.querySelectorAll('.cm-view-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.view;
+      _containerMembersView = (v === 'table') ? 'table' : 'cards';
+      try { localStorage.setItem('raschet.container-members.view.v1', _containerMembersView); } catch {}
+      // Очистим selection при смене view
+      _containerMembersSelected.clear();
+      openContainerMembersModal(n); // re-render всей модалки
+    });
+  });
+  // Table view: filter inputs.
+  const fSearch = body.querySelector('#cm-table-search');
+  if (fSearch) fSearch.addEventListener('input', e => {
+    _containerMembersTableFilter.search = e.target.value;
+    openContainerMembersModal(n);
+    // Re-focus + position cursor
+    setTimeout(() => {
+      const f2 = document.getElementById('cm-table-search');
+      if (f2) { f2.focus(); f2.setSelectionRange(f2.value.length, f2.value.length); }
+    }, 0);
+  });
+  body.querySelector('#cm-table-subtype')?.addEventListener('change', e => { _containerMembersTableFilter.subtype = e.target.value; openContainerMembersModal(n); });
+  body.querySelector('#cm-table-phase')?.addEventListener('change', e => { _containerMembersTableFilter.phase = e.target.value; openContainerMembersModal(n); });
+  body.querySelector('#cm-table-reset')?.addEventListener('click', () => {
+    _containerMembersTableFilter = { search: '', subtype: '', phase: '' };
+    openContainerMembersModal(n);
+  });
+  // Row select checkboxes
+  body.querySelectorAll('input.cm-row-sel').forEach(cb => {
+    cb.addEventListener('change', e => {
+      const mid = cb.dataset.mid;
+      if (cb.checked) _containerMembersSelected.add(mid);
+      else _containerMembersSelected.delete(mid);
+      openContainerMembersModal(n);
+    });
+  });
+  // Select-all
+  body.querySelector('#cm-table-selectall')?.addEventListener('change', e => {
+    const checked = e.target.checked;
+    body.querySelectorAll('input.cm-row-sel').forEach(cb => {
+      const mid = cb.dataset.mid;
+      if (checked) _containerMembersSelected.add(mid);
+      else _containerMembersSelected.delete(mid);
+    });
+    openContainerMembersModal(n);
+  });
+  // Per-row inline edit (change event — сохраняет на blur)
+  const _applyRowField = (field, parser, validator) => {
+    body.querySelectorAll('input.' + field + ', select.' + field).forEach(inp => {
+      inp.addEventListener('change', e => {
+        const mid = inp.dataset.mid;
+        const a = state.nodes.get(mid);
+        if (!a) return;
+        const raw = inp.value;
+        const parsed = parser(raw);
+        if (validator && !validator(parsed)) return;
+        const fieldName = field.replace('cm-row-', '');
+        a[fieldName] = parsed;
+        try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {}
+      });
+    });
+  };
+  _applyRowField('cm-row-kw',      v => Number(v) || 0, v => v >= 0);
+  _applyRowField('cm-row-cos',     v => Number(v) || 0.95, v => v >= 0.1 && v <= 1);
+  _applyRowField('cm-row-phase',   v => v);
+  _applyRowField('cm-row-voltage', v => Number(v) || 400, v => v >= 0);
+  _applyRowField('cm-row-ku',      v => Number(v) || 1, v => v >= 0 && v <= 1);
+  // Map renames: input.cm-row-X — нужно cm-row-X → имя поля без префикса.
+  // Я использую упрощённую логику выше; явные обработчики для kw → demandKw, ku → kUse:
+  body.querySelectorAll('input.cm-row-kw').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const a = state.nodes.get(inp.dataset.mid);
+      if (a) { a.demandKw = Number(inp.value) || 0; try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {} }
+    });
+  });
+  body.querySelectorAll('input.cm-row-cos').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const a = state.nodes.get(inp.dataset.mid);
+      if (a) { a.cosPhi = Number(inp.value) || 0.95; try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {} }
+    });
+  });
+  body.querySelectorAll('select.cm-row-phase').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const a = state.nodes.get(sel.dataset.mid);
+      if (a) { a.phase = sel.value; try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {} }
+    });
+  });
+  body.querySelectorAll('input.cm-row-voltage').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const a = state.nodes.get(inp.dataset.mid);
+      if (a) { a.voltage = Number(inp.value) || 400; try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {} }
+    });
+  });
+  body.querySelectorAll('input.cm-row-ku').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const a = state.nodes.get(inp.dataset.mid);
+      if (a) { a.kUse = Number(inp.value); try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {} }
+    });
+  });
+  // Bulk-edit toolbar
+  body.querySelector('#cm-bulk-apply')?.addEventListener('click', () => {
+    const kw = body.querySelector('#cm-bulk-kw').value;
+    const cos = body.querySelector('#cm-bulk-cos').value;
+    const ph = body.querySelector('#cm-bulk-phase').value;
+    const v = body.querySelector('#cm-bulk-voltage').value;
+    let count = 0;
+    for (const mid of _containerMembersSelected) {
+      const a = state.nodes.get(mid);
+      if (!a) continue;
+      if (kw !== '') a.demandKw = Number(kw) || 0;
+      if (cos !== '') a.cosPhi = Math.max(0.1, Math.min(1, Number(cos) || 0.95));
+      if (ph !== '') a.phase = ph;
+      if (v !== '') a.voltage = Number(v) || 400;
+      count++;
+    }
+    if (count > 0) {
+      try { window.Raschet?.recalc?.(); window.Raschet?.render?.(); } catch {}
+      openContainerMembersModal(n);
+    }
+  });
+  body.querySelector('#cm-bulk-clear')?.addEventListener('click', () => {
+    _containerMembersSelected.clear();
+    openContainerMembersModal(n);
+  });
+
   // Edit member full inspector — выбираем член, закрываем модалку, открываем
   // обычный consumer-modal через openConsumerParamsModal.
   // v0.59.838: после закрытия consumer-модалки возвращаемся в контейнер
