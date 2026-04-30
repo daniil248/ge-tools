@@ -2030,27 +2030,12 @@ export function renderGeneralPanel(n) {
   h.push(`<div class="muted" style="font-size:11px;margin-top:4px">UUID: <code style="font-size:11px">${escHtml(n.id)}</code></div>`);
   h.push(`</div>`);
 
-  // v0.58.48: блок «Тип / подвид» — только для consumer; определяет, какой
-  // конфигуратор вызывается кнопкой ниже (rack → rack-config/, …).
-  if (n.type === 'consumer') {
-    const st = n.subtype || 'generic';
-    h.push(`<div class="inspector-section">`);
-    h.push(`<h4>Назначение</h4>`);
-    h.push(field('Подтип',
-      `<select data-prop="subtype">
-        <option value="generic"${st === 'generic' ? ' selected' : ''}>Обычный потребитель</option>
-        <option value="rack"${st === 'rack' ? ' selected' : ''}>🗄 Серверная/телеком стойка</option>
-        <option value="hvac"${st === 'hvac' ? ' selected' : ''}>❄️ HVAC / климат</option>
-        <option value="lighting"${st === 'lighting' ? ' selected' : ''}>💡 Освещение</option>
-        <option value="motor"${st === 'motor' ? ' selected' : ''}>⚙️ Двигатель / привод</option>
-        <option value="heater"${st === 'heater' ? ' selected' : ''}>🔥 Нагреватель</option>
-        <option value="other"${st === 'other' ? ' selected' : ''}>Другое</option>
-      </select>`));
-    if (st === 'rack') {
-      h.push(`<div class="muted" style="font-size:11px;margin-top:4px">Раскладка юнитов, PDU, двери и BOM — в «Конфигураторе стойки» ниже.</div>`);
-    }
-    h.push(`</div>`);
-  }
+  // v0.59.835: блок «Назначение» УБРАН — ранее дублировал «Категория + Тип
+  // потребителя» в модалке параметров. Пользователь: «Не стоит использовать
+  // подтип и категорию если они абсолютно дублируют друг друга». Назначение
+  // теперь полностью определяется через `consumerSubtype` (запись каталога) —
+  // см. модалку «⚙ Параметры потребителя».  `n.subtype` авто-выводится из
+  // category каталожной записи (см. derive-helper в consumer.js apply).
 
   // Блок «Модель/изделие»
   const cfg = _configuratorForNode(n);

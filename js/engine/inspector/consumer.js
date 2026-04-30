@@ -1998,6 +1998,24 @@ export function openConsumerParamsModal(n) {
     const catId = document.getElementById('cp-catalog')?.value || n.consumerSubtype || 'custom';
     const cat = fullCatalog.find(c => c.id === catId);
     n.consumerSubtype = catId;
+    // v0.59.835: auto-sync n.subtype от category каталожной записи —
+    // прежний sidebar-блок «Подтип» убран как дублирующий, теперь subtype
+    // выводится автоматически.
+    if (cat && cat.category) {
+      // v0.59.835: маппинг category (CONSUMER_CATEGORIES) → subtype.
+      const _categoryToSubtype = {
+        'lighting':   'lighting',
+        'socket':     'generic',
+        'power':      'motor',
+        'hvac':       'hvac',
+        'it':         'rack',
+        'lowvoltage': 'generic',
+        'process':    'motor',
+        'other':      'generic',
+      };
+      const _autoSt = _categoryToSubtype[cat.category];
+      if (_autoSt) n.subtype = _autoSt;
+    }
     const nameInput = document.getElementById('cp-name')?.value?.trim();
     n.name = nameInput || (cat ? cat.label : n.name || 'Потребитель');
     n.count = readNum('cp-count', n.count ?? 1);
