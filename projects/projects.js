@@ -773,6 +773,30 @@ function _initAfterDom() {
       alert('Ошибка бэкапа: ' + (e.message || e));
     }
   });
+  // v0.59.877: «📤 Импортировать проект» — импорт ОДНОГО проекта из JSON.
+  // Работает с файлами, экспортированными через «📥 JSON» в карточке проекта.
+  document.getElementById('pr-import-project')?.addEventListener('click', () => {
+    document.getElementById('pr-import-project-file')?.click();
+  });
+  document.getElementById('pr-import-project-file')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const obj = JSON.parse(text);
+      const created = importProject(obj);
+      if (!created) throw new Error('importProject вернул null');
+      const isCopy = (created.id !== obj.project.id);
+      prToast(`✔ Импортирован проект «${created.name}»${isCopy ? ' (создан под новым ID — оригинал уже есть)' : ''}`);
+      e.target.value = '';
+      render();
+    } catch (err) {
+      console.error('[import-project] failed:', err);
+      prToast('Ошибка импорта: ' + (err.message || err), 'err');
+      e.target.value = '';
+    }
+  });
+
   // v0.59.854: «📂 Восстановить» — открывает file input → restore.
   document.getElementById('pr-restore-backup')?.addEventListener('click', () => {
     document.getElementById('pr-restore-backup-file')?.click();
