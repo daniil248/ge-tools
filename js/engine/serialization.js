@@ -90,6 +90,124 @@ export function stripRuntime(obj) {
   }
   return copy;
 }
+// v0.59.817 (1.28.20 Phase 5): миграция shell-aliases групп на новый
+// тип-узел 'consumer-container' со slots[]. Делаем при загрузке проекта
+// (deserialize) — единоразово на проект.
+//
+// Стратегия:
+//   1. Найти все consumer-узлы с linkedAliases.some(Boolean) и НЕ в
+//      groupMode='individual' (individual — другая модель).
+//   2. Для каждого shell:
+//      - Создать новый узел 'consumer-container' на месте shell'а
+//        (тот же x/y/pageIds/positionsByPage). Tag/name контейнер не
+//        наследует — effectiveTag/Name автоматически вернёт младший
+//        среди slot'ов.
+//      - Перенаправить все state.conns/sysConns where ?.nodeId===shell.id
+//        на container.id.
+//      - Заполнить container.slots: shell сам = слот #0 (linked), затем
+//        каждый non-null alias = linked, каждый null = placeholder
+//        со спекой shell'а.
+//      - shell остаётся в state.nodes как обычный consumer-узел, но
+//        скрытый с canvas (containerId установлен, pageIds=[]).
+//        linkedAliases очищаются. count удаляется (slot count теперь у
+//        контейнера).
+//      - aliases получают КОПИЮ параметров shell'а (demandKw, cosPhi,
+//        phase, voltage, voltageLevelIdx, kUse, inrushFactor,
+//        consumerSubtype) если у них своих не было — раньше они
+//        наследовали через _shellOf, теперь автономны.
+//        linkedAlias очищается; containerId устанавливается.
+function _migrateLegacyShellsToContainers() {
+  const _toMigrate = [];
+  for (const n of state.nodes.values()) {
+    if (n.type !== 'consumer') continue;
+    if (n.groupMode === 'individual') continue;
+    if (!Array.isArray(n.linkedAliases) || !n.linkedAliases.some(Boolean)) continue;
+    _toMigrate.push(n);
+  }
+  if (!_toMigrate.length) return;
+
+  const _ELEC_KEYS = ['demandKw', 'cosPhi', 'phase', 'voltage', 'voltageLevelIdx',
+                      'kUse', 'inrushFactor', 'consumerSubtype'];
+
+  for (const shell of _toMigrate) {
+    const containerId = uid('cn');
+    const aliases = (shell.linkedAliases || []).slice();
+    const slots = [];
+    // Слот #0 — сам бывший shell
+    slots.push({ kind: 'linked', nodeId: shell.id });
+    // Остальные слоты — aliases или placeholder (null)
+    for (const aid of aliases) {
+      if (aid && state.nodes.has(aid)) {
+        const a = state.nodes.get(aid);
+        // Скопировать параметры shell'а если у alias'а своих нет
+        for (const k of _ELEC_KEYS) {
+          if (a[k] == null || a[k] === '') a[k] = shell[k];
+        }
+        delete a.linkedAlias;
+        a.containerId = containerId;
+        a.pageIds = [];
+        if (a.positionsByPage) a.positionsByPage = {};
+        slots.push({ kind: 'linked', nodeId: a.id });
+      } else if (!aid) {
+        // null-слот → placeholder со спекой shell'а
+        slots.push({
+          kind: 'placeholder',
+          demandKw: Number(shell.demandKw) || 0,
+          cosPhi: Number(shell.cosPhi) || 0.95,
+          phase: shell.phase || '3ph',
+          voltage: Number(shell.voltage) || 400,
+          voltageLevelIdx: Number(shell.voltageLevelIdx) || 0,
+          subtype: shell.consumerSubtype || 'custom',
+        });
+      }
+      // aliasId, не существующий в state.nodes — пропускаем (битая ссылка)
+    }
+    // Создаём контейнер на месте shell'а
+    const container = {
+      id: containerId,
+      type: 'consumer-container',
+      name: shell.name || 'Контейнер потребителей',
+      // tag хранится для save/load уникальности (сам effectiveTag
+      // на канвасе/реестре всё равно вернёт младший tag среди slot'ов)
+      tag: nextFreeTag('consumer-container'),
+      x: shell.x, y: shell.y,
+      pageIds: Array.isArray(shell.pageIds) ? shell.pageIds.slice() : [],
+      positionsByPage: shell.positionsByPage
+        ? JSON.parse(JSON.stringify(shell.positionsByPage)) : undefined,
+      inputs: Math.max(1, Number(shell.inputs) || 1),
+      outputs: 0,
+      inputSide: shell.inputSide || 'top',
+      slots,
+      _migratedFromShell: shell.id,
+    };
+    state.nodes.set(containerId, container);
+
+    // Remap connections (state.conns) — все стрелки от/к shell'у уходят на container.
+    for (const c of state.conns.values()) {
+      if (c.from && c.from.nodeId === shell.id) c.from.nodeId = containerId;
+      if (c.to   && c.to.nodeId   === shell.id) c.to.nodeId   = containerId;
+    }
+    // sysConns — то же самое
+    if (state.sysConns) {
+      for (const sc of state.sysConns.values()) {
+        if (sc.fromNodeId === shell.id) sc.fromNodeId = containerId;
+        if (sc.toNodeId   === shell.id) sc.toNodeId   = containerId;
+      }
+    }
+
+    // Shell сам теперь — скрытый член контейнера
+    shell.containerId = containerId;
+    shell.pageIds = [];
+    if (shell.positionsByPage) shell.positionsByPage = {};
+    delete shell.linkedAliases;
+    delete shell.count;       // slot count теперь у контейнера, не у shell
+    // shell.tag остаётся — это его собственный tag как члена группы
+  }
+  if (typeof console !== 'undefined' && _toMigrate.length) {
+    try { console.info(`[migrate] legacy shell→container: ${_toMigrate.length} групп(ы) преобразовано`); } catch {}
+  }
+}
+
 export function deserialize(data) {
   state.nodes.clear();
   state.conns.clear();
@@ -138,6 +256,10 @@ export function deserialize(data) {
     }
     state.conns.set(c.id, c);
   }
+  // v0.59.817: миграция legacy shell-групп подготовлена, но НЕ активна —
+  // recalc.js пока не умеет раскрывать contaner.slots (Phase 6 не сделан).
+  // Включить вызов после расширения recalc/registries на 'consumer-container'.
+  // _migrateLegacyShellsToContainers();
   state.modes = data.modes || [];
   state.activeModeId = data.activeModeId || null;
   setIdSeq(Math.max(data.nextId || 1, 1));
