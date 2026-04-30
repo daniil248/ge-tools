@@ -870,7 +870,12 @@ export function initInteraction() {
         // SCS-узлы — теперь они остаются как linked alias. ROADMAP 1.28.10.
         if (n.type === 'consumer') {
           const target = _findConsumerOverlapAt(n);
-          if (target) {
+          // v0.59.812: gate-check compatibility ПЕРЕД auto-merge.
+          // Раньше любой overlap → merge, даже если параметры разные.
+          // Пользователь: «потребитель с похожими характеристиками»
+          // — значит, drop на несовместимый consumer должен оставить
+          // обоих как отдельные узлы.
+          if (target && _isCompatibleConsumer(target, n)) {
             const tagBefore = target.tag || target.name || target.id;
             const result = _aliasConsumerToGroup(target, n);
             if (result) {
@@ -884,6 +889,8 @@ export function initInteraction() {
               state.selectedId = target.id;
               try { flash(`«${n.tag || n.id}» связан с группой ${tagBefore} (слот #${result.slotIdx + 1})`, 'success'); } catch {}
             }
+          } else if (target) {
+            try { flash(`Параметры ${n.tag || n.id} и ${target.tag || target.id} не совпадают — добавлен как отдельный потребитель. Если это один объект — используйте Группа-tab для ручной связи.`, 'info'); } catch {}
           }
         }
         notifyChange();
@@ -1827,17 +1834,17 @@ export function initInteraction() {
           render();
         }
       }
-      // v0.59.769: drop consumer-ноды поверх consumer'а — IDENTIFY-AS (alias),
-      // НЕ удаляем source (юзер может потом разорвать связь). ROADMAP 1.28.10.
-      // Если source несовместим electrically (subtype/phase/etc) — линкуем
-      // тем не менее (cross-discipline сценарий: технолог и электрик имеют
-      // разные параметры одного объекта). Юзер: «именно связать ... не
-      // соединить а заменить по факту».
+      // v0.59.812: drop consumer на consumer — auto-merge ТОЛЬКО при
+      // совместимых параметрах (как user-flow drop-unplaced). Раньше
+      // любой overlap → alias. Пользователь: «потребитель с похожими
+      // характеристиками». Несовместимые остаются отдельно — для
+      // cross-discipline IDENTIFY-AS используется ручной picker в
+      // Группа-tab инспектора.
       if (wasNodeDrag && draggedNodeId) {
         const dragged = state.nodes.get(draggedNodeId);
         if (dragged && dragged.type === 'consumer') {
           const target = _findConsumerOverlapAt(dragged);
-          if (target) {
+          if (target && _isCompatibleConsumer(target, dragged)) {
             try { snapshot('consumer-alias:' + target.id + '←' + dragged.id); } catch {}
             const tagBefore = target.tag || target.name || target.id;
             const result = _aliasConsumerToGroup(target, dragged);
@@ -1847,6 +1854,8 @@ export function initInteraction() {
               try { flash(`«${dragged.tag || dragged.id}» связан с группой ${tagBefore} (слот #${result.slotIdx + 1}${result.overflow ? ', count → ' + target.count : ''})`, 'success'); } catch {}
               render();
             }
+          } else if (target) {
+            try { flash(`Параметры разные — узлы остаются отдельными. Для cross-discipline связи (один физ.объект, разные параметры) откройте Группа-tab.`, 'info'); } catch {}
           }
         }
       }
