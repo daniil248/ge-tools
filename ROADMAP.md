@@ -1,6 +1,6 @@
 # Raschet — Roadmap архитектурного развития платформы
 
-> **Статус:** v0.59.828 (2026-04-30). Фаза 1.27 — «Проекты» полностью закрыта (1.27.1–5: scs-design/schema/scs-config/inventory неймспейс + status filter + export). Фаза 1.28 — POR-registry, cross-discipline reconciliation закрыта (1.28.7/10–19); 1.28.20 (новый node-type `consumer-container` как организационная обёртка) — Phase 1 (foundation) + Phase 2 (render) сделаны. Фаза 19 (пресеты карточек) полностью закрыта (19.1–6 + v2 редактор с draggable-modal/zones/editable-labels/sample-preview). 1.24.18 (collapsible tables в scs-config) закрыто. Фаза 20 (Технолог ЦОД): базовый скелет + nav + catalog-picker + multi-variant compare + handoff в schematic + ПЗ, открыто 20.7 (план зала). Local/Online switcher. Центр помощи с 21 статьёй + кнопка ❓ в общей шапке.
+> **Статус:** v0.59.833 (2026-04-30). Фаза 1.27 — «Проекты» полностью закрыта (1.27.1–5: scs-design/schema/scs-config/inventory неймспейс + status filter + export). Фаза 1.28 — POR-registry, cross-discipline reconciliation закрыта (1.28.7/10–19); 1.28.20 (новый node-type `consumer-container` как организационная обёртка) — Phase 1 (foundation) + Phase 2 (render) сделаны. Фаза 19 (пресеты карточек) полностью закрыта (19.1–6 + v2 редактор с draggable-modal/zones/editable-labels/sample-preview). 1.24.18 (collapsible tables в scs-config) закрыто. Фаза 20 (Технолог ЦОД): базовый скелет + nav + catalog-picker + multi-variant compare + handoff в schematic + ПЗ, открыто 20.7 (план зала). Local/Online switcher. Центр помощи с 21 статьёй + кнопка ❓ в общей шапке.
 
 > **Правило ведения:** roadmap обновляется ПОСТОЯННО — при появлении новой фичи / задачи и при закрытии любого этапа. Hotfix'ы (regressions, мелкие правки UX) НЕ попадают в roadmap, только содержательная функциональность. Это правило зафиксировано пользователем 2026-04-29.
 
@@ -386,6 +386,31 @@ in-tab Map + cross-tab через storage event.
   - **Hotfix v0.59.824 — визуальный фикс:**
     - render.js: контейнер наследует CSS class `consumer` (не чёрный).
     - geometry.js nodeInputCount: контейнер берёт max inputs от членов.
+  - **Phase 7 — Sync с «Концепцией стоек» (handoff, закрыто v0.59.833):**
+    - tech-workspace handoff (`_buildSchemeFromConcept`): для каждой
+      группы стоек создаётся `consumer-container` с N placeholder-слотами,
+      где N = rg.count, спека = {demandKw: rg.kwPerRack, cosPhi:0.95,
+      phase:'3ph', voltage:400, subtype:'rack'}.
+    - Раньше создавался один `consumer count=N` (uniform group). Теперь —
+      контейнер с placeholders, что позволяет:
+        • технологу/электрику материализовать каждый слот в реальную
+          стойку с уникальным tag (SR01..SRN) через инспектор / модалку
+        • drop-merge новых стоек на канвасе → попадают в свободные слоты
+        • cross-discipline reconciliation работает естественно
+    - Поле `_conceptRgId` на контейнере хранит привязку к группе концепции
+      (для будущей двусторонней синхронизации).
+  - **Защита от удаления связанного объекта (1.28.6 partial):**
+    - **v0.59.831** — graph.js deleteNode: hard-delete блокируется при
+      наличии state.conns или state.sysConns. Toast: «подключён к
+      другим элементам — сначала снимите все линии».
+    - **v0.59.832** — cross-module check `_findCrossModuleReferences`:
+      читает `scs-design.links.v1` (project-namespace), ищет узел в
+      fromRackId/toRackId. Toast: «используется в модуле СКС-проектирование
+      (связей: N)».
+    - Inspector контейнера: ✂ Разъединить и × Удалить slot теперь НЕ
+      удаляют consumer — он становится unplaced (containerId снят,
+      pageIds=[]). Пользователь: «электрик максимум мог их выкинуть из
+      группы, но не мог удалить их с проекта».
   - **Phase 9 — Convert container ⇆ consumer (закрыто v0.59.827):**
     - Кнопка «⇆ В группового потребителя» в инспекторе контейнера:
       сворачивает container в одиночный `consumer` с count=N, demandKw=

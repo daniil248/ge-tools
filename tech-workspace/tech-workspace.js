@@ -1009,22 +1009,40 @@ function _buildSchemeFromConcept(concept, variantName) {
     });
     upsY += 200;
   }
-  // Consumer-group узлы для стоек
+  // v0.59.833 (1.28.20 Phase 7): handoff создаёт consumer-container с
+  // N placeholder-слотами вместо одиночного consumer count=N. Это
+  // позволяет технологу/электрику затем материализовать каждый слот
+  // в индивидуальную стойку с уникальным tag (SR01..SRN), сохранив
+  // изначальную спеку из «Концепции стоек».
   let rackY = panelY;
   for (const rg of (concept.rackGroups || [])) {
+    const cnt = Math.max(1, Number(rg.count) || 1);
+    const kwPerRack = Number(rg.kwPerRack) || 0;
+    const slots = [];
+    for (let i = 0; i < cnt; i++) {
+      slots.push({
+        kind: 'placeholder',
+        demandKw: kwPerRack,
+        cosPhi: 0.95,
+        phase: '3ph',
+        voltage: 400,
+        voltageLevelIdx: 0,
+        subtype: 'rack',
+        kUse: 1,
+      });
+    }
     nodes.push({
-      id: newId(), type: 'consumer', tag: newTag('SR'),
+      id: newId(), type: 'consumer-container', tag: newTag('GR'),
       name: rg.name || 'Стойки',
-      consumerSubtype: 'rack', consumerKind: 'rack',
       x: colX.end, y: rackY,
-      count: Number(rg.count) || 1,
-      demandKw: Number(rg.kwPerRack) || 0,
-      cosPhi: 0.95, phase: '3ph', voltage: 400,
-      width: 250, height: 120,
+      inputs: 2, outputs: 0,
+      inputSide: 'top',
+      slots,
       pageIds: [pageId],
       positionsByPage: { [pageId]: { x: colX.end, y: rackY } },
       _fromTechWorkspace: true,
       _profile: rg.profile,
+      _conceptRgId: rg.id,
     });
     rackY += 200;
   }
