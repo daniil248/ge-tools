@@ -1825,10 +1825,13 @@ export function renderNodes() {
     );
     const cls = [
       'node', n.type,
+      // v0.59.824: consumer-container наследует CSS стили от 'consumer'
+      // (иначе rect.node-body чёрный — нет CSS rule для consumer-container).
+      n.type === 'consumer-container' ? 'consumer' : '',
       selected ? 'selected' : '',
       state.selection.has(n.id) ? 'multi-selected' : '',
       _hasNodeIssue ? 'overload' : '',
-      (!n._powered && (n.type === 'panel' || n.type === 'consumer' || n.type === 'ups')) ? 'unpowered' : '',
+      (!n._powered && (n.type === 'panel' || n.type === 'consumer' || n.type === 'consumer-container' || n.type === 'ups')) ? 'unpowered' : '',
       (n.type === 'ups' && n._onBattery) ? 'onbattery' : '',
       (n.type === 'ups' && n._onStaticBypass) ? 'onbypass' : '',
       (n.type === 'panel' && n.switchMode === 'manual') ? 'manual' : '',

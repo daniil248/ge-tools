@@ -1,5 +1,6 @@
 import { NODE_H, NODE_MIN_W, PORT_GAP_MIN, GLOBAL, CONSUMER_CATALOG } from './constants.js';
 import { getElement } from '../../shared/element-library.js';
+import { state } from './state.js';
 
 // ============== Phase 2.3: реальные габариты узла в мм ==============
 // Возвращает { widthMm, heightMm, depthMm, weightKg, source } или null.
@@ -70,6 +71,21 @@ export function getNodeGeometryMm(n) {
 
 // ================= Геометрия узла =================
 export function nodeInputCount(n) {
+  // v0.59.824 (1.28.20): consumer-container наследует max inputs от
+  // первого linked-члена. Если linked нет — n.inputs (default 1).
+  if (n.type === 'consumer-container') {
+    if (Array.isArray(n.slots) && state && state.nodes) {
+      let maxIn = 0;
+      for (const s of n.slots) {
+        if (s && s.kind === 'linked' && s.nodeId) {
+          const a = state.nodes.get(s.nodeId);
+          if (a) maxIn = Math.max(maxIn, Math.max(0, a.inputs | 0));
+        }
+      }
+      if (maxIn > 0) return maxIn;
+    }
+    return Math.max(1, Number(n.inputs) || 1);
+  }
   if (n.type === 'source') {
     const st = n.sourceSubtype || 'transformer';
     if (st === 'utility') return 0;
