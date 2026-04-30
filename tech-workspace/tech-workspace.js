@@ -457,17 +457,93 @@ function renderFeedSection(feed, isReadOnly) {
   </div>`;
 }
 
+// ─── Render: compare mode (multi-variant side-by-side, Phase 20.10)
+function renderCompareMode() {
+  const pane = $('tw-mode-compare');
+  if (!pane) return;
+  if (_variants.length === 0) {
+    pane.innerHTML = '<div class="tw-empty-state"><div><h3>Нет вариантов</h3><p class="muted">Создайте 2+ варианта в левой панели для сравнения.</p></div></div>';
+    return;
+  }
+  // Build rows: each метрика — строка, варианты — колонки
+  const rows = [
+    { label: '⭐ Основной', get: v => v.primary ? '★' : '' },
+    { label: '🔒 Передан в проектирование', get: v => v.readOnly ? `да (${new Date(v.handoffAt || 0).toLocaleDateString()})` : 'нет' },
+    { label: '— Стойки —', isHeader: true },
+    { label: 'Кол-во групп стоек', get: v => (v.concept.rackGroups || []).length },
+    { label: 'Σ стоек', get: v => (v.concept.rackGroups || []).reduce((s, rg) => s + (Number(rg.count) || 0), 0) },
+    { label: 'Σ IT-нагрузка, кВт', get: v => calcITTotal(v.concept).toFixed(1), highlight: 'kw' },
+    { label: '— ИБП —', isHeader: true },
+    { label: 'Кол-во систем ИБП', get: v => (v.concept.upsSystems || []).length },
+    { label: 'Σ ИБП IT доступно, кВт', get: v => {
+      const u = calcUpsByPurpose(v.concept);
+      return (u.it + u.mixed).toFixed(1);
+    }, highlight: 'kw' },
+    { label: 'Σ ИБП климат доступно, кВт', get: v => {
+      const u = calcUpsByPurpose(v.concept);
+      return (u.cooling + u.mixed).toFixed(1);
+    } },
+    { label: '— Климат —', isHeader: true },
+    { label: 'Кол-во групп кондиц.', get: v => (v.concept.coolingUnits || []).length },
+    { label: 'Σ холод доступен, кВт', get: v => calcCoolTotal(v.concept).toFixed(1), highlight: 'kw' },
+    { label: '— Ввод —', isHeader: true },
+    { label: 'ТП', get: v => v.concept.feed?.tp?.needed ? `${v.concept.feed.tp.kva} кВА` : '—' },
+    { label: 'ДГУ', get: v => v.concept.feed?.dgu?.needed ? `${v.concept.feed.dgu.kw} кВт (${v.concept.feed.dgu.mode})` : '—' },
+    { label: 'Σ принятая мощность, кВт', get: v => calcFeedTotal(v.concept).toFixed(1), highlight: 'kw' },
+    { label: '— Площади —', isHeader: true },
+    { label: 'Σ площадь, м²', get: v => calcAreas(v.concept).reduce((s, a) => s + a.m2, 0), highlight: 'm2' },
+  ];
+  // Find max for highlighting
+  const maxBy = {};
+  for (const r of rows) {
+    if (!r.highlight) continue;
+    const vals = _variants.map(v => Number(r.get(v)) || 0);
+    maxBy[r.label] = Math.max(...vals);
+  }
+  pane.innerHTML = `<div class="tw-compare-wrap">
+    <div class="tw-compare-toolbar">
+      <span class="muted">Сравнение ${_variants.length} вариантов. Лучшие значения подсвечены зелёным (где больше = лучше).</span>
+    </div>
+    <table class="tw-compare-table">
+      <thead>
+        <tr>
+          <th class="tw-compare-metric">Параметр</th>
+          ${_variants.map(v => `<th class="tw-compare-variant${v.id === _activeId ? ' active' : ''}">${escHtml(v.name)}${v.primary ? ' ⭐' : ''}${v.readOnly ? ' 🔒' : ''}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => {
+          if (r.isHeader) {
+            return `<tr class="tw-compare-section-row"><td colspan="${_variants.length + 1}">${escHtml(r.label)}</td></tr>`;
+          }
+          return `<tr>
+            <td class="tw-compare-metric">${escHtml(r.label)}</td>
+            ${_variants.map(v => {
+              const val = r.get(v);
+              const num = Number(val);
+              const isBest = r.highlight && Number.isFinite(num) && num === maxBy[r.label] && num > 0;
+              return `<td class="tw-compare-cell${isBest ? ' best' : ''}">${escHtml(val == null ? '—' : val)}</td>`;
+            }).join('')}
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 // ─── Render: active variant (right pane)
 function renderActiveVariant() {
   const v = _variants.find(x => x.id === _activeId);
   const empty = $('tw-empty-state');
   const listPane = $('tw-mode-list');
   const planPane = $('tw-mode-plan');
+  const comparePane = $('tw-mode-compare');
   const handoffBtn = $('tw-handoff');
   if (!v) {
     if (empty) empty.style.display = 'flex';
     if (listPane) listPane.hidden = true;
     if (planPane) planPane.hidden = true;
+    if (comparePane) comparePane.hidden = true;
     if (handoffBtn) handoffBtn.disabled = true;
     return;
   }
@@ -475,6 +551,8 @@ function renderActiveVariant() {
   if (handoffBtn) handoffBtn.disabled = !!v.readOnly;
   if (listPane) listPane.hidden = (_mode !== 'list');
   if (planPane) planPane.hidden = (_mode !== 'plan');
+  if (comparePane) comparePane.hidden = (_mode !== 'compare');
+  if (_mode === 'compare') renderCompareMode();
   $('tw-variant-name').textContent = v.name + (v.primary ? ' ⭐' : '');
   $('tw-readonly-badge').hidden = !v.readOnly;
   const c = v.concept;
