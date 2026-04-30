@@ -715,19 +715,27 @@ function freeURanges(r, devices) {
 }
 
 function findFirstFreeSlot(r, devices, heightU, side) {
+  // v0.59.846: regression fix — r.occupied может быть undefined у draft-стоек
+  // или после миграции, тогда r.u - undefined = NaN, цикл не запускался,
+  // функция возвращала 1, и все добавленные устройства накладывались на
+  // U=1. Пользователь: «по кнопке добавить оборудование появляется всегда
+  // только в 1 юните, следующее накладывается, раньше было сверху и
+  // заполняло пустые слоты, верни как было».
+  const occupiedTop = Number(r.occupied) || 0;
+  const heightUSafe = Math.max(1, Number(heightU) || 1);
   const targetSide = side || 'front';
   const occ = new Array(r.u + 1).fill(false);
-  for (let u = r.u; u > r.u - r.occupied; u--) occ[u] = true;
+  for (let u = r.u; u > r.u - occupiedTop; u--) occ[u] = true;
   devices.forEach(d => {
     if ((d.mountSide || 'front') !== targetSide) return; // другая сторона — не мешает
     const type = state.catalog.find(c => c.id === d.typeId);
     const h = type ? type.heightU : 1;
     for (let k = 0; k < h; k++) occ[d.positionU - k] = true;
   });
-  // ищем сверху вниз первый свободный блок heightU (сверху = больший U)
-  for (let top = r.u - r.occupied; top >= heightU; top--) {
+  // ищем сверху вниз первый свободный блок heightUSafe (сверху = больший U)
+  for (let top = r.u - occupiedTop; top >= heightUSafe; top--) {
     let ok = true;
-    for (let k = 0; k < heightU; k++) if (occ[top - k]) { ok = false; break; }
+    for (let k = 0; k < heightUSafe; k++) if (occ[top - k]) { ok = false; break; }
     if (ok) return top;
   }
   return 1; // нет места — на дно, detectConflicts подсветит
