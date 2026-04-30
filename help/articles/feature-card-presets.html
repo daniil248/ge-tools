@@ -45,6 +45,32 @@
 
 <p>На текущий момент UI редактора поддерживает только <b>User-уровень</b>. Project и Scheme — поддержаны в resolver (можно задать через JSON), UI для них в разработке.</p>
 
+<h2>Per-field rendering (v0.59.802+)</h2>
+<p>Каждое выбранное поле в пресете = отдельная строка <code>«label: value»</code> на карточке. Раньше карточка показывала фиксированные 3 строки «Номинальная / Расчётная / Свободно» независимо от выбора, что не соответствовало пользовательской настройке.</p>
+
+<p><b>Поддерживаемые типы:</b> consumer / panel / source / generator / ups (5 «электрических» типов). Channel и zone — упрощённый формат.</p>
+
+<p><b>Поля по типам:</b></p>
+<table>
+  <thead><tr><th>Тип</th><th>Доступные electrical-поля</th></tr></thead>
+  <tbody>
+    <tr><td>consumer</td><td>demandKw, nominalKw, kvAOrVA, currentA, maxKw, maxA, freeKw, freeA, cosPhi, voltage, phase, breakerIn, cableSpec, deltaUPct, count</td></tr>
+    <tr><td>panel</td><td>capacityA, currentA, maxKw, maxA, freeKw, freeA, marginPct, kSim, switchMode, sectionsCount</td></tr>
+    <tr><td>source</td><td>sourceSubtype, voltage, snomKva, capacityKw, currentA, maxKw, maxA, freeKw, freeA, sscMva, ukPct</td></tr>
+    <tr><td>generator</td><td>capacityKw, snomKva, currentA, maxKw, maxA, freeKw, freeA, backupMode, triggerInfo</td></tr>
+    <tr><td>ups</td><td>kva, kw, autonomyMin, currentA, maxKw, maxA, freeKw, freeA, redundancy</td></tr>
+  </tbody>
+</table>
+
+<p>Status-line («Отключён», «⚠ Перегруз», «БАТ X:XX», «АВР Xс», «⛔ ΔU=-12%») показывается над load-блоком ВСЕГДА — это критичная информация независимо от пресета.</p>
+
+<h2>Редактируемые подписи (v0.59.802+)</h2>
+<p>В редакторе пресета каждое поле имеет input для подписи (вместо просто текста). Кликаете и вводите свою подпись — например «Уст.» вместо «Мощность» или «Автомат» переименовать в «QF».</p>
+
+<p>Стирание поля — возвращает дефолтную подпись (показано в placeholder).</p>
+
+<p>Подписи сохраняются в <code>preset.fieldLabels[kind][type][fieldId]</code>. Применяются и в preview-чипах редактора, и на канвасе при render.</p>
+
 <h2>Редактор пресетов (v2)</h2>
 <p>Редактор открывается кнопкой <kbd>✎</kbd> рядом с селектором. Возможности (v0.59.799+):</p>
 <ul>

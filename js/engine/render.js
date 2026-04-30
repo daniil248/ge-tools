@@ -2324,6 +2324,8 @@ export function renderNodes() {
           currentA:   { v: fmtDigits(Inom),  unit: 'А' },
           maxKw:      { v: fmtDigits(Pcalc), unit: 'кВт' },
           maxA:       { v: fmtDigits(Icalc), unit: 'А' },
+          freeKw:     { v: fmtDigits(n._freeKw), unit: 'кВт' },
+          freeA:      { v: fmtDigits(n._freeA),  unit: 'А' },
           cosPhi:     { v: cosC.toFixed(2),  unit: '' },
           voltage:    { v: Ucalc ? fmt(Ucalc) : null, unit: 'В' },
           phase:      { v: n.phase || '', unit: '' },
@@ -2334,7 +2336,8 @@ export function renderNodes() {
         };
         labelMap = {
           demandKw: 'Мощность', nominalKw: 'Номинал', kvAOrVA: 'кВА', currentA: 'Ток',
-          maxKw: 'Макс.', maxA: 'Макс. ток', cosPhi: 'cos φ', voltage: 'U',
+          maxKw: 'Макс.', maxA: 'Макс. ток', freeKw: 'Свободно', freeA: 'Своб. ток',
+          cosPhi: 'cos φ', voltage: 'U',
           phase: 'Фаза', breakerIn: 'Автомат', cableSpec: 'Кабель',
           deltaUPct: 'ΔU', count: '×',
         };
@@ -2347,13 +2350,20 @@ export function renderNodes() {
         valueMap = {
           capacityA:   { v: Number.isFinite(Number(n.capacityA)) ? String(n.capacityA) : null, unit: 'А' },
           currentA:    { v: fmtDigits(n._loadA), unit: 'А' },
+          maxKw:       { v: fmtDigits(n._maxLoadKw), unit: 'кВт' },
+          maxA:        { v: fmtDigits(n._maxLoadA),  unit: 'А' },
+          freeKw:      { v: fmtDigits(n._freeKw), unit: 'кВт' },
+          freeA:       { v: fmtDigits(n._freeA),  unit: 'А' },
           marginPct:   { v: margin != null ? margin.toFixed(1) : null, unit: '%' },
           kSim:        { v: Number.isFinite(Number(n.kSim)) ? Number(n.kSim).toFixed(2) : null, unit: '' },
           switchMode:  { v: n.switchMode || null, unit: '' },
           sectionsCount: { v: sectCount > 0 ? String(sectCount) : null, unit: 'секц.' },
         };
         labelMap = {
-          capacityA: 'Номинал', currentA: 'Ток', marginPct: 'Запас',
+          capacityA: 'Номинал', currentA: 'Ток',
+          maxKw: 'Макс.', maxA: 'Макс. ток',
+          freeKw: 'Свободно', freeA: 'Своб. ток',
+          marginPct: 'Запас',
           kSim: 'Kисп', switchMode: 'Режим', sectionsCount: 'Секций',
         };
       } else if (n.type === 'source') {
@@ -2365,12 +2375,20 @@ export function renderNodes() {
           voltage:    { v: Ucalc ? fmt(Ucalc) : null, unit: 'В' },
           snomKva:    { v: fmtDigits(SnomNameplate), unit: 'кВА' },
           capacityKw: { v: fmtDigits(n.capacityKw), unit: 'кВт' },
+          currentA:   { v: fmtDigits(n._loadA), unit: 'А' },
+          maxKw:      { v: fmtDigits(n._maxLoadKw), unit: 'кВт' },
+          maxA:       { v: fmtDigits(n._maxLoadA),  unit: 'А' },
+          freeKw:     { v: fmtDigits(n._freeKw), unit: 'кВт' },
+          freeA:      { v: fmtDigits(n._freeA),  unit: 'А' },
           sscMva:     { v: Number.isFinite(Number(n.sscMva)) ? Number(n.sscMva).toFixed(0) : null, unit: 'МВА' },
           ukPct:      { v: Number.isFinite(Number(n.ukPct)) ? Number(n.ukPct).toFixed(1) : null, unit: '%' },
         };
         labelMap = {
           sourceSubtype: 'Тип', voltage: 'U', snomKva: 'Sном',
-          capacityKw: 'Pном', sscMva: 'Sкз', ukPct: 'uк',
+          capacityKw: 'Pном',
+          currentA: 'Ток', maxKw: 'Макс.', maxA: 'Макс. ток',
+          freeKw: 'Свободно', freeA: 'Своб. ток',
+          sscMva: 'Sкз', ukPct: 'uк',
         };
       } else if (n.type === 'generator') {
         const SnomNameplate = (Number(n.snomKva) > 0)
@@ -2381,11 +2399,18 @@ export function renderNodes() {
         valueMap = {
           capacityKw: { v: fmtDigits(n.capacityKw), unit: 'кВт' },
           snomKva:    { v: fmtDigits(SnomNameplate), unit: 'кВА' },
+          currentA:   { v: fmtDigits(n._loadA), unit: 'А' },
+          maxKw:      { v: fmtDigits(n._maxLoadKw), unit: 'кВт' },
+          maxA:       { v: fmtDigits(n._maxLoadA),  unit: 'А' },
+          freeKw:     { v: fmtDigits(n._freeKw), unit: 'кВт' },
+          freeA:      { v: fmtDigits(n._freeA),  unit: 'А' },
           backupMode: { v: n.backupMode ? 'резерв' : 'основной', unit: '' },
           triggerInfo: { v: triggerCount > 0 ? String(triggerCount) : null, unit: 'триг.' },
         };
         labelMap = {
           capacityKw: 'Pном', snomKva: 'Sном',
+          currentA: 'Ток', maxKw: 'Макс.', maxA: 'Макс. ток',
+          freeKw: 'Свободно', freeA: 'Своб. ток',
           backupMode: 'Режим', triggerInfo: 'Триггеры',
         };
       } else if (n.type === 'ups') {
@@ -2401,11 +2426,17 @@ export function renderNodes() {
           kw:         { v: fmtDigits(n.capacityKw), unit: 'кВт' },
           autonomyMin: { v: Number.isFinite(Number(n.autonomyMin)) ? String(n.autonomyMin) : null, unit: 'мин' },
           currentA:   { v: fmtDigits(n._loadA || capA), unit: 'А' },
+          maxKw:      { v: fmtDigits(n._maxLoadKw), unit: 'кВт' },
+          maxA:       { v: fmtDigits(n._maxLoadA),  unit: 'А' },
+          freeKw:     { v: fmtDigits(n._freeKw), unit: 'кВт' },
+          freeA:      { v: fmtDigits(n._freeA),  unit: 'А' },
           redundancy: { v: n.redundancy || null, unit: '' },
         };
         labelMap = {
           kva: 'Sном', kw: 'Pном', autonomyMin: 'Автономия',
-          currentA: 'Ток', redundancy: 'Резерв',
+          currentA: 'Ток', maxKw: 'Макс.', maxA: 'Макс. ток',
+          freeKw: 'Свободно', freeA: 'Своб. ток',
+          redundancy: 'Резерв',
         };
       }
       // Build rows in registry order
