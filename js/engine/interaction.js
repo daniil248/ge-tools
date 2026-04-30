@@ -866,17 +866,37 @@ export function initInteraction() {
         if (n) {
           // v0.59.842: если узел — член контейнера (containerId), переход
           // должен быть на КОНТЕЙНЕР (он на canvas). Член сам скрыт через
-          // pageIds=[]. Пользователь: «по клику перехода, переходить на
-          // группу».
+          // pageIds=[].
+          // v0.59.889: при click по члену контейнера дополнительно ЦЕНТРИРУЕМ
+          // канвас на контейнере + переключаем страницу если он на другой.
+          // Пользователь: «при клике для перехода, переходить к группе с
+          // центрирование по центру экрана».
           let target = n;
-          if (n.containerId) {
-            const _c = state.nodes.get(n.containerId);
-            if (_c && _c.type === 'consumer-container') target = _c;
+          const isContainerMember = !!(n.containerId && state.nodes.get(n.containerId)?.type === 'consumer-container');
+          if (isContainerMember) {
+            target = state.nodes.get(n.containerId);
           }
           // Переключаемся на вкладку Свойства и открываем инспектор
           const propsTab = document.querySelector('.insp-tab[data-insp-tab="props"]');
           if (propsTab) propsTab.click();
           selectNode(target.id);
+          // v0.59.889: центрирование на контейнере для удобства навигации.
+          if (isContainerMember) {
+            const tgtPids = Array.isArray(target.pageIds) ? target.pageIds : [];
+            if (tgtPids.length > 0 && !tgtPids.includes(state.currentPageId)) {
+              try {
+                if (typeof window !== 'undefined' && typeof window.__raschetSwitchPage === 'function') {
+                  window.__raschetSwitchPage(tgtPids[0]);
+                }
+              } catch {}
+            }
+            (async () => {
+              try {
+                const expMod = await import('./export.js');
+                if (expMod && typeof expMod.centerOnNode === 'function') expMod.centerOnNode(target);
+              } catch {}
+            })();
+          }
         }
       }
     });
