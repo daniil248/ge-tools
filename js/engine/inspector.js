@@ -1,7 +1,7 @@
 import { state, svg, inspectorBody, uid, pagesForNode } from './state.js';
 import { GLOBAL, DEFAULTS, CHANNEL_TYPES, CABLE_TYPES, NODE_H, LINE_COLORS, CONSUMER_CATALOG, TRANSFORMER_CATALOG, INSTALL_METHODS, BREAKER_SERIES, BREAKER_TYPES, ZONE_PASTEL_PALETTE, SYSTEMS_CATALOG, getSystemMeta, getAllSystems } from './constants.js';
 import { escHtml, escAttr, fmt, field, checkField, flash, helpIcon } from './utils.js';
-import { nodeVoltage, isThreePhase, computeCurrentA, nodeWireCount, cableVoltageClass, formatVoltageLevelLabel, consumerTotalDemandKw, consumerCountEffective } from './electrical.js';
+import { nodeVoltage, isThreePhase, computeCurrentA, nodeWireCount, cableVoltageClass, formatVoltageLevelLabel, consumerTotalDemandKw, consumerCountEffective, containerHomogeneity } from './electrical.js';
 import { nodeInputCount, nodeOutputCount, nodeWidth, getNodeGeometryMm } from './geometry.js';
 import { getCurrentPage, getPageKind, PAGE_KINDS, PAGE_KINDS_META } from './state.js';
 import { effectiveOn, setEffectiveOn, effectiveLoadFactor, setEffectiveLoadFactor } from './modes.js';
@@ -1044,6 +1044,26 @@ export function renderInspectorNode(n) {
     }
     h.push('<div class="inspector-section"><h4>Контейнер потребителей</h4>');
     h.push(`<div class="muted" style="font-size:11px;margin-bottom:6px">Σ нагрузка: <b>${totalKw.toFixed(2)} кВт</b> · слотов: <b>${slots.length}</b>. Контейнер сам не считается потребителем — нагрузка считается по составу slot'ов.</div>`);
+    // v0.59.883: предупреждение если параметры членов разнородны.
+    // Пользователь: «любое рассогласование параметров нагрузок входящих
+    // в группу, должно формировать предупреждение».
+    try {
+      const _homo = containerHomogeneity(n);
+      if (!_homo.homogeneous && _homo.mismatches && _homo.mismatches.length) {
+        const _LABELS = {
+          demandKw: 'Pуст (мощность)',
+          cosPhi:   'cos φ',
+          voltage:  'напряжение',
+          phase:    'фаза',
+          kUse:     'Ки',
+        };
+        const list = _homo.mismatches.map(m => _LABELS[m] || m).join(', ');
+        h.push(`<div style="font-size:11px;padding:6px 8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;color:#78350f;margin-bottom:8px;line-height:1.5">
+          ⚠ <b>Расхождение параметров членов группы:</b> ${escHtml(list)}.<br>
+          <span style="opacity:0.85">Для однородной нагрузки автомат и кабель подбираются по группе. При расхождении — каждый член должен иметь свою защиту.</span>
+        </div>`);
+      }
+    } catch {}
     h.push(`<button type="button" id="btn-open-container-members" class="full-btn" style="margin-bottom:8px;padding:6px 10px;background:#dbeafe;color:#1e40af;border:1px solid #2563eb;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500">📋 Открыть состав в модалке (или dblclick на канвасе)</button>`);
     if (!slots.length) {
       h.push('<div class="muted" style="font-size:12px;padding:6px 0">Контейнер пуст. Drop потребителя на канвасе сюда — добавится как слот. Или нажмите кнопку «➕ Placeholder» внизу.</div>');

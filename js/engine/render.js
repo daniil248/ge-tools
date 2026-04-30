@@ -1894,11 +1894,14 @@ export function renderNodes() {
       // предупреждение».
       const _homo = _isContainer ? containerHomogeneity(n) : null;
       const _isMixed = _homo && !_homo.homogeneous;
-      // v0.59.882: gLabel снизу контейнера показывает Pуст и (если Ки<1)
-      // Pрасч в скобках. Раньше только Pуст — пользователь: «вроде мы
-      // внизу считали расчётную мощность а не номинальную».
+      // v0.59.883: ⚠ предупреждение появляется ВО ВСЕХ случаях когда
+      // параметры членов группы расходятся (раньше — только в Σ-формате).
+      // Пользователь: «любое рассогласование параметров нагрузок входящих
+      // в группу, должно формировать предупреждение». Tooltip с deталями
+      // через title-атрибут добавляется отдельно ниже.
       const _calcKwTotal = _isContainer ? consumerCalcDemandKw(n) : 0;
       const _hasKi = _isContainer && Math.abs(_calcKwTotal - totalKw) > 0.01 && _calcKwTotal > 0;
+      const _mismatchSuffix = _isMixed ? ' ⚠' : '';
       let gLabel = '';
       if (_showKw && _showCount) {
         if (_isContainer) {
@@ -1908,7 +1911,7 @@ export function renderNodes() {
           } else {
             gLabel = `Σ ${fmtPower(totalKw)} (${cntEff} шт.)`;
             if (_hasKi) gLabel += ` · Pрасч ${fmtPower(_calcKwTotal)}`;
-            if (_isMixed) gLabel += ' ⚠';
+            gLabel += _mismatchSuffix;
           }
         } else {
           gLabel = (n.groupMode === 'individual' && Array.isArray(n.items))
@@ -1918,9 +1921,9 @@ export function renderNodes() {
       } else if (_showKw) {
         gLabel = `Σ ${fmtPower(totalKw)}`;
         if (_hasKi) gLabel += ` (Pрасч ${fmtPower(_calcKwTotal)})`;
-        if (_isMixed) gLabel += ' ⚠';
+        gLabel += _mismatchSuffix;
       } else if (_showCount) {
-        gLabel = `${cntEff} шт.${_isMixed ? ' ⚠' : ''}`;
+        gLabel = `${cntEff} шт.${_mismatchSuffix}`;
       }
       if (gLabel && n.phaseDistribution && !n.serialMode && _visible.has('phase')) {
         const pd = n.phaseDistribution;
@@ -1979,6 +1982,33 @@ export function renderNodes() {
     // Имя (v0.59.811: для shell-группы — имя первого alias-узла,
     // как и tag — чтобы не было рассинхронизации tag/name)
     g.appendChild(text(12, 33, effectiveName(n) || n.name || '(без имени)', 'node-title'));
+
+    // v0.59.883: иконка ⚠ на контейнере с расходящимися параметрами членов.
+    // Пользователь: «любое рассогласование параметров нагрузок входящих
+    // в группу, должно формировать предупреждение».
+    if (_isContainer && _homo && !_homo.homogeneous && _homo.mismatches && _homo.mismatches.length) {
+      const _MISMATCH_LABELS = {
+        demandKw: 'Pуст (мощность)',
+        cosPhi:   'cos φ',
+        voltage:  'напряжение',
+        phase:    'фаза',
+        kUse:     'Ки',
+      };
+      const list = _homo.mismatches.map(m => _MISMATCH_LABELS[m] || m).join(', ');
+      const tipText = `⚠ Расхождение параметров членов группы:\n${list}\n\nДля однородной нагрузки автомат и кабель подбираются по группе. При расхождении — каждый член группы должен иметь свою защиту.`;
+      // Размещаем рядом с tag — справа от имени, или в правом верхнем углу.
+      // Положение: y=16 (на уровне tag), x=w-40 (отступ от иконки типа).
+      const warnG = el('g', { class: 'node-warn-mismatch', transform: `translate(${w - 42}, 14)`, style: 'cursor:help' });
+      warnG.appendChild(el('circle', { cx: 8, cy: 8, r: 8, fill: '#fef3c7', stroke: '#f59e0b', 'stroke-width': 1.5 }));
+      const warnText = text(8, 12, '⚠', 'node-warn-icon');
+      warnText.setAttribute('text-anchor', 'middle');
+      warnText.setAttribute('font-size', '11');
+      warnG.appendChild(warnText);
+      const titleEl = el('title');
+      titleEl.textContent = tipText;
+      warnG.appendChild(titleEl);
+      g.appendChild(warnG);
+    }
 
     // Иконка потребителя по подтипу — в правом верхнем углу карточки.
     // Для группы с serialMode — дополнительно ряд мелких иконок вдоль нижнего края.
