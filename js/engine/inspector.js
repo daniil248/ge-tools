@@ -1050,22 +1050,7 @@ export function renderInspectorNode(n) {
     }
     // Расчётные величины (агрегированные через consumerCurrentsBlock).
     h.push(consumerCurrentsBlock(n));
-    const slots = Array.isArray(n.slots) ? n.slots : [];
-    let totalKw = 0;
-    for (const s of slots) {
-      if (!s) continue;
-      if (s.kind === 'linked' && s.nodeId) {
-        const a = state.nodes.get(s.nodeId);
-        if (a) totalKw += (Number(a.demandKw) || 0) * Math.max(1, Number(a.count) || 1);
-      } else if (s.kind === 'placeholder') {
-        totalKw += Number(s.demandKw) || 0;
-      }
-    }
-    h.push('<div class="inspector-section"><h4>Контейнер потребителей</h4>');
-    h.push(`<div class="muted" style="font-size:11px;margin-bottom:6px">Σ нагрузка: <b>${totalKw.toFixed(2)} кВт</b> · слотов: <b>${slots.length}</b>. Контейнер сам не считается потребителем — нагрузка считается по составу slot'ов.</div>`);
     // v0.59.883: предупреждение если параметры членов разнородны.
-    // Пользователь: «любое рассогласование параметров нагрузок входящих
-    // в группу, должно формировать предупреждение».
     try {
       const _homo = containerHomogeneity(n);
       if (!_homo.homogeneous && _homo.mismatches && _homo.mismatches.length) {
@@ -1077,67 +1062,16 @@ export function renderInspectorNode(n) {
           kUse:     'Ки',
         };
         const list = _homo.mismatches.map(m => _LABELS[m] || m).join(', ');
-        h.push(`<div style="font-size:11px;padding:6px 8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;color:#78350f;margin-bottom:8px;line-height:1.5">
+        h.push(`<div class="inspector-section"><div style="font-size:11px;padding:6px 8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;color:#78350f;line-height:1.5">
           ⚠ <b>Расхождение параметров членов группы:</b> ${escHtml(list)}.<br>
           <span style="opacity:0.85">Для однородной нагрузки автомат и кабель подбираются по группе. При расхождении — каждый член должен иметь свою защиту.</span>
-        </div>`);
+        </div></div>`);
       }
     } catch {}
-    h.push(`<button type="button" id="btn-open-container-members" class="full-btn" style="margin-bottom:8px;padding:6px 10px;background:#dbeafe;color:#1e40af;border:1px solid #2563eb;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500">📋 Открыть состав в модалке (или dblclick на канвасе)</button>`);
-    if (!slots.length) {
-      h.push('<div class="muted" style="font-size:12px;padding:6px 0">Контейнер пуст. Drop потребителя на канвасе сюда — добавится как слот. Или нажмите кнопку «➕ Placeholder» внизу.</div>');
-    } else {
-      // v0.59.840: сортировка слотов по обозначению (natural sort: SR01<SR02<SR10).
-      // Linked-slot имеет tag реального узла; placeholder без tag — в конец.
-      // Пользователь: «сортировка по обозначению».
-      const _sorted = slots.map((s, i) => {
-        let _key = '￿'; // placeholders в конец
-        if (s && s.kind === 'linked' && s.nodeId) {
-          const a = state.nodes.get(s.nodeId);
-          if (a && a.tag) _key = String(a.tag);
-        }
-        return { s, i, key: _key };
-      });
-      _sorted.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' }));
-      h.push('<div style="display:flex;flex-direction:column;gap:3px;font-size:12px">');
-      for (const entry of _sorted) {
-        const s = entry.s; const i = entry.i;
-        if (!s) continue;
-        if (s.kind === 'linked' && s.nodeId) {
-          const a = state.nodes.get(s.nodeId);
-          if (a) {
-            const tag = a.tag || a.id;
-            const name = a.name || '';
-            const kw = Number(a.demandKw) || 0;
-            const cnt = Math.max(1, Number(a.count) || 1);
-            const kwLabel = cnt > 1 ? `${cnt}×${kw} = ${(kw * cnt).toFixed(1)} кВт` : `${kw} кВт`;
-            h.push(`<div style="padding:5px 6px;background:#f5f7fa;border-radius:4px;display:flex;align-items:center;gap:6px;cursor:pointer" data-slot-open="${escAttr(a.id)}" title="Открыть свойства члена контейнера">
-              <span style="flex:1"><b>${escHtml(tag)}</b> ${escHtml(name)}</span>
-              <span class="muted" style="font-size:11px">#${i + 1} · ${kwLabel}</span>
-              <button type="button" data-slot-extract="${escAttr(String(i))}" style="padding:1px 6px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:3px;cursor:pointer" title="Извлечь как standalone-потребителя">↗</button>
-              <button type="button" data-slot-unlink="${escAttr(String(i))}" style="padding:1px 6px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:3px;cursor:pointer" title="Разъединить (стать placeholder)">✂</button>
-            </div>`);
-          } else {
-            h.push(`<div style="padding:4px 6px;background:#fee;border-radius:4px;color:#991b1b;display:flex;align-items:center;gap:6px"><span style="flex:1">Слот #${i + 1}: битая ссылка ${escHtml(s.nodeId)}</span><button type="button" data-slot-remove="${escAttr(String(i))}" style="padding:1px 6px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:3px;cursor:pointer">×</button></div>`);
-          }
-        } else if (s.kind === 'placeholder') {
-          const kw = Number(s.demandKw) || 0;
-          const subtype = s.subtype || 'custom';
-          h.push(`<div style="padding:5px 6px;background:#fef3c7;border-radius:4px;display:flex;align-items:center;gap:6px">
-            <span style="flex:1"><i style="color:#92400e">placeholder</i> · ${escHtml(subtype)}</span>
-            <input type="number" data-slot-kw="${escAttr(String(i))}" value="${kw}" min="0" step="0.5" style="width:60px;padding:1px 4px;font-size:11px" title="Мощность slot'а, кВт"> кВт
-            <button type="button" data-slot-materialize="${escAttr(String(i))}" style="padding:1px 6px;font-size:11px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;border-radius:3px;cursor:pointer" title="Создать реальный consumer-узел из этой спеки">⊕</button>
-            <button type="button" data-slot-remove="${escAttr(String(i))}" style="padding:1px 6px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:3px;cursor:pointer" title="Удалить slot">×</button>
-          </div>`);
-        }
-      }
-      h.push('</div>');
-    }
-    h.push('<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">');
-    h.push('<button type="button" id="btn-add-placeholder" class="full-btn" style="flex:1;padding:5px 10px;font-size:12px">➕ Placeholder-слот</button>');
-    h.push('<button type="button" id="btn-container-to-consumer" class="full-btn" style="flex:1;padding:5px 10px;font-size:12px;background:#fff7ed;border:1px solid #fb923c;color:#9a3412" title="Свернуть контейнер в одиночный групповой потребитель count=N (как «10 лампочек × 50Вт»)">⇆ В группового потребителя</button>');
-    h.push('</div>');
-    h.push('</div>');
+    // v0.59.887: блок «список slot'ов» переехал в Общее (renderGeneralPanel).
+    // Здесь во вкладке «Электрика» оставлены только электрические данные:
+    // Расположение входов, Расчётные величины, ⚠ предупреждение.
+    // Кнопки управления составом ➕/⇆ — тоже в Общем, под списком slot'ов.
   }
 
   // v0.58.49: подсказка про режим «В работе» перенесена на вкладку «Общее».
@@ -2710,6 +2644,12 @@ export function renderGeneralPanel(n) {
       }
       h.push('</div>');
     }
+    // v0.59.887: кнопки управления составом контейнера в Общее
+    // (раньше были на вкладке Электрика).
+    h.push('<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">');
+    h.push('<button type="button" id="btn-add-placeholder" class="full-btn" style="flex:1;padding:5px 10px;font-size:12px">➕ Placeholder-слот</button>');
+    h.push('<button type="button" id="btn-container-to-consumer" class="full-btn" style="flex:1;padding:5px 10px;font-size:12px;background:#fff7ed;border:1px solid #fb923c;color:#9a3412" title="Свернуть контейнер в одиночный групповой потребитель count=N (как «10 лампочек × 50Вт»)">⇆ В группового потребителя</button>');
+    h.push('</div>');
     h.push('</div>');
   }
 

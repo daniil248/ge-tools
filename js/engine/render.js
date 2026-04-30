@@ -1984,9 +1984,13 @@ export function renderNodes() {
     g.appendChild(text(12, 33, effectiveName(n) || n.name || '(без имени)', 'node-title'));
 
     // v0.59.883: иконка ⚠ на контейнере с расходящимися параметрами членов.
-    // Пользователь: «любое рассогласование параметров нагрузок входящих
-    // в группу, должно формировать предупреждение».
-    if (_isContainer && _homo && !_homo.homogeneous && _homo.mismatches && _homo.mismatches.length) {
+    // v0.59.887: _homo вычисляется заново здесь — переменная из gLabel-блока
+    // выше (line ~1895) находится в другом scope (внутри `if (isGroup)`),
+    // и обращение к ней снаружи давало ReferenceError «_homo is not defined»,
+    // ломая весь рендер канваса. Конструктор не запускался для проектов
+    // с контейнерами.
+    const _homoIcon = _isContainer ? containerHomogeneity(n) : null;
+    if (_isContainer && _homoIcon && !_homoIcon.homogeneous && _homoIcon.mismatches && _homoIcon.mismatches.length) {
       const _MISMATCH_LABELS = {
         demandKw: 'Pуст (мощность)',
         cosPhi:   'cos φ',
@@ -1994,7 +1998,7 @@ export function renderNodes() {
         phase:    'фаза',
         kUse:     'Ки',
       };
-      const list = _homo.mismatches.map(m => _MISMATCH_LABELS[m] || m).join(', ');
+      const list = _homoIcon.mismatches.map(m => _MISMATCH_LABELS[m] || m).join(', ');
       const tipText = `⚠ Расхождение параметров членов группы:\n${list}\n\nДля однородной нагрузки автомат и кабель подбираются по группе. При расхождении — каждый член группы должен иметь свою защиту.`;
       // Размещаем рядом с tag — справа от имени, или в правом верхнем углу.
       // Положение: y=16 (на уровне tag), x=w-40 (отступ от иконки типа).
