@@ -1,0 +1,55 @@
+<h2>Назначение</h2>
+<p><b>Конструктор схем</b> — главный модуль платформы. Принципиальная схема электроснабжения с автоматическим расчётом нагрузок, подбором кабелей и автоматов.</p>
+
+<h2>Узлы и связи</h2>
+<p>Схема состоит из <b>узлов</b> (source / generator / panel / consumer / ups / channel / zone) и <b>связей</b> (cables, system-conns) между их портами.</p>
+
+<table>
+  <thead><tr><th>Тип узла</th><th>Что представляет</th></tr></thead>
+  <tbody>
+    <tr><td><b>source</b></td><td>Источник питания: TP, utility, transformer</td></tr>
+    <tr><td><b>generator</b></td><td>ДГУ (дизель-генератор)</td></tr>
+    <tr><td><b>panel</b></td><td>Распред. щит (ВРУ, АВР, ЩС)</td></tr>
+    <tr><td><b>ups</b></td><td>ИБП — моноблок или модульный</td></tr>
+    <tr><td><b>consumer</b></td><td>Нагрузка: стойка, рабочее место, освещение, вентиляция и т.п.</td></tr>
+    <tr><td><b>channel</b></td><td>Кабельный канал / трасса</td></tr>
+    <tr><td><b>zone</b></td><td>Группировка узлов (helper-блок)</td></tr>
+  </tbody>
+</table>
+
+<h2>Расчёты</h2>
+<ul>
+  <li><b>Нагрузки</b>: Σ потребители × коэф. использования. Per-line и суммарно.</li>
+  <li><b>Токи КЗ</b>: по схеме замещения (источник + трансформатор + ЛЭП + ...).</li>
+  <li><b>Падение напряжения</b> (ΔU): накопленное от источника по линиям. Норма ±10% по ГОСТ 32144-2013.</li>
+  <li><b>Кабели</b>: подбор сечения по IEC / ПУЭ с учётом температуры, способа прокладки, групп.</li>
+  <li><b>Автоматы</b>: подбор номинала, проверка селективности с upstream.</li>
+</ul>
+
+<h2>Возможности</h2>
+<ul>
+  <li><b><a data-article-link href="#feature-shell-container">Группы потребителей (shell)</a></b> — одна карточка для N одинаковых стоек</li>
+  <li><b><a data-article-link href="#feature-card-presets">Пресеты карточек</a></b> — фильтр полей по ролям (электрик / технолог / минимум)</li>
+  <li><b>Несколько страниц</b>: главная схема + план зала (layout) + СКС-страницы</li>
+  <li><b>Режимы расчёта</b>: РТМ 36.18.32.4-92, упрощённый, ручной</li>
+  <li><b>Экспорт</b>: PNG, SVG, JSON-проект</li>
+  <li><b>Live-collab</b>: presence, cursors, locks (Firestore mode)</li>
+</ul>
+
+<h2>Навигация по канвасу</h2>
+<ul>
+  <li><kbd>ЛКМ drag</kbd> по узлу — переместить</li>
+  <li><kbd>ЛКМ</kbd> по порту → drag к другому порту — провести связь</li>
+  <li><kbd>ПКМ</kbd> по линии — toggle линкмода (скрыть/показать ссылкой)</li>
+  <li><kbd>Колесо</kbd> — масштаб</li>
+  <li><kbd>Ctrl+Z / Ctrl+Shift+Z</kbd> — отмена / возврат</li>
+  <li><kbd>Ctrl+click</kbd> по объекту в реестре — центрировать на схеме</li>
+</ul>
+
+<h2>Связи с другими модулями</h2>
+<ul>
+  <li>Из tech-workspace — через <a data-article-link href="#feature-handoff">handoff</a> (создаёт engine.scheme.v1)</li>
+  <li>В <a data-article-link href="#module-scs-config">scs-config</a> — consumer-узлы со <code>subtype=rack</code> автоматически становятся стойками</li>
+  <li>В <a data-article-link href="#module-scs-design">scs-design</a> — те же стойки попадают в план зала</li>
+  <li>В <a data-article-link href="#module-mdc-config">mdc-config</a> — для МЦОД-проектов: расстановка зон</li>
+</ul>

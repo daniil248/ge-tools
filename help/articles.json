@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "Манифест статей центра помощи Raschet. Категории + статьи с cross-references.",
+  "categories": [
+    { "id": "getting-started", "name": "Начало работы", "icon": "🏁", "order": 1 },
+    { "id": "modules",         "name": "Модули",         "icon": "📦", "order": 2 },
+    { "id": "features",        "name": "Возможности",    "icon": "✨", "order": 3 },
+    { "id": "architecture",    "name": "Архитектура",    "icon": "🏗",  "order": 4 }
+  ],
+  "articles": [
+    {
+      "id": "intro",
+      "title": "Что такое Raschet",
+      "category": "getting-started",
+      "summary": "Платформа для проектирования электроснабжения объектов: ЦОД, промплощадки, инфраструктура.",
+      "file": "intro.html",
+      "related": ["projects-overview", "module-tech-workspace", "module-schematic"]
+    },
+    {
+      "id": "projects-overview",
+      "title": "Работа с проектами",
+      "category": "getting-started",
+      "summary": "Каждый проект хранит схему, СКС, шкафы, реестры. Local/Online режимы.",
+      "file": "projects-overview.html",
+      "related": ["intro", "feature-storage-mode"],
+      "requiresModule": "projects"
+    },
+    {
+      "id": "modules-overview",
+      "title": "Обзор модулей",
+      "category": "getting-started",
+      "summary": "Каждый модуль покрывает свой этап проектирования. Связи между модулями.",
+      "file": "modules-overview.html",
+      "related": ["module-tech-workspace", "module-schematic", "module-scs-design"]
+    },
+
+    {
+      "id": "module-tech-workspace",
+      "title": "🧮 Технолог ЦОД",
+      "category": "modules",
+      "summary": "Предпроектная стадия: концепция, IT-нагрузка, ИБП, климат, площади. Multi-variant compare и handoff в детальное проектирование.",
+      "file": "module-tech-workspace.html",
+      "related": ["feature-multi-rack-groups", "feature-catalog-picker", "feature-handoff", "feature-report", "feature-multi-variant-compare"],
+      "requiresModule": "tech-workspace"
+    },
+    {
+      "id": "module-schematic",
+      "title": "⚡ Конструктор схем",
+      "category": "modules",
+      "summary": "Главная схема электроснабжения. Узлы, связи, расчёт нагрузок и кабелей.",
+      "file": "module-schematic.html",
+      "related": ["feature-card-presets", "feature-shell-container", "feature-storage-mode"]
+    },
+    {
+      "id": "module-scs-design",
+      "title": "🔗 Проектирование СКС",
+      "category": "modules",
+      "summary": "Межшкафные связи, план зала, кабельный журнал.",
+      "file": "module-scs-design.html",
+      "related": ["module-scs-config", "feature-shell-container"],
+      "requiresModule": "scs-design"
+    },
+    {
+      "id": "module-scs-config",
+      "title": "🗄 Компоновщик шкафа",
+      "category": "modules",
+      "summary": "Содержимое каждого экземпляра шкафа.",
+      "file": "module-scs-config.html",
+      "related": ["module-scs-design"],
+      "requiresModule": "scs-config"
+    },
+    {
+      "id": "module-projects",
+      "title": "📁 Проекты",
+      "category": "modules",
+      "summary": "Центр управления проектами.",
+      "file": "module-projects.html",
+      "related": ["projects-overview", "feature-storage-mode"],
+      "requiresModule": "projects"
+    },
+    {
+      "id": "module-mdc-config",
+      "title": "🏗 Модульный ЦОД (МЦОД)",
+      "category": "modules",
+      "summary": "Если объект — МЦОД: wizard зон, расстановка стоек/ИБП/кондёров.",
+      "file": "module-mdc-config.html",
+      "related": ["module-tech-workspace"],
+      "requiresModule": "mdc-config"
+    },
+
+    {
+      "id": "feature-multi-rack-groups",
+      "title": "Несколько групп стоек и систем ИБП",
+      "category": "features",
+      "summary": "Группы стоек разной мощности; ИБП отдельно для IT и климата; PDU per-rack.",
+      "file": "feature-multi-rack-groups.html",
+      "related": ["module-tech-workspace"]
+    },
+    {
+      "id": "feature-catalog-picker",
+      "title": "📦 Привязка моделей из каталога",
+      "category": "features",
+      "summary": "Выбор конкретной модели изделия из общей библиотеки. Auto-копирование параметров.",
+      "file": "feature-catalog-picker.html",
+      "related": ["module-tech-workspace"]
+    },
+    {
+      "id": "feature-handoff",
+      "title": "📤 Передача в проектирование (handoff)",
+      "category": "features",
+      "summary": "Концепция → схема: автоматическая генерация узлов schematic / scs-design / mdc-config.",
+      "file": "feature-handoff.html",
+      "related": ["module-tech-workspace", "module-schematic"]
+    },
+    {
+      "id": "feature-report",
+      "title": "📄 Пояснительная записка",
+      "category": "features",
+      "summary": "Структурированный HTML-отчёт по концепции: 7 разделов + ТЗ для смежных дисциплин. Сохранение в PDF через Ctrl+P.",
+      "file": "feature-report.html",
+      "related": ["module-tech-workspace"]
+    },
+    {
+      "id": "feature-multi-variant-compare",
+      "title": "📊 Сравнение вариантов",
+      "category": "features",
+      "summary": "Side-by-side таблица с подсветкой best-значений.",
+      "file": "feature-multi-variant-compare.html",
+      "related": ["module-tech-workspace"]
+    },
+    {
+      "id": "feature-card-presets",
+      "title": "🎴 Пресеты отображения карточек",
+      "category": "features",
+      "summary": "Системные пресеты «Электрик / Технолог / Минимум / Полный» + custom user-пресеты. Live-переключение.",
+      "file": "feature-card-presets.html",
+      "related": ["module-schematic"]
+    },
+    {
+      "id": "feature-shell-container",
+      "title": "🔗 Группы потребителей (shell-container)",
+      "category": "features",
+      "summary": "Связь экземпляров стоек: shell — оболочка с младшим обозначением, остальные внутри. Свойства наследуются.",
+      "file": "feature-shell-container.html",
+      "related": ["module-schematic", "module-scs-config"]
+    },
+    {
+      "id": "feature-storage-mode",
+      "title": "💾☁ Режим хранения: Локальный / Онлайн",
+      "category": "features",
+      "summary": "Переключение между LocalStorage (без квот) и Firebase (совместная работа). Manual sync push/pull.",
+      "file": "feature-storage-mode.html",
+      "related": ["module-projects"]
+    },
+
+    {
+      "id": "arch-data-model",
+      "title": "Модель данных",
+      "category": "architecture",
+      "summary": "engine.scheme.v1, POR-objects, project storage keys.",
+      "file": "arch-data-model.html",
+      "related": ["arch-storage-keys"]
+    },
+    {
+      "id": "arch-storage-keys",
+      "title": "Ключи LocalStorage",
+      "category": "architecture",
+      "summary": "Соглашение об именовании раздельных хранилищ per-project.",
+      "file": "arch-storage-keys.html",
+      "related": ["arch-data-model"]
+    }
+  ]
+}

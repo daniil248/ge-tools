@@ -1,0 +1,93 @@
+<h2>Что это</h2>
+<p>Handoff — передача активного варианта концепции в детальное проектирование. Создаёт <code>engine.scheme.v1</code> проекта (главную схему) с предзаполненными узлами по данным концепции. Варианту присваивается <b>read-only</b> — повторно его редактировать нельзя.</p>
+
+<h2>Как использовать</h2>
+<ol>
+  <li>В tech-workspace откройте основной вариант (или любой выбранный).</li>
+  <li>Кнопка <kbd>📤 Передать в проектирование</kbd> в левой панели (зелёная).</li>
+  <li>Появится диалог подтверждения с описанием того, что будет создано.</li>
+  <li>Если в проекте уже есть схема — второе подтверждение «Заменить?». <b>Внимание</b> — старая схема будет потеряна.</li>
+  <li>После handoff — предложение «Открыть Конструктор?» с переходом на <code>../index.html</code>.</li>
+</ol>
+
+<h2>Что создаётся в схеме</h2>
+<svg class="hc-fig" viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px">
+  <defs>
+    <marker id="arrow2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Source -->
+  <rect x="20" y="40" width="120" height="50" rx="4" fill="#fef3c7" stroke="#92400e"/>
+  <text x="80" y="60" text-anchor="middle" font-size="11" font-weight="600">⚡ Источник</text>
+  <text x="80" y="76" text-anchor="middle" font-size="9" fill="#475569">TP / Utility</text>
+
+  <!-- Generator -->
+  <rect x="20" y="120" width="120" height="50" rx="4" fill="#fef3c7" stroke="#92400e"/>
+  <text x="80" y="140" text-anchor="middle" font-size="11" font-weight="600">🔧 ДГУ</text>
+  <text x="80" y="156" text-anchor="middle" font-size="9" fill="#475569">если feed.dgu</text>
+
+  <!-- Panel ГРЩ -->
+  <rect x="220" y="80" width="100" height="50" rx="4" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="270" y="100" text-anchor="middle" font-size="11" font-weight="600">🔌 ГРЩ</text>
+  <text x="270" y="116" text-anchor="middle" font-size="9" fill="#475569">panel</text>
+
+  <!-- UPS systems -->
+  <rect x="380" y="20" width="120" height="40" rx="4" fill="#dcfce7" stroke="#15803d"/>
+  <text x="440" y="35" text-anchor="middle" font-size="10" font-weight="600">🔋 ИБП IT</text>
+  <text x="440" y="50" text-anchor="middle" font-size="9" fill="#475569">×N upsSystems</text>
+  <rect x="380" y="70" width="120" height="40" rx="4" fill="#dcfce7" stroke="#15803d"/>
+  <text x="440" y="85" text-anchor="middle" font-size="10" font-weight="600">🔋 ИБП клим</text>
+
+  <!-- Consumers -->
+  <rect x="540" y="20" width="140" height="40" rx="4" fill="#fce7f3" stroke="#be185d"/>
+  <text x="610" y="35" text-anchor="middle" font-size="10" font-weight="600">📦 SR ×8 (rack)</text>
+  <text x="610" y="50" text-anchor="middle" font-size="9" fill="#475569">consumer-group</text>
+
+  <rect x="540" y="70" width="140" height="40" rx="4" fill="#fce7f3" stroke="#be185d"/>
+  <text x="610" y="85" text-anchor="middle" font-size="10" font-weight="600">📦 GR ×4 (gpu)</text>
+
+  <rect x="540" y="120" width="140" height="40" rx="4" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="610" y="135" text-anchor="middle" font-size="10" font-weight="600">❄ Кондиц ×3</text>
+  <text x="610" y="150" text-anchor="middle" font-size="9" fill="#475569">outdoor_unit</text>
+
+  <text x="350" y="240" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">⚠ Связи между узлами НЕ создаются автоматически — пользователь проводит их вручную в Конструкторе</text>
+  <text x="350" y="260" text-anchor="middle" font-size="10" fill="#6b7280">(MVP-уровень handoff. Полная топология с port-связями — в следующих версиях)</text>
+</svg>
+
+<h3>Узлы:</h3>
+<ul>
+  <li><b>source</b>: TP (если <code>feed.tp.needed</code>) или Utility («Городская сеть»)</li>
+  <li><b>generator</b>: ДГУ (если <code>feed.dgu.needed</code>) с capacityKw + backupMode</li>
+  <li><b>panel</b>: ГРЩ — главный распределительный щит, <code>inputs=2</code>, <code>outputs = upsSystems.length + coolingUnits.length</code></li>
+  <li><b>ups</b>: по одному узлу на каждую <code>upsSystem</code> (тэг ИБП или ИБПК для climate)</li>
+  <li><b>consumer (rack)</b>: по одному на <code>rackGroup</code>, <code>count = group.count</code>, <code>demandKw = group.kwPerRack</code></li>
+  <li><b>consumer (outdoor_unit)</b>: по одному на <code>coolingUnit</code></li>
+</ul>
+
+<h3>Метаданные узлов:</h3>
+<pre><code>node._fromTechWorkspace = true;     ← маркер происхождения
+node._profile = 'it';                ← профиль из rackGroup (для GPU/Network)</code></pre>
+
+<h2>Что НЕ создаётся (на MVP-уровне)</h2>
+<ul>
+  <li><b>Связи (conns):</b> ноды стоят на схеме, но не соединены. Электрик проводит линии вручную.</li>
+  <li><b>Автоматы и кабели:</b> подбираются электриком после прокладки связей.</li>
+  <li><b>Расположение в схеме:</b> базовый layout — источник слева, ГРЩ в центре, потребители справа. Электрик может перекомпоновать.</li>
+  <li><b>scs-design / scs-config:</b> в MVP не затрагивается. <code>scheme-rack-bridge</code> при следующем входе в scs-config автоматически создаст виртуальные стойки из rack-узлов схемы.</li>
+</ul>
+
+<h2>Read-only после handoff</h2>
+<p>Variant получает <code>readOnly: true</code> и timestamp <code>handoffAt</code>. Все input/select в его модалке disabled. В сравнении (📊) появляется иконка 🔒.</p>
+
+<div class="warn">⚠ Read-only необратим. Если нужно скорректировать — создайте копию варианта (📋 Дублировать) и работайте с ней.</div>
+
+<h2>Что дальше после handoff</h2>
+<ol>
+  <li>Открыть <a data-article-link href="#module-schematic">Конструктор схем</a> — появится сгенерированная схема.</li>
+  <li>Провести связи между узлами (drag из выходного порта одного → входной порт другого).</li>
+  <li>Электрические параметры (cosφ, напряжение) уже заполнены из концепции.</li>
+  <li>Электрик подбирает автоматы и кабели через инспектор узлов.</li>
+  <li>СКС-инженер видит rack-стойки в Компоновщике (через scheme-rack-bridge).</li>
+</ol>

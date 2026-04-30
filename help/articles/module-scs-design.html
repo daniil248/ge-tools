@@ -1,0 +1,24 @@
+<h2>Назначение</h2>
+<p><b>Проектирование СКС</b> — модуль для СКС-инженера: межшкафные связи, план зала, кабельный журнал.</p>
+
+<h2>Источники данных</h2>
+<ul>
+  <li>Стойки берутся из engine-схемы (consumer-узлы со <code>subtype=rack</code>) через <code>shared/scheme-rack-bridge.js</code>.</li>
+  <li>Группы стоек (shell-container) автоматически разворачиваются: shell ×N → N виртуальных стоек с уникальными tag.</li>
+  <li>Для concept-групп с populated <code>linkedAliases</code> shell не создаёт виртуалов (slots уже linked к реальным узлам).</li>
+</ul>
+
+<h2>Возможности</h2>
+<ul>
+  <li>План зала с drag-drop стоек</li>
+  <li>Кабельные трассы между шкафами</li>
+  <li>Кабельный журнал (марка, длина, тип, концы A→B)</li>
+  <li>Подпроекты СКС внутри проекта (несколько серверных в одном объекте)</li>
+</ul>
+
+<h2>Связи</h2>
+<ul>
+  <li><a data-article-link href="#module-scs-config">scs-config</a> — содержимое каждой стойки (юниты, оборудование)</li>
+  <li><a data-article-link href="#module-schematic">schematic</a> — общая электрическая схема, откуда стойки</li>
+  <li><a data-article-link href="#feature-shell-container">shell-container</a> — модель групп</li>
+</ul>

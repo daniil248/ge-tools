@@ -1,0 +1,76 @@
+<h2>Зачем</h2>
+<p>Карточки узлов на схеме (consumer / panel / source / generator / ups) могут содержать много полей: kW, A, автомат, кабель, ΔU, cosφ, фаза, габариты и т.д. Не всем пользователям нужен весь набор:</p>
+<ul>
+  <li><b>Электрик</b> хочет видеть автомат, Iдоп, кабель, ΔU.</li>
+  <li><b>Технолог</b> — мощность, габариты, тип охлаждения.</li>
+  <li><b>Презейл / клиент</b> — только tag/name (для скриншотов).</li>
+</ul>
+
+<h2>Системные пресеты</h2>
+<table>
+  <thead><tr><th>Пресет</th><th>Описание</th><th>Что видно</th></tr></thead>
+  <tbody>
+    <tr><td>Полный</td><td>Все поля карточки видны</td><td>Текущее поведение Конструктора (load-блок: текущая / макс.расч / номин / Свободно)</td></tr>
+    <tr><td>Электрик</td><td>kW/A/автомат/кабель/ΔU</td><td>Электрические параметры</td></tr>
+    <tr><td>Технолог</td><td>Мощность/cosφ/габариты/охлаждение</td><td>Параметры технолога</td></tr>
+    <tr><td>Минимум</td><td>Только tag и name</td><td>Load-блок скрыт. Status-line (Отключён, ⚠ Перегруз) показывается всегда</td></tr>
+  </tbody>
+</table>
+
+<h2>Где переключается</h2>
+<p>В шапке инструментов (toolbar) Конструктора схем — селектор <kbd>🎴 ▾</kbd>. Слева от него — иконка карточки. Справа — кнопка <kbd>✎</kbd> (открыть редактор пресетов).</p>
+
+<h2>Иерархия выбора</h2>
+<svg class="hc-fig" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px">
+  <rect x="20" y="20" width="160" height="50" rx="6" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="100" y="40" text-anchor="middle" font-size="12" font-weight="600">1️⃣ Page (схема)</text>
+  <text x="100" y="58" text-anchor="middle" font-size="9" fill="#475569">самый высокий приоритет</text>
+
+  <rect x="220" y="20" width="160" height="50" rx="6" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="300" y="40" text-anchor="middle" font-size="12" font-weight="600">2️⃣ Project</text>
+  <text x="300" y="58" text-anchor="middle" font-size="9" fill="#475569">если страница не задаёт</text>
+
+  <rect x="420" y="20" width="160" height="50" rx="6" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="500" y="40" text-anchor="middle" font-size="12" font-weight="600">3️⃣ User (LS)</text>
+  <text x="500" y="58" text-anchor="middle" font-size="9" fill="#475569">если проект не задаёт</text>
+
+  <text x="180" y="105" text-anchor="middle" font-size="22" fill="#4f46e5">↓</text>
+  <text x="380" y="105" text-anchor="middle" font-size="22" fill="#4f46e5">↓</text>
+  <text x="580" y="105" text-anchor="middle" font-size="22" fill="#4f46e5">↓</text>
+
+  <rect x="200" y="120" width="200" height="50" rx="6" fill="#dcfce7" stroke="#15803d"/>
+  <text x="300" y="140" text-anchor="middle" font-size="12" font-weight="600">4️⃣ System default</text>
+  <text x="300" y="158" text-anchor="middle" font-size="9" fill="#475569">«Полный» (full)</text>
+</svg>
+
+<p>На текущий момент UI редактора поддерживает только <b>User-уровень</b>. Project и Scheme — поддержаны в resolver (можно задать через JSON), UI для них в разработке.</p>
+
+<h2>Custom user-пресеты</h2>
+<ol>
+  <li>Click на <kbd>✎</kbd> рядом с селектором → открывается редактор.</li>
+  <li>Tab «📋 Пресеты»: системные read-only вверху, user внизу.</li>
+  <li>Кнопка <kbd>➕ Создать</kbd> — копирует выбранный пресет (или Полный).</li>
+  <li>Tab «✎ Поля»: per-mode (schematic / layout / scs-design) → per-type (consumer / panel / ...) → чекбоксы по полям.</li>
+  <li>Required-поля (tag/name) заблокированы — всегда on.</li>
+  <li>Кнопки <kbd>☑ Все</kbd> / <kbd>☐ Только обязательные</kbd> — bulk-операции.</li>
+</ol>
+
+<h2>Live-переключение</h2>
+<p>Смена активного пресета через селектор → <code>raschet:card-preset-changed</code> event → invalidate cache в render.js → re-render всех карточек canvas. Без перезагрузки страницы.</p>
+
+<h2>Импорт / экспорт</h2>
+<p>Tab «⇅ Импорт/Экспорт» в редакторе:</p>
+<ul>
+  <li><kbd>⬇ Скачать JSON</kbd> — экспорт всех user-пресетов в файл <code>card-presets-YYYY-MM-DD.json</code>.</li>
+  <li><kbd>⬆ Загрузить JSON</kbd> — импорт. Существующие пресеты с тем же id обновляются.</li>
+</ul>
+
+<h2>Реестр полей</h2>
+<p>Полный список полей и их группировка — в <code>shared/card-fields-registry.js</code>:</p>
+<ul>
+  <li><b>identification</b>: tag*, name*, count, icon, sourceSubtype, ...</li>
+  <li><b>electrical</b>: demandKw, currentA, breakerIn, cableSpec, deltaUPct, voltage, phase, cosPhi, capacityA, marginPct, kVA, ...</li>
+  <li><b>mechanical</b>: widthMm, depthMm, heightMm, weightKg, rackUnits, cooling</li>
+  <li><b>status</b>: backupMode, redundancy, switchMode, sectionsCount</li>
+</ul>
+<p>* — обязательные (required, нельзя выключить).</p>

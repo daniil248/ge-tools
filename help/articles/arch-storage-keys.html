@@ -1,0 +1,38 @@
+<h2>Соглашение об именовании</h2>
+<p>Все per-project ключи имеют префикс <code>raschet.project.&lt;pid&gt;.</code> где <code>&lt;pid&gt;</code> — id проекта.</p>
+
+<h3>Главные ключи</h3>
+<table>
+  <thead><tr><th>Ключ</th><th>Содержимое</th></tr></thead>
+  <tbody>
+    <tr><td><code>raschet.project.&lt;pid&gt;.engine.scheme.v1</code></td><td>JSON схемы (Конструктор)</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.por.objects.v1</code></td><td>POR-объекты</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.tech-workspace.variants.v1</code></td><td>Варианты концепции</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.tech-workspace.activeVariantId.v1</code></td><td>id активного варианта</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.rack-config.instances.v1</code></td><td>Стойки (legacy)</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.rack-config.tombstones.v1</code></td><td>Tombstones (удалённые id)</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.scs-config.contents.v1</code></td><td>Содержимое стоек</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.scs-config.rackTags.v1</code></td><td>Тэги стоек СКС</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.scs-design.links.v1</code></td><td>Меж-шкафные связи</td></tr>
+    <tr><td><code>raschet.project.&lt;pid&gt;.scs-design.plan.v1</code></td><td>План зала</td></tr>
+  </tbody>
+</table>
+
+<h3>Глобальные (не per-project)</h3>
+<table>
+  <tbody>
+    <tr><td><code>raschet.projects.v1</code></td><td>Список всех проектов (Local-режим)</td></tr>
+    <tr><td><code>raschet.storageMode.v1</code></td><td>Режим хранения user override (auto/local/cloud)</td></tr>
+    <tr><td><code>raschet.cardPresets.v1</code></td><td>User-пресеты карточек</td></tr>
+    <tr><td><code>raschet.cardPresetActive.v1</code></td><td>id активного user-пресета</td></tr>
+    <tr><td><code>raschet.elementLibrary.v1</code></td><td>User-каталог изделий</td></tr>
+  </tbody>
+</table>
+
+<h2>Helper-функция</h2>
+<pre><code>// shared/project-storage.js
+import { projectKey } from './project-storage.js';
+projectKey('p_123', 'engine', 'scheme.v1')
+// → 'raschet.project.p_123.engine.scheme.v1'</code></pre>
+
+<p>Все модули используют этот helper — единый источник истины для именования.</p>

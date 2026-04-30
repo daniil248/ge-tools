@@ -1,0 +1,54 @@
+<h2>Зачем</h2>
+<p>На предпроектной стадии иногда нужно сразу выбирать <b>конкретные модели</b> изделий — например, заказчик заранее хочет Schneider Galaxy VS 100 кВА, а не «100 кВА абстракцию». Привязка к каталогу позволяет:</p>
+<ul>
+  <li>Авто-копировать паспортные параметры (kW, kVA, размеры, cosφ)</li>
+  <li>Передавать modelRef в schematic при handoff'е</li>
+  <li>Считать стоимость concept-уровня через цены каталога</li>
+</ul>
+
+<h2>Как использовать</h2>
+<ol>
+  <li>В любой секции tech-workspace (стойка / ИБП / кондиционер / ТП / ДГУ / PDU) нажмите <kbd>📦 Привязать модель…</kbd></li>
+  <li>Откроется модалка с поиском по производителю/модели.</li>
+  <li>Кликните на нужную строку — параметры скопируются в карточку, кнопка станет зелёной с указанием модели.</li>
+  <li>Чтобы изменить — кликните на ту же кнопку (теперь она с ✏ карандашом). Кнопка <kbd>🗑 Снять привязку</kbd> в модалке отвязывает.</li>
+</ol>
+
+<h2>Маппинг domain → element kind</h2>
+<table>
+  <thead><tr><th>Domain в tech-workspace</th><th>kind в каталоге</th><th>Что копируется автоматически</th></tr></thead>
+  <tbody>
+    <tr><td>rack (стойка)</td><td><code>rack</code></td><td>widthMm, depthMm, demandKw (если ещё не задана)</td></tr>
+    <tr><td>ups (ИБП)</td><td><code>ups</code></td><td>kva (если ещё не задана)</td></tr>
+    <tr><td>cool (кондиционер)</td><td><code>cooler</code></td><td>kw (если ещё не задана)</td></tr>
+    <tr><td>tp (трансформатор)</td><td><code>transformer</code></td><td>kva</td></tr>
+    <tr><td>dgu (генератор)</td><td><code>generator</code></td><td>kw</td></tr>
+    <tr><td>pdu</td><td><code>pdu</code></td><td>—</td></tr>
+  </tbody>
+</table>
+
+<div class="note">⚠ Если у пользователя уже введено значение, оно <b>не перезаписывается</b> — приоритет у пользовательского ввода. Только пустые поля заполняются из каталога.</div>
+
+<h2>Каталог-источник</h2>
+<p>Все picker'ы используют общую библиотеку <code>shared/element-library.js</code>. Включает:</p>
+<ul>
+  <li>Builtin-элементы (зашиты в код, обновляются с релизами)</li>
+  <li>User-элементы (добавлены пользователем через модуль 📦 Каталог)</li>
+  <li>Override'ы builtin'ов (пользователь может переопределить параметры)</li>
+</ul>
+
+<h2>Хранение привязки</h2>
+<pre><code>variant.concept.rackGroups[0].modelRef = {
+  id: 'el-rack-eaton-rstck-42u',
+  manufacturer: 'Eaton',
+  model: 'RS Rack 42U 600×1200',
+  kind: 'rack'
+}</code></pre>
+
+<p>Привязка хранится по <code>id</code> — устойчива к переименованиям модели в каталоге.</p>
+
+<h2>Что попадает в handoff</h2>
+<p>При <a data-article-link href="#feature-handoff">передаче в проектирование</a>, modelRef передаётся в engine.scheme.v1 как поле узла:</p>
+<pre><code>node._fromTechWorkspace = true;
+node._modelRefId = rackGroup.modelRef.id;</code></pre>
+<p>Электрик видит modelRef в инспекторе узла на схеме (TODO: явное отображение).</p>

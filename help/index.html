@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Raschet · Центр помощи</title>
+  <link rel="stylesheet" href="../shared/styles/base.css">
+  <link rel="stylesheet" href="../shared/app-header.css">
+  <link rel="stylesheet" href="help.css">
+  <script src="../firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="../shared/auth.js"></script>
+</head>
+<body>
+  <div id="rs-header-mount"></div>
+  <script type="module">
+    import { mountHeader } from '../shared/app-header.js';
+    mountHeader({ title: 'Центр помощи', home: '../hub.html', moduleId: 'help', moduleTitle: 'Помощь' });
+  </script>
+
+  <main class="hc-main">
+    <aside class="hc-sidebar">
+      <div class="hc-search-row">
+        <input type="text" id="hc-search" placeholder="🔍 Поиск по статьям...">
+      </div>
+      <nav id="hc-toc" class="hc-toc"></nav>
+      <div class="hc-sidebar-foot muted">
+        Доступ к статьям зависит от подключённых модулей.
+        Пересмотрено 2026-04-30.
+      </div>
+    </aside>
+    <section class="hc-content">
+      <div id="hc-breadcrumb" class="hc-breadcrumb"></div>
+      <article id="hc-article" class="hc-article">
+        <div class="hc-empty">
+          <h1>Центр помощи Raschet</h1>
+          <p>Выберите статью слева. Категории:</p>
+          <div id="hc-cat-cards" class="hc-cat-cards"></div>
+        </div>
+      </article>
+      <div id="hc-related" class="hc-related" hidden>
+        <h3>См. также</h3>
+        <div id="hc-related-list" class="hc-related-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="help.js"></script>
+</body>
+</html>

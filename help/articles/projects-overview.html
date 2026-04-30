@@ -1,0 +1,50 @@
+<h2>Концепция проекта</h2>
+<p>Проект — это контейнер для всей документации одного объекта: схема электроснабжения, план зала СКС, реестр оборудования, шкафы, концепция технолога, отчёты.</p>
+
+<h2>Структура хранения</h2>
+<svg class="hc-fig" viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px">
+  <rect x="10" y="10" width="180" height="260" rx="6" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="100" y="35" text-anchor="middle" font-size="13" font-weight="600" fill="#1e3a8a">📁 Проект</text>
+  <text x="100" y="55" text-anchor="middle" font-size="10" fill="#475569">«Серверная № 7»</text>
+
+  <line x1="190" y1="50" x2="240" y2="50" stroke="#4f46e5" stroke-width="1.5"/>
+  <line x1="190" y1="100" x2="240" y2="100" stroke="#4f46e5" stroke-width="1.5"/>
+  <line x1="190" y1="150" x2="240" y2="150" stroke="#4f46e5" stroke-width="1.5"/>
+  <line x1="190" y1="200" x2="240" y2="200" stroke="#4f46e5" stroke-width="1.5"/>
+  <line x1="190" y1="240" x2="240" y2="240" stroke="#4f46e5" stroke-width="1.5"/>
+
+  <rect x="240" y="30" width="220" height="40" rx="4" fill="#fff" stroke="#1e40af"/>
+  <text x="252" y="55" font-size="11" fill="#1e3a8a">⚡ engine.scheme.v1 (схема)</text>
+  <rect x="240" y="80" width="220" height="40" rx="4" fill="#fff" stroke="#1e40af"/>
+  <text x="252" y="105" font-size="11" fill="#1e3a8a">🧮 tech-workspace.variants.v1</text>
+  <rect x="240" y="130" width="220" height="40" rx="4" fill="#fff" stroke="#1e40af"/>
+  <text x="252" y="155" font-size="11" fill="#1e3a8a">🗄 scs-config.* (шкафы)</text>
+  <rect x="240" y="180" width="220" height="40" rx="4" fill="#fff" stroke="#1e40af"/>
+  <text x="252" y="205" font-size="11" fill="#1e3a8a">🔗 scs-design.* (план СКС)</text>
+  <rect x="240" y="230" width="220" height="40" rx="4" fill="#fff" stroke="#1e40af"/>
+  <text x="252" y="255" font-size="11" fill="#1e3a8a">📦 inventory + reports + …</text>
+
+  <text x="540" y="140" text-anchor="middle" font-size="10" fill="#475569" font-style="italic">общий ключ:</text>
+  <text x="540" y="155" text-anchor="middle" font-size="10" fill="#475569" font-family="ui-monospace,monospace">raschet.project.&lt;pid&gt;.*</text>
+</svg>
+
+<h2>Создание проекта</h2>
+<ol>
+  <li>На главной странице (Hub) откройте карточку <b>«Проекты»</b>.</li>
+  <li>Кнопка <kbd>➕ Новый проект</kbd>.</li>
+  <li>Введите имя; проект создаётся с дефолтной (пустой) схемой.</li>
+  <li>В карточке проекта виден список модулей, доступных для проекта (Технолог, Схема, СКС, МЦОД и др.).</li>
+</ol>
+
+<h2>Local / Online режимы</h2>
+<p>В шапке любого модуля есть переключатель режима хранения (см. <a data-article-link href="#feature-storage-mode">статью</a>). По умолчанию — auto:</p>
+<ul>
+  <li>Если Gmail-аккаунт авторизован → проекты в Firebase Firestore (совместная работа).</li>
+  <li>Иначе — LocalStorage браузера.</li>
+</ul>
+<p>Принудительно можно переключить в <code>local</code> чтобы не тратить квоту Firebase, или в <code>cloud</code> чтобы использовать только облако.</p>
+
+<div class="note">⚠ Local-проекты с id <code>lp_*</code>, <code>p_*</code>, <code>s_*</code> не уходят в облако — для них кнопка sync ⬆ Local→Cloud копирует данные с новыми cloud-id.</div>
+
+<h2>Совместная работа</h2>
+<p>В Online-режиме проект можно «расшарить» с коллегами по Gmail. Они получают доступ через карточку проекта. Изменения синхронизируются live (Firestore listeners).</p>

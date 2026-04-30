@@ -1,0 +1,83 @@
+<h2>Назначение</h2>
+<p>Модуль <b>«Технолог ЦОД»</b> покрывает <b>предпроектную стадию</b> ЦОД: формирование концепции объекта (количество стоек, мощности, резервирование, площади, ТП/ДГУ) до углубления в детальное проектирование.</p>
+
+<p><b>Что входит:</b> количество и мощности стоек, IT-нагрузка, ИБП-системы, кондиционеры, резервирование, ТП/ДГУ, концептуальные требования к PDU, площади, multi-variant compare, пояснительная записка.</p>
+
+<p><b>Что НЕ входит:</b> СКС (отвечает СКС-инженер), активное/пассивное оборудование в стойках (заказчик/IT-отдел), детальный выбор моделей (электрик), кабельные журналы (электрик).</p>
+
+<h2>Структура UI</h2>
+<svg class="hc-fig" viewBox="0 0 700 280" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:700px">
+  <rect x="10" y="10" width="180" height="260" rx="6" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="100" y="32" text-anchor="middle" font-size="12" font-weight="600" fill="#1e3a8a">📋 Список ▸ 🗺 План ▸ 📊 Сравнение</text>
+  <text x="100" y="50" text-anchor="middle" font-size="11" font-weight="600" fill="#1e3a8a">━━━━━━━</text>
+  <text x="100" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#1e3a8a">Варианты концепции</text>
+
+  <rect x="20" y="80" width="160" height="22" rx="3" fill="#fff" stroke="#1e40af"/>
+  <text x="30" y="95" font-size="10" fill="#1e3a8a">⭐ Базовый вариант</text>
+  <rect x="20" y="106" width="160" height="22" rx="3" fill="#fff" stroke="#1e40af"/>
+  <text x="30" y="121" font-size="10" fill="#1e3a8a">Расширение N+1</text>
+  <rect x="20" y="132" width="160" height="22" rx="3" fill="#fff" stroke="#1e40af"/>
+  <text x="30" y="147" font-size="10" fill="#1e3a8a">2N для финсектора</text>
+
+  <line x1="20" y1="200" x2="180" y2="200" stroke="#cbd5e1"/>
+  <rect x="20" y="210" width="160" height="22" rx="3" fill="#fff" stroke="#1e40af"/>
+  <text x="100" y="225" text-anchor="middle" font-size="10" fill="#1e40af">📄 Пояснительная записка</text>
+  <rect x="20" y="238" width="160" height="22" rx="3" fill="#16a34a" stroke="#15803d"/>
+  <text x="100" y="253" text-anchor="middle" font-size="10" fill="#fff" font-weight="600">📤 Передать в проектирование</text>
+
+  <!-- Right pane: sections -->
+  <rect x="200" y="10" width="490" height="260" rx="6" fill="#fff" stroke="#cbd5e1"/>
+  <text x="445" y="35" text-anchor="middle" font-size="13" font-weight="600" fill="#111">⭐ Базовый вариант</text>
+
+  <rect x="220" y="50" width="450" height="40" rx="4" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="232" y="68" font-size="10" font-weight="600" fill="#374151">1. КОНЦЕПЦИЯ СТОЕК [➕ Группа стоек]</text>
+  <text x="232" y="84" font-size="9" fill="#475569">SR ×8, 7 кВт · GR ×4, 12 кВт (GPU) · σ 80 кВт IT, 89 м²</text>
+
+  <rect x="220" y="95" width="450" height="40" rx="4" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="232" y="113" font-size="10" font-weight="600" fill="#374151">2. СИСТЕМЫ ИБП [➕ ИБП]</text>
+  <text x="232" y="129" font-size="9" fill="#475569">⚡ ИБП IT 2×100 кВА (N+1) · ❄ ИБП климат 2×60 кВА</text>
+
+  <rect x="220" y="140" width="450" height="40" rx="4" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="232" y="158" font-size="10" font-weight="600" fill="#374151">3. КЛИМАТ [➕ Кондиционеры]</text>
+  <text x="232" y="174" font-size="9" fill="#475569">CRAC ×3, 30 кВт холода (N+1) ✓ запас +10 кВт</text>
+
+  <rect x="220" y="185" width="220" height="40" rx="4" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="232" y="203" font-size="10" font-weight="600" fill="#374151">4. ВВОД</text>
+  <text x="232" y="219" font-size="9" fill="#475569">ТП 1000 кВА · ДГУ 500 кВт</text>
+
+  <rect x="450" y="185" width="220" height="40" rx="4" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="462" y="203" font-size="10" font-weight="600" fill="#374151">5. ПЛОЩАДИ</text>
+  <text x="462" y="219" font-size="9" fill="#475569">машзал 89 + ИБП 16 + климат 24…</text>
+</svg>
+
+<h2>Два режима входа</h2>
+<ul>
+  <li><b>📋 Список</b> — заполнение параметров по 5 секциям. Подходит когда есть готовое ТЗ.</li>
+  <li><b>🗺 План</b> — drag-drop помещений и оборудования на сетку (в разработке).</li>
+  <li><b>📊 Сравнение</b> — see <a data-article-link href="#feature-multi-variant-compare">статью</a>.</li>
+</ul>
+
+<h2>Несколько групп стоек</h2>
+<p>В одной концепции может быть несколько групп стоек разной мощности (см. <a data-article-link href="#feature-multi-rack-groups">статью</a>):</p>
+<ul>
+  <li>Серверные стойки 8×7 кВт (профиль IT-rack)</li>
+  <li>GPU-стойки 4×12 кВт (профиль GPU-heavy)</li>
+  <li>Сетевые стойки 2×3 кВт (профиль Network — НЕ входит в IT-нагрузку)</li>
+</ul>
+<p>Аналогично для ИБП: разные системы для IT и для климата с разными покупательскими параметрами.</p>
+
+<h2>Привязка к каталогу</h2>
+<p>Каждая группа имеет кнопку <kbd>📦 Привязать модель…</kbd> — открывает <a data-article-link href="#feature-catalog-picker">picker</a> с моделями из общей библиотеки. После привязки параметры (widthMm/depthMm/demandKw/kva) автоматически копируются из выбранной модели.</p>
+
+<h2>Workflow</h2>
+<ol>
+  <li>Создайте вариант концепции (➕ слева).</li>
+  <li>Заполните 5 секций (стойки → ИБП → климат → ввод → площади авто-считаются).</li>
+  <li>(Опционально) привяжите модели через <kbd>📦</kbd>.</li>
+  <li>Создайте альтернативные варианты (📋 Дублировать), сравните в <kbd>📊 Сравнение</kbd>.</li>
+  <li>Выгрузите ПЗ через <kbd>📄 Пояснительная записка</kbd> (HTML с возможностью «Печать → PDF»).</li>
+  <li>Согласуйте с заказчиком, отметьте основной вариант (⭐).</li>
+  <li>Нажмите <kbd>📤 Передать в проектирование</kbd> — концепция превратится в узлы схемы (см. <a data-article-link href="#feature-handoff">handoff</a>).</li>
+</ol>
+
+<div class="note">⚠ После handoff'а variant становится read-only — повторно его редактировать нельзя. Можно создать новый вариант если нужно.</div>

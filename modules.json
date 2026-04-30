@@ -124,6 +124,18 @@
       "enabled": true
     },
     {
+      "id": "help",
+      "name": "Центр помощи",
+      "description": "Справочник по платформе: модули, возможности, архитектура. Статьи с поиском, cross-references и SVG-диаграммами. Доступ зависит от подключённых модулей.",
+      "path": "help/",
+      "icon": "blue",
+      "badge": "new",
+      "requires": [],
+      "dbCollections": [],
+      "permissions": ["help.use"],
+      "enabled": true
+    },
+    {
       "id": "tech-workspace",
       "name": "Технолог ЦОД",
       "description": "Предпроектная стадия ЦОД: концепция объекта (стойки, IT-нагрузка, ИБП, климат, ввод ТП/ДГУ, PDU, площади), multi-variant compare, handoff в детальное проектирование. Два режима входа — список параметров или план зала.",

@@ -1,0 +1,18 @@
+<h2>Назначение</h2>
+<p><b>Компоновщик шкафа</b> — содержимое каждого экземпляра шкафа: юниты (U), активное и пассивное оборудование.</p>
+
+<h2>Источники стоек</h2>
+<ul>
+  <li>Из engine-схемы через <code>scheme-rack-bridge.js</code>: каждый consumer-rack узел со count=N разворачивается в N экземпляров.</li>
+  <li>Из POR-объектов проекта: <code>raschet.project.&lt;pid&gt;.por.objects.v1</code> с типом <code>rack</code>.</li>
+  <li>Из rack-config.instances.v1 (legacy storage).</li>
+</ul>
+
+<h2>Tombstones</h2>
+<p>Удалённые стойки помечаются в <code>raschet.project.&lt;pid&gt;.rack-config.tombstones.v1</code>. При следующем bootstrap migrate-функция не воссоздаёт их из legacy storage. Сохраняется чистота данных.</p>
+
+<h2>Связи</h2>
+<ul>
+  <li><a data-article-link href="#module-scs-design">scs-design</a> — план зала с этими стойками</li>
+  <li>Реестр IT-оборудования — S/N, IP, MAC активного оборудования</li>
+</ul>

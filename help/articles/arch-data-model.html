@@ -1,0 +1,20 @@
+<h2>Слои хранения</h2>
+<ol>
+  <li><b>engine.scheme.v1</b> — JSON-схема (узлы, связи, страницы, режимы). Главный artifact Конструктора.</li>
+  <li><b>POR objects</b> (<code>por.objects.v1</code>) — объектная модель проекта (rack, panel, consumer-system и т.п.). Domains: mechanical / electrical / scs / location / hvac.</li>
+  <li><b>tech-workspace.variants.v1</b> — концепции технолога. Массив вариантов с rackGroups[], upsSystems[], coolingUnits[], feed{tp,dgu}.</li>
+  <li><b>scs-config.* / scs-design.*</b> — данные СКС-инженера.</li>
+  <li><b>rack-config.instances.v1</b> — legacy storage стоек.</li>
+</ol>
+
+<h2>Связи между слоями</h2>
+<ul>
+  <li>engine consumer-rack ↔ scs-config rack: bridge через <code>shared/scheme-rack-bridge.js</code> (виртуальные id <code>scheme-&lt;nodeId&gt;-&lt;i&gt;</code>).</li>
+  <li>POR rack ↔ engine consumer: <code>n.porObjectId</code> + <code>obj.legacyRackId</code>.</li>
+  <li>Tombstones (anti-resurrection): см. <a data-article-link href="#module-scs-config">scs-config</a>.</li>
+</ul>
+
+<h2>См. также</h2>
+<ul>
+  <li><a data-article-link href="#arch-storage-keys">Ключи LocalStorage</a></li>
+</ul>

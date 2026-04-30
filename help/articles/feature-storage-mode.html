@@ -1,0 +1,54 @@
+<h2>Зачем</h2>
+<p>Firebase Firestore (бесплатный тариф) имеет дневной лимит на запись. При активной работе (особенно с автосохранением) лимит можно исчерпать — сохранение начинает падать с <code>resource-exhausted</code>.</p>
+
+<p>Решение — пользователь явно выбирает режим хранения:</p>
+<ul>
+  <li><b>💾 Локально</b> — все данные в LocalStorage браузера, без квот, без сети. Идеально для одиночной работы.</li>
+  <li><b>☁ Онлайн</b> — Firebase Firestore. Совместная работа, синхронизация между устройствами.</li>
+  <li><b>🔄 Авто</b> (default) — Cloud если Firebase авторизован, иначе Local.</li>
+</ul>
+
+<h2>Где переключается</h2>
+<p>В шапке любого модуля (рядом с шестерёнкой ⚙) — кнопка-badge:</p>
+<ul>
+  <li><span style="background:#fef3c7;padding:2px 6px;border-radius:3px;font-size:11px;border:1px solid #fcd34d">💾 Локально</span> — текущий режим Local</li>
+  <li><span style="background:#dbeafe;padding:2px 6px;border-radius:3px;font-size:11px;border:1px solid #93c5fd">☁ Онлайн</span> — Cloud</li>
+  <li><b>🔒</b> рядом с режимом — означает что выбран override (не auto)</li>
+</ul>
+
+<p>Click → модалка с тремя радио-кнопками + secciones синхронизации.</p>
+
+<h2>Синхронизация</h2>
+<p>При смене режима данные <b>не переносятся автоматически</b>. Используйте sync-кнопки:</p>
+<ul>
+  <li><kbd>⬆ Local → Cloud</kbd> — копирует все local-проекты в Firebase. Local-id (<code>lp_*</code>, <code>p_*</code>, <code>s_*</code>) получают новые cloud-id.</li>
+  <li><kbd>⬇ Cloud → Local</kbd> — копирует все cloud-проекты в LS как «снимок». Полезно перед длительной офлайн-работой.</li>
+</ul>
+
+<div class="note">⚠ Sync ручной (manual). Не автоматический. Это сохраняет контроль за квотой Firebase.</div>
+
+<h2>Технические детали</h2>
+<pre><code>// js/projects.js
+const STORAGE_MODE_KEY = 'raschet.storageMode.v1';
+function getUserStorageMode() {
+  return localStorage.getItem(STORAGE_MODE_KEY) || 'auto';
+}
+function getStorage() {
+  const userMode = getUserStorageMode();
+  if (userMode === 'local') return Local;
+  if (window.Auth?.isFirebaseReady) return Fs;
+  return Local;
+}</code></pre>
+
+<p>Глобальный <code>window.Storage.userMode</code> / <code>setUserMode(m)</code> + event <code>raschet:storage-mode-changed</code> для обновления UI.</p>
+
+<h2>Когда что выбирать</h2>
+<table>
+  <thead><tr><th>Сценарий</th><th>Рекомендуемый режим</th></tr></thead>
+  <tbody>
+    <tr><td>Одиночная работа, много правок</td><td>💾 Локально (нет квот)</td></tr>
+    <tr><td>Команда из 2-3 проектировщиков</td><td>☁ Онлайн (live-sync через Firestore)</td></tr>
+    <tr><td>Дорога / поездка без интернета</td><td>💾 Локально + перед уходом ⬇ Cloud→Local</td></tr>
+    <tr><td>Quick-эксперимент, не привязанный к проекту</td><td>💾 Локально</td></tr>
+  </tbody>
+</table>

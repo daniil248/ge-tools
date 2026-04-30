@@ -1,0 +1,56 @@
+<h2>Назначение</h2>
+<p><b>Raschet</b> — платформа сквозного проектирования электроснабжения объектов: от концепции (предпроектная стадия) до детальной схемы и кабельного журнала. Подходит для ЦОД, промплощадок, складов, инженерных систем зданий.</p>
+
+<h2>Ключевые возможности</h2>
+<ul>
+  <li>Принципиальная схема с автоматическим подбором кабелей и автоматов (ПУЭ / IEC).</li>
+  <li>Расчёт нагрузок, токов короткого замыкания, падения напряжения, селективности.</li>
+  <li>Концепция объекта (предпроект) — мощности, площади, multi-variant compare.</li>
+  <li>Конфигураторы: ИБП, НКУ, РУ СН, трансформатор, СКС-стойка, PDU, АГПТ.</li>
+  <li>Каталог изделий с импортом прайс-листов и аналитикой.</li>
+</ul>
+
+<h2>Цикл проектирования</h2>
+<svg class="hc-fig" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:600px">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4f46e5"/>
+    </marker>
+  </defs>
+  <rect x="10" y="80" width="120" height="50" rx="6" fill="#dbeafe" stroke="#1e40af"/>
+  <text x="70" y="100" text-anchor="middle" font-size="12" fill="#1e3a8a" font-weight="600">🧮 Технолог</text>
+  <text x="70" y="118" text-anchor="middle" font-size="10" fill="#475569">концепция</text>
+
+  <line x1="130" y1="105" x2="180" y2="105" stroke="#4f46e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <rect x="180" y="80" width="120" height="50" rx="6" fill="#fef3c7" stroke="#92400e"/>
+  <text x="240" y="100" text-anchor="middle" font-size="12" fill="#7c2d12" font-weight="600">⚡ Электрик</text>
+  <text x="240" y="118" text-anchor="middle" font-size="10" fill="#475569">схема + кабели</text>
+
+  <line x1="300" y1="105" x2="350" y2="105" stroke="#4f46e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <rect x="350" y="80" width="120" height="50" rx="6" fill="#dcfce7" stroke="#15803d"/>
+  <text x="410" y="100" text-anchor="middle" font-size="12" fill="#14532d" font-weight="600">🔗 СКС-инженер</text>
+  <text x="410" y="118" text-anchor="middle" font-size="10" fill="#475569">шкафы + связи</text>
+
+  <line x1="470" y1="105" x2="520" y2="105" stroke="#4f46e5" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <rect x="520" y="80" width="70" height="50" rx="6" fill="#f3f4f6" stroke="#6b7280"/>
+  <text x="555" y="100" text-anchor="middle" font-size="11" fill="#374151" font-weight="600">📦 BOM</text>
+  <text x="555" y="118" text-anchor="middle" font-size="9" fill="#475569">+ логист</text>
+
+  <text x="300" y="170" text-anchor="middle" font-size="11" fill="#6b7280" font-style="italic">Каждый этап передаёт свой результат следующему через handoff</text>
+</svg>
+
+<h2>С чего начать</h2>
+<ol>
+  <li>Откройте <a data-article-link href="#projects-overview">«Проекты»</a> — создайте проект (или используйте default).</li>
+  <li>Если у вас концептуальная стадия — заходите в <a data-article-link href="#module-tech-workspace">Технолог ЦОД</a>.</li>
+  <li>Если уже есть ТЗ и нужна схема — открывайте <a data-article-link href="#module-schematic">Конструктор схем</a>.</li>
+  <li>Каждый модуль имеет встроенный значок <code>?</code> с подсказкой по работе.</li>
+</ol>
+
+<h2>Режим хранения</h2>
+<p>Все данные могут храниться <a data-article-link href="#feature-storage-mode">локально (LocalStorage)</a> или в облаке (Firebase). По умолчанию — авто: облако если есть Gmail-вход, иначе локально. В шапке инструментов есть переключатель режима.</p>
+
+<div class="ok">💡 <b>Совет:</b> для одиночной работы выбирайте локальный режим — нет ограничений на запись (Firebase бесплатный тариф ограничен квотами).</div>

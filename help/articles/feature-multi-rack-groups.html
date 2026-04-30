@@ -1,0 +1,67 @@
+<h2>Зачем</h2>
+<p>В реальном ЦОДе редко бывают «8 одинаковых стоек по 7 кВт». Обычно есть несколько групп с разными характеристиками:</p>
+<ul>
+  <li>Серверные (IT-rack, 600×1200 мм, 7 кВт каждая)</li>
+  <li>GPU-стойки (800×1200 мм, 12-25 кВт каждая)</li>
+  <li>Сетевые (network rack, 600×800 мм, 2-3 кВт)</li>
+  <li>Storage (горячая зона, 600×1200, 8 кВт)</li>
+</ul>
+
+<p>Аналогично для ИБП — IT и климат могут питаться от разных систем (например, IT — от ИБП с N+1, климат — без резерва или 2N от другого ИБП).</p>
+
+<h2>Модель данных</h2>
+<pre><code>concept = {
+  rackGroups: [
+    { id, name, count, kwPerRack, profile, widthMm, depthMm,
+      modelRef,                                ← привязка к каталогу
+      pdu: { kind, phases, ratingA,
+             inputsPerRack, modelRef }         ← PDU настраивается per-rack-group
+    },
+    ...
+  ],
+  upsSystems: [
+    { id, name,
+      purpose: 'it' | 'cooling' | 'mixed',     ← разные цели
+      count, ratedKva, redundancy,
+      cosPhi, loadFactor,
+      autonomyMin, batteryTech, modelRef
+    },
+    ...
+  ],
+  coolingUnits: [ … ],
+  feed: { tp, dgu },
+}</code></pre>
+
+<h2>UI</h2>
+<p>В каждой секции есть кнопка <kbd>➕ Группа стоек</kbd> / <kbd>➕ Система ИБП</kbd> / <kbd>➕ Кондиционеры</kbd>. Каждая карточка имеет:</p>
+<ul>
+  <li>Inline-редактирование имени (клик на название)</li>
+  <li>Поля параметров</li>
+  <li>Кнопку <kbd>📦 Привязать модель…</kbd> (см. <a data-article-link href="#feature-catalog-picker">статью</a>)</li>
+  <li>Кнопку <kbd>×</kbd> для удаления (минимум одна группа должна остаться)</li>
+  <li>Сводку справа: «8 × 7.0 кВт = 56.0 кВт» (динамически)</li>
+</ul>
+
+<h2>PDU per-rack-group</h2>
+<p>Раньше в концепции был один общий PDU-блок. По запросу пользователя — теперь PDU настраивается <b>внутри каждой группы стоек</b>: серверные могут иметь Metered 32А ×2 ввода, а GPU — Switched 63А ×4.</p>
+
+<h2>ИБП purpose: IT vs Cooling</h2>
+<p>Для каждой системы ИБП можно выбрать:</p>
+<table>
+  <thead><tr><th>Purpose</th><th>Что считается</th></tr></thead>
+  <tbody>
+    <tr><td>⚡ IT-нагрузка</td><td>Питает стойки. Должен покрывать <code>Σ rackGroups × profile≠network</code>.</td></tr>
+    <tr><td>❄ Климат</td><td>Питает кондиционеры. Может быть N+1 от другого ИБП.</td></tr>
+    <tr><td>🔄 Смешанное</td><td>Считается и в IT, и в climate (для ИБП-резерва).</td></tr>
+  </tbody>
+</table>
+<p>В summary секции «ИБП» показано отдельно: ⚡ IT доступно vs ❄ климат доступно. С margin (запас) — зелёный если ≥ нужно, красный если меньше.</p>
+
+<h2>Расчёт IT-нагрузки</h2>
+<p>Σ IT = сумма по всем rackGroups, исключая <code>profile === 'network'</code> (network-стойки — отдельная нагрузка, не классическая IT).</p>
+<pre><code>itTotal = Σ (group.count × group.kwPerRack), where group.profile ≠ 'network'</code></pre>
+
+<h2>Миграция со старой модели</h2>
+<p>В версиях ≤ v0.59.783 концепция имела одно поле <code>concept.racks</code> (объект). При первом открытии в v0.59.784+ происходит автоматическая миграция в массив <code>concept.rackGroups</code> с одним элементом. Старые данные сохраняются.</p>
+
+<div class="ok">💡 <b>Совет:</b> чтобы получить разные мощности — создайте 2-3 группы. Например, "Серверные ×6 7кВт" + "GPU ×4 15кВт" + "Сетевые ×2 3кВт".</div>

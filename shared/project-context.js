@@ -70,6 +70,7 @@ export const MODULE_LABELS = {
   'mdc-config':            '🏗 Модульный ЦОД',
   'suppression-config':    '🔥 АГПТ',
   'tech-workspace':        '🧮 Технолог ЦОД',
+  'help':                  '❓ Центр помощи',
   'hub':                   '🏠 Программы',
 };
 export function moduleLabel(id) { return MODULE_LABELS[id] || id || ''; }
