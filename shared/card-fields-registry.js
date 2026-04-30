@@ -20,82 +20,82 @@
 
 // Common (для всех режимов): identification / status — обязательные.
 const COMMON_REQUIRED = [
-  { id: 'tag',  label: 'Обозначение', required: true, group: 'identification' },
-  { id: 'name', label: 'Имя',         required: true, group: 'identification' },
+  { id: 'tag',  label: 'Обозначение', required: true, group: 'identification', shortLabel: 'Tag' },
+  { id: 'name', label: 'Имя',         required: true, group: 'identification', shortLabel: 'Имя' },
 ];
 
 // Schematic-режим (главная схема, electrical) ─────────────────────────────
 const SCHEMATIC_FIELDS = {
   consumer: [
     ...COMMON_REQUIRED,
-    { id: 'subtitle',     label: 'Подзаголовок (тип / вход)', group: 'identification' },
-    { id: 'demandKw',     label: 'Мощность (кВт)',         group: 'electrical' },
-    { id: 'kvAOrVA',      label: 'кВА',                     group: 'electrical' },
-    { id: 'currentA',     label: 'Ток (А)',                 group: 'electrical' },
-    { id: 'maxKw',        label: 'Макс. (кВт)',             group: 'electrical' },
-    { id: 'maxA',         label: 'Макс. ток (А)',           group: 'electrical' },
-    { id: 'nominalKw',    label: 'Номинал (кВт)',           group: 'electrical' },
-    { id: 'cosPhi',       label: 'cos φ',                   group: 'electrical' },
-    { id: 'phase',        label: 'Фаза',                    group: 'electrical' },
-    { id: 'voltage',      label: 'Напряжение',              group: 'electrical' },
-    { id: 'breakerIn',    label: 'Автомат (А)',             group: 'electrical' },
-    { id: 'cableSpec',    label: 'Кабель (марка/сечение)',  group: 'electrical' },
-    { id: 'deltaUPct',    label: 'ΔU (%)',                  group: 'electrical' },
-    { id: 'freeKw',       label: 'Свободно (кВт)',          group: 'electrical' },
-    { id: 'freeA',        label: 'Свободно (А)',            group: 'electrical' },
-    { id: 'count',        label: 'Кол-во в группе',         group: 'identification' },
-    { id: 'icon',         label: 'Иконка типа',             group: 'identification' },
+    { id: 'subtitle',     label: 'Подзаголовок (тип / вход)', shortLabel: 'Тип',       group: 'identification' },
+    { id: 'demandKw',     label: 'Мощность (кВт)',            shortLabel: 'Мощность',  unit: 'кВт', group: 'electrical' },
+    { id: 'kvAOrVA',      label: 'кВА',                        shortLabel: 'кВА',        unit: 'кВА', group: 'electrical' },
+    { id: 'currentA',     label: 'Ток (А)',                    shortLabel: 'Ток',        unit: 'А',   group: 'electrical' },
+    { id: 'maxKw',        label: 'Макс. (кВт)',                shortLabel: 'Макс.',      unit: 'кВт', group: 'electrical' },
+    { id: 'maxA',         label: 'Макс. ток (А)',              shortLabel: 'Макс. ток',  unit: 'А',   group: 'electrical' },
+    { id: 'nominalKw',    label: 'Номинал (кВт)',              shortLabel: 'Номинал',    unit: 'кВт', group: 'electrical' },
+    { id: 'cosPhi',       label: 'cos φ',                      shortLabel: 'cos φ',                   group: 'electrical' },
+    { id: 'phase',        label: 'Фаза',                       shortLabel: 'Фаза',                    group: 'electrical' },
+    { id: 'voltage',      label: 'Напряжение',                 shortLabel: 'U',          unit: 'В',   group: 'electrical' },
+    { id: 'breakerIn',    label: 'Автомат (А)',                shortLabel: 'Автомат',    unit: 'А',   group: 'electrical' },
+    { id: 'cableSpec',    label: 'Кабель (марка/сечение)',     shortLabel: 'Кабель',                  group: 'electrical' },
+    { id: 'deltaUPct',    label: 'ΔU (%)',                     shortLabel: 'ΔU',         unit: '%',   group: 'electrical' },
+    { id: 'freeKw',       label: 'Свободно (кВт)',             shortLabel: 'Свободно',   unit: 'кВт', group: 'electrical' },
+    { id: 'freeA',        label: 'Свободно (А)',               shortLabel: 'Своб. ток',  unit: 'А',   group: 'electrical' },
+    { id: 'count',        label: 'Кол-во в группе',            shortLabel: '×',          unit: 'шт.', group: 'identification' },
+    { id: 'icon',         label: 'Иконка типа',                shortLabel: 'Иконка',                  group: 'identification' },
   ],
   panel: [
     ...COMMON_REQUIRED,
-    { id: 'capacityA',    label: 'Номинал шкафа (А)',       group: 'electrical' },
-    { id: 'currentA',     label: 'Текущий ток (А)',         group: 'electrical' },
-    { id: 'maxKw',        label: 'Макс. (кВт)',             group: 'electrical' },
-    { id: 'maxA',         label: 'Макс. ток (А)',           group: 'electrical' },
-    { id: 'freeKw',       label: 'Свободно (кВт)',          group: 'electrical' },
-    { id: 'freeA',        label: 'Свободно (А)',            group: 'electrical' },
-    { id: 'marginPct',    label: 'Запас (%)',               group: 'electrical' },
-    { id: 'kSim',         label: 'Kисп',                    group: 'electrical' },
-    { id: 'switchMode',   label: 'Режим АВР',               group: 'electrical' },
-    { id: 'sectionsCount',label: 'Кол-во секций',           group: 'identification' },
+    { id: 'capacityA',    label: 'Номинал шкафа (А)',       shortLabel: 'Номинал',    unit: 'А',     group: 'electrical' },
+    { id: 'currentA',     label: 'Текущий ток (А)',         shortLabel: 'Ток',        unit: 'А',     group: 'electrical' },
+    { id: 'maxKw',        label: 'Макс. (кВт)',             shortLabel: 'Макс.',      unit: 'кВт',   group: 'electrical' },
+    { id: 'maxA',         label: 'Макс. ток (А)',           shortLabel: 'Макс. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'freeKw',       label: 'Свободно (кВт)',          shortLabel: 'Свободно',   unit: 'кВт',   group: 'electrical' },
+    { id: 'freeA',        label: 'Свободно (А)',            shortLabel: 'Своб. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'marginPct',    label: 'Запас (%)',               shortLabel: 'Запас',      unit: '%',     group: 'electrical' },
+    { id: 'kSim',         label: 'Kисп',                    shortLabel: 'Kисп',                       group: 'electrical' },
+    { id: 'switchMode',   label: 'Режим АВР',               shortLabel: 'Режим',                      group: 'electrical' },
+    { id: 'sectionsCount',label: 'Кол-во секций',           shortLabel: 'Секций',     unit: 'секц.', group: 'identification' },
   ],
   source: [
     ...COMMON_REQUIRED,
-    { id: 'sourceSubtype',label: 'Тип источника',           group: 'identification' },
-    { id: 'voltage',      label: 'Напряжение',              group: 'electrical' },
-    { id: 'snomKva',      label: 'Sном (кВА)',              group: 'electrical' },
-    { id: 'capacityKw',   label: 'Мощность (кВт)',          group: 'electrical' },
-    { id: 'currentA',     label: 'Текущий ток (А)',         group: 'electrical' },
-    { id: 'maxKw',        label: 'Макс. (кВт)',             group: 'electrical' },
-    { id: 'maxA',         label: 'Макс. ток (А)',           group: 'electrical' },
-    { id: 'freeKw',       label: 'Свободно (кВт)',          group: 'electrical' },
-    { id: 'freeA',        label: 'Свободно (А)',            group: 'electrical' },
-    { id: 'sscMva',       label: 'Sкз (МВА)',               group: 'electrical' },
-    { id: 'ukPct',        label: 'uк (%)',                  group: 'electrical' },
+    { id: 'sourceSubtype',label: 'Тип источника',           shortLabel: 'Тип',                       group: 'identification' },
+    { id: 'voltage',      label: 'Напряжение',              shortLabel: 'U',          unit: 'В',     group: 'electrical' },
+    { id: 'snomKva',      label: 'Sном (кВА)',              shortLabel: 'Sном',       unit: 'кВА',   group: 'electrical' },
+    { id: 'capacityKw',   label: 'Мощность (кВт)',          shortLabel: 'Pном',       unit: 'кВт',   group: 'electrical' },
+    { id: 'currentA',     label: 'Текущий ток (А)',         shortLabel: 'Ток',        unit: 'А',     group: 'electrical' },
+    { id: 'maxKw',        label: 'Макс. (кВт)',             shortLabel: 'Макс.',      unit: 'кВт',   group: 'electrical' },
+    { id: 'maxA',         label: 'Макс. ток (А)',           shortLabel: 'Макс. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'freeKw',       label: 'Свободно (кВт)',          shortLabel: 'Свободно',   unit: 'кВт',   group: 'electrical' },
+    { id: 'freeA',        label: 'Свободно (А)',            shortLabel: 'Своб. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'sscMva',       label: 'Sкз (МВА)',               shortLabel: 'Sкз',        unit: 'МВА',   group: 'electrical' },
+    { id: 'ukPct',        label: 'uк (%)',                  shortLabel: 'uк',         unit: '%',     group: 'electrical' },
   ],
   generator: [
     ...COMMON_REQUIRED,
-    { id: 'capacityKw',   label: 'Мощность (кВт)',          group: 'electrical' },
-    { id: 'snomKva',      label: 'Sном (кВА)',              group: 'electrical' },
-    { id: 'currentA',     label: 'Текущий ток (А)',         group: 'electrical' },
-    { id: 'maxKw',        label: 'Макс. (кВт)',             group: 'electrical' },
-    { id: 'maxA',         label: 'Макс. ток (А)',           group: 'electrical' },
-    { id: 'freeKw',       label: 'Свободно (кВт)',          group: 'electrical' },
-    { id: 'freeA',        label: 'Свободно (А)',            group: 'electrical' },
-    { id: 'backupMode',   label: 'Резервный режим',         group: 'status' },
-    { id: 'triggerInfo',  label: 'Триггеры',                group: 'status' },
+    { id: 'capacityKw',   label: 'Мощность (кВт)',          shortLabel: 'Pном',       unit: 'кВт',   group: 'electrical' },
+    { id: 'snomKva',      label: 'Sном (кВА)',              shortLabel: 'Sном',       unit: 'кВА',   group: 'electrical' },
+    { id: 'currentA',     label: 'Текущий ток (А)',         shortLabel: 'Ток',        unit: 'А',     group: 'electrical' },
+    { id: 'maxKw',        label: 'Макс. (кВт)',             shortLabel: 'Макс.',      unit: 'кВт',   group: 'electrical' },
+    { id: 'maxA',         label: 'Макс. ток (А)',           shortLabel: 'Макс. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'freeKw',       label: 'Свободно (кВт)',          shortLabel: 'Свободно',   unit: 'кВт',   group: 'electrical' },
+    { id: 'freeA',        label: 'Свободно (А)',            shortLabel: 'Своб. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'backupMode',   label: 'Резервный режим',         shortLabel: 'Режим',                     group: 'status' },
+    { id: 'triggerInfo',  label: 'Триггеры',                shortLabel: 'Триггеры',   unit: 'триг.', group: 'status' },
   ],
   ups: [
     ...COMMON_REQUIRED,
-    { id: 'kva',          label: 'кВА',                     group: 'electrical' },
-    { id: 'kw',           label: 'кВт',                     group: 'electrical' },
-    { id: 'autonomyMin',  label: 'Автономия (мин)',         group: 'electrical' },
-    { id: 'currentA',     label: 'Ток (А)',                 group: 'electrical' },
-    { id: 'maxKw',        label: 'Макс. (кВт)',             group: 'electrical' },
-    { id: 'maxA',         label: 'Макс. ток (А)',           group: 'electrical' },
-    { id: 'freeKw',       label: 'Свободно (кВт)',          group: 'electrical' },
-    { id: 'freeA',        label: 'Свободно (А)',            group: 'electrical' },
-    { id: 'redundancy',   label: 'Резервирование',          group: 'status' },
+    { id: 'kva',          label: 'кВА',                     shortLabel: 'Sном',       unit: 'кВА',   group: 'electrical' },
+    { id: 'kw',           label: 'кВт',                     shortLabel: 'Pном',       unit: 'кВт',   group: 'electrical' },
+    { id: 'autonomyMin',  label: 'Автономия (мин)',         shortLabel: 'Автономия',  unit: 'мин',   group: 'electrical' },
+    { id: 'currentA',     label: 'Ток (А)',                 shortLabel: 'Ток',        unit: 'А',     group: 'electrical' },
+    { id: 'maxKw',        label: 'Макс. (кВт)',             shortLabel: 'Макс.',      unit: 'кВт',   group: 'electrical' },
+    { id: 'maxA',         label: 'Макс. ток (А)',           shortLabel: 'Макс. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'freeKw',       label: 'Свободно (кВт)',          shortLabel: 'Свободно',   unit: 'кВт',   group: 'electrical' },
+    { id: 'freeA',        label: 'Свободно (А)',            shortLabel: 'Своб. ток',  unit: 'А',     group: 'electrical' },
+    { id: 'redundancy',   label: 'Резервирование',          shortLabel: 'Резерв',                    group: 'status' },
   ],
   zone: [
     { id: 'zonePrefix', label: 'Префикс зоны', required: true, group: 'identification' },
@@ -167,4 +167,28 @@ export function allFieldIds(kind, type) {
 /** Required-IDs — обязательные поля, которые preset не может выключить. */
 export function requiredFieldIds(kind, type) {
   return listCardFields(kind, type).filter(f => f.required).map(f => f.id);
+}
+
+/**
+ * Найти описание поля по (kind, type, fieldId).
+ * Возвращает поле или null. v0.59.807.
+ */
+export function getFieldDef(kind, type, fieldId) {
+  return listCardFields(kind, type).find(f => f.id === fieldId) || null;
+}
+
+/**
+ * Краткая подпись поля для канваса (короче чем label, без скобочек с
+ * единицами, т.к. unit рендерится отдельно после value).
+ * Если у поля нет shortLabel — fallback на label.
+ */
+export function shortLabel(kind, type, fieldId) {
+  const f = getFieldDef(kind, type, fieldId);
+  return (f && f.shortLabel) || (f && f.label) || fieldId;
+}
+
+/** Единица измерения поля (если есть). */
+export function fieldUnit(kind, type, fieldId) {
+  const f = getFieldDef(kind, type, fieldId);
+  return (f && f.unit) || '';
 }

@@ -27,7 +27,7 @@ import {
   getUserActivePresetId, setUserActivePresetId,
   createUserPreset, deleteUserPreset, renameUserPreset, setUserPresetFields,
 } from './card-presets.js';
-import { CARD_FIELDS, listCardFields, requiredFieldIds } from './card-fields-registry.js';
+import { CARD_FIELDS, listCardFields, requiredFieldIds, shortLabel as registryShortLabel, fieldUnit } from './card-fields-registry.js';
 
 // ─── Helpers
 function escHtml(s) {
@@ -296,32 +296,8 @@ function _renderSampleCard(sel, kind, type, fields, activeIds, required) {
     channel: { tag: 'CH1', name: 'Лоток LM-300', cableSpec: 'F · 30°C · 50м' },
   }[type] || { tag: 'X1', name: 'Sample' };
 
-  // Labels (short for canvas-style display)
-  const LABELS = {
-    consumer: { demandKw: 'Мощность', nominalKw: 'Номинал', kvAOrVA: 'кВА', currentA: 'Ток',
-      maxKw: 'Макс.', maxA: 'Макс. ток', freeKw: 'Свободно', freeA: 'Своб. ток',
-      cosPhi: 'cos φ', voltage: 'U', phase: 'Фаза', breakerIn: 'Автомат',
-      cableSpec: 'Кабель', deltaUPct: 'ΔU', count: '×' },
-    panel: { capacityA: 'Номинал', currentA: 'Ток', maxKw: 'Макс.', maxA: 'Макс. ток',
-      freeKw: 'Свободно', freeA: 'Своб. ток', marginPct: 'Запас',
-      kSim: 'Kисп', switchMode: 'Режим', sectionsCount: 'Секций' },
-    source: { sourceSubtype: 'Тип', voltage: 'U', snomKva: 'Sном', capacityKw: 'Pном',
-      currentA: 'Ток', maxKw: 'Макс.', maxA: 'Макс. ток',
-      freeKw: 'Свободно', freeA: 'Своб. ток', sscMva: 'Sкз', ukPct: 'uк' },
-    generator: { capacityKw: 'Pном', snomKva: 'Sном', currentA: 'Ток',
-      maxKw: 'Макс.', maxA: 'Макс. ток', freeKw: 'Свободно', freeA: 'Своб. ток',
-      backupMode: 'Режим', triggerInfo: 'Триггеры' },
-    ups: { kva: 'Sном', kw: 'Pном', autonomyMin: 'Автономия', currentA: 'Ток',
-      maxKw: 'Макс.', maxA: 'Макс. ток', freeKw: 'Свободно', freeA: 'Своб. ток',
-      redundancy: 'Резерв' },
-  };
-  const UNITS = {
-    demandKw: 'кВт', nominalKw: 'кВт', kvAOrVA: 'кВА', currentA: 'А', maxKw: 'кВт',
-    maxA: 'А', freeKw: 'кВт', freeA: 'А', voltage: 'В', breakerIn: 'А',
-    deltaUPct: '%', count: 'шт.', capacityA: 'А', marginPct: '%', sectionsCount: 'секц.',
-    snomKva: 'кВА', capacityKw: 'кВт', sscMva: 'МВА', ukPct: '%',
-    kva: 'кВА', kw: 'кВт', autonomyMin: 'мин', triggerInfo: 'триг.',
-  };
+  // v0.59.807: labels и units берутся из registry (shortLabel/fieldUnit) —
+  // единый источник истины для редактора и canvas-render'а.
 
   // Tag, name show only if active (always required so always shown)
   const showTag = activeIds.has('tag') || required.has('tag');
@@ -340,8 +316,8 @@ function _renderSampleCard(sel, kind, type, fields, activeIds, required) {
     if (val == null || val === '') continue;
     const customLabel = sel.fieldLabels?.[kind]?.[type]?.[f.id];
     const lbl = (typeof customLabel === 'string' && customLabel.trim())
-      ? customLabel : (LABELS[type]?.[f.id] || f.label);
-    const unit = UNITS[f.id] || '';
+      ? customLabel : registryShortLabel(kind, type, f.id);
+    const unit = fieldUnit(kind, type, f.id);
     rows.push(`${escHtml(lbl)}: ${escHtml(val)}${unit ? ' ' + escHtml(unit) : ''}`);
   }
 
