@@ -2263,22 +2263,42 @@ export function renderNodes() {
 
     // Рендер: либо одной строкой (consumer/channel/устаревший формат),
     // либо 3-строчным блоком (новый вариант B).
-    if (loadLines && loadLines.length) {
-      // 3 строки внизу: располагаем снизу вверх с шагом 12px.
-      const lineCount = loadLines.length;
-      const baseY = NODE_H - 12;
-      const lineH = 12;
-      // Если есть статус — резервируем верхнюю строчку под него.
-      const statusOffset = statusLine ? lineH : 0;
-      for (let i = 0; i < lineCount; i++) {
-        const y = baseY - statusOffset - (lineCount - 1 - i) * lineH;
-        g.appendChild(text(12, y, loadLines[i], loadCls + ' node-load-row'));
+    // v0.59.795 (Phase 19.4): фильтр по active card-preset. Если для
+    // текущего (kind, type) preset не разрешает ни одного non-required
+    // поля → скрываем весь load-блок (для пресета «Минимум»). Status-line
+    // (off, ⚠ перегруз и т.п.) всегда виден — это критичная информация.
+    let _showLoadInfo = true;
+    {
+      const _curPage = getCurrentPage();
+      const _kind = _curPage ? getPageKind(_curPage) : 'schematic';
+      const _preset = _getActiveCardPreset();
+      const _vis = getVisibleFieldIds(_preset, _kind, n.type);
+      // Required = tag/name; если в preset больше ничего нет — скрываем
+      let _hasNonRequired = false;
+      for (const id of _vis) {
+        if (id !== 'tag' && id !== 'name') { _hasNonRequired = true; break; }
       }
-      if (statusLine) {
-        g.appendChild(text(12, baseY, statusLine, loadCls + ' node-load-status'));
+      _showLoadInfo = _hasNonRequired;
+    }
+    if (_showLoadInfo) {
+      if (loadLines && loadLines.length) {
+        const lineCount = loadLines.length;
+        const baseY = NODE_H - 12;
+        const lineH = 12;
+        const statusOffset = statusLine ? lineH : 0;
+        for (let i = 0; i < lineCount; i++) {
+          const y = baseY - statusOffset - (lineCount - 1 - i) * lineH;
+          g.appendChild(text(12, y, loadLines[i], loadCls + ' node-load-row'));
+        }
+        if (statusLine) {
+          g.appendChild(text(12, baseY, statusLine, loadCls + ' node-load-status'));
+        }
+      } else {
+        g.appendChild(text(12, NODE_H - 12, loadLine, loadCls));
       }
-    } else {
-      g.appendChild(text(12, NODE_H - 12, loadLine, loadCls));
+    } else if (statusLine) {
+      // «Минимум»-пресет: load info скрыта, но статус (отключён, перегруз) важен
+      g.appendChild(text(12, NODE_H - 12, statusLine, loadCls + ' node-load-status'));
     }
 
     // Порты — входы

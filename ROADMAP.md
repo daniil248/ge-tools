@@ -2243,7 +2243,7 @@ ups) рисуют фиксированный набор полей. Не все 
       под-табы (consumer/panel/...), чекбоксы на каждое поле.
     - Tab 3: «Импорт/экспорт» — кнопки export JSON, import JSON.
 
-- [~] **19.4** Resolver и применение в render.js (resolver полный + invalidate-кэш закрыто v0.59.783; интеграция в render.js пока минимальная — фильтрует только consumer-group footer label, остальные карточки применять по мере необходимости)
+- [~] **19.4** Resolver и применение в render.js (resolver полный + invalidate-кэш закрыто v0.59.783; v0.59.795 расширено: load-блок (для всех типов узлов кроме channel/zone) скрывается полностью если active preset не имеет non-required полей для (kind, type) — позволяет «Минимум» пресету реально скрыть электрические данные. Status-line (off / ⚠ перегруз) остаётся видимой как критичная инфо. Per-field гранулярность для panel/source/ups — в следующей итерации)
   - Helper `resolveCardPreset(page, project, user)` возвращает effective
     пресет, выбирая по приоритету scheme → project → user → system-default.
   - В render.js при отрисовке карточки узла: читаем `preset.perMode[page.kind].perType[node.type]` → фильтруем поля.
