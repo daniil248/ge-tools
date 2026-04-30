@@ -1069,6 +1069,228 @@ function _buildSchemeFromConcept(concept, variantName) {
   };
 }
 
+// ─── Phase 20.9: пояснительная записка (HTML-report, печатаемый)
+// Юзер: «Шаблонная ПЗ по концепции: структура с разделами «Описание
+// объекта», «Концепция размещения», «Электроснабжение», «Климат»,
+// «Резервирование», «Площади», «Перечень ТЗ для смежных дисциплин».
+function _redundancyLabel(r) {
+  return ({ 'N': 'без резерва (N)', 'N+1': 'N+1', '2N': '2N', '1': '1 ввод', '2': '2 ввода', '2-avr': '2 ввода + АВР', 'none': 'нет', 'esp': 'резервный (ESP)', 'prp': 'постоянный (PRP)' }[r]) || r;
+}
+function _profileLabel(p) {
+  return ({ 'it': 'IT-rack', 'blade': 'Blade', 'gpu': 'GPU-heavy', 'network': 'Network', 'storage': 'Storage' }[p]) || p;
+}
+function _coolTypeLabel(t) {
+  return ({ 'crac': 'CRAC (downflow)', 'inrow': 'In-Row', 'fancoil': 'Fan-coil', 'freecool': 'Free cooling' }[t]) || t;
+}
+function _purposeLabel(p) {
+  return ({ 'it': 'IT-нагрузка', 'cooling': 'климат', 'mixed': 'смешанное' }[p]) || p;
+}
+function generateReportHtml(v) {
+  const c = v.concept;
+  const itKw = calcITTotal(c);
+  const upsByPurpose = calcUpsByPurpose(c);
+  const coolKw = calcCoolTotal(c);
+  const feedKw = calcFeedTotal(c);
+  const areas = calcAreas(c);
+  const sumM2 = areas.reduce((s, a) => s + a.m2, 0);
+  const totalRacks = (c.rackGroups || []).reduce((s, rg) => s + (Number(rg.count) || 0), 0);
+  const date = new Date().toLocaleDateString('ru-RU');
+
+  return `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>Пояснительная записка — ${escHtml(v.name)}</title>
+<style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.4; color: #000; max-width: 800px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 20pt; text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; }
+  h2 { font-size: 14pt; margin-top: 24px; border-bottom: 1px solid #888; padding-bottom: 4px; }
+  h3 { font-size: 12pt; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 11pt; }
+  table th, table td { border: 1px solid #888; padding: 5px 8px; text-align: left; }
+  table th { background: #f0f0f0; font-weight: bold; }
+  table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .meta { color: #555; font-size: 10pt; text-align: center; margin-bottom: 24px; }
+  .badge { display: inline-block; padding: 1px 6px; background: #f0f0f0; border: 1px solid #888; border-radius: 3px; font-size: 10pt; }
+  .summary { background: #f9f9f9; border: 1px solid #ccc; padding: 10px 14px; margin: 12px 0; border-radius: 4px; }
+  .summary b { color: #000; }
+  .toc { background: #f9f9f9; padding: 10px 14px; border: 1px solid #ddd; margin: 16px 0; }
+  .toc ul { margin: 4px 0; padding-left: 24px; }
+  .print-actions { position: fixed; top: 8px; right: 8px; }
+  .print-actions button { padding: 6px 12px; font-size: 11pt; cursor: pointer; }
+  @media print { .print-actions { display: none; } body { padding: 0; max-width: 100%; } }
+</style>
+</head><body>
+<div class="print-actions">
+  <button onclick="window.print()">🖨 Печать / PDF</button>
+  <button onclick="window.close()">✕ Закрыть</button>
+</div>
+
+<h1>Пояснительная записка</h1>
+<div class="meta">
+  Концепция объекта ЦОД · Вариант «${escHtml(v.name)}»${v.primary ? ' (основной)' : ''}<br>
+  Сформировано: ${date} · Технолог ЦОД, Raschet
+</div>
+
+<div class="toc">
+  <b>Содержание:</b>
+  <ul>
+    <li>1. Описание объекта</li>
+    <li>2. Концепция стоек</li>
+    <li>3. Электроснабжение (ИБП)</li>
+    <li>4. Климатическое обеспечение</li>
+    <li>5. Ввод (ТП и ДГУ)</li>
+    <li>6. Площади помещений</li>
+    <li>7. Перечень ТЗ для смежных дисциплин</li>
+  </ul>
+</div>
+
+<h2>1. Описание объекта</h2>
+<p>Объект — центр обработки данных (ЦОД) с IT-нагрузкой <b>${itKw.toFixed(1)} кВт</b>
+и общей площадью <b>${sumM2} м²</b>. Концепция включает ${totalRacks} серверных стоек,
+${(c.upsSystems || []).length} систем(ы) ИБП,
+${(c.coolingUnits || []).length} групп(ы) кондиционирования.</p>
+<div class="summary">
+  <b>Ключевые параметры:</b><br>
+  • IT-нагрузка: ${itKw.toFixed(1)} кВт (${totalRacks} стоек)<br>
+  • Подключённая мощность ИБП: ⚡ IT ${(upsByPurpose.it + upsByPurpose.mixed).toFixed(1)} кВт · ❄ климат ${(upsByPurpose.cooling + upsByPurpose.mixed).toFixed(1)} кВт<br>
+  • Холодопроизводительность: ${coolKw.toFixed(1)} кВт<br>
+  • Принятая мощность объекта: ${feedKw.toFixed(1)} кВт<br>
+  • Общая площадь: ${sumM2} м²
+</div>
+
+<h2>2. Концепция стоек</h2>
+<p>Объект включает ${(c.rackGroups || []).length} групп(ы) серверных стоек:</p>
+<table>
+  <thead><tr><th>Группа</th><th>Профиль</th><th class="num">Кол-во</th><th class="num">кВт/стойка</th><th class="num">Σ кВт</th><th>Размеры (Ш × Г)</th><th>PDU</th></tr></thead>
+  <tbody>
+    ${(c.rackGroups || []).map(rg => {
+      const sumKw = (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0);
+      const pduSummary = `${rg.pdu?.kind || ''} ${rg.pdu?.phases || ''} ${rg.pdu?.ratingA || ''}А ×${rg.pdu?.inputsPerRack || 1}`;
+      return `<tr>
+        <td>${escHtml(rg.name)}</td>
+        <td>${_profileLabel(rg.profile)}</td>
+        <td class="num">${rg.count}</td>
+        <td class="num">${rg.kwPerRack}</td>
+        <td class="num"><b>${sumKw.toFixed(1)}</b></td>
+        <td>${rg.widthMm} × ${rg.depthMm} мм</td>
+        <td>${escHtml(pduSummary)}</td>
+      </tr>`;
+    }).join('')}
+    <tr><td colspan="2"><b>Итого:</b></td><td class="num"><b>${totalRacks}</b></td><td></td><td class="num"><b>${itKw.toFixed(1)}</b></td><td></td><td></td></tr>
+  </tbody>
+</table>
+
+<h2>3. Электроснабжение (ИБП)</h2>
+<p>Питание IT-нагрузки и систем климата обеспечивается ${(c.upsSystems || []).length} системами ИБП:</p>
+<table>
+  <thead><tr><th>Система</th><th>Назначение</th><th class="num">Кол-во</th><th class="num">кВА/шт.</th><th>Резерв</th><th class="num">Доступно, кВт</th><th class="num">Автономия, мин</th><th>АКБ</th></tr></thead>
+  <tbody>
+    ${(c.upsSystems || []).map(us => `<tr>
+      <td>${escHtml(us.name)}</td>
+      <td>${_purposeLabel(us.purpose)}</td>
+      <td class="num">${us.count}</td>
+      <td class="num">${us.ratedKva}</td>
+      <td>${_redundancyLabel(us.redundancy)}</td>
+      <td class="num">${_upsAvail(us).toFixed(1)}</td>
+      <td class="num">${us.autonomyMin}</td>
+      <td>${us.batteryTech === 'vrla' ? 'VRLA' : 'Li-Ion (LFP)'}</td>
+    </tr>`).join('')}
+  </tbody>
+</table>
+<div class="summary">
+  <b>Σ доступная мощность ИБП:</b> ⚡ IT ${(upsByPurpose.it + upsByPurpose.mixed).toFixed(1)} кВт ·
+  ❄ климат ${(upsByPurpose.cooling + upsByPurpose.mixed).toFixed(1)} кВт ·
+  итого ${upsByPurpose.total.toFixed(1)} кВт
+</div>
+
+<h2>4. Климатическое обеспечение</h2>
+<p>Для отвода тепла IT-нагрузки (${itKw.toFixed(1)} кВт) предусмотрены:</p>
+<table>
+  <thead><tr><th>Группа</th><th>Тип</th><th class="num">Кол-во</th><th class="num">кВт/шт.</th><th>Резерв</th><th class="num">Доступно, кВт</th></tr></thead>
+  <tbody>
+    ${(c.coolingUnits || []).map(cu => `<tr>
+      <td>${escHtml(cu.name)}</td>
+      <td>${_coolTypeLabel(cu.type)}</td>
+      <td class="num">${cu.count}</td>
+      <td class="num">${cu.kwPerUnit}</td>
+      <td>${_redundancyLabel(cu.redundancy)}</td>
+      <td class="num">${_coolAvail(cu).toFixed(1)}</td>
+    </tr>`).join('')}
+    <tr><td colspan="5"><b>Итого:</b></td><td class="num"><b>${coolKw.toFixed(1)}</b></td></tr>
+  </tbody>
+</table>
+${coolKw < itKw ? `<p style="color:#c62828"><b>⚠ Внимание:</b> Холодопроизводительность (${coolKw.toFixed(1)} кВт) меньше IT-нагрузки (${itKw.toFixed(1)} кВт). Требуется доукомплектование на ${(itKw - coolKw).toFixed(1)} кВт.</p>` : ''}
+
+<h2>5. Ввод (ТП и ДГУ)</h2>
+${c.feed?.tp?.needed ? `<p><b>Трансформаторная подстанция (ТП):</b> ${c.feed.tp.kva} кВА, резервирование — ${_redundancyLabel(c.feed.tp.redundancy)}.</p>` : '<p><i>ТП не предусмотрена.</i></p>'}
+${c.feed?.dgu?.needed ? `<p><b>Дизель-генераторная установка (ДГУ):</b> ${c.feed.dgu.kw} кВт, режим — ${_redundancyLabel(c.feed.dgu.mode)}, резервирование — ${_redundancyLabel(c.feed.dgu.redundancy)}.</p>` : '<p><i>ДГУ не предусмотрена.</i></p>'}
+<div class="summary">
+  <b>Σ принятая мощность объекта:</b> ${feedKw.toFixed(1)} кВт (с учётом потерь и климата ~30%)
+</div>
+
+<h2>6. Площади помещений</h2>
+<p>Расчётная разбивка площадей (по ТКП 308-2011 / TIA-942):</p>
+<table>
+  <thead><tr><th>Помещение</th><th class="num">Площадь, м²</th></tr></thead>
+  <tbody>
+    ${areas.map(a => `<tr><td>${escHtml(a.name)}</td><td class="num">${a.m2}</td></tr>`).join('')}
+    <tr><td><b>Σ Итого</b></td><td class="num"><b>${sumM2}</b></td></tr>
+  </tbody>
+</table>
+
+<h2>7. Перечень ТЗ для смежных дисциплин</h2>
+
+<h3>7.1. Электрик</h3>
+<ul>
+  <li>Подобрать конкретные модели ИБП (${(c.upsSystems || []).length} шт.) под параметры из раздела 3.</li>
+  <li>Подобрать автоматические выключатели и сечения кабелей по нагрузкам стоек (${itKw.toFixed(1)} кВт IT).</li>
+  <li>Предусмотреть распределительный щит ГРЩ под ${(c.upsSystems || []).length + (c.coolingUnits || []).length} вводов.</li>
+  ${c.feed?.tp?.needed ? `<li>Подобрать трансформатор ${c.feed.tp.kva} кВА.</li>` : ''}
+  ${c.feed?.dgu?.needed ? `<li>Подобрать ДГУ ${c.feed.dgu.kw} кВт (${_redundancyLabel(c.feed.dgu.mode)}).</li>` : ''}
+</ul>
+
+<h3>7.2. СКС-инженер</h3>
+<ul>
+  <li>Расположить ${totalRacks} стоек по группам (раздел 2) в машзале (≈ ${areas.find(a => a.name.startsWith('Машзал'))?.m2 || 0} м²).</li>
+  <li>Спроектировать межшкафные связи и кабельные трассы.</li>
+  <li>Подобрать конкретные модели стоек (${(c.rackGroups || []).filter(rg => rg.modelRef?.id).length} из ${(c.rackGroups || []).length} групп уже привязаны к каталогу).</li>
+</ul>
+
+<h3>7.3. Климатик</h3>
+<ul>
+  <li>Подобрать конкретные модели кондиционеров (${(c.coolingUnits || []).length} групп(ы) на ${coolKw.toFixed(1)} кВт холода).</li>
+  <li>Расположить кондиционеры в климат-зале (≈ ${areas.find(a => a.name.startsWith('Климат'))?.m2 || 0} м²).</li>
+  <li>${coolKw < itKw ? 'Доукомплектовать на ' + (itKw - coolKw).toFixed(1) + ' кВт.' : 'Проверить запас при максимальных температурах окружающей среды.'}</li>
+</ul>
+
+<h3>7.4. Архитектор</h3>
+<ul>
+  <li>Скомпоновать помещения общей площадью ${sumM2} м² (см. раздел 6).</li>
+  <li>Учесть требования по электротехническим свойствам (двери, кабельные проходки), пожарной безопасности (АГПТ для машзала и АКБ-зала), ИБП-залу — отдельная вентиляция.</li>
+</ul>
+
+<p style="margin-top:32px;border-top:1px solid #888;padding-top:8px;font-size:10pt;color:#888;text-align:center">
+  Документ сгенерирован автоматически в Raschet · Технолог ЦОД · ${date}
+</p>
+
+</body></html>`;
+}
+
+function bindReport() {
+  const btn = $('tw-report');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const v = _variants.find(x => x.id === _activeId);
+    if (!v) { alert('Сначала выберите вариант.'); return; }
+    const html = generateReportHtml(v);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if (!w) { alert('Браузер заблокировал открытие. Разрешите попапы для этого сайта.'); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  });
+}
+
 function bindHandoff() {
   const btn = $('tw-handoff');
   if (!btn) return;
@@ -1114,6 +1336,7 @@ function init() {
   renderVariantsList();
   renderActiveVariant();
   bindListEvents();
+  bindReport();
   bindHandoff();
   // Sidebar variants list events
   $('tw-variants-list').addEventListener('click', (e) => {

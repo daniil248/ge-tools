@@ -127,6 +127,19 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
   border-top: 1px solid #e5e7eb;
   padding-top: 10px;
 }
+#tw-report {
+  width: 100%;
+  padding: 8px;
+  background: #fff;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+#tw-report:hover { background: #eff6ff; }
 #tw-handoff {
   width: 100%;
   padding: 10px;
