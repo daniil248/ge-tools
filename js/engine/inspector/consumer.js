@@ -176,17 +176,20 @@ export function openConsumerParamsModal(n) {
         </div>
       </div>`);
     } else {
+      // v0.59.836: alias переделан в merge (объединение). Раньше было два
+      // узла со ссылкой alias — теперь объединяем в один. Пользователь:
+      // «альясы переделай в мердж. объединение».
       h.push(`<div class="field" style="margin-top:8px;padding:8px 10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:4px">
-        <label style="font-size:11px;font-weight:600;color:#3730a3;margin-bottom:4px;display:block">🔗 Это тот же объект, что:</label>
+        <label style="font-size:11px;font-weight:600;color:#3730a3;margin-bottom:4px;display:block">🔀 Это тот же объект, что:</label>
         <div class="muted" style="font-size:10.5px;margin-bottom:6px;color:#3730a3;line-height:1.4">
-          Если на схеме и в неразмещённых (POR / СКС) есть один и тот же физический объект (например, размещённая <code>CR1</code> и неразмещённая <code>CR01</code>) — отметьте их как alias друг друга. Атрибуты остаются раздельными по доменам.
+          Если на схеме и в неразмещённых есть один и тот же физический объект (например, <code>CR1</code> и <code>CR01</code>) — объедините их в один. Атрибуты выбранного узла перенесутся в текущий, все его связи (электрика/СКС/инфо) перенаправятся, дубликат удалится.
         </div>
         ${linkedNode ? `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #c7d2fe;border-radius:3px">
           <span style="font-size:13px">🔗</span>
           <span style="font-weight:600">${escHtml(linkedNode.tag || linkedNode.id)}</span>
           <span class="muted">${escHtml(linkedNode.name || '')}</span>
           <span class="muted" style="margin-left:auto;font-size:10px">${(Number(linkedNode.demandKw)||0).toFixed(2)} кВт</span>
-          <button type="button" id="cp-alias-unlink" title="Разорвать связь" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">🔓</button>
+          <button type="button" id="cp-alias-unlink" title="Разорвать связь (legacy alias)" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:13px;padding:0 4px">🔓</button>
         </div>` : (_aliasCandidates.length > 0 ? `<div style="display:flex;gap:6px;align-items:center">
           <select id="cp-alias-select" style="flex:1;padding:4px 6px;border:1px solid #c7d2fe;border-radius:3px;font:inherit;font-size:11.5px">
             <option value="">— выбрать узел —</option>
@@ -197,8 +200,8 @@ export function openConsumerParamsModal(n) {
               return `<option value="${escAttr(m.id)}">${escHtml(m.tag || m.id)} ${escHtml(m.name || '')} (${placement}, ${(Number(m.demandKw)||0).toFixed(2)} кВт)</option>`;
             }).join('')}
           </select>
-          <button type="button" id="cp-alias-link" style="padding:4px 12px;border:1px solid #4f46e5;background:#4f46e5;color:#fff;border-radius:3px;cursor:pointer;font-size:11px">🔗 Связать</button>
-        </div>` : `<div class="muted" style="font-size:11px;color:#6b7280;font-style:italic">В проекте нет других одиночных потребителей для связи.</div>`)}
+          <button type="button" id="cp-alias-link" style="padding:4px 12px;border:1px solid #4f46e5;background:#4f46e5;color:#fff;border-radius:3px;cursor:pointer;font-size:11px">🔀 Объединить</button>
+        </div>` : `<div class="muted" style="font-size:11px;color:#6b7280;font-style:italic">В проекте нет других одиночных потребителей для объединения.</div>`)}
       </div>`);
     }
   }
@@ -1196,15 +1199,76 @@ export function openConsumerParamsModal(n) {
       });
     }
     if (aliasLinkBtn && aliasSel) {
-      aliasLinkBtn.addEventListener('click', () => {
+      aliasLinkBtn.addEventListener('click', async () => {
         const targetId = aliasSel.value;
         if (!targetId) { try { flash('Выберите узел из списка', 'warn'); } catch {} return; }
         const target = state.nodes.get(targetId);
         if (!target) return;
-        try { snapshot('alias-link:' + n.id + '↔' + target.id); } catch {}
-        n.linkedAlias = target.id;
-        target.linkedAlias = n.id;
-        try { flash(`Связаны: ${n.tag || n.id} ↔ ${target.tag || target.id}`, 'success'); } catch {}
+        // v0.59.836: реальный merge вместо alias-link.
+        // Пользователь: «альясы переделай в мердж. объединение».
+        const tLbl = `${target.tag || target.id} ${target.name || ''}`.trim();
+        const nLbl = `${n.tag || n.id} ${n.name || ''}`.trim();
+        const ok = await rsConfirm(
+          `Объединить «${tLbl}» с текущим «${nLbl}»?`,
+          `«${tLbl}» будет удалён из проекта. Все его связи (электрика, СКС, инфо-порты) перенаправятся на «${nLbl}». Атрибуты, не заданные в текущем — копируются из объединяемого. Действие необратимо без Ctrl+Z.`,
+          { okLabel: '🔀 Объединить', cancelLabel: 'Отмена' });
+        if (!ok) return;
+        try { snapshot('merge:' + n.id + '←' + target.id); } catch {}
+        // 1. Копируем НЕ ПУСТЫЕ поля target → n (без перезаписи существующих
+        //    значений n). Skip: id, type, x, y, pageIds, positionsByPage,
+        //    runtime-поля (_*), tag, linkedAlias.
+        const _SKIP = new Set(['id', 'type', 'x', 'y', 'pageIds', 'positionsByPage',
+          'tag', 'linkedAlias', 'linkedAliases', 'containerId', 'slots']);
+        for (const k of Object.keys(target)) {
+          if (_SKIP.has(k) || k.startsWith('_')) continue;
+          const tv = target[k];
+          if (tv == null || tv === '') continue;
+          if (n[k] != null && n[k] !== '') continue; // не перетираем
+          n[k] = tv;
+        }
+        // 2. Re-route connections target.id → n.id
+        for (const c of state.conns.values()) {
+          if (c.from && c.from.nodeId === target.id) c.from.nodeId = n.id;
+          if (c.to   && c.to.nodeId   === target.id) c.to.nodeId   = n.id;
+        }
+        if (state.sysConns) {
+          for (const sc of state.sysConns.values()) {
+            if (sc.fromNodeId === target.id) sc.fromNodeId = n.id;
+            if (sc.toNodeId   === target.id) sc.toNodeId   = n.id;
+          }
+        }
+        // 3. Re-route SCS-design links (cross-module storage)
+        try {
+          const _pid = (typeof localStorage !== 'undefined')
+            ? JSON.parse(localStorage.getItem('raschet.activeProjectId.v1') || 'null') : null;
+          if (_pid) {
+            const _key = `raschet.project.${_pid}.scs-design.links.v1`;
+            const _raw = localStorage.getItem(_key);
+            if (_raw) {
+              const _arr = JSON.parse(_raw);
+              if (Array.isArray(_arr)) {
+                let _changed = false;
+                for (const l of _arr) {
+                  if (!l) continue;
+                  if (l.fromRackId === target.id) { l.fromRackId = n.id; _changed = true; }
+                  if (l.toRackId   === target.id) { l.toRackId   = n.id; _changed = true; }
+                }
+                if (_changed) localStorage.setItem(_key, JSON.stringify(_arr));
+              }
+            }
+          }
+        } catch (e) { console.warn('[merge] SCS rebind failed', e); }
+        // 4. Если target в каком-то контейнере — заменим slot.nodeId на n.id
+        for (const m of state.nodes.values()) {
+          if (m.type !== 'consumer-container' || !Array.isArray(m.slots)) continue;
+          for (const s of m.slots) {
+            if (s && s.kind === 'linked' && s.nodeId === target.id) s.nodeId = n.id;
+          }
+        }
+        // 5. Удаляем target из state.nodes (bypass conn-gate, т.к. мы только
+        //    что перенаправили все его связи).
+        state.nodes.delete(target.id);
+        try { flash(`Объединено: «${tLbl}» → «${nLbl}»`, 'success'); } catch {}
         notifyChange();
         openConsumerParamsModal(n);
       });
