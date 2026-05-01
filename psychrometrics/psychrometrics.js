@@ -1479,45 +1479,70 @@ function escHtml(s) {
    Диаграмма
    ======================================================================== */
 
-// v0.59.929: каталог зон для overlay на i-d диаграмме.
-//   ASHRAE 55-2017 — комфорт-зона офиса (T × RH bounds)
-//   ASHRAE TC 9.9 (2021) — ЦОД-классы Recommended / A1 / A2 / A3 / A4
-//     (упрощённые прямоугольники T × RH; в реальности есть max DP corner — но
-//     для визуального ориентира box достаточен.)
+// v0.59.937: каталог зон с ПОЛНЫМИ ASHRAE TC 9.9 (2021) bounds:
+//   Tmin/Tmax — DB (dry-bulb) пределы
+//   RHmin/RHmax — относительная влажность
+//   TdMin/TdMax — точка росы (dew-point) — КРИТИЧНО для правильной формы.
+// По репорту: «в оригинале линия не идет до пересечения с линией влажности,
+// а заканчивается гораздо раньше». Раньше зона рисовалась как прямоугольник
+// T × RH — верхний правый угол выходил за реальный максимум Td (например
+// для Recommended W при T=27, RH=60% получалось ~0.0135 кг/кг = Td≈18.5°C,
+// а в спеке TC 9.9 макс Td для Recommended = 15°C). На i-d это видно как
+// зону, перерезающую больше, чем должна.
+//
+// Финальная форма envelope = пересечение четырёх ограничений:
+//   T ∈ [Tmin, Tmax]
+//   RH ∈ [RHmin, RHmax]    (W ≥ W(T, RHmin), W ≤ W(T, RHmax))
+//   Td ∈ [TdMin, TdMax]    (W ≥ W_sat(TdMin), W ≤ W_sat(TdMax))
 const COMFORT_ZONES = {
-  'ashrae55':  { Tmin: 23, Tmax: 26, RHmin: 0.30, RHmax: 0.60, label: 'ASHRAE 55', stroke: '#16a34a', fill: 'rgba(22,163,74,0.12)' },
-  'tc99-rec':  { Tmin: 18, Tmax: 27, RHmin: 0.30, RHmax: 0.60, label: 'TC 9.9 Recommended', stroke: '#15803d', fill: 'rgba(22,163,74,0.12)' },
-  'tc99-a1':   { Tmin: 15, Tmax: 32, RHmin: 0.20, RHmax: 0.80, label: 'TC 9.9 A1',  stroke: '#1e40af', fill: 'rgba(59,130,246,0.10)' },
-  'tc99-a2':   { Tmin: 10, Tmax: 35, RHmin: 0.20, RHmax: 0.80, label: 'TC 9.9 A2',  stroke: '#7c3aed', fill: 'rgba(124,58,237,0.10)' },
-  'tc99-a3':   { Tmin:  5, Tmax: 40, RHmin: 0.08, RHmax: 0.85, label: 'TC 9.9 A3',  stroke: '#b45309', fill: 'rgba(180,83,9,0.10)' },
-  'tc99-a4':   { Tmin:  5, Tmax: 45, RHmin: 0.08, RHmax: 0.90, label: 'TC 9.9 A4',  stroke: '#b91c1c', fill: 'rgba(185,28,28,0.10)' },
+  'ashrae55':  { Tmin: 23, Tmax: 26, RHmin: 0.30, RHmax: 0.60, TdMin: 4,   TdMax: 17, label: 'ASHRAE 55',          stroke: '#16a34a', fill: 'rgba(22,163,74,0.12)' },
+  'tc99-rec':  { Tmin: 18, Tmax: 27, RHmin: 0.0,  RHmax: 0.60, TdMin: 5.5, TdMax: 15, label: 'TC 9.9 Recommended', stroke: '#15803d', fill: 'rgba(22,163,74,0.12)' },
+  'tc99-a1':   { Tmin: 15, Tmax: 32, RHmin: 0.08, RHmax: 0.80, TdMin: -12, TdMax: 17, label: 'TC 9.9 A1',          stroke: '#1e40af', fill: 'rgba(59,130,246,0.10)' },
+  'tc99-a2':   { Tmin: 10, Tmax: 35, RHmin: 0.08, RHmax: 0.80, TdMin: -12, TdMax: 21, label: 'TC 9.9 A2',          stroke: '#7c3aed', fill: 'rgba(124,58,237,0.10)' },
+  'tc99-a3':   { Tmin:  5, Tmax: 40, RHmin: 0.08, RHmax: 0.85, TdMin: -12, TdMax: 24, label: 'TC 9.9 A3',          stroke: '#b45309', fill: 'rgba(180,83,9,0.10)' },
+  'tc99-a4':   { Tmin:  5, Tmax: 45, RHmin: 0.08, RHmax: 0.90, TdMin: -12, TdMax: 24, label: 'TC 9.9 A4',          stroke: '#b91c1c', fill: 'rgba(185,28,28,0.10)' },
 };
 
 function computeComfortZonePolygon(P, X, Y, zoneId) {
   const z = COMFORT_ZONES[zoneId];
   if (!z) return null;
-  // v0.59.932: edges по RH=const на i-d являются КРИВЫМИ (W = f(T,RH) нелинейно
-  // через Pws(T)), а не прямыми. Подразбиваем top/bottom edges по T с шагом
-  // 0.5°C → плавные кривые. Left/right edges (T=const) рисуются как прямые.
-  const Tstep = 0.5;
-  const corners = [];
+  // v0.59.937: envelope = AND по 4-м constraints. На каждом T ∈ [Tmin, Tmax]
+  // вычисляем верхнюю и нижнюю границу W:
+  //   W_low(T)  = max( W(T, RHmin),  W_sat(TdMin) )   ← если RHmin задано
+  //   W_high(T) = min( W(T, RHmax),  W_sat(TdMax) )
+  // Если W_low > W_high при данном T — точка вне envelope (не добавляем).
+  // Затем строим polygon: нижняя кривая слева→направо + верхняя кривая
+  // справа→налево. Точки T_in/T_out на пересечении constraints находятся
+  // автоматически (просто отсекаем участок где low>high).
   try {
-    // Bottom edge (RH=RHmin): T от Tmin до Tmax, RH=RHmin
+    const Tstep = 0.5;
+    const Wsat = (T) => humidityRatio(T, 1.0, P);
+    const Wlow = (T) => Math.max(
+      humidityRatio(T, z.RHmin || 0, P),
+      Number.isFinite(z.TdMin) ? Wsat(z.TdMin) : 0
+    );
+    const Whigh = (T) => Math.min(
+      humidityRatio(T, z.RHmax, P),
+      Number.isFinite(z.TdMax) ? Wsat(z.TdMax) : Infinity
+    );
+    // Bottom curve: T от Tmin до Tmax, W = W_low(T)
+    const bottom = [];
     for (let T = z.Tmin; T <= z.Tmax + 1e-3; T += Tstep) {
-      corners.push([Math.min(T, z.Tmax), z.RHmin]);
+      const T_ = Math.min(T, z.Tmax);
+      const wl = Wlow(T_), wh = Whigh(T_);
+      if (wl <= wh + 1e-9) bottom.push([T_, wl]);
     }
-    // Right edge (T=Tmax): RH от RHmin до RHmax — straight (in T-coords)
-    // Уже добавили (Tmax, RHmin) в bottom. Теперь добавим (Tmax, RHmax).
-    corners.push([z.Tmax, z.RHmax]);
-    // Top edge (RH=RHmax): T от Tmax до Tmin (обратно), RH=RHmax
-    for (let T = z.Tmax - Tstep; T >= z.Tmin - 1e-3; T -= Tstep) {
-      corners.push([Math.max(T, z.Tmin), z.RHmax]);
+    // Top curve: T от Tmax до Tmin (обратный обход), W = W_high(T)
+    const top = [];
+    for (let T = z.Tmax; T >= z.Tmin - 1e-3; T -= Tstep) {
+      const T_ = Math.max(T, z.Tmin);
+      const wl = Wlow(T_), wh = Whigh(T_);
+      if (wl <= wh + 1e-9) top.push([T_, wh]);
     }
-    // Left edge (T=Tmin): RH от RHmax до RHmin — closed automatically by polygon
-    const pts = corners.map(([T, RH]) => {
-      const W = humidityRatio(T, RH, P);
-      return `${X(W).toFixed(1)},${Y(T).toFixed(1)}`;
-    });
+    if (bottom.length < 2 || top.length < 2) return null;
+    const corners = [...bottom, ...top];
+    const pts = corners.map(([T, W]) =>
+      `${X(W).toFixed(1)},${Y(T).toFixed(1)}`);
     return { points: pts.join(' '), zone: z };
   } catch { return null; }
 }
