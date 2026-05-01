@@ -4,6 +4,11 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.918', date: '2026-04-30', items: [
+      '👀 <b>Новые точки появляются в центре viewport</b>. По репорту: «соединения еще не работают» — оказалось точки добавлялись в фиксированных координатах (20+i×220) и при отзумленном/панорамированном canvas просто были вне видимой области. Связи рендерились корректно, но не видны.',
+      '• <code>+ узел</code> теперь размещает новую точку в центре текущего viewport (с учётом pan tx/ty и scale через <code>computeViewportCenter()</code>). Пользователь сразу её видит.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (computeViewportCenter helper + psy-add handler с smart placement).',
+    ] },
     { version: '0.59.917', date: '2026-04-30', items: [
       '🔍 <b>Auto-fit canvas после создания recup/recirc блока</b>. Раньше после клика «♻ + Рекуператор» новый блок мог быть за пределами viewport (если canvas был отзумлен или панорамирован). Теперь после создания вызывается fitCanvas() — все точки + зоны вписываются в viewport с padding 40px.',
       '• <code>fitCanvas()</code> вынесена в global scope (раньше была внутри wireInfiniteCanvas closure) для использования из recup/recirc-кнопок.',

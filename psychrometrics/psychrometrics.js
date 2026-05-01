@@ -2255,7 +2255,14 @@ function wire() {
 
   $('psy-add').addEventListener('click', () => {
     try {
-      S.points.push({ name:'', t:'', rh:'', x:'', h:'', V:'' });
+      // v0.59.918: размещаем новую точку в центре viewport (с учётом pan/zoom)
+      // чтобы пользователь её сразу увидел
+      const vp = computeViewportCenter();
+      S.points.push({
+        name:'', t:'', rh:'', x:'', h:'', V:'',
+        cx: vp.x - 100,  // -100 = NODE_W/2 чтобы центр карточки совпал
+        cy: vp.y - 110,
+      });
       rerenderCycle();
     } catch (e) { console.error('[psy-add click]', e); }
   });
@@ -2856,6 +2863,19 @@ function applyWizard(pt, overlay, fromIdx) {
 // Zoom: wheel (с origin под курсором).
 // Fit: кнопка ⊞ или dblclick на пустой области — вписывает все узлы.
 // ========================================================================
+// v0.59.918: вычисляет центр текущего viewport в координатах canvas-inner
+// (с учётом pan tx/ty и scale). Полезно для размещения новых точек.
+function computeViewportCenter() {
+  const canvas = document.getElementById('psy-canvas');
+  if (!canvas) return { x: 200, y: 200 };
+  const v = S.canvasView || { tx: 0, ty: 0, scale: 1 };
+  const cw = canvas.clientWidth, ch = canvas.clientHeight;
+  return {
+    x: (cw / 2 - v.tx) / (v.scale || 1),
+    y: (ch / 2 - v.ty) / (v.scale || 1),
+  };
+}
+
 // v0.59.917: глобальная fit-функция для canvas (используется тоже из
 // recup/recirc-кнопок). Вычисляется отдельно, без замыкания на wireInfiniteCanvas.
 function fitCanvas() {
