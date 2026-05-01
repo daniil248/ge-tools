@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.943', date: '2026-05-01', items: [
+      '🌡 <b>Wet-Bulb метки на кривой насыщения в ASHRAE-style</b>. Соответствует reference ASHRAE Handbook Foundamentals Fig.2 («Wet Bulb or Saturation Temperature» на левой оси).',
+      '• На кривой насыщения T_db = T_wb, поэтому каждая точка при integer T (5, 10, 15, 20, 25, 30°C) одновременно — метка wet-bulb. Раскрашены красным (#c62828) с белой stroke-обводкой для читаемости.',
+      '• Под кривой насыщения наклонная подпись «Wet Bulb / Saturation Temp, °C» (повторяет ориентацию кривой ≈45°).',
+      '• Только в ASHRAE-mode (landscape). В Mollier-Ramzin метки T идут по левой оси и Wet-Bulb там не нужен.',
+      'Файл: <code>psychrometrics/psychrometrics-chart.js</code> (Wet-Bulb tick marks + axis label).',
+    ] },
     { version: '0.59.942', date: '2026-05-01', items: [
       '🏷 <b>Bug-fix: метки зон ASHRAE TC 9.9 уезжали в пустоту</b>. По репорту: «подписи зон уезжают в таком виде» (скрин TC 9.9 stack-mode где A1, A2, A3, A4 labels были высоко сверху, далеко от своих envelopes).',
       '• Раньше: метка зоны позиционировалась в <code>(Tmax, RHmax)</code>. С введением Td-clamping (v0.59.938) фактический верхний-правый угол envelope = <code>(Tmax, min(W_RH(Tmax,RHmax), W_sat(TdMax)))</code>, а метка ставилась ВЫШЕ — в области, где envelope больше не доходит.',

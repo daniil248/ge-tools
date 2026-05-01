@@ -161,6 +161,30 @@ export function render(container, opts = {}) {
                 φ=${rh}%</text>`;
       }
     }
+    // v0.59.943: Wet-Bulb метки на кривой насыщения. На saturation curve
+    // T_db = T_wb, поэтому каждая точка кривой при integer T = метка
+    // wet-bulb. Раскрашиваем красным (как в reference ASHRAE Foundamentals
+    // Fig.2 — Wet Bulb / Saturation Temperature на левой оси).
+    for (let T = 0; T <= 30; T += 5) {
+      if (T < o.T_min || T > o.T_max) continue;
+      const W = humidityRatio(T, 1.0, o.P);
+      if (W > o.W_max) continue;
+      const [px, py] = pos(W, T);
+      svg += `<text x="${px - 4}" y="${py - 3}" text-anchor="end"
+               style="font-size:9px;fill:#c62828;font-weight:600;
+               paint-order:stroke;stroke:#fff;stroke-width:2px;">${T}</text>`;
+    }
+    // Подпись «Wet Bulb / Saturation» вдоль кривой насыщения (диагональ).
+    // Размещаем у Twb=15°C, ориентированную вдоль кривой ≈45°.
+    const twbLbl_W = humidityRatio(15, 1.0, o.P);
+    if (twbLbl_W >= o.W_min && twbLbl_W <= o.W_max) {
+      const [lx, ly] = pos(twbLbl_W, 15);
+      svg += `<text x="${lx - 14}" y="${ly + 22}" text-anchor="middle"
+               transform="rotate(-45 ${lx - 14} ${ly + 22})"
+               style="font-size:9px;fill:#c62828;font-style:italic;
+               paint-order:stroke;stroke:#fff;stroke-width:2px;">
+               Wet Bulb / Saturation Temp, °C</text>`;
+    }
   } else {
     // RAMZIN: T-метки слева, W-метки снизу
     for (let T = Math.ceil(o.T_min / 5) * 5; T <= o.T_max; T += 5) {
