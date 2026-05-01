@@ -4,6 +4,11 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.917', date: '2026-04-30', items: [
+      '🔍 <b>Auto-fit canvas после создания recup/recirc блока</b>. Раньше после клика «♻ + Рекуператор» новый блок мог быть за пределами viewport (если canvas был отзумлен или панорамирован). Теперь после создания вызывается fitCanvas() — все точки + зоны вписываются в viewport с padding 40px.',
+      '• <code>fitCanvas()</code> вынесена в global scope (раньше была внутри wireInfiniteCanvas closure) для использования из recup/recirc-кнопок.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code>.',
+    ] },
     { version: '0.59.916', date: '2026-04-30', items: [
       '🐛 <b>SVG links учитывают отрицательные координаты</b>. После v0.59.914 (drag без 0-clamp) карточки точек могут быть в negative space, но SVG-связи виднелись только в положительной зоне (viewBox начинался с 0,0).',
       '• Fix: <code>renderCanvasLinks</code> вычисляет min(cx,cy) среди всех точек и устанавливает viewBox с этими координатами как origin. SVG-элемент позиционируется через <code>style.left/top</code> на минимальные координаты. Padding 40px от граней.',

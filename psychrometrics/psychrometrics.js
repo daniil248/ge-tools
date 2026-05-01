@@ -2283,6 +2283,8 @@ function wire() {
     // визуально полезно показать второй поток.
     S.procs.push({ type:'R', fromIdx: baseI + 2, toIdx: baseI + 3, recupWith: String(baseI + 0), recupEff: '0.65', Q:'', qw:'' });
     rerenderCycle();
+    // v0.59.917: auto-fit canvas чтобы новый блок попал в viewport
+    setTimeout(() => fitCanvas(), 50);
     psyToast('♻ Рекуператор-блок: 4 точки + 2 R-процесса. η=0.65', 'ok');
   });
 
@@ -2297,6 +2299,7 @@ function wire() {
     S.points.push({ name:'Смесь',              t:'',    rh:'',   cx: baseX + 160,   cy: baseY + 280,   x:'', h:'', V:'' });
     S.procs.push({ type:'M', fromIdx: baseI + 0, toIdx: baseI + 2, mixWith: String(baseI + 1), mixRatio: '0.3', Q:'', qw:'' });
     rerenderCycle();
+    setTimeout(() => fitCanvas(), 50);
     psyToast('🔄 Рециркуляция-блок: свежий 30%, возврат 70%', 'ok');
   });
 
@@ -2853,6 +2856,50 @@ function applyWizard(pt, overlay, fromIdx) {
 // Zoom: wheel (с origin под курсором).
 // Fit: кнопка ⊞ или dblclick на пустой области — вписывает все узлы.
 // ========================================================================
+// v0.59.917: глобальная fit-функция для canvas (используется тоже из
+// recup/recirc-кнопок). Вычисляется отдельно, без замыкания на wireInfiniteCanvas.
+function fitCanvas() {
+  const canvas = document.getElementById('psy-canvas');
+  const inner  = document.getElementById('psy-canvas-inner');
+  if (!canvas || !inner) return;
+  const points = S.points || [];
+  const zones = S.zones || [];
+  if (!points.length && !zones.length) return;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    const cx = Number(p.cx) || 0, cy = Number(p.cy) || 0;
+    if (cx < minX) minX = cx;
+    if (cy < minY) minY = cy;
+    if (cx + 200 > maxX) maxX = cx + 200;
+    if (cy + 220 > maxY) maxY = cy + 220;
+  }
+  for (const z of zones) {
+    const cx = Number(z.cx) || 0, cy = Number(z.cy) || 0;
+    const w = Number(z.w) || 200, h = Number(z.h) || 200;
+    if (cx < minX) minX = cx;
+    if (cy < minY) minY = cy;
+    if (cx + w > maxX) maxX = cx + w;
+    if (cy + h > maxY) maxY = cy + h;
+  }
+  if (!Number.isFinite(minX)) return;
+  const padding = 40;
+  minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+  const cw = canvas.clientWidth, ch = canvas.clientHeight;
+  const contentW = maxX - minX, contentH = maxY - minY;
+  const scale = Math.min(cw / contentW, ch / contentH, 1.5);
+  if (!S.canvasView) S.canvasView = { tx: 0, ty: 0, scale: 1 };
+  S.canvasView.scale = Math.max(0.15, scale);
+  S.canvasView.tx = (cw - contentW * S.canvasView.scale) / 2 - minX * S.canvasView.scale;
+  S.canvasView.ty = (ch - contentH * S.canvasView.scale) / 2 - minY * S.canvasView.scale;
+  inner.style.transform = `translate3d(${S.canvasView.tx}px, ${S.canvasView.ty}px, 0) scale(${S.canvasView.scale})`;
+  const lab = document.getElementById('psy-canvas-zoom');
+  if (lab) lab.textContent = Math.round(S.canvasView.scale * 100) + '%';
+  const gridSize = 20 * S.canvasView.scale;
+  canvas.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+  canvas.style.backgroundPosition = `${S.canvasView.tx}px ${S.canvasView.ty}px`;
+  try { localStorage.setItem('psy.canvasView', JSON.stringify(S.canvasView)); } catch {}
+}
+
 function wireInfiniteCanvas() {
   const canvas = document.getElementById('psy-canvas');
   const inner  = document.getElementById('psy-canvas-inner');
