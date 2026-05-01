@@ -498,8 +498,59 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 .mt-sp-pick-here-btn:hover { background: #eef2ff; }
 
 /* ASHRAE design table */
-.mt-ashrae-table { margin: 8px 0 14px; }
-.mt-ashrae-table th { background: #fef3c7; }
+.mt-ashrae-table { margin: 8px 0 14px; font-size: 11.5px; }
+.mt-ashrae-table th { background: #f3f4f6; }
+
+/* v0.59.904: ASHRAE Foundamentals datasheet (стиль официальной таблицы) */
+.mt-ashrae-sheet { font-family: system-ui, sans-serif; color: #1f2937; }
+.mt-ashrae-banner {
+  text-align: center;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.mt-ashrae-banner h3 { margin: 0 0 4px; font-size: 14px; color: #111827; }
+.mt-ashrae-meta { font-size: 11.5px; color: #4b5563; }
+.mt-ashrae-band {
+  margin: 14px 0 0;
+  padding: 5px 10px;
+  background: #16a34a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 3px 3px 0 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.mt-band-h { background: #15803d; }
+.mt-band-c { background: #16a34a; }
+.mt-band-x { background: #b91c1c; }
+.mt-band-m { background: #1e40af; }
+.mt-ashrae-uptime {
+  font-size: 10.5px;
+  font-weight: 400;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 1px 7px;
+  border-radius: 3px;
+  margin-left: 8px;
+}
+.mt-ashrae-sheet .mt-ashrae-table {
+  margin: 0 0 4px;
+  font-size: 11px;
+}
+.mt-ashrae-sheet .mt-ashrae-table th,
+.mt-ashrae-sheet .mt-ashrae-table td {
+  padding: 4px 6px;
+  text-align: center;
+  border: 1px solid #d1d5db;
+  font-variant-numeric: tabular-nums;
+}
+.mt-ashrae-sheet .mt-ashrae-table th { background: #ecfccb; color: #1f2937; font-weight: 600; }
+.mt-ashrae-sheet .mt-ashrae-table tbody td:first-child { background: #f9fafb; font-weight: 600; text-align: left; }
+.mt-ashrae-note { margin-top: 12px; font-size: 11px; }
 
 /* ─── v0.59.900: chiller spec form */
 .mt-chiller-wrap {

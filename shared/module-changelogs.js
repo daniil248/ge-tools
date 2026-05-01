@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.904', date: '2026-04-30', items: [
+      '📋 <b>Полный ASHRAE Foundamentals datasheet по метеостанции</b>. По задаче: «нужны листы данных из ASHRAE Handbook - Foundamentals и в ASHRAE Design минимум блок минимумов и максимумов, это важно для обоснования выбора климатических систем для Uptime Institute».',
+      '• Новый файл <code>meteo/ashrae-datasheet.js</code> — формат идентичен официальной таблице 2025 ASHRAE HoF гл. 14 (см. screenshot пользователя).',
+      '<b>Включает все 5 разделов:</b>',
+      '• <b>Annual Heating, Humidification, Ventilation</b>: Coldest Month, Heating DB 99.6%/99%, Humidification DP/MCDB/HR (99.6%/99%), Coldest Month WS/MCDB (0.4%/1%), MCWS/PCWD, WSF.',
+      '• <b>Annual Cooling, Dehumidification, Enthalpy</b>: Hottest Month, DB Range, Cooling DB/MCWB (0.4%/1%/2%), Evaporation WB/MCDB (0.4%/1%/2%), Dehumidification DP/HR/MCDB (0.4%/1%/2%), Enthalpy/MCDB (0.4%/1%/2%).',
+      '• <b>🚨 Extreme Annual Design Conditions (КРИТИЧНО для Uptime Institute)</b>: Extreme Annual WS (1%/2.5%/5%), Mean min/max + Std deviation, n-Year Return Period (n=5/10/20/50 years × min/max). Return-period расчёт по нормальному распределению с k-коэффициентами 1.51/1.91/2.27/2.66.',
+      '• <b>Monthly Climatic Design Conditions</b>: 12 столбцов + Annual. Параметры: DBAvg, DBStd, HDD10.0, HDD18.3, CDD10.0, CDD18.3, WSAvg.',
+      '🎨 <b>Стиль таблицы — как в официальном Handbook</b>: зелёные band-заголовки, серые tab-headers, светлые строки, моноширинные tabular-числа.',
+      '🧮 <b>Психрометрия — точная</b>: HR/Enthalpy через ASHRAE 2021 формулы из <code>psychrometrics-core.js</code> (а не упрощённую Stull). Атмосферное давление учитывает elev станции через barometric formula.',
+      '🔄 <b>Tab «🌡 ASHRAE design» теперь работает для любого датасета</b> (open-meteo / rp5 / csv-generic), не только ashrae-source — расчёт inline из hourly. Минимум 30 дней данных.',
+      'Файл: <code>meteo/ashrae-datasheet.js</code> (новый), <code>meteo/meteo.js</code> (renderAshraeBlock переписан), <code>meteo/meteo.css</code> (стили mt-ashrae-band/mt-ashrae-uptime/etc).',
+    ] },
     { version: '0.59.903', date: '2026-04-30', items: [
       '🎨 <b>Унификация оформления модулей</b>. По репорту: «у новых модулей нет однотипно как для всех модулей футера, оформление должно быть одинаковым; и почему раздел проекты в темных тонах».',
       '• <b>Footer</b> подключён в <code>meteo/</code> и <code>tech-workspace/</code> — стандартный <code>shared/module-footer.js</code> с APP_VERSION + changelog (как в cable, battery, mdc-config и других модулях).',

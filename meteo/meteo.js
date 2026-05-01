@@ -20,6 +20,7 @@ import { ensureDefaultProject, projectKey } from '../shared/project-storage.js';
 import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
 import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, drawWindRose, renderDaysInRangeTable } from './charts.js';
+import { renderAshraeDatasheet } from './ashrae-datasheet.js';
 import { COLUMNS, DEFAULT_CHILLER, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker, renderChillerSpecForm } from './annual-table.js';
 
 const $ = (id) => document.getElementById(id);
@@ -196,45 +197,15 @@ function drawSummary(d, s) {
 function renderAshraeBlock(d) {
   const block = $('mt-ashrae-block');
   if (!block) return;
-  const ash = d.stats?.ashraeDesign;
-  if (!ash) {
-    block.innerHTML = `<p class="muted">ASHRAE design conditions для этого датасета не вычислены. Загружайте данные через источник <b>📐 ASHRAE</b> (10 лет архива по выбранной станции) — расчёт делается автоматически.</p>
-      <p class="muted" style="font-size:11.5px">Текущий датасет: <code>${util.escHtml(d.source)}</code> (${(d.hourly || []).length} записей). Если данных ≥ 5 лет, можно выполнить расчёт прямо сейчас:</p>
-      <button type="button" class="mt-btn-primary" id="mt-ashrae-compute">📐 Вычислить design-условия из текущих данных</button>`;
-    const btn = block.querySelector('#mt-ashrae-compute');
-    if (btn) btn.addEventListener('click', async () => {
-      const m = await import('./sources/ashrae.js');
-      // ashrae.js не экспортирует computeAshraeDesign публично — для inline-расчёта
-      // вызываем общий percentile-помощник из ниже:
-      const ds = computeAshraeFromHourly(d.hourly);
-      d.stats.ashraeDesign = ds;
-      persist();
-      renderActiveTab();
-    });
+  // v0.59.904: всегда рендерим полный ASHRAE-datasheet из hourly,
+  // независимо от того был ли датасет загружен через ASHRAE-источник
+  // или Open-Meteo/rp5. Минимум 1 год данных нужен.
+  const hourly = d.hourly || [];
+  if (hourly.length < 24 * 30) {
+    block.innerHTML = `<p class="muted">Недостаточно данных (${hourly.length} часов). Минимум 30 дней почасовых наблюдений для статистических расчётов.</p>`;
     return;
   }
-  block.innerHTML = `
-    <p class="muted">Расчётные условия по ASHRAE HoF гл. 14, рассчитаны из ${ash.nYears || '?'} лет почасовых данных. MCWB — coincident wet-bulb, MCDP — coincident dew-point.</p>
-    <h4>Heating (зимний расчёт)</h4>
-    <table class="mt-ashrae-table">
-      <thead><tr><th>Перцентиль</th><th class="num">T<sub>db</sub>, °C</th><th class="num">MCWB, °C</th><th class="num">MCDP, °C</th></tr></thead>
-      <tbody>
-        <tr><td><b>99.6%</b> (extreme)</td><td class="num">${fmt(ash.heating?.pct99_6?.Tdb)}</td><td class="num">${fmt(ash.heating?.pct99_6?.MCWB)}</td><td class="num">${fmt(ash.heating?.pct99_6?.MCDP)}</td></tr>
-        <tr><td><b>99%</b> (typical)</td><td class="num">${fmt(ash.heating?.pct99_0?.Tdb)}</td><td class="num">${fmt(ash.heating?.pct99_0?.MCWB)}</td><td class="num">${fmt(ash.heating?.pct99_0?.MCDP)}</td></tr>
-      </tbody>
-    </table>
-    <h4>Cooling (летний расчёт)</h4>
-    <table class="mt-ashrae-table">
-      <thead><tr><th>Перцентиль</th><th class="num">T<sub>db</sub>, °C</th><th class="num">MCWB, °C</th><th class="num">MCDP, °C</th></tr></thead>
-      <tbody>
-        <tr><td><b>0.4%</b> (peak)</td><td class="num">${fmt(ash.cooling?.pct0_4?.Tdb)}</td><td class="num">${fmt(ash.cooling?.pct0_4?.MCWB)}</td><td class="num">${fmt(ash.cooling?.pct0_4?.MCDP)}</td></tr>
-        <tr><td><b>1%</b></td><td class="num">${fmt(ash.cooling?.pct1_0?.Tdb)}</td><td class="num">${fmt(ash.cooling?.pct1_0?.MCWB)}</td><td class="num">${fmt(ash.cooling?.pct1_0?.MCDP)}</td></tr>
-        <tr><td><b>2%</b></td><td class="num">${fmt(ash.cooling?.pct2_0?.Tdb)}</td><td class="num">${fmt(ash.cooling?.pct2_0?.MCWB)}</td><td class="num">${fmt(ash.cooling?.pct2_0?.MCDP)}</td></tr>
-      </tbody>
-    </table>
-    <p class="muted" style="font-size:11.5px;margin-top:10px">⚠ Значения вычислены по public Open-Meteo historical data (1940→present), не из официальных ASHRAE Handbook таблиц (paywalled). Методика — стандартные перцентили T<sub>db</sub> по ряду; MCWB — упрощённая Stull 2011.</p>`;
-
-  function fmt(v) { return v == null ? '—' : Number(v).toFixed(1); }
+  block.innerHTML = renderAshraeDatasheet(d, d.locationName || d.name);
 }
 
 function computeAshraeFromHourly(hourly) {
