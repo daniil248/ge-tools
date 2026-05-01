@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.987', date: '2026-05-01', items: [
+      '❄ <b>Free-cooling для чиллеров + DX-системы (air-cooled / pumped refrigerant)</b>. По требованию: «для чиллеров нужно добавить режим фрикулинга. Так же такой же расчёт сделать для простых DX систем, и конденсаторов с фрикулингом (фреоновые насосы)».',
+      '• <b>Тип системы</b>: Чиллер (CHW) / DX air-cooled (RTU/сплит) / DX с pumped refrigerant FC (Liebert/Vertiv-style).',
+      '• <b>Free-cooling chiller</b>: режимы dry (drycooler, T_ref=T_db) и wet (cooling tower, T_ref=T_wb). Параметры: CHWS T (°C), Approach ΔT (°C), Aux power FC (% от ratedCap).',
+      '• <b>DX pumped FC</b>: бинарный режим — компрессор отключается при T_db ≤ threshold (default 13°C), хладагент гонится насосом. Aux pump power 2–4% от ratedCap.',
+      '• <b>Per-bin расчёт</b>: capacity(T) c T-correction, COP_mech(T) IPLV-curve, FC fraction по threshold, P_total = (1−fc)·Cap/COP + P_aux, COP_eff = Cap/P_total. Bin T_wb вычисляется через формулу Stull (2011) из avg RH в бине.',
+      '• <b>Новые столбцы annual table</b>: capacity, COP_mech, FC%, COP_eff, Total Power, Annual energy, Avg T_wb. Tooltip на каждом столбце с расширенным описанием формулы.',
+      '• <b>Спецификация-форма</b>: разбита на 4 секции (тип системы / capacity-COP correction / free-cooling / DX-pumped FC). Секции FC/DX-FC показываются по типу системы. Раскрывающийся блок «📐 Методика расчёта (формулы)» с полным описанием алгоритма и источниками (ASHRAE HoF 2021 гл. 18, ASHRAE 90.1 IPLV bin-method, Vertiv Pumped Refrigerant Economizer, Stull 2011 Wet-Bulb).',
+      '• Tooltip на каждом параметре формы — что это, в каких единицах, типичные значения, формула.',
+      'Файлы: <code>meteo/annual-table.js</code> (DEFAULT_CHILLER расширен, COLUMNS + tip, applyChillerCalc rewritten, buildBinData → twbAvg, renderChillerSpecForm 4 секции + методика), <code>meteo/meteo.css</code> (.mt-chiller-section), <code>meteo/meteo.js</code> (auto-enable новых cols + re-render формы при смене systemType).',
+    ] },
     { version: '0.59.986', date: '2026-05-01', items: [
       '📅 <b>Глобальный фильтр периода в meteo — применяется ко всем вкладкам</b>. По требованию: «все графики и сводка должны иметь настройку, вывод по годам, за произвольный период».',
       '• Бар над вкладками: select режим («Все годы (среднее)» / «Конкретный год» / «Период от-до») + дополнительные элементы зависят от режима (year-select или 2 date-input).',

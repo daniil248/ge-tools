@@ -444,31 +444,35 @@ function init() {
   const chillerBtn = $('mt-chiller-btn');
   if (chillerBtn) {
     const wrap = $('mt-chiller-wrap');
+    // v0.59.987: re-render формы при каждом изменении spec (нужно чтобы
+    // секции FC/DX-FC показывались/скрывались сразу при смене systemType).
+    const renderForm = () => {
+      if (!wrap || wrap.hidden) return;
+      wrap.innerHTML = '';
+      wrap.appendChild(renderChillerSpecForm(_chillerSpec, (next) => {
+        const sysTypeChanged = (_chillerSpec?.systemType || 'chiller') !== (next.systemType || 'chiller');
+        _chillerSpec = next;
+        // Auto-enable chiller-columns если ratedCapKw введён впервые.
+        if (next && Number(next.ratedCapKw) > 0) {
+          const chillerCols = ['capacity', 'copMech', 'fcFraction', 'cop', 'power', 'energy'];
+          for (const c of chillerCols) if (!_activeCols.includes(c)) _activeCols.push(c);
+        }
+        persist();
+        reRenderAnnual();
+        if (sysTypeChanged) renderForm();   // показать/скрыть секции FC/DX-FC
+      }, () => {
+        _chillerSpec = null;
+        _activeCols = _activeCols.filter(c => !['capacity','copMech','fcFraction','cop','power','energy'].includes(c));
+        persist();
+        reRenderAnnual();
+        wrap.hidden = true;
+        util.toast('Chiller/DX spec сброшен', 'info');
+      }));
+    };
     chillerBtn.addEventListener('click', () => {
       if (!wrap) return;
       wrap.hidden = !wrap.hidden;
-      if (!wrap.hidden) {
-        wrap.innerHTML = '';
-        wrap.appendChild(renderChillerSpecForm(_chillerSpec, (next) => {
-          _chillerSpec = next;
-          // Auto-enable chiller-columns если ratedCapKw введён впервые
-          if (next && Number(next.ratedCapKw) > 0) {
-            const chillerCols = ['capacity', 'cop', 'power', 'energy'];
-            for (const c of chillerCols) if (!_activeCols.includes(c)) _activeCols.push(c);
-          }
-          persist();
-          reRenderAnnual();
-        }, () => {
-          _chillerSpec = null;
-          // Также убираем chiller-cols
-          _activeCols = _activeCols.filter(c => !['capacity','cop','power','energy'].includes(c));
-          persist();
-          reRenderAnnual();
-          // Закрыть форму
-          wrap.hidden = true;
-          util.toast('Chiller spec сброшен', 'info');
-        }));
-      }
+      renderForm();
     });
   }
 

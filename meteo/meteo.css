@@ -626,4 +626,17 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
   border-color: #1e40af;
   box-shadow: 0 0 0 2px rgba(30,64,175,0.15);
 }
+/* v0.59.987: секции chiller spec form */
+.mt-chiller-section { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed #cbd5e1; }
+.mt-chiller-section:last-child { border-bottom: none; }
+.mt-chiller-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #075985;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.mt-chiller-actions { margin-top: 6px; text-align: right; }
+.mt-chiller-formula summary { font-size: 11.5px; }
 
