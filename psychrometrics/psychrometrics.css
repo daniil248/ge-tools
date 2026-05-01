@@ -284,6 +284,45 @@
 .psy-formulas code { background: #f0f4fb; padding: 1px 5px; border-radius: 3px; color: #0d47a1; font-family: 'Consolas', monospace; }
 .psy-formulas .note { background: #fff9c4; border: 1px solid #fbc02d; padding: 6px 10px; border-radius: 4px; margin: 6px 0; font-size: 11px; }
 
+/* ─── v0.59.909: Collapsible formulas panel */
+.psy-panel-collapse {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+.psy-panel-collapse > summary.psy-panel-title {
+  cursor: pointer;
+  padding: 10px 14px;
+  margin: 0;
+  border-bottom: 0;
+  user-select: none;
+  list-style: none;
+}
+.psy-panel-collapse > summary.psy-panel-title::-webkit-details-marker { display: none; }
+.psy-panel-collapse > summary.psy-panel-title::marker { content: ''; }
+.psy-panel-collapse > summary.psy-panel-title::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 10px;
+  color: #6b7280;
+  transition: transform 0.15s;
+}
+.psy-panel-collapse[open] > summary.psy-panel-title::before {
+  transform: rotate(90deg);
+}
+.psy-panel-collapse[open] > summary.psy-panel-title {
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+.psy-panel-collapse > .psy-formulas {
+  padding: 12px 18px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
 /* ─── v0.59.906: Process wizard modal */
 .psy-wiz-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000;

@@ -4,6 +4,10 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.909', date: '2026-04-30', items: [
+      '📐 <b>ID-диаграмма: «Формулы и пояснения» свёрнуты в collapsible-панель</b>. По репорту: «формулы убери в отдельную вкладку или в хелпер». Раньше блок занимал ~400 px вертикально на основной странице. Теперь — свёрнут (только заголовок «📐 Формулы и пояснения — раскрыть»), кликом раскрывается с max-height: 600px и внутренним скроллом.',
+      'Файлы: <code>psychrometrics/index.html</code> (div.psy-panel → details.psy-panel-collapse), <code>psychrometrics/psychrometrics.css</code> (стили collapsible с rotate-стрелкой ▶).',
+    ] },
     { version: '0.59.908', date: '2026-04-30', items: [
       '🚨 <b>ID-диаграмма: «📍 Из meteo» больше НЕ плодит дубли + station-picker</b>. По двум репортам пользователя:',
       '• «нажал пять раз и каждый раз вывалились по 2 карточки» → теперь точки помечаются <code>_meteoTag</code> (meteo-h996 / meteo-h99 / meteo-c1 / meteo-c04). При повторном клике — обновление существующих, не добавление.',
