@@ -387,12 +387,21 @@ body.psy-dragging *::after {
 .psy-cycle {
   position: relative;
   width: 100%; height: 100%;
+  /* v0.59.959: пропускаем клики через прозрачный wrapper.
+     По репорту: «зоны на холсте не перемещаются и не изменяют размер
+     вручную перетаскиванием». .psy-cycle — div 100×100% без фона, но
+     pointer-events: auto (default) → intercepts ВСЕ клики, не даёт им
+     достичь .psy-canvas-zones (z-index 0) под ним.
+     Теперь cycle прозрачен для событий, но точки внутри (с явным
+     pointer-events: auto) ловят клики. */
+  pointer-events: none;
 }
 .psy-cycle .psy-point {
   position: absolute;
   width: 200px;                /* ФИКСИРОВАННАЯ ШИРИНА */
   box-sizing: border-box;
   z-index: 2;
+  pointer-events: auto;
 }
 .psy-cycle .psy-point label,
 .psy-cycle .psy-point .pt-hint,

@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.959', date: '2026-05-01', items: [
+      '🚧 <b>Critical: зоны на холсте можно перетаскивать и изменять размер</b>. По репорту: «зоны на холсте не перемещаются и не изменяют размер вручную перетаскиванием, это делает их бесполезными».',
+      '• Раньше: <code>.psy-cycle</code> — wrapper 100×100% над <code>.psy-canvas-zones</code> (z=0) — имел <code>pointer-events: auto</code> (default). Без видимого фона он intercept-ил ВСЕ клики до того, как они достигали zone-слоя. Зоны были полностью некликабельны.',
+      '• Fix: <code>.psy-cycle { pointer-events: none }</code> — клики проходят сквозь прозрачный wrapper. Точки внутри получают <code>pointer-events: auto</code> явно, чтобы остаться кликабельными.',
+      '• Зоны теперь dragable за тело + resize за угловой grip, как и задумано.',
+      'Файл: <code>psychrometrics/psychrometrics.css</code> (.psy-cycle pointer-events).',
+    ] },
     { version: '0.59.958', date: '2026-05-01', items: [
       '🔬 <b>Единый расчётный движок для точек, процессов и калькулятора</b>. По репорту: «для вычисления полей в точках и процессах должен использоваться тот же калькулятор который доступен пользователю на вкладке. Значения не должны отличаться».',
       '• <code>pointState</code> теперь делегирует все формулы через <code>psychrometrics-core.js</code> (<code>state()</code>, <code>RHfromW()</code>, <code>humidityRatio</code>, <code>enthalpy</code>, <code>Pws</code>) — те же функции, что использует <code>psy-calculators.js</code> на вкладке «Калькуляторы и формулы».',
