@@ -93,7 +93,7 @@
 
           <div class="mt-section-card">
             <h3>📈 Распределение температуры (бины по 1 °C, ось Y — дней / год)</h3>
-            <canvas id="mt-hist-canvas" width="900" height="240"></canvas>
+            <div class="mt-chart-box"><canvas id="mt-hist-canvas"></canvas></div>
           </div>
 
           <div class="mt-section-card">
@@ -105,15 +105,16 @@
         <div class="mt-tab-pane" data-pane="charts" hidden>
           <div class="mt-section-card">
             <h3>💧 Распределение относительной влажности (бины 5 %, ось Y — дней / год)</h3>
-            <canvas id="mt-rh-canvas" width="900" height="220"></canvas>
+            <div class="mt-chart-box"><canvas id="mt-rh-canvas"></canvas></div>
           </div>
           <div class="mt-section-card">
             <h3>🗓 Среднемесячная температура (с диапазоном min…max)</h3>
-            <canvas id="mt-monthly-canvas" width="900" height="240"></canvas>
+            <div class="mt-chart-box"><canvas id="mt-monthly-canvas"></canvas></div>
           </div>
           <div class="mt-section-card">
             <h3>🧭 Роза ветров (16 румбов, цвет = средняя сила)</h3>
-            <canvas id="mt-windrose-canvas" width="500" height="500"></canvas>
+            <!-- Wind rose: canvas (не Chart.js), нужен фиксированный pixel-buffer 480×480. -->
+            <div class="mt-windrose-wrap"><canvas id="mt-windrose-canvas" width="480" height="480"></canvas></div>
           </div>
           <div class="mt-section-card">
             <h3>📅 Дней с T в бине × год</h3>

@@ -159,13 +159,41 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
   letter-spacing: 0.4px;
 }
 .mt-section-card canvas {
-  width: 100%;
-  max-width: 100%;
-  height: auto;
   display: block;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 4px;
+}
+/* v0.59.902: фиксированная высота для Chart.js (responsive: true,
+   maintainAspectRatio: false). Без явной высоты родителя Chart.js
+   рекурсивно растягивает canvas каждый ResizeObserver-tick → infinity. */
+.mt-chart-box {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+.mt-chart-box canvas {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+.mt-windrose-wrap {
+  display: flex;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  padding: 8px;
+}
+.mt-windrose-wrap canvas {
+  width: 480px;
+  max-width: 100%;
+  height: auto;
+  border: 0;
 }
 .mt-section-card table {
   width: 100%;

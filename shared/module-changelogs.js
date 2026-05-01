@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.902', date: '2026-04-30', items: [
+      '🚨 <b>Hotfix: графики растут в высоту бесконечно</b>. Известный Chart.js bug — <code>responsive:true; maintainAspectRatio:false</code> без явной высоты у родителя → ResizeObserver loop, canvas каждый tick прибавляет высоту.',
+      '• Fix: каждый Chart.js canvas обёрнут в <code>.mt-chart-box { height: 280px }</code> (фиксированная высота), canvas внутри — <code>width:100%!important; height:100%!important</code>.',
+      '• Wind rose не Chart.js (canvas с pixel-buffer 480×480) — для него отдельный <code>.mt-windrose-wrap</code> с центрированием и max-width.',
+      'Файлы: <code>meteo/index.html</code> (canvas-обёртки), <code>meteo/meteo.css</code> (.mt-chart-box / .mt-windrose-wrap).',
+    ] },
     { version: '0.59.901', date: '2026-04-30', items: [
       '⚙ <b>Расширение системы охлаждения в Технологе ЦОД</b> по запросу: «для системы охлаждения нет выбора опций фрикулинг и его тип чиллеров или конденсаторов вообще нет, как без этого можно считать PUE».',
       '• Новый блок «⚙ Топология» в rail-секции «❄ Климат». Параметры: топология (chiller-fc / chiller / dx / adiabatic / immersion) с типичными PUE-диапазонами в подсказках; setpoint холодного коридора; ΔT холодный↔горячий; freecool (enabled/тип direct/indirect/glycol/tCutoff); chiller spec (rated capacity/COP/ambient/correction).',
