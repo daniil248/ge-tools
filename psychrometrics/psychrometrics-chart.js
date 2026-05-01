@@ -236,18 +236,14 @@ export function render(container, opts = {}) {
 function rhLabelsAlongCurves(o, pos, isAshrae) {
   // Раскладка T_lab по уровню RH: лоу-φ — на высоком T (далеко справа на
   // ASHRAE / далеко вверх на ramzin); хай-φ — ближе к низким T.
+  // v0.59.964: расширенный набор RH-меток (5..90% шаг 5%) — как в reference
+  // ASHRAE Foundamentals и ГОСТ-Mollier (см. user screenshots).
   const RHs = [
-    { rh: 5,  T: 35 },
-    { rh: 10, T: 33 },
-    { rh: 15, T: 30 },
-    { rh: 20, T: 28 },
-    { rh: 30, T: 25 },
-    { rh: 40, T: 22 },
-    { rh: 50, T: 20 },
-    { rh: 60, T: 18 },
-    { rh: 70, T: 16 },
-    { rh: 80, T: 14 },
-    { rh: 90, T: 12 },
+    { rh: 5,  T: 38 }, { rh: 10, T: 35 }, { rh: 15, T: 32 }, { rh: 20, T: 30 },
+    { rh: 25, T: 28 }, { rh: 30, T: 26 }, { rh: 35, T: 24 }, { rh: 40, T: 22 },
+    { rh: 45, T: 21 }, { rh: 50, T: 20 }, { rh: 55, T: 19 }, { rh: 60, T: 18 },
+    { rh: 65, T: 17 }, { rh: 70, T: 16 }, { rh: 75, T: 15 }, { rh: 80, T: 14 },
+    { rh: 85, T: 13 }, { rh: 90, T: 12 },
   ];
   let s = '';
   for (const { rh, T } of RHs) {
