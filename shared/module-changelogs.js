@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.924', date: '2026-04-30', items: [
+      '🖨 <b>Печать / сохранение в PDF</b>. Новая кнопка «🖨 Печать» в toolbar. Click → инжектируется print-header (i-d диаграмма Молье–Рамзина · дата · метаданные) → window.print(). В системном диалоге печати можно сохранить как PDF.',
+      '• <code>@media print</code> CSS скрывает UI-элементы (header / footer / toolbars / panels / canvas-инструменты), оставляя цикл-canvas + i-d диаграмму + таблицы.',
+      '• <code>page-break-inside: avoid</code> для diagram + строк таблиц — корректное разделение по страницам.',
+      'Файл: <code>psychrometrics/index.html</code> (+кнопка), <code>psychrometrics/psychrometrics.css</code> (@media print rules), <code>psychrometrics/psychrometrics.js</code> (print handler с inject header).',
+    ] },
     { version: '0.59.923', date: '2026-04-30', items: [
       '🧙 <b>Wizard: dropdown «📍 От точки»</b>. Раньше wizard всегда подсоединял новый процесс к ПОСЛЕДНЕЙ точке (S.points.length-1). Теперь в шаге 2 — select со ВСЕМИ точками (с превью t°C), default = последняя. Удобно для ветвистых графов (рециркуляция, рекуператор).',
       'Файл: <code>psychrometrics/psychrometrics.js</code> (openWizardStep2: добавлен select #wz-fromIdx, apply читает его значение).',

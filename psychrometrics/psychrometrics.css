@@ -334,6 +334,46 @@
 .psy-formulas code { background: #f0f4fb; padding: 1px 5px; border-radius: 3px; color: #0d47a1; font-family: 'Consolas', monospace; }
 .psy-formulas .note { background: #fff9c4; border: 1px solid #fbc02d; padding: 6px 10px; border-radius: 4px; margin: 6px 0; font-size: 11px; }
 
+/* ─── v0.59.924: Print-friendly view */
+@media print {
+  body { background: #fff; color: #000; }
+  /* Скрыть UI-элементы которые не нужны на печати */
+  #rs-header-mount,
+  #rs-footer,
+  .rs-help-btn,
+  .psy-edges-list-wrap,
+  .psy-canvas-toolbar,
+  .psy-panel-collapse,
+  #psy-edges,
+  #psy-zones-panel,
+  #psy-calcs,
+  .psy-tab-bar,
+  .psy-btn-bar { display: none !important; }
+  /* Канвас цикла — без скроллбаров, на полную страницу */
+  .psy-canvas {
+    height: auto !important;
+    overflow: visible !important;
+    page-break-inside: avoid;
+    background: #fff !important;
+  }
+  .psy-canvas-inner { transform: none !important; }
+  /* Диаграмма ID — на полную ширину страницы */
+  .psy-chart-host svg {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+  /* Таблицы — нормальный page-break */
+  .psy-tbl-wrap { overflow: visible !important; }
+  .psy-tbl { page-break-inside: auto; }
+  .psy-tbl tr { page-break-inside: avoid; }
+  /* Header страницы для печати */
+  .psy-print-header { display: block !important; text-align: center; padding: 8px 0; border-bottom: 1px solid #000; margin-bottom: 12px; }
+  .psy-print-header h1 { font-size: 18px; margin: 0; }
+}
+.psy-print-header { display: none; }
+
 /* ─── v0.59.909: Collapsible formulas panel */
 .psy-panel-collapse {
   background: #fff;

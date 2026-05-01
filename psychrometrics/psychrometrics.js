@@ -2597,6 +2597,22 @@ function wire() {
   }
   const btnCsv = $('psy-csv');
   if (btnCsv) btnCsv.addEventListener('click', exportCsv);
+
+  // v0.59.924: print-friendly export
+  const btnPrint = $('psy-print');
+  if (btnPrint) btnPrint.addEventListener('click', () => {
+    // Inject print header (страница печати с датой и метаданными)
+    let hdr = document.querySelector('.psy-print-header');
+    if (!hdr) {
+      hdr = document.createElement('div');
+      hdr.className = 'psy-print-header';
+      document.body.insertBefore(hdr, document.body.firstChild);
+    }
+    const date = new Date().toLocaleDateString('ru-RU');
+    hdr.innerHTML = `<h1>i-d диаграмма Молье–Рамзина · ${date}</h1>
+      <div style="font-size:11px;color:#555">Высота: ${S.alt} м · P: ${(S.P/1000).toFixed(2)} кПа · Точек: ${S.points.length} · Процессов: ${S.procs.filter(p => p.type !== 'none').length}</div>`;
+    setTimeout(() => window.print(), 100);
+  });
 }
 
 /* Экспорт точек и процессов в CSV (UTF-8 BOM, ';' — для Excel-RU). */
