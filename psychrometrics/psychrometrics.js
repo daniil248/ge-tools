@@ -710,6 +710,9 @@ function openProcessEditor(procIdx) {
   const body = overlay.querySelector('#psy-proc-edit-body');
   body.appendChild(procArrow(pr, procIdx));
   wireGraphHost(body);  // те же event-handlers как в основной панели
+  // v0.59.951: триггерим update() чтобы computed-блок (Δ состояний,
+  // Q/qw) сразу заполнился актуальными значениями для новой DOM-карточки.
+  try { update(); } catch {}
   const close = () => {
     overlay.remove();
     rerenderCycle();  // диаграмма + sidebar обновляются
