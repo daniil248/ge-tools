@@ -1453,14 +1453,32 @@ function renderChart(sts) {
   _chartCtx = { X, Y, opts };
   let overlay = arrowDefs();
 
-  // v0.59.929: zone overlay (ASHRAE 55 или TC 9.9 A1-A4 / Recommended).
-  // S.comfortZoneId — ключ из COMFORT_ZONES; пустой → ничего не рисуем.
+  // v0.59.929/930: zone overlay (ASHRAE 55 или TC 9.9 A1-A4 / Recommended).
+  // S.comfortZoneId — ключ из COMFORT_ZONES; 'tc99-all' рисует все вложенные
+  // (Recommended внутри A1 внутри A2 ...A4) — стиль официального ASHRAE TC 9.9
+  // chart. Пустой → ничего не рисуем.
   const zoneId = S.comfortZoneId || (S.showComfortZone !== false ? 'tc99-rec' : '');
-  if (zoneId) {
+  if (zoneId === 'tc99-all') {
+    // Стек: рисуем от наибольшего (A4) к наименьшему (Recommended) — большие
+    // полигоны под маленькими. Подписи у правого верхнего угла каждой зоны.
+    const stack = ['tc99-a4', 'tc99-a3', 'tc99-a2', 'tc99-a1', 'tc99-rec'];
+    for (const id of stack) {
+      const cz = computeComfortZonePolygon(S.P, X, Y, id);
+      if (!cz) continue;
+      const z = cz.zone;
+      // Лейбл в правом верхнем углу зоны (Tmax, RHmax)
+      const labelW = humidityRatio(z.Tmax, z.RHmax, S.P);
+      const labelX = X(labelW) + 4;
+      const labelY = Y(z.Tmax) + 12;
+      overlay += `<g class="psy-comfort-zone" pointer-events="none">
+        <polygon points="${cz.points}" fill="none" stroke="${z.stroke}" stroke-width="1.4"/>
+        <text x="${labelX}" y="${labelY}" font-size="11" fill="${z.stroke}" font-weight="700">${escAttr(z.label.replace('TC 9.9 ', ''))}</text>
+      </g>`;
+    }
+  } else if (zoneId) {
     const cz = computeComfortZonePolygon(S.P, X, Y, zoneId);
     if (cz) {
       const z = cz.zone;
-      // Подпись посередине по T_max (на правой границе зоны)
       const labelX = X(humidityRatio(z.Tmax, z.RHmax, S.P)) + 6;
       const labelY = Y(z.Tmax) - 4;
       overlay += `<g class="psy-comfort-zone" pointer-events="none">

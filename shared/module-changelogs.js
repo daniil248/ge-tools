@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.930', date: '2026-04-30', items: [
+      '📊 <b>Стек всех TC 9.9 envelopes на i-d (как в официальной ASHRAE-таблице)</b>. По репорту: «такой вид отображения тоже сделай, когда выбран альбомный вид» — на скрине пользователя видны все 4 зоны вложенными.',
+      '• Новая опция в select «🟩 Зона»: «📊 Все TC 9.9 (стек Rec/A1/A2/A3/A4)». Когда выбрано — на диаграмме рисуются все 5 envelopes одновременно (от A4 снаружи до Recommended внутри). Лейблы A4/A3/A2/A1/Recommended у правых углов каждой зоны.',
+      '• Только границы (без fill) для лучшей читаемости — точки и процессы видны через полигоны.',
+      'Verified в preview: 5 polygons, labels [A4, A3, A2, A1, Recommended].',
+      'Файл: <code>psychrometrics/index.html</code> (option tc99-all), <code>psychrometrics/psychrometrics.js</code> (stack-render branch в overlay).',
+    ] },
     { version: '0.59.929', date: '2026-04-30', items: [
       '🟩 <b>Зоны на i-d: ASHRAE 55 + TC 9.9 (Recommended/A1/A2/A3/A4)</b>. По репорту: «добавь все диапазоны A1, -A4 просто выбором, один из».',
       '• Checkbox заменён на select: «🟩 Зона: …». Опции: ASHRAE 55 (комфорт офис), TC 9.9 Recommended (ЦОД, default), A1 / A2 / A3 / A4. Выбранная зона рисуется на главном i-d chart с разными цветами (зелёный/синий/фиолетовый/оранжевый/красный по эскалации).',
