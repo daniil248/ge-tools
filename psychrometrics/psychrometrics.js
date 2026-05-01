@@ -2818,6 +2818,36 @@ function applyWizard(pt, overlay, fromIdx) {
   else if (Number.isFinite(Q)) { pickedTgt = 'Q'; pickedVal = Q; }
   else if (Number.isFinite(qw)) { pickedTgt = 'qw'; pickedVal = qw; }
 
+  // v0.59.920: feasibility validation — проверяем физическую осмысленность
+  // ввода до создания процесса. Если нелогично — предупреждаем, но не блокируем
+  // (пользователь может всё равно создать).
+  const fromPt = S.points[fromIdx];
+  const tIn = Number(fromPt?.t);
+  if (Number.isFinite(tIn)) {
+    const warns = [];
+    if (pt === 'P') {  // нагрев
+      if (Number.isFinite(t2) && t2 < tIn) warns.push(`Нагрев: t₂=${t2}°C < t_in=${tIn}°C — это охлаждение (выберите C)`);
+      if (Number.isFinite(dt) && dt < 0) warns.push(`Нагрев: Δt=${dt}°C — отрицательный (выберите C для охлаждения)`);
+      if (Number.isFinite(Q) && Q < 0) warns.push(`Нагрев: Q=${Q} кВт — отрицательная мощность бессмысленна для P`);
+    } else if (pt === 'C') {  // охлаждение
+      if (Number.isFinite(t2) && t2 > tIn) warns.push(`Охлаждение: t₂=${t2}°C > t_in=${tIn}°C — это нагрев (выберите P)`);
+      if (Number.isFinite(Q) && Q > 0) warns.push(`Охлаждение: Q=${Q} кВт — должна быть отрицательной для C`);
+    } else if (pt === 'A') {  // адиабатическое увлажнение — испарение охлаждает
+      if (Number.isFinite(t2) && t2 > tIn) warns.push(`Адиабат. увл.: t₂=${t2}°C > t_in=${tIn}°C — испарение охлаждает воздух (t₂ должна быть НИЖЕ)`);
+      if (Number.isFinite(dd) && dd < 0) warns.push(`Адиабат. увл.: Δd=${dd} — увлажнение должно увеличивать d (положительное значение)`);
+    } else if (pt === 'S') {  // паровое увлажнение — t примерно const
+      if (Number.isFinite(dd) && dd < 0) warns.push(`Паровое увл.: Δd=${dd} — увлажнение положительное`);
+    }
+    if (warns.length) {
+      // Показываем toast с warning, но не блокируем создание (пользователь
+      // может всё равно знать что делает; рекомендуем правку тип процесса).
+      psyToast(`⚠ ${warns[0]}`, 'warn');
+      // Также сохраним warning для отображения на стрелке (renderProcArrow
+      // показывает [data-role="proc-warn"]).
+      proc._wizWarn = warns.join(' · ');
+    }
+  }
+
   if (pt === 'M') {
     const mixI = Number(overlay.querySelector('#wz-mix')?.value);
     if (!Number.isFinite(ratio)) { psyToast('Укажите долю смешения (mixRatio).', 'warn'); return false; }
