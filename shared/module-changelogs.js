@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.948', date: '2026-05-01', items: [
+      '📑 <b>Вкладки «Диаграмма» / «Калькуляторы»</b>. По репорту: «калькуляторы из нижнего положения перенеси в отдельную вкладку. диаграмма с процессами в одной, калькуляторы с формулами в другой. Переключение не должно сбивать предыдущие сделанные расчеты».',
+      '• Tab 1 «📊 Диаграмма с процессами»: атмосфера, узлы (canvas + sidebar), зоны, диаграмма, таблицы результатов.',
+      '• Tab 2 «🧮 Калькуляторы и формулы»: psy-калькулятор + collapsible формулы.',
+      '• Pane\'ы переключаются через <code>display:none/block</code> — БЕЗ recreation. Состояние полей калькулятора и формы графика полностью сохраняется при переключении.',
+      '• Активная вкладка persists в LS (<code>psy.activeTab</code>). При переключении на «Диаграмма» вызывается <code>fitCanvas()</code> (т.к. размеры canvas могли быть посчитаны неверно при display:none).',
+      '• <code>@media print</code>: вкладки скрыты, оба pane\'а печатаются.',
+      '🧹 <b>Легенда «Параметры точек» — компактный 2-строчный формат</b>. По репорту: «тексты вылазиют за границы, нам же потом это еще и печатать, сделай аккуратно».',
+      '• Раньше: одна строка на точку с длинным «1. <name> t=NN°C · φ=NN% · d=N.NN г/кг · h=N.NN кДж/кг» — за границы 360px-box-а часто вылезала.',
+      '• Теперь: 2 строки на точку — № и имя жирным сверху, параметры (font 9px) снизу. h округлён до 1 знака. Имя обрезается до 28 символов.',
+      '🔢 <b>Префикс «N.» в dropdown «📍 От точки» wizard</b>. По репорту: «добавь везде где есть ссылка, номера точек, иначе не понятно что это именно та точка».',
+      '🐛 <b>Bug-fix: модалка-редактор не получала computed Q/qw/V</b>. <code>fillComputedQW</code> / <code>fillCondensate</code> / <code>refreshAutoV</code> / <code>fillProcWarnings</code> использовали <code>querySelector</code> — возвращал только первый matching proc-arrow (скрытый в #psy-edges с v0.59.941). Замена на <code>querySelectorAll</code> → теперь и модалка, и sidebar обновляются.',
+      'Файлы: <code>psychrometrics/index.html</code> (tabs + panes), <code>psychrometrics/psychrometrics.css</code> (.psy-tabs + .psy-tab-pane), <code>psychrometrics/psychrometrics.js</code> (tab logic + querySelectorAll fixes + wizard dropdown number prefix), <code>psychrometrics/psychrometrics-chart.js</code> (compact 2-line legend).',
+    ] },
     { version: '0.59.947', date: '2026-05-01', items: [
       '🔄 <b>Демо «recup» переписан под новое представление рекуператора</b>. По репорту: «измени демо циклы исходя из нового представления рекуператора».',
       '• Раньше демо показывало только приточную сторону рекуператора + dangling вытяжку без R на ней (3 процесса: R + P + none-разрыв).',

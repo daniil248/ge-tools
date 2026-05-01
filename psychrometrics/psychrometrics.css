@@ -28,6 +28,42 @@
  * v0.59.912: grid background теперь на самом viewport с динамическим
  *  background-position/size — следует за pan/zoom, выглядит бесконечным.
  */
+/* v0.59.948: вкладки «Диаграмма / Калькуляторы». Pane'ы переключаются
+   через display, без re-mount → состояние сохраняется. */
+.psy-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 0 4px;
+}
+.psy-tab {
+  padding: 8px 16px;
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: #f1f5f9;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: background 0.15s, color 0.15s;
+}
+.psy-tab:hover { background: #e2e8f0; }
+.psy-tab.active {
+  background: #fff;
+  color: #1565c0;
+  border-color: #cbd5e1 #cbd5e1 #fff;
+  box-shadow: 0 -1px 2px rgba(0,0,0,0.05);
+}
+.psy-tab-pane { display: none; }
+.psy-tab-pane.active { display: block; }
+@media print {
+  .psy-tabs { display: none; }
+  .psy-tab-pane { display: block !important; }
+}
+
 /* v0.59.939: канвас + сайдбар «Процессы» бок о бок */
 .psy-canvas-row {
   display: flex;

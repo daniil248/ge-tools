@@ -72,6 +72,15 @@
   </script>
 
   <div class="psy-wrap">
+    <!-- v0.59.948: вкладки. Pane'ы — display:none/block, без recreation, чтобы
+         состояние калькуляторов и графика сохранялось при переключении. -->
+    <div class="psy-tabs" role="tablist">
+      <button type="button" class="psy-tab active" data-pane="diagram" role="tab" aria-selected="true">📊 Диаграмма с процессами</button>
+      <button type="button" class="psy-tab" data-pane="calc" role="tab" aria-selected="false">🧮 Калькуляторы и формулы</button>
+    </div>
+
+    <!-- Pane: диаграмма с процессами -->
+    <div class="psy-tab-pane active" data-pane="diagram">
     <!-- Атмосфера / условия объекта -->
     <div class="psy-panel">
       <div class="psy-panel-title">Условия объекта</div>
@@ -270,6 +279,10 @@
       </div>
     </div>
 
+    </div><!-- /.psy-tab-pane[data-pane=diagram] -->
+
+    <!-- Pane: калькуляторы и формулы -->
+    <div class="psy-tab-pane" data-pane="calc">
     <!-- Калькуляторы: заполни любые известные → получишь неизвестные -->
     <div class="psy-panel">
       <div class="psy-panel-title">
@@ -284,6 +297,7 @@
       <summary class="psy-panel-title">📐 Формулы и пояснения <span class="muted" style="font-weight:400;font-size:11px;margin-left:8px">— раскрыть</span></summary>
       <div class="psy-formulas" id="psy-formulas"></div>
     </details>
+    </div><!-- /.psy-tab-pane[data-pane=calc] -->
   </div>
 
   <script type="module" src="psychrometrics.js"></script>

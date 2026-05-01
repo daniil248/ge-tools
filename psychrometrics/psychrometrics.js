@@ -997,20 +997,23 @@ function refreshComputedInCards() {
    чтобы пользователь мог редактировать с текущего числа (стрелки/ввод). */
 function refreshAutoV(segs, primaryIdx) {
   if (!segs) return;
+  // v0.59.948: querySelectorAll — обновляем ВСЕ proc-arrow (модалка тоже).
   segs.forEach((s, i) => {
-    const wrap = document.querySelector(`.psy-proc-arrow[data-proc-idx="${i}"] [data-role="v-auto"]`);
-    const inp  = document.querySelector(`.psy-proc-arrow[data-proc-idx="${i}"] input[data-col="V"]`);
-    if (!s) { if (wrap) wrap.textContent = ''; return; }
-    if (s.derived) {
-      if (wrap) { wrap.textContent = `авто: ${s.V.toFixed(0)} м³/ч (по массе)`; wrap.style.color = '#2e7d32'; }
-      if (inp && inp.dataset.user !== '1') {
-        // подставляем вычисленное значение, не дёргая каретку у фокуса
-        if (document.activeElement !== inp) inp.value = s.V.toFixed(0);
-        else if (inp.value.trim() === '') inp.value = s.V.toFixed(0);
+    const arrs = document.querySelectorAll(`.psy-proc-arrow[data-proc-idx="${i}"]`);
+    arrs.forEach(arrEl => {
+      const wrap = arrEl.querySelector(`[data-role="v-auto"]`);
+      const inp  = arrEl.querySelector(`input[data-col="V"]`);
+      if (!s) { if (wrap) wrap.textContent = ''; return; }
+      if (s.derived) {
+        if (wrap) { wrap.textContent = `авто: ${s.V.toFixed(0)} м³/ч (по массе)`; wrap.style.color = '#2e7d32'; }
+        if (inp && inp.dataset.user !== '1') {
+          if (document.activeElement !== inp) inp.value = s.V.toFixed(0);
+          else if (inp.value.trim() === '') inp.value = s.V.toFixed(0);
+        }
+      } else {
+        if (wrap) { wrap.textContent = `ведущий · Gда=${s.G.toFixed(0)} кг/ч`; wrap.style.color = '#1565c0'; }
       }
-    } else {
-      if (wrap) { wrap.textContent = `ведущий · Gда=${s.G.toFixed(0)} кг/ч`; wrap.style.color = '#1565c0'; }
-    }
+    });
   });
 }
 
@@ -2443,9 +2446,10 @@ function update() {
    тогда график/расчёт формально сработает, но термодинамически это будет уже
    не изобарный нагрев, а что-то другое. Предупреждаем без блокировки. */
 function fillProcWarnings(sts) {
+  // v0.59.948: querySelectorAll — обновляем все proc-arrow elements.
   for (let i = 0; i < S.procs.length; i++) {
-    const box = document.querySelector(`.psy-proc-arrow[data-proc-idx="${i}"] [data-role="proc-warn"]`);
-    if (!box) continue;
+    const boxes = document.querySelectorAll(`.psy-proc-arrow[data-proc-idx="${i}"] [data-role="proc-warn"]`);
+    if (!boxes.length) continue;
     const pr = S.procs[i];
     const fromI = edgeFrom(pr, i), toI = edgeTo(pr, i);
     const a = sts[fromI], b = sts[toI];
@@ -2508,13 +2512,15 @@ function fillProcWarnings(sts) {
         msgs.push(`Пересечение линии насыщения: φ > φ_max (${S.rhMax}%). Физически невозможно без конденсации.`);
       }
     }
-    if (msgs.length === 0) {
-      box.style.display = 'none';
-      box.innerHTML = '';
-    } else {
-      box.style.display = '';
-      box.innerHTML = '⚠ ' + msgs.join('<br>⚠ ');
-    }
+    boxes.forEach(box => {
+      if (msgs.length === 0) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+      } else {
+        box.style.display = '';
+        box.innerHTML = '⚠ ' + msgs.join('<br>⚠ ');
+      }
+    });
   }
 }
 
@@ -2522,17 +2528,20 @@ function fillProcWarnings(sts) {
    подставляем вычисленные значения из segs — чтобы сразу было видно
    мощность/влагоприток, не переключаясь на таблицу процессов. */
 function fillComputedQW(segs) {
+  // v0.59.948: querySelectorAll — обновляем ВСЕ matching proc-arrows
+  // (скрытый #psy-edges + модалка-редактор + sidebar). Раньше querySelector
+  // возвращал только первый (скрытый) — модалка не получала computed Q/qw.
   segs.forEach((s, i) => {
     if (!s) return;
-    const arr = document.querySelector(`.psy-proc-arrow[data-proc-idx="${i}"]`);
-    if (!arr) return;
-    ['Q','qw'].forEach(col => {
-      const inp = arr.querySelector(`input[data-col="${col}"]`);
-      if (!inp) return;
-      if (inp.dataset.user === '1') return;     // не трогаем user-ввод
-      if (document.activeElement === inp) return;
-      const val = col === 'Q' ? s.Q.toFixed(2) : s.qw.toFixed(3);
-      inp.value = val;
+    document.querySelectorAll(`.psy-proc-arrow[data-proc-idx="${i}"]`).forEach(arr => {
+      ['Q','qw'].forEach(col => {
+        const inp = arr.querySelector(`input[data-col="${col}"]`);
+        if (!inp) return;
+        if (inp.dataset.user === '1') return;
+        if (document.activeElement === inp) return;
+        const val = col === 'Q' ? s.Q.toFixed(2) : s.qw.toFixed(3);
+        inp.value = val;
+      });
     });
   });
 }
@@ -2546,24 +2555,25 @@ function fillComputedQW(segs) {
    Плюс суммарная точка росы t_р₁ входного потока — для проверки, что
    t_поверхности охладителя ниже t_р (иначе осушения просто не будет). */
 function fillCondensate(segs) {
+  // v0.59.948: querySelectorAll — обновляем все proc-arrows (см. fillComputedQW)
   segs.forEach((s, i) => {
-    const arr = document.querySelector(`.psy-proc-arrow[data-proc-idx="${i}"]`);
-    if (!arr) return;
-    const box = arr.querySelector('[data-role="condensate"]');
-    if (!box) return;
-    if (!s || !(s.qw < -0.001)) {
-      box.style.display = 'none';
-      box.innerHTML = '';
-      return;
-    }
-    const abs = Math.abs(s.qw);          // кг/ч
-    const lph = abs / 0.998;             // л/ч (ρ_воды ≈ 998 кг/м³ при 20 °C)
-    const lpd = lph * 24;                // л/сут
-    box.style.display = '';
-    box.innerHTML =
-      `💧 Конденсат: <b>${abs.toFixed(3)}</b> кг/ч ≈ `
-      + `<b>${lph.toFixed(3)}</b> л/ч ≈ `
-      + `<b>${lpd.toFixed(1)}</b> л/сут`;
+    document.querySelectorAll(`.psy-proc-arrow[data-proc-idx="${i}"]`).forEach(arr => {
+      const box = arr.querySelector('[data-role="condensate"]');
+      if (!box) return;
+      if (!s || !(s.qw < -0.001)) {
+        box.style.display = 'none';
+        box.innerHTML = '';
+        return;
+      }
+      const abs = Math.abs(s.qw);
+      const lph = abs / 0.998;
+      const lpd = lph * 24;
+      box.style.display = '';
+      box.innerHTML =
+        `💧 Конденсат: <b>${abs.toFixed(3)}</b> кг/ч ≈ `
+        + `<b>${lph.toFixed(3)}</b> л/ч ≈ `
+        + `<b>${lpd.toFixed(1)}</b> л/сут`;
+    });
   });
 }
 
@@ -3147,6 +3157,36 @@ function wire() {
       <div style="font-size:11px;color:#555">Высота: ${S.alt} м · P: ${(S.P/1000).toFixed(2)} кПа · Точек: ${S.points.length} · Процессов: ${S.procs.filter(p => p.type !== 'none').length}</div>`;
     setTimeout(() => window.print(), 100);
   });
+
+  // v0.59.948: tab-switching. Pane'ы переключаются через display
+  // (без recreation), состояние калькуляторов и графика сохраняется.
+  // Активная вкладка persist в LS.
+  try {
+    const tabs = document.querySelectorAll('.psy-tab');
+    const panes = document.querySelectorAll('.psy-tab-pane');
+    const setActive = (paneName) => {
+      tabs.forEach(t => {
+        const on = t.dataset.pane === paneName;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      panes.forEach(p => {
+        p.classList.toggle('active', p.dataset.pane === paneName);
+      });
+      try { localStorage.setItem('psy.activeTab', paneName); } catch {}
+      // При переключении на «Диаграмма» — re-fit canvas (т.к. размеры могли
+      // быть посчитаны при display:none и быть некорректны).
+      if (paneName === 'diagram') {
+        setTimeout(() => { try { fitCanvas(); } catch {} }, 50);
+      }
+    };
+    tabs.forEach(t => t.addEventListener('click', () => setActive(t.dataset.pane)));
+    // Восстановить вкладку из LS
+    try {
+      const saved = localStorage.getItem('psy.activeTab');
+      if (saved && (saved === 'diagram' || saved === 'calc')) setActive(saved);
+    } catch {}
+  } catch (e) { console.error('[psy.tabs]', e); }
 }
 
 /* Экспорт точек и процессов в CSV (UTF-8 BOM, ';' — для Excel-RU). */
@@ -3271,9 +3311,11 @@ function openWizardStep2(procType) {
   const PROC_LABELS = { P:'🔥 Нагрев', C:'❄ Охлаждение', A:'💦 Адиабат. увлажн.',
     S:'♨ Паровое увлажн.', M:'🔀 Смешение', R:'♻ Рекуператор', X:'📍 Произвольный' };
 
-  // v0.59.923: dropdown «От точки» — пользователь выбирает stand-точку (раньше всегда последняя)
+  // v0.59.923: dropdown «От точки» — пользователь выбирает stand-точку.
+  // v0.59.948: префикс «N. » с номером точки (по репорту: «добавь везде где
+  // есть ссылка, номера точек, иначе не понятно что это именно та точка»).
   const fromOpts = S.points.map((p, i) =>
-    `<option value="${i}" ${i === defaultFromIdx ? 'selected' : ''}>${escAttr((p.name || ('Точка ' + (i+1))).slice(0, 40))}${p.t ? ` · ${p.t}°C` : ''}</option>`
+    `<option value="${i}" ${i === defaultFromIdx ? 'selected' : ''}>${i+1}. ${escAttr((p.name || ('Точка ' + (i+1))).slice(0, 40))}${p.t ? ` · ${p.t}°C` : ''}</option>`
   ).join('');
 
   const overlay = document.createElement('div');

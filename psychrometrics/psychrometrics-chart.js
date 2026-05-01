@@ -275,25 +275,28 @@ export function plotPoint(ctx, st, label, color = '#0d47a1') {
   return s;
 }
 
-/* Легенда точек в правом нижнем углу диаграммы. Возвращает SVG-блок. */
+/* Легенда точек в углу диаграммы. v0.59.948: компактный 2-строчный формат
+   на точку (имя сверху, параметры — снизу, мелким шрифтом). По репорту:
+   «тексты вылазиют за границы, нам же потом это еще и печатать, сделай
+   аккуратно». */
 export function plotLegend(opts, sts, pointNames = []) {
   const items = [];
   sts.forEach((st, i) => {
     if (!st) return;
-    const name = pointNames[i] ? ` ${pointNames[i].slice(0, 20)}` : '';
+    const rawName = pointNames[i] || '';
+    const name = rawName.length > 28 ? rawName.slice(0, 27) + '…' : rawName;
     items.push({
       idx: i + 1, name,
-      txt: `t=${st.T.toFixed(1)}°C · φ=${st.RH.toFixed(0)}% · d=${(st.W*1000).toFixed(2)} г/кг · h=${st.h.toFixed(2)} кДж/кг`
+      txt: `t=${st.T.toFixed(1)}° · φ=${st.RH.toFixed(0)}% · d=${(st.W*1000).toFixed(2)} г/кг · h=${st.h.toFixed(1)} кДж/кг`
     });
   });
   if (!items.length) return '';
-  const lineH = 14;
+  // 2-строчный формат: header + (name + values) per item
+  const headerH = 16;
+  const itemH = 24;            // ~2 строки на точку
   const padX = 8, padY = 6;
   const boxW = 360;
-  const boxH = items.length * lineH + padY * 2 + 16; // +16 для заголовка
-  // v0.59.941: для ASHRAE-style W-метки на правой оси — легенду ставим
-  // в ВЕРХНИЙ-левый угол (а не правый-нижний), чтобы не наезжала
-  // на ось W и её подписи.
+  const boxH = items.length * itemH + padY * 2 + headerH;
   const isAshrae = opts.style === 'ashrae';
   const x0 = isAshrae
     ? opts.marginL + 4
@@ -304,14 +307,18 @@ export function plotLegend(opts, sts, pointNames = []) {
   let s = `<g class="psy-legend" pointer-events="none">`;
   s += `<rect x="${x0}" y="${y0}" width="${boxW}" height="${boxH}" rx="4"
           fill="#fff" stroke="#b0bec5" stroke-width="0.8" opacity="0.96"/>`;
-  s += `<text x="${x0 + padX}" y="${y0 + padY + 10}"
+  s += `<text x="${x0 + padX}" y="${y0 + padY + 11}"
           style="font-size:10px;font-weight:700;fill:#37474f;">Параметры точек</text>`;
+  // 2 строки на точку: 1-я — № и имя жирным, 2-я — параметры мельче
   items.forEach((it, k) => {
-    const y = y0 + padY + 16 + (k + 1) * lineH - 3;
-    s += `<text x="${x0 + padX}" y="${y}" style="font-size:10px;fill:#263238;">`
-       + `<tspan font-weight="700" fill="#0d47a1">${it.idx}.</tspan>`
-       + `<tspan fill="#455a64">${escXml(it.name)}</tspan>`
-       + ` <tspan fill="#263238">${it.txt}</tspan>`
+    const yName = y0 + padY + headerH + k * itemH + 11;
+    const yVals = yName + 11;
+    s += `<text x="${x0 + padX}" y="${yName}" style="font-size:10px;fill:#263238;">`
+       + `<tspan font-weight="700" fill="#0d47a1">${it.idx}.</tspan> `
+       + `<tspan font-weight="600" fill="#37474f">${escXml(it.name)}</tspan>`
+       + `</text>`;
+    s += `<text x="${x0 + padX + 12}" y="${yVals}" style="font-size:9px;fill:#455a64;">`
+       + escXml(it.txt)
        + `</text>`;
   });
   s += `</g>`;
