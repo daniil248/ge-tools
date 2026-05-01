@@ -94,22 +94,13 @@
           <span>Базовый расход V, м³/ч</span>
           <input type="number" id="psy-vbase" value="10000" step="100" min="0">
         </label>
-        <label class="psy-field psy-inline" title="Нижняя граница оси t на диаграмме.">
-          <span>Диаграмма t<sub>min</sub>, °C</span>
-          <input type="number" id="psy-tmin-chart" value="-15" step="5">
-        </label>
-        <label class="psy-field psy-inline" title="Верхняя граница оси t на диаграмме.">
-          <span>Диаграмма t<sub>max</sub>, °C</span>
-          <input type="number" id="psy-tmax-chart" value="50" step="5">
-        </label>
-        <label class="psy-field psy-inline" title="Правая граница оси d (влагосодержание) на диаграмме.">
-          <span>Диаграмма d<sub>max</sub>, г/кг</span>
-          <input type="number" id="psy-dmax-chart" value="30" step="5" min="5">
-        </label>
         <label class="psy-field psy-inline" style="flex-direction:row;gap:6px;align-items:center;" title="В подписях показывать SI-обозначения и русское название в скобках.">
           <input type="checkbox" id="psy-ru-names" style="margin:0;">
           <span>Русские названия параметров</span>
         </label>
+        <span class="psy-field psy-inline" style="flex-direction:row;gap:6px;align-items:center;color:#607080;font-size:11px;">
+          📐 Границы осей диаграммы (t<sub>min</sub>/t<sub>max</sub>/d<sub>max</sub>) — теперь над самой диаграммой.
+        </span>
       </div>
     </div>
 
@@ -188,7 +179,11 @@
     <div class="psy-panel">
       <div class="psy-panel-title">
         Диаграмма Молье-Рамзина
-        <span style="margin-left:auto;display:inline-flex;gap:10px;align-items:center;font-weight:400;text-transform:none;letter-spacing:0;color:#455a64;">
+        <!-- v0.59.936: настройки диаграммы (формат + ориентация + границы осей)
+             перенесены сюда (раньше t_min/t_max/d_max жили в «Условия объекта»
+             на самом верху страницы — приходилось скроллить, чтобы поправить
+             границы во время работы с диаграммой). -->
+        <span style="margin-left:auto;display:inline-flex;gap:10px;align-items:center;flex-wrap:wrap;font-weight:400;text-transform:none;letter-spacing:0;color:#455a64;">
           <label style="display:inline-flex;gap:4px;align-items:center;font-size:11px">
             Формат
             <select id="psy-chart-format" style="font-size:11px;padding:2px 4px">
@@ -202,6 +197,18 @@
               <option value="landscape">Альбомная</option>
               <option value="portrait">Книжная</option>
             </select>
+          </label>
+          <label style="display:inline-flex;gap:4px;align-items:center;font-size:11px" title="Нижняя граница оси t на диаграмме.">
+            t<sub>min</sub>, °C
+            <input type="number" id="psy-tmin-chart" value="-15" step="5" style="width:60px;font-size:11px;padding:2px 4px">
+          </label>
+          <label style="display:inline-flex;gap:4px;align-items:center;font-size:11px" title="Верхняя граница оси t на диаграмме.">
+            t<sub>max</sub>, °C
+            <input type="number" id="psy-tmax-chart" value="50" step="5" style="width:60px;font-size:11px;padding:2px 4px">
+          </label>
+          <label style="display:inline-flex;gap:4px;align-items:center;font-size:11px" title="Правая граница оси d (влагосодержание) на диаграмме.">
+            d<sub>max</sub>, г/кг
+            <input type="number" id="psy-dmax-chart" value="30" step="5" min="5" style="width:60px;font-size:11px;padding:2px 4px">
           </label>
         </span>
       </div>

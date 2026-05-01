@@ -1178,6 +1178,46 @@ function cascadePass() {
       }
     }
 
+    // v0.59.936: C-процесс с заданным ADP — auto-apply BF-модель.
+    // По репорту: «при таких параметрах, на теплообменнике охладителя
+    // точно будет конденсат выпадать, а у тебя ни чего нет. Учти это»
+    // и далее: «это фантомная точка, в которой происходит процесс совсем
+    // другого охлаждения и смешения с воздухом который не успел охладиться
+    // до температуры теплообменника».
+    //
+    // Раньше: cascade пропускал C-процесс если пользователь не задал явный
+    // target (t2/φ2/Q/qw) → точка 2 оставалась с дефолтным W=W1 → ΔW=0 →
+    // qw=0 (хотя физически конденсат ОБЯЗАН выпадать при ADP < Td_in).
+    //
+    // BF-модель: часть (1-BF) воздуха проходит через ADP-saturated state
+    // (фантомная точка на кривой насыщения при T=ADP), часть BF обходит
+    // коил без изменения. Финал = смешение:
+    //   T_out = BF·T_in + (1-BF)·ADP
+    //   W_out = BF·W_in + (1-BF)·W_sat(ADP)
+    if (proc.type === 'C') {
+      const adpC = nNum(proc.adp);
+      const bfRaw = nNum(proc.bf);
+      const bf = Number.isFinite(bfRaw) ? Math.max(0, Math.min(1, bfRaw)) : 0.15;
+      const hasManualCand = (p.tUser || p.rhUser || p.xUser || p.hUser
+                             || proc.Qs || proc.qws);
+      if (Number.isFinite(adpC) && adpC < aState.Td - 0.01 && !hasManualCand) {
+        const t2 = bf * aState.T + (1 - bf) * adpC;
+        const Wadp = humidityRatio(adpC, 1.0, S.P);
+        let W2 = bf * aState.W + (1 - bf) * Wadp;
+        // Безопасный clamp до W_sat(t2) — не должно быть >100% RH.
+        const Wsat2 = humidityRatio(t2, 1.0, S.P);
+        if (W2 > Wsat2) W2 = Wsat2;
+        if (W2 < 0) W2 = 0;
+        const rh2 = Math.max(0, Math.min(100, RHfromW(t2, W2, S.P) * 100));
+        const h2 = 1.006 * t2 + W2 * (2501 + 1.86 * t2);
+        p.t  = Number(t2.toFixed(2));
+        p.rh = Number(rh2.toFixed(2));
+        p.x  = Number((W2 * 1000).toFixed(3));
+        p.h  = Number(h2.toFixed(3));
+        continue;
+      }
+    }
+
     // Собираем кандидаты на «цель» — всё, что пользователь задал вручную.
     // Побеждает самый свежий по timestamp.
     const cands = [];
@@ -1539,7 +1579,25 @@ function renderChart(sts) {
     <line class="psy-xh-h" stroke="#c62828" stroke-width="0.6" stroke-dasharray="3,2"/>
     <circle class="psy-xh-dot" r="3" fill="#c62828" stroke="#fff" stroke-width="1"/>
   </g>`;
-  // сегменты — по всем рёбрам графа (fromIdx → toIdx)
+  // v0.59.936: сегменты — по всем рёбрам графа.
+  // Если два процесса используют ОДНУ И ТУ ЖЕ пару точек (например, 1→2
+  // охлаждение и 2→1 нагрев в open-loop замкнутом цикле), они визуально
+  // ложатся друг на друга и видим только последний. Сдвигаем такие
+  // дубликаты перпендикулярно оси соединения на ±OFFSET, чтобы оба были
+  // видны.
+  const PAIR_OFFSET_PX = 6;
+  const segCounts = new Map();
+  const segIdx = new Map();
+  for (let i = 0; i < S.procs.length; i++) {
+    const pr = S.procs[i] || {};
+    const fromI = edgeFrom(pr, i);
+    const toI   = edgeTo(pr, i);
+    if (pr.type === 'none' || fromI === toI) continue;
+    // Канонический ключ пары — независимо от направления (для подсчёта).
+    const key = fromI < toI ? `${fromI}-${toI}` : `${toI}-${fromI}`;
+    segCounts.set(key, (segCounts.get(key) || 0) + 1);
+  }
+
   const badges = [];
   for (let i = 0; i < S.procs.length; i++) {
     const pr = S.procs[i] || { type: 'P' };
@@ -1548,7 +1606,24 @@ function renderChart(sts) {
     const a = sts[fromI], b = sts[toI];
     if (!a || !b || pr.type === 'none' || fromI === toI) continue;
     const color = PROC_COLOR[pr.type] || '#0d47a1';
-    overlay += drawProcessPath(ctx, a, b, pr.type, color);
+    // Считаем смещение для дубликата
+    const key = fromI < toI ? `${fromI}-${toI}` : `${toI}-${fromI}`;
+    const total = segCounts.get(key) || 1;
+    const idx = (segIdx.get(`${i}-${key}`) || segIdx.size) % total;
+    segIdx.set(`${i}-${key}`, idx);
+    let dx = 0, dy = 0;
+    if (total > 1) {
+      // Перпендикулярное смещение: pos i из total равномерно по ±half
+      const sign = fromI < toI ? 1 : -1;  // прямое vs обратное направление
+      const ax = X(a.W), ay = Y(a.T), bx = X(b.W), by = Y(b.T);
+      const dxLine = bx - ax, dyLine = by - ay;
+      const len = Math.max(1, Math.hypot(dxLine, dyLine));
+      // perpendicular unit normal
+      const nx = -dyLine / len, ny = dxLine / len;
+      dx = sign * PAIR_OFFSET_PX * nx;
+      dy = sign * PAIR_OFFSET_PX * ny;
+    }
+    overlay += drawProcessPath(ctx, a, b, pr.type, color, pr, { dx, dy });
     // Штриховая связь с опорной точкой для M/R (визуализация графа)
     if (pr.type === 'M' || pr.type === 'R') {
       const refKey = pr.type === 'M' ? pr.mixWith : pr.recupWith;
@@ -1559,15 +1634,25 @@ function renderChart(sts) {
                      stroke="${color}" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>`;
       }
     }
-    // Бейдж типа процесса на середине сегмента
-    const mx = (X(a.W) + X(b.W)) / 2;
-    const my = (Y(a.T) + Y(b.T)) / 2;
-    badges.push({ x: mx, y: my, type: pr.type, color });
+    // Бейдж типа процесса на середине сегмента + смещение
+    const mx = (X(a.W) + X(b.W)) / 2 + dx;
+    const my = (Y(a.T) + Y(b.T)) / 2 + dy;
+    // v0.59.936: подпись имени процесса под бейджем (короткое чтение типа,
+    // чтобы было ясно кому P/C/A/S/M/R соответствует — иначе буква без
+    // контекста). По репорту: «не видно название второго процесса».
+    const PROC_SHORT_NAME = {
+      P: 'Нагрев', C: 'Охлаждение', A: 'Адиабат. увл.',
+      S: 'Пар. увл.', M: 'Смешение', R: 'Рекуператор', X: 'Своб.',
+    };
+    const procName = pr.name || PROC_SHORT_NAME[pr.type] || '';
+    badges.push({ x: mx, y: my, type: pr.type, color, name: procName });
   }
   badges.forEach(b => {
     overlay += `<g transform="translate(${b.x},${b.y})">
       <circle r="8" fill="#fff" stroke="${b.color}" stroke-width="1.5"/>
       <text y="3.5" text-anchor="middle" font-size="10" font-weight="700" fill="${b.color}">${b.type}</text>
+      ${b.name ? `<text y="22" text-anchor="middle" font-size="9" fill="${b.color}" font-weight="600"
+        paint-order="stroke" stroke="#fff" stroke-width="2.5">${escAttr(b.name)}</text>` : ''}
     </g>`;
   });
   // Кольцо-подсветка активной точки (если карточка в фокусе)
@@ -1775,73 +1860,95 @@ function attachCrosshair(host) {
   });
 }
 
-/* Промежуточные точки, чтобы линия процесса шла по реалистичной траектории */
-function drawProcessPath(ctx, a, b, type, color) {
+/* Промежуточные точки, чтобы линия процесса шла по реалистичной траектории.
+   v0.59.936: для C-процесса с заданным ADP/BF — рисуем «фантомную точку»
+   ADP на кривой насыщения + пунктирную mix-линию (a → ADP-sat), затем
+   основную стрелку a → b (mix-result). По репорту пользователя:
+   «фантомная точка, в которой происходит процесс совсем другого
+   охлаждения и смешения с воздухом который не успел охладиться до
+   температуры теплообменника, но его нужно учитывать».
+   offset = { dx, dy } — перпендикулярное смещение для overlapping-арок
+   (если два процесса делят одни и те же endpoints). */
+function drawProcessPath(ctx, a, b, type, color, proc, offset) {
   const { X, Y } = ctx;
-  const pts = [[X(a.W), Y(a.T)]];
+  const dx = offset?.dx || 0;
+  const dy = offset?.dy || 0;
+  const xx = (W) => X(W) + dx;
+  const yy = (T) => Y(T) + dy;
+  // C с ADP/BF — спец-визуал: ADP-marker + mix line.
+  if (type === 'C') {
+    const adpC = nNum(proc?.adp);
+    if (Number.isFinite(adpC) && adpC < a.Td - 0.01 && b.W < a.W - 1e-6) {
+      const Wadp = humidityRatio(adpC, 1.0, a.P);
+      const xA = xx(a.W),  yA = yy(a.T);
+      const xB = xx(b.W),  yB = yy(b.T);
+      const xAdp = xx(Wadp), yAdp = yy(adpC);
+      return `<g>
+        <line x1="${xA}" y1="${yA}" x2="${xAdp}" y2="${yAdp}"
+              stroke="${color}" stroke-width="0.9" stroke-dasharray="2,3" opacity="0.6"/>
+        <circle cx="${xAdp}" cy="${yAdp}" r="3.5" fill="#fff"
+                stroke="${color}" stroke-width="1.5"/>
+        <text x="${xAdp + 6}" y="${yAdp + 3}" font-size="9"
+              fill="${color}" font-weight="700"
+              paint-order="stroke" stroke="#fff" stroke-width="2.5">ADP ${adpC.toFixed(0)}°C</text>
+        <line x1="${xA}" y1="${yA}" x2="${xB}" y2="${yB}"
+              stroke="${color}" stroke-width="2.2"
+              marker-end="url(#arrow-${type})"/>
+      </g>`;
+    }
+  }
+  const pts = [[xx(a.W), yy(a.T)]];
   if (type === 'P') {
-    // d = const, прямая по W=const (вертикаль в Wxx координатах)
-    pts.push([X(a.W), Y(b.T)]);
+    pts.push([xx(a.W), yy(b.T)]);
   } else if (type === 'A') {
-    // h = const → t(W) = (h - 2501·W)/(1.006+1.86·W). Интерполируем.
     const h = a.h;
     const steps = 12;
     for (let k = 1; k <= steps; k++) {
       const W = a.W + (b.W - a.W) * (k/steps);
       const t = (h - 2501*W) / (1.006 + 1.86*W);
-      pts.push([X(W), Y(t)]);
+      pts.push([xx(W), yy(t)]);
     }
   } else if (type === 'S') {
-    // t ≈ const
-    pts.push([X(b.W), Y(a.T)]);
+    pts.push([xx(b.W), yy(a.T)]);
   } else if (type === 'M') {
-    // Смешение: прямая от a к b (линия смеси — отрезок на плоскости)
-    pts.push([X(b.W), Y(b.T)]);
+    pts.push([xx(b.W), yy(b.T)]);
   } else if (type === 'R') {
-    // v0.59.929 fix: рекуператор не может пересекать кривую насыщения 100% RH.
-    // Когда t падает ниже точки росы, образуется конденсат — путь идёт по
-    // линии насыщения. Раньше рисовали прямо до b.T при d=const — невозможно.
     if (b.T < a.Td - 0.05 && b.W < a.W - 1e-6) {
-      // Cool along d=const до dewpoint, потом по линии насыщения до конечного W
       const Tdew = a.Td;
-      pts.push([X(a.W), Y(Tdew)]);
+      pts.push([xx(a.W), yy(Tdew)]);
       const steps = 10;
       for (let k = 1; k <= steps; k++) {
         const T = Tdew + (b.T - Tdew) * (k / steps);
         const W = humidityRatio(T, 1.0, a.P);
-        pts.push([X(W), Y(T)]);
+        pts.push([xx(W), yy(T)]);
       }
     } else if (b.T < a.Td - 0.05) {
-      // Если b.W не меньше a.W — clamp по линии насыщения
       const Tdew = a.Td;
-      pts.push([X(a.W), Y(Tdew)]);
+      pts.push([xx(a.W), yy(Tdew)]);
       const steps = 10;
       for (let k = 1; k <= steps; k++) {
         const T = Tdew + (b.T - Tdew) * (k / steps);
         const W = Math.min(b.W || a.W, humidityRatio(T, 1.0, a.P));
-        pts.push([X(W), Y(T)]);
+        pts.push([xx(W), yy(T)]);
       }
     } else {
-      // Сенсибельный режим (без конденсата) — по d=const до b.T
-      pts.push([X(a.W), Y(b.T)]);
+      pts.push([xx(a.W), yy(b.T)]);
     }
   } else if (type === 'C') {
-    // охлаждение с осушением: если dW < 0 — сначала по W=const до tр, затем по φ=100%
     if (b.W < a.W - 1e-6) {
       const Tdew = a.Td;
-      pts.push([X(a.W), Y(Tdew)]);
+      pts.push([xx(a.W), yy(Tdew)]);
       const steps = 10;
       for (let k = 1; k <= steps; k++) {
         const T = Tdew + (b.T - Tdew) * (k/steps);
         const W = humidityRatio(T, 1.0, a.P);
-        pts.push([X(W), Y(T)]);
+        pts.push([xx(W), yy(T)]);
       }
     } else {
-      pts.push([X(b.W), Y(b.T)]);  // сухое охлаждение
+      pts.push([xx(b.W), yy(b.T)]);
     }
   }
-  // конец
-  pts.push([X(b.W), Y(b.T)]);
+  pts.push([xx(b.W), yy(b.T)]);
   return `<polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none"
            stroke="${color}" stroke-width="2.2" stroke-linejoin="round"
            marker-end="url(#arrow-${type})"/>`;
