@@ -967,16 +967,26 @@ function pointCard(p, i) {
   const hint = i === 0
     ? `<span class="pt-hint">Начало цикла: задайте любые 2 из {t, φ, d, h}.</span>`
     : `<span class="pt-hint">Задайте любую из {t, φ, d, h} — остальное посчитается от процесса ${i}→${i+1}. Либо задайте Q или q<sub>w</sub> на стрелке выше.</span>`;
+  // v0.59.970: title-tooltips для всех полей. По репорту:
+  // «добавь подсказки при наведении ... показывать при наведении мыши на
+  // обозначение параметра или поле ввода».
+  const TT = {
+    name: 'Имя точки — описательное (напр., «Наружный воздух», «После калорифера»). Меняется отдельно от t/φ/d/h.',
+    t:    'Сухая температура воздуха (Dry-Bulb T), °C. Типично: −40…+50.',
+    rh:   'Относительная влажность φ = P_w/P_ws, %. Диапазон 0..100. При 100% — насыщение (точка росы = T).',
+    d:    'Влагосодержание d = 622·P_w/(P−P_w), г/кг сух. возд. Связано с φ через P_ws(t).',
+    h:    'Энтальпия h = 1.006·t + d·(2501+1.86·t)/1000, кДж/кг сух. возд. Сумма sensible + latent.',
+  };
   el.innerHTML = `
     <div class="psy-point-header">
       <span>Точка ${i+1}</span>
       <button type="button" class="pt-del" title="Удалить точку" data-act="del" data-i="${i}">✕</button>
     </div>
-    <label>Имя<input type="text" data-col="name" data-i="${i}" data-user="${du('name')}" value="${escAttr(p.name || '')}"></label>
-    <label>${L.t}<input type="number" data-col="t" data-i="${i}" data-user="${du('t')}" data-ts="${ts('t')}" value="${p.t ?? ''}" step="0.1"></label>
-    <label>${L.rh}<input type="number" data-col="rh" data-i="${i}" data-user="${du('rh')}" data-ts="${ts('rh')}" value="${p.rh ?? ''}" step="1" min="0" max="100"></label>
-    <label>${L.d}<input type="number" data-col="x" data-i="${i}" data-user="${du('x')}" data-ts="${ts('x')}" value="${p.x ?? ''}" step="0.1" placeholder="авто"></label>
-    <label>${L.h}<input type="number" data-col="h" data-i="${i}" data-user="${du('h')}" data-ts="${ts('h')}" value="${p.h ?? ''}" step="0.1" placeholder="авто"></label>
+    <label title="${escAttr(TT.name)}">Имя<input type="text" data-col="name" data-i="${i}" data-user="${du('name')}" value="${escAttr(p.name || '')}" title="${escAttr(TT.name)}"></label>
+    <label title="${escAttr(TT.t)}">${L.t}<input type="number" data-col="t" data-i="${i}" data-user="${du('t')}" data-ts="${ts('t')}" value="${p.t ?? ''}" step="0.1" title="${escAttr(TT.t)}"></label>
+    <label title="${escAttr(TT.rh)}">${L.rh}<input type="number" data-col="rh" data-i="${i}" data-user="${du('rh')}" data-ts="${ts('rh')}" value="${p.rh ?? ''}" step="1" min="0" max="100" title="${escAttr(TT.rh)}"></label>
+    <label title="${escAttr(TT.d)}">${L.d}<input type="number" data-col="x" data-i="${i}" data-user="${du('x')}" data-ts="${ts('x')}" value="${p.x ?? ''}" step="0.1" placeholder="авто" title="${escAttr(TT.d)}"></label>
+    <label title="${escAttr(TT.h)}">${L.h}<input type="number" data-col="h" data-i="${i}" data-user="${du('h')}" data-ts="${ts('h')}" value="${p.h ?? ''}" step="0.1" placeholder="авто" title="${escAttr(TT.h)}"></label>
     ${hint}
     <div class="pt-computed" data-role="pt-computed"></div>
   `;
