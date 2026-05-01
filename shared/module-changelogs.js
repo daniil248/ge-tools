@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.913', date: '2026-04-30', items: [
+      '🚨 <b>CRITICAL: найден корень бага «не работают все кнопки»</b>. По репорту: «продолжай, связей пока нет / и кнопки не работают».',
+      '• <b>Корень</b>: в массиве <code>[\'psy-alt\',\'psy-P-kpa\',\'psy-rhmax\',\'psy-tevap\',\'psy-vbase\',...]</code> внутри <code>wire()</code> присутствовал id <code>psy-tevap</code>, которого НЕТ в HTML (поле было удалено когда-то ранее, но JS не подчистили). <code>$(id).addEventListener(...)</code> на null бросал TypeError, обрывая <code>wire()</code> МЕЖДУ <code>wireInfiniteCanvas()</code> и <code>$(\'psy-add\').addEventListener</code> — все кнопки (add/wizard/demo/csv/from-meteo) НЕ присваивались.',
+      '• <b>Fix</b>: добавлен null-check <code>const el = $(id); if (!el) return;</code>. Теперь missing элементы тихо пропускаются.',
+      '• <b>Бонус</b>: <code>window.__psy</code> debug-handle для будущей диагностики ({ S, points, procs, addPoint(), rerender() }).',
+      '• <b>Ещё бонус</b>: try-catch в <code>$(\'psy-add\').addEventListener</code> чтобы любая будущая ошибка в click-handler не убивала остальные.',
+      'Verified в preview: psy-add.click() теперь увеличивает points 3→4. Связи (10 SVG paths) рендерятся корректно — баг с «нет связей» был проявлением того же — wire() обрывалось до их полного init.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (forEach-handler null-guard + window.__psy + click-handler try-catch).',
+    ] },
     { version: '0.59.912', date: '2026-04-30', items: [
       '🚨 <b>Hotfix: возможная регрессия в кнопках после v0.59.911</b>. По репорту: «перестали работать все кнопки блока, добавление точек, мастер демо циклы; нет связей».',
       '• <b>Изоляция через try-catch</b>: каждая стадия wire() теперь обёрнута в try-catch. Даже если одна функция бросит ошибку (loadCycle/renderCycle/update/wireInfiniteCanvas), все остальные attachment-listeners attach корректно.',

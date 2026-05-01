@@ -2028,9 +2028,15 @@ function wire() {
   catch (e) { console.error('[wireInfiniteCanvas]', e); }
 
   // Верхние поля
+  // v0.59.913: null-check — psy-tevap отсутствует в HTML, без проверки
+  // $(id).addEventListener бросал TypeError, обрывая wire() — кнопки add/
+  // wizard/csv/from-meteo не приcвоились. Этот баг существовал ещё до
+  // v0.59.911, но проявился только с моими новыми wizard/from-meteo handlers.
   ['psy-alt','psy-P-kpa','psy-rhmax','psy-tevap','psy-vbase','psy-tmin-chart','psy-tmax-chart','psy-dmax-chart'].forEach(id => {
-    $(id).addEventListener('input', update);
-    $(id).addEventListener('change', update);
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('input', update);
+    el.addEventListener('change', update);
   });
 
   // Переключатель русских названий
@@ -2180,9 +2186,22 @@ function wire() {
     });
   }
 
+  // v0.59.913: глобальный debug-handle для диагностики (window.__psy)
+  try {
+    window.__psy = {
+      get S() { return S; },
+      get points() { return S?.points; },
+      get procs() { return S?.procs; },
+      addPoint() { S.points.push({ name:'', t:'', rh:'', x:'', h:'', V:'' }); rerenderCycle(); },
+      rerender: () => rerenderCycle(),
+    };
+  } catch (e) {}
+
   $('psy-add').addEventListener('click', () => {
-    S.points.push({ name:'', t:'', rh:'', x:'', h:'', V:'' });
-    rerenderCycle();
+    try {
+      S.points.push({ name:'', t:'', rh:'', x:'', h:'', V:'' });
+      rerenderCycle();
+    } catch (e) { console.error('[psy-add click]', e); }
   });
 
   // v0.59.906: Мастер процесса — пошаговое добавление с минимальными вводными
