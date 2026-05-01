@@ -2816,7 +2816,7 @@ const DEMOS = {
         { name:'После рекуп. (приток)', nameUser:true, t:'', rh:'', x:'', h:'', V:'',                                                                       cx:260,  cy:20  },
         { name:'После догрева (+18 °C)', nameUser:true, t:18, tUser:true, tTs:now+2, rh:'', x:'', h:'', V:'',                                              cx:500,  cy:20  },
         { name:'Приток в зал (смесь)',   nameUser:true, t:'', rh:'', x:'', h:'', V:50000,                                                                   cx:740,  cy:20  },
-        { name:'Горячий коридор (+35)',  nameUser:true, t:35, tUser:true, tTs:now+4, rh:25, rhUser:true, rhTs:now+4, x:'', h:'', V:'',                      cx:980,  cy:150 },
+        { name:'Горячий коридор (+35)',  nameUser:true, t:35, tUser:true, tTs:now+4, rh:25, rhUser:true, rhTs:now+4, x:'', h:'', V:50000,                  cx:980,  cy:150 },
         { name:'После CRAC (+22, 50%)',  nameUser:true, t:22, tUser:true, tTs:now+5, rh:50, rhUser:true, rhTs:now+5, x:'', h:'', V:'',                      cx:740,  cy:300 },
         { name:'Вытяжка (300 м³/ч)',     nameUser:true, t:'', rh:'', x:'', h:'', V:300,                                                                     cx:500,  cy:300 },
         { name:'Наружу после рекуп.',     nameUser:true, t:'', rh:'', x:'', h:'', V:'',                                                                      cx:20,   cy:300 },

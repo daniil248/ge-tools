@@ -4,6 +4,11 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.981', date: '2026-05-01', items: [
+      '🔧 <b>dc-winter demo: V=50000 на «Горячий коридор» — CRAC получает корректный V</b>. Раньше на точке 5 V был пуст → cascade derive давал малый V (394 м³/ч) для CRAC → Q_охл показывал −1.64 кВт вместо ~200.',
+      '• Теперь V=50000 явно на точке 5 → CRAC видит полный recirc-расход → Q_cool корректно отражает IT-нагрузку.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (DEMOS.dc-winter point 5).',
+    ] },
     { version: '0.59.980', date: '2026-05-01', items: [
       '🔄 <b>X-процесс auto-inherit состояния если ничего не задано</b>. По выявленной проблеме в demo dc-winter: X 5→6 «Тап вытяжки» оставлял Вытяжку empty → R 6→7 (recupWith=Вытяжка) не мог вычислить → каскад «висел» с пустыми точками 7-8.',
       '• Раньше: cascade пропускал X-процесс если нет user-target. Точка-цель оставалась пустой.',
