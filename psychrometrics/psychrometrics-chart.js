@@ -92,16 +92,33 @@ export function render(container, opts = {}) {
     }
     if (pts.length > 1) {
       svg += `<polyline points="${pts.map(p=>p[0]+','+p[1]).join(' ')}" fill="none"/>`;
-      const head = pts[0];
+      // v0.59.941: правильный «head» по style:
+      //   ramzin — верхний-левый конец линии (мин W, макс T) = pts[0]
+      //   ashrae — наоборот, верхний-левый = pts[последний] (мин W соответствует
+      //     максимальному Y, мы хотим точку с НАИМЕНЬШИМ y — она в pts[конец]
+      //     при ASHRAE-mapping, потому что W возрастает по итерации, а Y(W)
+      //     убывает с ростом W). Иначе h-метки наезжают на правую W-ось.
+      const head = isAshrae ? pts[pts.length - 1] : pts[0];
       enthalpyLabels.push({ x: head[0], y: head[1], h });
     }
   }
   svg += `</g>`;
+  // Метки h: для ramzin размещаем чуть выше «головы» (стандартно, на верхнем
+  // конце); для ashrae — чуть СЛЕВА от «головы», text-anchor end, чтобы метки
+  // не лезли в W-ось справа.
   for (const lbl of enthalpyLabels) {
     if (lbl.y < o.marginT + 6) continue;
-    svg += `<text x="${lbl.x + 2}" y="${lbl.y - 3}"
-             style="font-size:9px;fill:#1565c0;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:2.5px;">
-             h=${lbl.h}</text>`;
+    if (isAshrae) {
+      // Не выходим за левую границу плот-области
+      if (lbl.x < o.marginL + 8) continue;
+      svg += `<text x="${lbl.x - 4}" y="${lbl.y - 3}" text-anchor="end"
+               style="font-size:9px;fill:#1565c0;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:2.5px;">
+               h=${lbl.h}</text>`;
+    } else {
+      svg += `<text x="${lbl.x + 2}" y="${lbl.y - 3}"
+               style="font-size:9px;fill:#1565c0;font-weight:600;paint-order:stroke;stroke:#fff;stroke-width:2.5px;">
+               h=${lbl.h}</text>`;
+    }
   }
 
   // --- Axes (плот-рамка) ---
@@ -227,8 +244,16 @@ export function plotLegend(opts, sts, pointNames = []) {
   const padX = 8, padY = 6;
   const boxW = 360;
   const boxH = items.length * lineH + padY * 2 + 16; // +16 для заголовка
-  const x0 = opts.width - opts.marginR - boxW;
-  const y0 = opts.height - opts.marginB - boxH - 4;
+  // v0.59.941: для ASHRAE-style W-метки на правой оси — легенду ставим
+  // в ВЕРХНИЙ-левый угол (а не правый-нижний), чтобы не наезжала
+  // на ось W и её подписи.
+  const isAshrae = opts.style === 'ashrae';
+  const x0 = isAshrae
+    ? opts.marginL + 4
+    : opts.width - opts.marginR - boxW;
+  const y0 = isAshrae
+    ? opts.marginT + 4
+    : opts.height - opts.marginB - boxH - 4;
   let s = `<g class="psy-legend" pointer-events="none">`;
   s += `<rect x="${x0}" y="${y0}" width="${boxW}" height="${boxH}" rx="4"
           fill="#fff" stroke="#b0bec5" stroke-width="0.8" opacity="0.96"/>`;

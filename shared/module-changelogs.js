@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.941', date: '2026-05-01', items: [
+      '🧹 <b>Дублирующая панель «Связи» скрыта</b>. Управление процессами полностью перенесено в left-sidebar блока «Узлы» (compact-список + modal с детальной настройкой). DOM-узлы <code>#psy-edges</code>, <code>#psy-edges-list</code>, <code>#psy-add-edge</code> сохранены скрытыми для обратной совместимости с JS-селекторами.',
+      '🏷 <b>h-isolines labels не наезжают на W-ось в ASHRAE-style</b>. Раньше «head» полилинии для метки h=… выбирался как pts[0], что в ASHRAE-mapping (W-axis вертикально справа) давало точку у ПРАВОЙ границы плот-области → метка наезжала на W-ось labels (5, 10, 15… г/кг).',
+      '• Fix: для ashrae берём pts[последний] (где W=W_min, верхний-левый конец линии), text-anchor end, и метка ставится СЛЕВА от точки. В ramzin поведение прежнее.',
+      '📋 <b>Легенда «Параметры точек» переехала в верхний-левый угол в ASHRAE-style</b>. Раньше она была в правом-нижнем (стандартно для ramzin), что в ashrae перекрывало W-ось и её подписи.',
+      'Файлы: <code>psychrometrics/index.html</code> (Связи panel hidden), <code>psychrometrics/psychrometrics-chart.js</code> (h-label head + plotLegend position по style).',
+    ] },
     { version: '0.59.940', date: '2026-05-01', items: [
       '🌐 <b>ASHRAE-style chart layout в альбомной ориентации</b>. Долгожданный фикс по pending-репорту: «не забудь что в альбомной ориентации я просил сделать другой тип диаграммы, как в Ashrae».',
       '• <code>render()</code> в <code>psychrometrics-chart.js</code> теперь принимает option <code>style: \'ramzin\' | \'ashrae\'</code>. В alb. → ASHRAE (T горизонталь, W вертикаль на правой оси, как в учебниках/западных стандартах). В книжной → Mollier-Ramzin (W горизонталь, T вертикаль, RU-стиль).',

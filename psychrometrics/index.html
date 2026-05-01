@@ -170,18 +170,14 @@
       <div class="psy-zones-panel" id="psy-zones-panel"></div>
     </div>
 
-    <!-- Связи (процессы) -->
-    <div class="psy-panel">
-      <div class="psy-panel-title">
-        Связи (процессы, рёбра графа)
-        <button type="button" id="psy-add-edge" class="psy-btn psy-btn-primary">+ связь</button>
-        <span class="psy-view-toggle" role="tablist" aria-label="Вид процессов" style="margin-left:auto;display:inline-flex;gap:2px;background:#eef2f7;border:1px solid #d4d9e0;border-radius:4px;padding:2px;">
-          <button type="button" class="psy-btn psy-view-btn active" data-view="cards" title="Карточки на полотне" aria-pressed="true" style="border:0;background:#fff;">▦ карточки</button>
-          <button type="button" class="psy-btn psy-view-btn" data-view="list" title="Таблица-список" aria-pressed="false" style="border:0;background:transparent;">☰ список</button>
-        </span>
-      </div>
+    <!-- v0.59.941: панель «Связи» скрыта — управление процессами полностью
+         перенесено в left-sidebar блока «Узлы» (compact-список + modal).
+         Hidden-divs оставлены для обратной совместимости (id-селекторы из
+         JS-кода ещё ссылаются на #psy-edges и #psy-edges-list). -->
+    <div hidden>
+      <button type="button" id="psy-add-edge" class="psy-btn"></button>
       <div class="psy-edges" id="psy-edges"></div>
-      <div class="psy-edges-list" id="psy-edges-list" style="display:none;"></div>
+      <div class="psy-edges-list" id="psy-edges-list"></div>
     </div>
 
     <!-- Диаграмма -->
