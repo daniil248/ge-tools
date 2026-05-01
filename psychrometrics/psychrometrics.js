@@ -2429,17 +2429,95 @@ function openWizardStep2(procType) {
   overlay.querySelector('.psy-wiz-apply').addEventListener('click', () => {
     if (applyWizard(procType, overlay, fromIdx)) close();
   });
+  // v0.59.907: preset selector — auto-fill полей при выборе
+  const presetSel = overlay.querySelector('#wz-preset');
+  if (presetSel) presetSel.addEventListener('change', () => {
+    const preset = (WIZARD_PRESETS[procType] || []).find(p => p.id === presetSel.value);
+    if (!preset) return;
+    // Сначала очистить все известные поля, потом заполнить из preset
+    ['wz-t2','wz-dt','wz-Q','wz-V','wz-phi2','wz-d2','wz-dd','wz-qw','wz-adp','wz-bf','wz-eta','wz-ratio'].forEach(id => {
+      const el = overlay.querySelector('#' + id);
+      if (el) el.value = '';
+    });
+    for (const [k, v] of Object.entries(preset.fields || {})) {
+      const el = overlay.querySelector('#wz-' + k);
+      if (el) el.value = v;
+    }
+  });
+}
+
+// v0.59.907: пресеты методик и типового оборудования.
+// Каждый пресет — заранее заданный набор полей wizard, выбираемый из
+// dropdown в шаге 2. Пользователь может оставить «Custom» и ввести вручную.
+const WIZARD_PRESETS = {
+  P: [
+    { id: 'custom', label: '✏ Custom (ввести вручную)', fields: {} },
+    { id: 'electric',    label: '⚡ Электрокалорифер · ΔT=+12°C', fields: { dt: 12 } },
+    { id: 'water-low',   label: '🌡 Водяной 70/55 · ΔT=+25°C', fields: { dt: 25 } },
+    { id: 'water-mid',   label: '🌡 Водяной 80/60 · ΔT=+35°C', fields: { dt: 35 } },
+    { id: 'preheat',     label: '❄→🔥 Преднагрев · t₂=2°C (защита коил)', fields: { t2: 2 } },
+    { id: 'reheat-comf', label: '🌬 Доводчик к 22°C', fields: { t2: 22 } },
+  ],
+  C: [
+    { id: 'custom', label: '✏ Custom (ввести вручную)', fields: {} },
+    { id: 'dx-coil',   label: '❄ DX-coil типовой (ADP 10°C, BF 0.15)', fields: { adp: 10, bf: 0.15 } },
+    { id: 'cw-coil',   label: '❄ Чиллер 7/12°C (ADP 9°C, BF 0.10)', fields: { adp: 9, bf: 0.10 } },
+    { id: 'cw-coil-deep', label: '❄ Чиллер 5/10°C, глубокая (ADP 7°C, BF 0.05)', fields: { adp: 7, bf: 0.05 } },
+    { id: 'freecool', label: '🌬 Free-cool до 14°C (контакт)', fields: { t2: 14 } },
+    { id: 'precool',  label: '🌬 Предохлаждение в 22°C', fields: { t2: 22 } },
+    { id: 'desic',    label: '💨 Глубокое осушение φ₂=50%', fields: { phi2: 50, adp: 5, bf: 0.10 } },
+  ],
+  A: [
+    { id: 'custom', label: '✏ Custom (ввести вручную)', fields: {} },
+    { id: 'pad-typical', label: '💦 Адиабат. пэд η=0.85 → φ≈90%', fields: { phi2: 90 } },
+    { id: 'pad-eff',     label: '💦 Высокоэффект. пэд → φ≈95%', fields: { phi2: 95 } },
+    { id: 'spray',       label: '💧 Форсуночная камера → φ≈80%', fields: { phi2: 80 } },
+  ],
+  S: [
+    { id: 'custom', label: '✏ Custom (ввести вручную)', fields: {} },
+    { id: 'steam-low',  label: '♨ Паровой увлажн. +2 г/кг', fields: { dd: 2 } },
+    { id: 'steam-mid',  label: '♨ Паровой увлажн. +5 г/кг', fields: { dd: 5 } },
+    { id: 'steam-high', label: '♨ Паровой увлажн. +8 г/кг', fields: { dd: 8 } },
+  ],
+  M: [
+    { id: 'custom', label: '✏ Custom (ввести вручную)', fields: {} },
+    { id: 'rec-30', label: '🔄 Рециркуляция 30/70 (свежий/возврат)', fields: { ratio: 0.3 } },
+    { id: 'rec-50', label: '🔄 Рециркуляция 50/50', fields: { ratio: 0.5 } },
+    { id: 'rec-70', label: '🔄 Рециркуляция 70/30 (минимум приточного)', fields: { ratio: 0.7 } },
+    { id: 'fresh-only', label: '🌫 Только свежий воздух', fields: { ratio: 1.0 } },
+  ],
+  R: [
+    { id: 'custom', label: '✏ Custom (ввести вручную)', fields: {} },
+    { id: 'rotary',     label: '♻ Роторный энтальпийный η=0.80', fields: { eta: 0.80 } },
+    { id: 'plate-cross',label: '♻ Пластинч. перекрестный η=0.65', fields: { eta: 0.65 } },
+    { id: 'plate-counter', label: '♻ Пластинч. противоток η=0.85', fields: { eta: 0.85 } },
+    { id: 'glycol',     label: '♻ Гликолевый η=0.50 (раздел.)', fields: { eta: 0.50 } },
+    { id: 'heatpipe',   label: '♻ Heat-pipe η=0.55', fields: { eta: 0.55 } },
+  ],
+  X: [{ id: 'custom', label: '✏ Custom', fields: {} }],
+};
+
+function presetSelector(pt) {
+  const presets = WIZARD_PRESETS[pt] || [];
+  if (presets.length <= 1) return '';
+  return `<label style="margin-bottom:12px"><b>📚 Пресет (типовое оборудование/режим):</b>
+    <select id="wz-preset" style="font-weight:500">
+      ${presets.map(p => `<option value="${p.id}">${escAttr(p.label)}</option>`).join('')}
+    </select>
+  </label>
+  <p class="psy-wiz-hint" style="margin:0 0 8px">Выберите пресет — поля заполнятся автоматически. Можно оставить «Custom» и ввести вручную.</p>`;
 }
 
 function wizardFields(pt) {
   const NODE_OPTS = S.points.map((p, i) => `<option value="${i}">${i+1}. ${escAttr((p.name||'').slice(0,30))}</option>`).join('');
-  if (pt === 'P') return `
+  const presetUI = presetSelector(pt);
+  if (pt === 'P') return presetUI + `
     <label>Целевая t₂, °C ⓘ<input type="number" id="wz-t2" step="0.5" placeholder="напр. 22"></label>
     <label>Прирост Δt, °C ⓘ<input type="number" id="wz-dt" step="0.5" placeholder="напр. +12"></label>
     <label>Мощность Q, кВт ⓘ<input type="number" id="wz-Q" step="1" placeholder="требуется V м³/ч (см. ниже)"></label>
     <label>Расход воздуха V, м³/ч (для Q)<input type="number" id="wz-V" step="100" placeholder="опционально"></label>
   `;
-  if (pt === 'C') return `
+  if (pt === 'C') return presetUI + `
     <label>Целевая t₂, °C ⓘ<input type="number" id="wz-t2" step="0.5" placeholder="напр. 14"></label>
     <label>Целевая φ₂, % ⓘ<input type="number" id="wz-phi2" step="1" min="0" max="100" placeholder="напр. 90"></label>
     <label>Мощность охлаждения Q, кВт (отриц.) ⓘ<input type="number" id="wz-Q" step="1" placeholder="напр. -25"></label>
@@ -2448,22 +2526,22 @@ function wizardFields(pt) {
     <label>❄ ADP — T поверхности коил, °C (опц., точная модель)<input type="number" id="wz-adp" step="0.5" placeholder="напр. 10"></label>
     <label>BF — bypass factor (0..1, тип. 0.15)<input type="number" id="wz-bf" step="0.05" min="0" max="1" placeholder="0.15"></label>
   `;
-  if (pt === 'A') return `
+  if (pt === 'A') return presetUI + `
     <label>Целевая t₂, °C ⓘ<input type="number" id="wz-t2" step="0.5" placeholder="ниже t_in (испарение охлаждает)"></label>
     <label>Целевая φ₂, % ⓘ<input type="number" id="wz-phi2" step="1" min="0" max="100" placeholder="напр. 90"></label>
     <label>Прирост Δd, г/кг ⓘ<input type="number" id="wz-dd" step="0.1" placeholder="напр. +3"></label>
   `;
-  if (pt === 'S') return `
+  if (pt === 'S') return presetUI + `
     <label>Целевая d₂, г/кг ⓘ<input type="number" id="wz-d2" step="0.1" placeholder="напр. 8"></label>
     <label>Прирост Δd, г/кг ⓘ<input type="number" id="wz-dd" step="0.1" placeholder="напр. +2"></label>
     <label>Влагоприток qw, кг/ч ⓘ<input type="number" id="wz-qw" step="0.1" placeholder="требует V"></label>
     <label>Расход V, м³/ч (для qw)<input type="number" id="wz-V" step="100" placeholder="опционально"></label>
   `;
-  if (pt === 'M') return `
+  if (pt === 'M') return presetUI + `
     <label>С какой точкой смешивать?<select id="wz-mix">${NODE_OPTS}</select></label>
     <label>Доля исходной (mixRatio, 0..1) ⓘ<input type="number" id="wz-ratio" step="0.05" min="0" max="1" placeholder="напр. 0.7 (рециркуляция)"></label>
   `;
-  if (pt === 'R') return `
+  if (pt === 'R') return presetUI + `
     <label>Опорная точка (вытяжка)<select id="wz-recref">${NODE_OPTS}</select></label>
     <label>КПД рекуператора η (0..1) ⓘ<input type="number" id="wz-eta" step="0.05" min="0" max="1" placeholder="напр. 0.65"></label>
   `;
