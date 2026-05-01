@@ -211,6 +211,11 @@
             <div class="mt-annual-toolbar">
               <h3 style="margin:0" title="Pivot-таблица: бины Ambient T °C (целочисленные диапазоны 1°C) × агрегированные показатели (часы/год, дни/год, RH avg/min/max, ветер, мощность чиллера если задана spec).">📐 Annual hours table</h3>
               <span class="muted" style="flex:1;font-size:11.5px" title="Период выборки задаётся ГЛОБАЛЬНЫМ фильтром выше (📅 Период).">Бины Ambient T °C × часы/дни в году.</span>
+              <label style="display:inline-flex;gap:4px;align-items:center;font-size:12px"
+                     title="Тариф на электроэнергию (₽/кВт·ч) для расчёта годовых эксплуатационных затрат и денежной экономии от free-cooling. Default 7.5 — типичный тариф РФ для коммерческих/ЦОД-объектов. Установите 0 чтобы скрыть OPEX-метрики.">
+                💰 ₽/кВт·ч:
+                <input type="number" id="mt-tariff" min="0" step="0.1" style="width:60px;padding:3px 6px;font-size:12px;border:1px solid #cbd5e1;border-radius:3px">
+              </label>
               <button type="button" class="mt-btn-ghost" id="mt-chiller-btn"
                       title="Спецификация чиллера/DX-системы для расчёта Capacity (T-correction), COP (IPLV-curve), Power и годовой энергии. Опции: free-cooling (dry/wet), DX air-cooled, DX с pumped refrigerant.">❄ Chiller / DX</button>
               <button type="button" class="mt-btn-ghost" id="mt-cols-btn"
@@ -220,6 +225,7 @@
             </div>
             <div class="mt-chiller-wrap" id="mt-chiller-wrap" hidden></div>
             <div class="mt-col-picker-wrap" id="mt-col-picker-wrap" hidden></div>
+            <div id="mt-fc-summary"></div>
             <div id="mt-annual-table" class="mt-table-scroll"></div>
           </div>
         </div>

@@ -21,7 +21,7 @@ import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
 import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, drawWindRose, renderDaysInRangeTable } from './charts.js';
 import { renderAshraeDatasheet } from './ashrae-datasheet.js';
-import { COLUMNS, DEFAULT_CHILLER, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker, renderChillerSpecForm } from './annual-table.js';
+import { COLUMNS, DEFAULT_CHILLER, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker, renderChillerSpecForm, renderFreeCoolingSummary } from './annual-table.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,12 +37,16 @@ let _chillerSpec = null;
 //   periodFrom / periodTo: 'YYYY-MM-DD' — при mode='period'
 // Заменяет более узкий _annualYear (v0.59.971) — теперь фильтр глобальный.
 let _filter = { mode: 'all', year: '', periodFrom: '', periodTo: '' };
+// v0.59.989: тариф ₽/кВт·ч для расчёта годовых эксплуатационных затрат
+//   и экономии от free-cooling. Default 7.5 — типичный тариф РФ для ЦОД.
+let _tariffRubKwh = 7.5;
 
 const KEY_DATA = ['meteo', 'datasets.v1'];
 const KEY_ACTIVE = ['meteo', 'activeId.v1'];
 const KEY_COLS = ['meteo', 'annualCols.v1'];
 const KEY_CHILLER = ['meteo', 'chillerSpec.v1'];
 const KEY_FILTER = ['meteo', 'globalFilter.v1'];
+const KEY_TARIFF = ['meteo', 'tariffRubKwh.v1'];
 
 function loadJson(suffix, fallback) {
   if (!_pid) return fallback;
@@ -59,6 +63,7 @@ function persist() {
   saveJson(KEY_COLS, _activeCols);
   saveJson(KEY_CHILLER, _chillerSpec);
   saveJson(KEY_FILTER, _filter);
+  saveJson(KEY_TARIFF, _tariffRubKwh);
 }
 
 /* v0.59.986: Применить глобальный фильтр к hourly. Возвращает массив
@@ -261,6 +266,13 @@ function renderActiveTab() {
     const rows = buildBinData(hourly, _chillerSpec);
     const tbl = $('mt-annual-table');
     if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
+    // v0.59.989: сводка FC + OPEX, если задан chillerSpec
+    const sumEl = $('mt-fc-summary');
+    if (sumEl) {
+      sumEl.innerHTML = (_chillerSpec && Number(_chillerSpec.ratedCapKw) > 0)
+        ? renderFreeCoolingSummary(rows, _chillerSpec, _tariffRubKwh, hourly)
+        : '';
+    }
   } else if (_activeTab === 'ashrae') {
     renderAshraeBlock(d, hourly);
   }
@@ -339,6 +351,8 @@ function init() {
   if (savedFilter && typeof savedFilter === 'object') {
     _filter = { mode: 'all', year: '', periodFrom: '', periodTo: '', ...savedFilter };
   }
+  const savedTariff = Number(loadJson(KEY_TARIFF, null));
+  if (Number.isFinite(savedTariff) && savedTariff >= 0) _tariffRubKwh = savedTariff;
   if (_activeId && !_datasets.some(d => d.id === _activeId)) _activeId = _datasets[0]?.id || null;
 
   renderImportButtons();
@@ -421,7 +435,26 @@ function init() {
     const rows = buildBinData(filtered, _chillerSpec);
     const tbl = $('mt-annual-table');
     if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
+    // v0.59.989: пересчёт сводки FC/OPEX
+    const sumEl = $('mt-fc-summary');
+    if (sumEl) {
+      sumEl.innerHTML = (_chillerSpec && Number(_chillerSpec.ratedCapKw) > 0)
+        ? renderFreeCoolingSummary(rows, _chillerSpec, _tariffRubKwh, filtered)
+        : '';
+    }
   };
+
+  // Тариф ₽/кВт·ч
+  const tariffInp = $('mt-tariff');
+  if (tariffInp) {
+    tariffInp.value = _tariffRubKwh;
+    tariffInp.addEventListener('change', () => {
+      const v = Number(tariffInp.value);
+      _tariffRubKwh = Number.isFinite(v) && v >= 0 ? v : 0;
+      persist();
+      reRenderAnnual();
+    });
+  }
 
   const colsBtn = $('mt-cols-btn');
   if (colsBtn) {

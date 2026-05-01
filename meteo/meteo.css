@@ -640,3 +640,58 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 .mt-chiller-actions { margin-top: 6px; text-align: right; }
 .mt-chiller-formula summary { font-size: 11.5px; }
 
+/* v0.59.989: FC + OPEX сводка */
+.mt-fc-summary {
+  margin: 8px 0;
+}
+.mt-fc-summary .mt-fc-summary-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #075985;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 10px;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+}
+.mt-fc-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: #6ee7b7;
+  border: 1px solid #6ee7b7;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+}
+.mt-fc-kpi {
+  padding: 8px 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mt-fc-kpi-lbl {
+  font-size: 10.5px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+.mt-fc-kpi-val {
+  font-size: 14px;
+  color: #0f172a;
+  font-weight: 700;
+}
+.mt-fc-kpi-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: #16a34a;
+}
+.mt-fc-kpi-saving {
+  background: #f0fdf4;
+}
+.mt-fc-kpi-saving .mt-fc-kpi-val { color: #15803d; }
+

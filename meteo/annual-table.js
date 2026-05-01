@@ -298,6 +298,87 @@ export function exportAnnualTableCsv(rows, activeCols, filename = 'annual-hours.
   downloadCsv(tableToCsv(csvRows), filename);
 }
 
+/* v0.59.989: Сводка по фрикулингу и стоимости. Возвращает HTML-блок
+   для отображения над таблицей. Параметры:
+     rows         — результат buildBinData (с примененным chillerSpec)
+     spec         — chillerSpec
+     tariffRubKwh — тариф ₽/кВт·ч (для расчёта годовых эксплуатационных затрат)
+     hourly       — исходный фильтрованный hourly (для baseline noFC сравнения)
+
+   Считаем:
+     • часы FC (где fc > 0) и средневзвешенную FC%
+     • годовое потребление (текущий режим)
+     • baseline noFC = строит spec без FC и пересчитывает rows
+     • savings vs noFC (кВт·ч/год + ₽/год + %)
+*/
+export function renderFreeCoolingSummary(rows, spec, tariffRubKwh, hourly) {
+  if (!spec || !Number(spec.ratedCapKw) > 0) return '';
+  const totalHours = rows.reduce((a, r) => a + (r.hours || 0), 0);
+  const fcHours = rows.reduce((a, r) => a + (r.fcFraction || 0) * (r.hours || 0), 0);
+  const fcPct = totalHours > 0 ? (fcHours / totalHours * 100) : 0;
+  const energyKwh = rows.reduce((a, r) => a + (r.energy || 0), 0);
+  const tariff = Number(tariffRubKwh) || 0;
+  const costRub = energyKwh * tariff;
+
+  // Baseline = тот же spec, но без FC (noFC + dx-air)
+  const baselineSpec = {
+    ...spec,
+    systemType: spec.systemType === 'dx-pumped-fc' ? 'dx-air' : 'chiller',
+    freeCoolingMode: 'none',
+  };
+  const baselineRows = buildBinData(hourly, baselineSpec);
+  const baselineEnergy = baselineRows.reduce((a, r) => a + (r.energy || 0), 0);
+  const savedKwh = Math.max(0, baselineEnergy - energyKwh);
+  const savedPct = baselineEnergy > 0 ? (savedKwh / baselineEnergy * 100) : 0;
+  const savedRub = savedKwh * tariff;
+
+  const fmtKwh = (v) => v >= 1000000 ? `${(v/1000000).toFixed(2)} ГВт·ч`
+    : v >= 1000 ? `${(v/1000).toFixed(2)} МВт·ч`
+    : `${v.toFixed(0)} кВт·ч`;
+  const fmtRub = (v) => v >= 1000000 ? `${(v/1000000).toFixed(2)} млн ₽`
+    : v >= 1000 ? `${(v/1000).toFixed(0)} тыс ₽`
+    : `${v.toFixed(0)} ₽`;
+
+  const sysLabel = {
+    'chiller': `Чиллер (FC: ${spec.freeCoolingMode || 'none'})`,
+    'dx-air': 'DX air-cooled',
+    'dx-pumped-fc': 'DX pumped refrigerant FC',
+  }[spec.systemType || 'chiller'];
+
+  const fcActive = (spec.systemType === 'chiller' && spec.freeCoolingMode !== 'none')
+    || spec.systemType === 'dx-pumped-fc';
+
+  return `<div class="mt-fc-summary">
+    <div class="mt-fc-summary-title" title="Сводка по выбранной системе охлаждения и фрикулингу.">
+      📊 Сводка ${escHtml(sysLabel)} · ${Math.round(spec.ratedCapKw)} кВт rated
+    </div>
+    <div class="mt-fc-kpi-grid">
+      <div class="mt-fc-kpi" title="Часы в году в режиме фрикулинга (с учётом partial FC). Σ fc_fraction × hours_in_bin.">
+        <span class="mt-fc-kpi-lbl">FC часов/год</span>
+        <span class="mt-fc-kpi-val">${fcHours.toFixed(0)} ч</span>
+      </div>
+      <div class="mt-fc-kpi" title="Доля года в режиме FC = FC_hours / total_hours × 100.">
+        <span class="mt-fc-kpi-lbl">% года в FC</span>
+        <span class="mt-fc-kpi-val">${fcPct.toFixed(1)} %</span>
+      </div>
+      <div class="mt-fc-kpi" title="Годовое эл. потребление системы при текущей конфигурации = Σ P_total × hours.">
+        <span class="mt-fc-kpi-lbl">Эл. потребление</span>
+        <span class="mt-fc-kpi-val">${fmtKwh(energyKwh)}</span>
+      </div>
+      ${tariff > 0 ? `
+      <div class="mt-fc-kpi" title="Годовые эксплуатационные затраты на электроэнергию = Energy × tariff. Не включает обслуживание.">
+        <span class="mt-fc-kpi-lbl">OPEX за год</span>
+        <span class="mt-fc-kpi-val">${fmtRub(costRub)}</span>
+      </div>` : ''}
+      ${fcActive ? `
+      <div class="mt-fc-kpi mt-fc-kpi-saving" title="Экономия по сравнению с baseline (тот же чиллер/DX без free-cooling). Demonstrates ROI инвестиции в FC-оборудование.">
+        <span class="mt-fc-kpi-lbl">Экономия vs noFC</span>
+        <span class="mt-fc-kpi-val">${fmtKwh(savedKwh)} <span class="mt-fc-kpi-sub">(−${savedPct.toFixed(0)}%${tariff > 0 ? ` · ${fmtRub(savedRub)}/год` : ''})</span></span>
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
 // HTML столбец-пикера. Tooltip = описание из COLUMNS[i].tip.
 export function renderColumnPicker(activeCols, onChange, hasChillerSpec = false) {
   const wrap = document.createElement('div');

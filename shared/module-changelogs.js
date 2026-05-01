@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.989', date: '2026-05-01', items: [
+      '💰 <b>FC + OPEX сводка над annual table + тариф ₽/кВт·ч</b>. ROI-метрики для подбора free-cooling решений.',
+      '• Поле «💰 ₽/кВт·ч» в toolbar Annual hours (default 7.5 — типичный тариф РФ для коммерческих/ЦОД-объектов). Persist в LS.',
+      '• Сводка-блок над таблицей при заданной chillerSpec: <b>FC часов/год</b>, <b>% года в FC</b>, <b>Эл. потребление</b>, <b>OPEX за год</b> (если тариф &gt; 0), <b>Экономия vs noFC</b> (кВт·ч + % + ₽/год если FC активен).',
+      '• Baseline для расчёта экономии = тот же spec но без FC (chiller→noFC, dx-pumped-fc→dx-air). Прямая ROI-оценка инвестиции в FC-оборудование.',
+      '• Auto-форматирование чисел: ≥1000 кВт·ч → МВт·ч, ≥1000 МВт·ч → ГВт·ч; ≥1000 ₽ → тыс ₽, ≥10⁶ ₽ → млн ₽.',
+      '• Tooltip на каждом KPI с пояснением методики.',
+      'Файлы: <code>meteo/annual-table.js</code> (renderFreeCoolingSummary), <code>meteo/index.html</code> (input #mt-tariff + #mt-fc-summary placeholder), <code>meteo/meteo.css</code> (.mt-fc-summary), <code>meteo/meteo.js</code> (_tariffRubKwh state + persist + wire input + рендер summary в renderActiveTab/reRenderAnnual).',
+    ] },
     { version: '0.59.988', date: '2026-05-01', items: [
       '📚 <b>Методика расчёта чиллера / DX / free-cooling в help-панели</b>. По требованию: «все задокументируй, как рассчитывается».',
       '• Help-панель meteo (кнопка ❓ в шапке) дополнена секцией «Расчёт чиллера / DX-системы»: типы систем, capacity/COP correction формулы, free-cooling (dry/wet) для чиллеров, DX-pumped FC, формулы Power & Energy, ссылки на источники (ASHRAE HoF, 90.1, TC 9.9, Vertiv whitepapers, Stull 2011).',
