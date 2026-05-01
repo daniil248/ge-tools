@@ -538,6 +538,55 @@ body.psy-dragging *::after {
 
 /* Диаграмма */
 .psy-chart-wrap { position: relative; }
+
+/* v0.59.961: zoom-toolbar для диаграммы. По репорту: «увеличение
+   масштаба окна браузера не увеличивает саму диаграмму».
+   Floating справа сверху, рядом с zone-селектором. */
+.psy-chart-zoom-toolbar {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.96);
+  border: 1px solid #cfd8dc;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.psy-chart-zoom-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+.psy-chart-zoom-btn:hover { background: #e2e8f0; }
+.psy-chart-zoom-label {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: #263238;
+  font-weight: 600;
+}
+@media print {
+  .psy-chart-zoom-toolbar { display: none; }
+  /* v0.59.961: при печати zoom отменяется — лист возвращается к
+     A3/A4 размеру по viewBox SVG. По репорту: «при этом для печати
+     это должен оставаться все тот же A3, A4 лист». */
+  .psy-chart svg { transform: none !important; }
+}
+/* Хост диаграммы поддерживает overflow при zoom > 100%. */
+.psy-chart {
+  position: relative;
+  /* overflow перенесён в правило ниже — оригинальное .psy-chart правило */
+}
 /* v0.59.935: ограничиваем высоту контейнера диаграммы по высоте viewport,
    чтобы диаграмма не «съедала» весь экран и оставалась пространство для
    таблиц, легенды, формул. SVG вписывается с сохранением aspect-ratio.

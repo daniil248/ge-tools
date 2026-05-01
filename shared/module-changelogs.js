@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.961', date: '2026-05-01', items: [
+      '🔍 <b>Zoom самой диаграммы (независимо от browser-zoom)</b>. По репорту: «увеличение масштаба окна браузера, не увеличивает саму диаграмму, только тексты. Добавь увеличение самой диаграммы внутри зоны, чтобы можно было изучать точки и процессы без увеличения самой страницы. При этом для печати это должен оставаться все тот же A3, A4 лист».',
+      '• Toolbar в левом-верхнем углу диаграммы: −, %label, +, ⊞ 100% (reset). Range 25%…500%.',
+      '• <code>Ctrl + wheel</code> над диаграммой — zoom без скролла страницы (passive:false).',
+      '• Применяется через CSS <code>transform: scale(N)</code> на SVG, transform-origin top-left. <code>.psy-chart{ overflow:auto }</code> даёт скролл при scale>1.',
+      '• Persists в LS (<code>psy.chartZoom</code>). Применяется автоматически после каждого <code>renderChart()</code>.',
+      '• <code>@media print</code> отменяет transform → лист печатается в исходном A3/A4 размере (по viewBox), независимо от текущего zoom.',
+      'Файлы: <code>psychrometrics/index.html</code> (.psy-chart-zoom-toolbar), <code>psychrometrics/psychrometrics.css</code> (toolbar style + print reset), <code>psychrometrics/psychrometrics.js</code> (applyChartZoom + wireChartZoomToolbar).',
+    ] },
     { version: '0.59.960', date: '2026-05-01', items: [
       '🔢 <b>Spinner-стрелки на number-полях видны всегда</b>. По репорту: «добавь в поля стрелки увеличения уменьшения мышью». Раньше браузерный <code>::-webkit-inner-spin-button</code> показывался только на hover/focus — теперь <code>opacity:1</code> + <code>cursor:pointer</code> делают стрелки кликабельными мышью с первого взгляда. Применено к точкам, процессам, top-row полям.',
       '🔒 <b>Точка: только 2 из {t, φ, d, h} могут быть user-input</b>. По репорту: «почему я могу изменять энтальпию третьим параметром? разве это возможно?» — физически нет, при фиксированном P только 2 независимых.',

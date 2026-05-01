@@ -2090,6 +2090,60 @@ function renderChart(sts) {
       raf = requestAnimationFrame(() => normalizeChartFontSizes(host));
     });
   }
+  // v0.59.961: применяем chart-zoom к SVG (если был сохранён в LS).
+  applyChartZoom();
+}
+
+/* v0.59.961: chart-zoom — независимый от browser-zoom масштаб самой
+   диаграммы. По репорту: «увеличение масштаба окна браузера, не увеличивает
+   саму диаграмму, только тексты. Добавь увеличение самой диаграммы внутри
+   зоны, чтобы можно было изучать точки и процессы без увеличения самой
+   страницы. При этом для печати это должен оставаться все тот же A3, A4».
+   CSS transform: scale на SVG; @media print → transform отменяется
+   через CSS-class psy-no-print-zoom. */
+let _chartZoom = (() => {
+  try { const v = parseFloat(localStorage.getItem('psy.chartZoom')); return v > 0 ? v : 1; }
+  catch { return 1; }
+})();
+function applyChartZoom(z) {
+  if (z !== undefined) {
+    _chartZoom = Math.max(0.25, Math.min(5, z));
+    try { localStorage.setItem('psy.chartZoom', String(_chartZoom)); } catch {}
+  }
+  const host = document.getElementById('psy-chart');
+  const svg  = host?.querySelector('svg');
+  if (svg) {
+    svg.style.transform = `scale(${_chartZoom})`;
+    svg.style.transformOrigin = 'top left';
+    // При scale > 1 SVG больше контейнера — overflow:auto даст скролл.
+    // .psy-chart уже имеет overflow:auto и max-height:80vh.
+  }
+  const lbl = document.getElementById('psy-chart-zoom-label');
+  if (lbl) lbl.textContent = Math.round(_chartZoom * 100) + '%';
+}
+function wireChartZoomToolbar() {
+  const tb = document.querySelector('.psy-chart-zoom-toolbar');
+  if (!tb || tb._wired) return;
+  tb._wired = true;
+  tb.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-cz-act]')?.dataset.czAct;
+    if (!act) return;
+    if (act === 'zoom-in')  applyChartZoom(_chartZoom * 1.25);
+    else if (act === 'zoom-out') applyChartZoom(_chartZoom / 1.25);
+    else if (act === 'fit')      applyChartZoom(1);
+  });
+  // Ctrl+wheel внутри chart → zoom (без скролла страницы)
+  const host = document.getElementById('psy-chart');
+  if (host && !host._chartZoomWheelWired) {
+    host._chartZoomWheelWired = true;
+    host.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const delta = -e.deltaY;
+      const factor = delta > 0 ? 1.1 : 1 / 1.1;
+      applyChartZoom(_chartZoom * factor);
+    }, { passive: false });
+  }
 }
 
 // v0.59.935: пересчитывает font-size у каждого <text> в SVG диаграммы так,
@@ -2850,6 +2904,7 @@ function wire() {
   try { renderFormulas(); } catch (e) { console.error('[psy.wire.renderFormulas]', e); }
   try { renderCycle(); } catch (e) { console.error('[psy.wire.renderCycle]', e); }
   try { update(); } catch (e) { console.error('[psy.wire.update]', e); }
+  try { wireChartZoomToolbar(); } catch (e) { console.error('[wireChartZoomToolbar]', e); }
   try { wireInfiniteCanvas(); }
   catch (e) { console.error('[wireInfiniteCanvas]', e); }
   // v0.59.927: рендер «active meteo» chip

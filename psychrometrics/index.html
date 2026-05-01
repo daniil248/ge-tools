@@ -227,6 +227,15 @@
         </span>
       </div>
       <div class="psy-chart-wrap" style="position:relative;">
+        <!-- v0.59.961: floating zoom-toolbar для диаграммы (CAD-style).
+             По репорту: «увеличение масштаба окна браузера, не увеличивает
+             саму диаграмму, только тексты. Добавь увеличение самой диаграммы». -->
+        <div class="psy-chart-zoom-toolbar">
+          <button type="button" class="psy-chart-zoom-btn" data-cz-act="zoom-out" title="Уменьшить (−)">−</button>
+          <span class="psy-chart-zoom-label" id="psy-chart-zoom-label">100%</span>
+          <button type="button" class="psy-chart-zoom-btn" data-cz-act="zoom-in" title="Увеличить (+)">+</button>
+          <button type="button" class="psy-chart-zoom-btn" data-cz-act="fit" title="Сбросить (100%)">⊞ 100%</button>
+        </div>
         <div class="psy-chart" id="psy-chart"></div>
         <!-- v0.59.934: zone-селектор в правом верхнем углу диаграммы (виден при переключении). -->
         <div class="psy-chart-zone-ctl" title="Показать на i-d диаграмме зону: офисный комфорт (ASHRAE 55) или ЦОД-классы по ASHRAE TC 9.9 (Recommended / A1 / A2 / A3 / A4).">
