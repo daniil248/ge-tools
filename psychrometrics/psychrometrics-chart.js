@@ -170,18 +170,8 @@ export function render(container, opts = {}) {
              transform="rotate(90 ${wLblX} ${wLblY})"
              style="font-size:11px;fill:#555;font-weight:600;">
              d (W), г/кг — Humidity Ratio</text>`;
-    // RH-аннотации
-    for (const rh of [20, 40, 60, 80, 100]) {
-      const T = 28;
-      const Pws_T = Pws(T);
-      const Pw = rh / 100 * Pws_T;
-      const W = 0.621945 * Pw / (o.P - Pw);
-      if (W >= o.W_min && W <= o.W_max) {
-        const [px, py] = pos(W, T);
-        svg += `<text x="${px + 3}" y="${py - 2}" style="font-size:9px;fill:#666;font-style:italic;">
-                φ=${rh}%</text>`;
-      }
-    }
+    // v0.59.964: RH-метки RotatedAlongCurve как в reference ASHRAE.
+    svg += rhLabelsAlongCurves(o, pos, true /* isAshrae */);
     // v0.59.943: Wet-Bulb метки на кривой насыщения. На saturation curve
     // T_db = T_wb, поэтому каждая точка кривой при integer T = метка
     // wet-bulb. Раскрашиваем красным (как в reference ASHRAE Foundamentals
@@ -226,17 +216,8 @@ export function render(container, opts = {}) {
     svg += `<text x="12" y="${o.marginT + plotH / 2}" text-anchor="middle"
              transform="rotate(-90 12 ${o.marginT + plotH / 2})"
              style="font-size:11px;fill:#555;font-weight:600;">t, °C</text>`;
-    for (const rh of [20, 40, 60, 80, 100]) {
-      const T = 30;
-      const Pws_T = Pws(T);
-      const Pw = rh / 100 * Pws_T;
-      const W = 0.621945 * Pw / (o.P - Pw);
-      if (W >= o.W_min && W <= o.W_max) {
-        const [px, py] = pos(W, T);
-        svg += `<text x="${px + 3}" y="${py}" style="font-size:9px;fill:#666;">
-                φ=${rh}%</text>`;
-      }
-    }
+    // v0.59.964: RH-метки rotated along curves.
+    svg += rhLabelsAlongCurves(o, pos, false /* ramzin */);
   }
 
   // Закрывающий тег SVG. Без него svg.replace('</svg>', overlay+'</svg>')
@@ -245,6 +226,68 @@ export function render(container, opts = {}) {
   // присвоения в innerHTML, но overlay в строку попасть не успевает.
   svg += `</svg>`;
   return { svg, X, Y, pos, inv, opts: o, style: o.style };
+}
+
+/* v0.59.964: метки RH=const, ориентированные ВДОЛЬ кривой (как в
+   reference ASHRAE Foundamentals Fig.2 + ГОСТ-Mollier). По репорту:
+   «и подписи влажности сделай как на скринах для режимов».
+   Каждой метке — позиция на кривой при выбранном T_lab + tangent
+   angle от ближайших точек. */
+function rhLabelsAlongCurves(o, pos, isAshrae) {
+  // Раскладка T_lab по уровню RH: лоу-φ — на высоком T (далеко справа на
+  // ASHRAE / далеко вверх на ramzin); хай-φ — ближе к низким T.
+  const RHs = [
+    { rh: 5,  T: 35 },
+    { rh: 10, T: 33 },
+    { rh: 15, T: 30 },
+    { rh: 20, T: 28 },
+    { rh: 30, T: 25 },
+    { rh: 40, T: 22 },
+    { rh: 50, T: 20 },
+    { rh: 60, T: 18 },
+    { rh: 70, T: 16 },
+    { rh: 80, T: 14 },
+    { rh: 90, T: 12 },
+  ];
+  let s = '';
+  for (const { rh, T } of RHs) {
+    const T_lab = Math.max(o.T_min + 2, Math.min(o.T_max - 2, T));
+    const W = humidityRatio(T_lab, rh / 100, o.P);
+    if (!Number.isFinite(W) || W < o.W_min || W > o.W_max) continue;
+    // Tangent: соседние точки на кривой
+    const dT = 1.0;
+    const T1 = Math.max(o.T_min, T_lab - dT);
+    const T2 = Math.min(o.T_max, T_lab + dT);
+    const W1 = humidityRatio(T1, rh / 100, o.P);
+    const W2 = humidityRatio(T2, rh / 100, o.P);
+    const [px1, py1] = pos(W1, T1);
+    const [px2, py2] = pos(W2, T2);
+    const angle = Math.atan2(py2 - py1, px2 - px1) * 180 / Math.PI;
+    const [px, py] = pos(W, T_lab);
+    // Метка чуть в стороне от линии (нормаль к тангенсу)
+    const offset = isAshrae ? -8 : -8;  // в обоих layouts чуть выше/слева линии
+    s += `<text x="${px}" y="${py + offset}" text-anchor="middle"
+             transform="rotate(${angle.toFixed(1)} ${px} ${py + offset})"
+             style="font-size:9px;fill:#666;font-style:italic;
+             paint-order:stroke;stroke:#fff;stroke-width:2px;">${rh}%</text>`;
+  }
+  // 100% — на самой кривой насыщения, у середины-верха
+  const T100 = Math.max(o.T_min + 5, Math.min(o.T_max - 5, 30));
+  const W100 = humidityRatio(T100, 1.0, o.P);
+  if (W100 >= o.W_min && W100 <= o.W_max) {
+    const dT = 1.0;
+    const W1 = humidityRatio(T100 - dT, 1.0, o.P);
+    const W2 = humidityRatio(T100 + dT, 1.0, o.P);
+    const [px1, py1] = pos(W1, T100 - dT);
+    const [px2, py2] = pos(W2, T100 + dT);
+    const angle = Math.atan2(py2 - py1, px2 - px1) * 180 / Math.PI;
+    const [px, py] = pos(W100, T100);
+    s += `<text x="${px}" y="${py - 6}" text-anchor="middle"
+             transform="rotate(${angle.toFixed(1)} ${px} ${py - 6})"
+             style="font-size:10px;fill:#c62828;font-weight:600;
+             paint-order:stroke;stroke:#fff;stroke-width:2px;">100% (sat.)</text>`;
+  }
+  return s;
 }
 
 function curvePath(o, pos, rh, color, width) {

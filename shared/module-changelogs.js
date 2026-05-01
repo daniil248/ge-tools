@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.964', date: '2026-05-01', items: [
+      '🏷 <b>RH-метки rotated along curves (как в reference ASHRAE/Mollier)</b>. По репорту: «и подписи влажности сделай как на скринах для режимов».',
+      '• Раньше: 5 меток φ=20/40/60/80/100% горизонтально при T=28-30°C — простые, но не информативные.',
+      '• Теперь: 11 меток φ=5/10/15/20/30/40/50/60/70/80/90% с разной T_lab (низкое φ → высокое T, высокое φ → низкое T) + угол поворота по тангенсу кривой (atan2 от двух соседних точек).',
+      '• 100% (saturation) — отдельная метка красным «100% (sat.)» вдоль кривой насыщения.',
+      '• Белая stroke-обводка (paint-order:stroke + stroke-width:2) для читаемости поверх grid и других кривых.',
+      'Файл: <code>psychrometrics/psychrometrics-chart.js</code> (rhLabelsAlongCurves helper).',
+    ] },
     { version: '0.59.963', date: '2026-05-01', items: [
       '🖱 <b>Drag-pan диаграммы вместо scroll-bars</b>. По репорту: «еще бы линии прокрутки убрать на диаграмме и сделать перетаскивание мышью и сброс размера».',
       '• <code>.psy-chart{ overflow:hidden }</code> вместо auto — scroll-bars удалены.',
