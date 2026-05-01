@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.921', date: '2026-04-30', items: [
+      '📁 <b>Сохранённые циклы (named cycles)</b>: новый dropdown «📁 Циклы» в toolbar для save/load multiple циклов в один проект (Лето / Зима / Расчётный режим и т.п.).',
+      '• «💾 Сохранить текущий цикл как…» — inline psyPrompt для имени, snapshot { points, procs, zones } сохраняется в LS (<code>psy.namedCycles.v1</code>).',
+      '• Любой сохранённый цикл доступен в dropdown — клик по нему загружает snapshot, заменяя текущий.',
+      '• «🗑 Удалить сохранённые…» — ввод имени для точечного удаления.',
+      '• Inline psyPrompt-modal вместо browser <code>prompt()</code> — Esc/Enter работают, нет dialog-spam.',
+      'Файл: <code>psychrometrics/index.html</code> (+select #psy-named-cycles), <code>psychrometrics/psychrometrics.js</code> (loadNamedCycles/saveNamedCycles/refreshNamedCyclesList + psyPrompt).',
+    ] },
     { version: '0.59.920', date: '2026-04-30', items: [
       '⚠ <b>Wizard: feasibility-валидация процессов</b>. Перед созданием процесса проверяется физическая осмысленность ввода относительно t_in исходной точки:',
       '• <b>P (нагрев)</b>: t₂ &lt; t_in или Δt &lt; 0 → warn «это охлаждение, выберите C»; Q &lt; 0 → warn',

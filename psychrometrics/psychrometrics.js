@@ -2521,6 +2521,47 @@ function wire() {
     e.target.value = '';   // reset select
     setTimeout(() => fitCanvas(), 100);  // v0.59.919: видимость демо-цикла
   });
+
+  // v0.59.921: named cycles save/load (multiple cycles per project)
+  const ncSel = $('psy-named-cycles');
+  if (ncSel) {
+    refreshNamedCyclesList();
+    ncSel.addEventListener('change', async (e) => {
+      const v = e.target.value;
+      e.target.value = '';
+      if (!v) return;
+      const cycles = loadNamedCycles();
+      if (v === '__save__') {
+        const name = await psyPrompt('Название цикла', 'Например: Лето расч., Зима расч., Расчётный режим');
+        if (!name) return;
+        cycles[name.trim()] = JSON.parse(JSON.stringify({
+          points: S.points, procs: S.procs, zones: S.zones,
+        }));
+        saveNamedCycles(cycles);
+        refreshNamedCyclesList();
+        psyToast(`💾 Сохранён цикл «${name}»`, 'ok');
+      } else if (v === '__manage__') {
+        const names = Object.keys(cycles);
+        if (!names.length) { psyToast('Нет сохранённых циклов.', 'info'); return; }
+        const which = await psyPrompt('Удалить цикл с именем (точно)', names.join(' / '));
+        if (!which || !cycles[which.trim()]) return;
+        delete cycles[which.trim()];
+        saveNamedCycles(cycles);
+        refreshNamedCyclesList();
+        psyToast(`🗑 Удалён цикл «${which.trim()}»`, 'ok');
+      } else {
+        // Load by name
+        const snap = cycles[v];
+        if (!snap) { psyToast('Цикл не найден.', 'warn'); return; }
+        S.points = JSON.parse(JSON.stringify(snap.points || []));
+        S.procs = JSON.parse(JSON.stringify(snap.procs || []));
+        S.zones = JSON.parse(JSON.stringify(snap.zones || []));
+        rerenderCycle();
+        setTimeout(() => fitCanvas(), 100);
+        psyToast(`📁 Загружен цикл «${v}»`, 'ok');
+      }
+    });
+  }
   const btnCsv = $('psy-csv');
   if (btnCsv) btnCsv.addEventListener('click', exportCsv);
 }
@@ -3108,6 +3149,62 @@ function wireInfiniteCanvas() {
 
   // v0.59.912: убрал document-keydown шорткаты — они могли перехватывать
   // ввод в input полях (включая psy-add и др.). Если нужны — навешу на canvas.
+}
+
+// v0.59.921: named cycles в LS — { name: { points, procs, zones } }
+const NAMED_CYCLES_KEY = 'psy.namedCycles.v1';
+function loadNamedCycles() {
+  try { return JSON.parse(localStorage.getItem(NAMED_CYCLES_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+function saveNamedCycles(obj) {
+  try { localStorage.setItem(NAMED_CYCLES_KEY, JSON.stringify(obj || {})); } catch {}
+}
+function refreshNamedCyclesList() {
+  const sel = document.getElementById('psy-named-cycles');
+  if (!sel) return;
+  const cycles = loadNamedCycles();
+  const names = Object.keys(cycles);
+  // Перестраиваем список — все существующие named-cycles сверху, потом __save__ / __manage__
+  sel.innerHTML = `
+    <option value="">📁 Циклы (${names.length})…</option>
+    ${names.map(n => `<option value="${escAttr(n)}">▸ ${escAttr(n)}</option>`).join('')}
+    <option value="__save__">💾 Сохранить текущий цикл как…</option>
+    <option value="__manage__">🗑 Удалить сохранённые…</option>
+  `;
+}
+
+// Inline-prompt замена для browser prompt (No browser dialogs правило).
+function psyPrompt(title, placeholder = '') {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'psy-wiz-overlay';
+    overlay.innerHTML = `<div class="psy-wiz-modal" style="width:min(420px,92vw)" role="dialog">
+      <div class="psy-wiz-head"><h3>${escAttr(title)}</h3>
+        <button type="button" class="psy-wiz-close" title="Закрыть">×</button>
+      </div>
+      <div class="psy-wiz-body">
+        <input type="text" id="psy-prompt-input" placeholder="${escAttr(placeholder)}" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:13px" autofocus>
+      </div>
+      <div class="psy-wiz-actions">
+        <button type="button" class="psy-wiz-btn psy-wiz-cancel">Отмена</button>
+        <button type="button" class="psy-wiz-btn psy-wiz-primary psy-wiz-ok">OK</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const inp = overlay.querySelector('#psy-prompt-input');
+    setTimeout(() => inp?.focus(), 50);
+    const close = (val) => { overlay.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') close(null);
+      else if (e.key === 'Enter') close(inp.value);
+    };
+    overlay.querySelector('.psy-wiz-close').addEventListener('click', () => close(null));
+    overlay.querySelector('.psy-wiz-cancel').addEventListener('click', () => close(null));
+    overlay.querySelector('.psy-wiz-ok').addEventListener('click', () => close(inp.value));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+    document.addEventListener('keydown', onKey);
+  });
 }
 
 // Глобальный psyToast (nested-копия в wire() остаётся для backward-compat).

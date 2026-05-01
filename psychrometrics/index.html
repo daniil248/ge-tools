@@ -132,6 +132,11 @@
         </select>
         <button type="button" id="psy-clear" class="psy-btn">Очистить</button>
         <button type="button" id="psy-csv" class="psy-btn" title="Экспорт таблиц «Точки» и «Процессы» в CSV (UTF-8 BOM, разделитель ;)">CSV</button>
+        <select id="psy-named-cycles" class="psy-btn" title="Сохранённые циклы — переключение между «Лето / Зима / Расчётный» и т.п.">
+          <option value="">📁 Циклы…</option>
+          <option value="__save__">💾 Сохранить текущий цикл как…</option>
+          <option value="__manage__">🗑 Удалить сохранённые…</option>
+        </select>
       </div>
       <div class="psy-canvas" id="psy-canvas">
         <!-- v0.59.911: floating toolbar для бесконечного canvas -->
