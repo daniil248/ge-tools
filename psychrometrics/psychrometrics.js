@@ -871,6 +871,13 @@ function procArrow(pr, i) {
   const tsQw = Number.isFinite(+pr.qwts) ? String(pr.qwts) : '0';
   const nodeOpts = (sel) => S.points.map((p, pi) =>
     `<option value="${pi}" ${pi===sel?'selected':''}>${pi+1}. ${escAttr((p.name||'').slice(0,22))}</option>`).join('');
+  // v0.59.951: для P-нагрева q_w структурно всегда 0 (d=const → ΔW=0)
+  // — input убираем, чтобы не сбивать пользователя. По репорту:
+  // «использование для нагрева qw, кг/ч, для меня не понятно? это нужно?»
+  // Также скрываем для S (паровое увлажн.) — там qw тоже однозначно =
+  // m_da·(W₂−W₁), но пользователь обычно задаёт W₂ через φ или через ΔW
+  // на точке, не через qw напрямую.
+  const showQwInput = !['P'].includes(pr.type);
   el.innerHTML = `
     <div class="arr-label" style="display:flex;justify-content:space-between;align-items:center;gap:4px">
       <span>${fromI+1} → ${toI+1}</span>
@@ -890,10 +897,17 @@ function procArrow(pr, i) {
     <label style="font-size:10px;color:#666;margin-top:4px">Q, кВт
       <input type="number" data-col="Q" data-i="${i}" data-user="${duQ}" data-ts="${tsQ}" value="${pr.Q ?? ''}" step="0.1" placeholder="авто">
     </label>
+    ${showQwInput ? `
     <label style="font-size:10px;color:#666;margin-top:2px">q<sub>w</sub>, кг/ч
       <input type="number" data-col="qw" data-i="${i}" data-user="${duQw}" data-ts="${tsQw}" value="${pr.qw ?? ''}" step="0.1" placeholder="авто">
       <span data-role="condensate" style="display:none;margin-top:3px;padding:3px 5px;background:#e1f5fe;border:1px solid #4fc3f7;border-radius:3px;font-size:10px;color:#01579b;font-weight:600;"></span>
     </label>
+    ` : `
+    <div style="font-size:10px;color:#999;margin-top:2px;font-style:italic;">
+      q<sub>w</sub> = 0 (нагрев d=const, влагу не передаёт)
+      <span data-role="condensate" style="display:none"></span>
+    </div>
+    `}
     <label style="font-size:10px;color:#666;margin-top:4px">V процесса, м³/ч
       <input type="number" data-col="V" data-i="${i}" data-user="${hasUserV?'1':''}" value="${hasUserV?userV:''}" step="100" placeholder="авто (масса)">
       <span class="v-auto" data-role="v-auto" style="font-size:10px;color:#2e7d32;display:block;margin-top:2px;"></span>
@@ -901,6 +915,14 @@ function procArrow(pr, i) {
     ${pr.type === 'M' ? mixControls(pr, i) : ''}
     ${pr.type === 'R' ? recupControls(pr, i) : ''}
     ${pr.type === 'C' ? coolControls(pr, i) : ''}
+    <!-- v0.59.951: блок computed-параметров — расчётная Δ-разница состояний.
+         По репорту: «в карточке процесса нужно сразу отображать расчетные
+         параметры если пользователь изменил значения в точке». Обновляется
+         в refreshProcCardComputed() после каждого update(). -->
+    <div data-role="proc-computed" style="margin-top:6px;padding:5px 7px;background:#f0f4f8;border:1px solid #d4d9e0;border-radius:3px;font-size:10px;line-height:1.5;color:#37474f;display:none">
+      <div data-role="proc-computed-row" style="font-weight:600;color:#263238;margin-bottom:2px">📊 Δ состояний и нагрузка:</div>
+      <div data-role="proc-computed-deltas">—</div>
+    </div>
     <div data-role="proc-warn" style="display:none;margin-top:6px;padding:4px 6px;background:#fff3e0;border:1px solid #ffb74d;border-radius:3px;font-size:10px;line-height:1.3;color:#bf360c;"></div>
   `;
   return el;
@@ -2586,6 +2608,41 @@ function fillComputedQW(segs) {
         const val = col === 'Q' ? s.Q.toFixed(2) : s.qw.toFixed(3);
         inp.value = val;
       });
+    });
+  });
+  // v0.59.951: после fill Q/qw — обновляем блок computed-параметров.
+  refreshProcCardComputed(segs);
+}
+
+/* v0.59.951: блок «📊 Δ состояний и нагрузка» в карточке процесса.
+   По репорту: «в карточке процесса нужно сразу отображать расчетные
+   параметры если пользователь изменил значения в точке». Показывает
+   ΔT, Δd, Δh, computed Q и q_w — обновляется автоматически после
+   каждого update() pipeline (через fillComputedQW в самом конце). */
+function refreshProcCardComputed(segs) {
+  segs.forEach((s, i) => {
+    document.querySelectorAll(`.psy-proc-arrow[data-proc-idx="${i}"]`).forEach(arr => {
+      const wrap = arr.querySelector('[data-role="proc-computed"]');
+      const out  = arr.querySelector('[data-role="proc-computed-deltas"]');
+      if (!wrap || !out) return;
+      if (!s) {
+        wrap.style.display = 'none';
+        return;
+      }
+      wrap.style.display = '';
+      const fmt = (v, d=2) => Number.isFinite(v) ? v.toFixed(d) : '—';
+      const sgn = (v, d=2) => Number.isFinite(v)
+        ? (v >= 0 ? '+' : '') + v.toFixed(d)
+        : '—';
+      const QColor = s.Q > 0 ? '#c62828' : s.Q < 0 ? '#0277bd' : '#607080';
+      const qwColor = s.qw > 0.001 ? '#2e7d32' : s.qw < -0.001 ? '#6a1b9a' : '#607080';
+      out.innerHTML =
+        `ΔT=<b>${sgn(s.dT, 2)}</b>°C · ` +
+        `Δd=<b>${sgn(s.dW, 3)}</b> г/кг · ` +
+        `Δh=<b>${sgn(s.dh, 2)}</b> кДж/кг<br>` +
+        `Q=<b style="color:${QColor}">${sgn(s.Q, 2)}</b> кВт · ` +
+        `q<sub>w</sub>=<b style="color:${qwColor}">${sgn(s.qw, 3)}</b> кг/ч<br>` +
+        `<span style="color:#607080">V=${fmt(s.V, 0)} м³/ч · G<sub>да</sub>=${fmt(s.G, 0)} кг/ч</span>`;
     });
   });
 }
