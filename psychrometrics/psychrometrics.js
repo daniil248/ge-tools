@@ -3110,9 +3110,28 @@ function applyWizard(pt, overlay, fromIdx) {
     // Запишем V в исходную точку (cascade использует srcNode.V для вычисления массы)
     const src = S.points[fromIdx]; if (src) src.V = String(V);
   }
-  // Создаём новую точку и привязываем процесс
-  const newName = ({P:'После нагревателя',C:'После охл./осуш.',A:'После адиабат. увл.',
-    S:'После пар. увл.',M:'После смешения',R:'После рекуператора',X:'Точка'})[pt];
+  // v0.59.933: умное авто-имя точки с учётом фактических target-значений
+  // (e.g. «Нагрев до 22°C», «Охл. до 14°C / 50%», «Адиабат. до 90%»).
+  const baseName = ({P:'Нагрев',C:'Охлаждение',A:'Адиабат. увл.',
+    S:'Пар. увл.',M:'Смешение',R:'После рекуператора',X:'Точка'})[pt];
+  let detail = '';
+  if (pt === 'P' || pt === 'C' || pt === 'A') {
+    if (Number.isFinite(t2)) detail = ` до ${t2}°C`;
+    else if (Number.isFinite(phi2)) detail = ` до φ${phi2}%`;
+    else if (Number.isFinite(dt)) detail = ` Δt${dt > 0 ? '+' : ''}${dt}°C`;
+    else if (Number.isFinite(Q)) detail = ` Q ${Q > 0 ? '+' : ''}${Q} кВт`;
+  } else if (pt === 'S') {
+    if (Number.isFinite(d2)) detail = ` до d${d2} г/кг`;
+    else if (Number.isFinite(dd)) detail = ` Δd ${dd > 0 ? '+' : ''}${dd} г/кг`;
+    else if (Number.isFinite(qw)) detail = ` qw ${qw} кг/ч`;
+  } else if (pt === 'M') {
+    if (Number.isFinite(ratio)) detail = ` α=${ratio}`;
+  } else if (pt === 'R') {
+    if (Number.isFinite(eta)) detail = ` η=${eta}`;
+  } else if (pt === 'X' && Number.isFinite(t2) && Number.isFinite(phi2)) {
+    detail = ` ${t2}°C / ${phi2}%`;
+  }
+  const newName = baseName + detail;
   const newPoint = { name: newName, t: '', rh: '', x: '', h: '', V: '' };
   if (pt === 'X') {
     newPoint.t = String(t2); newPoint.tUser = true;
