@@ -638,6 +638,29 @@ function wireGraphHost(hostOrId) {
     if (col && ['V','name','t','rh','x','h','Q','qw'].includes(col)) {
       e.target.dataset.user = '1';
       e.target.dataset.ts = String(performance.now());
+      // v0.59.957: при изменении одного из «парного» поля сбрасываем
+      // user-флаг конфликтующих, чтобы pointState не запоминал устаревшее
+      // значение. По репорту: «почему связанные параметры не пересчитываются
+      // автоматический????».
+      // Логика: pointState приоритезирует d > h > φ. Если user изменяет φ,
+      // но x/h помечены user — pointState использует old x → новый φ
+      // игнорируется. Поэтому:
+      //   • t или rh типит → x/h становятся auto (cleared user-flag)
+      //   • x или h типит → rh становится auto (производное от t+d или t+h)
+      const card = e.target.closest('.psy-point');
+      if (card) {
+        const clearList =
+          col === 't' || col === 'rh' ? ['x', 'h'] :
+          col === 'x' || col === 'h'  ? ['rh']     :
+          [];
+        clearList.forEach(f => {
+          const fInp = card.querySelector(`[data-col="${f}"]`);
+          if (fInp && fInp !== e.target) {
+            fInp.dataset.user = '';
+            fInp.dataset.ts = '0';
+          }
+        });
+      }
     }
     update();
   });
@@ -3766,28 +3789,16 @@ function applyWizard(pt, overlay, fromIdx, editProcIdx) {
     // Запишем V в исходную точку (cascade использует srcNode.V для вычисления массы)
     const src = S.points[fromIdx]; if (src) src.V = String(V);
   }
-  // v0.59.933: умное авто-имя точки с учётом фактических target-значений
-  // (e.g. «Нагрев до 22°C», «Охл. до 14°C / 50%», «Адиабат. до 90%»).
-  const baseName = ({P:'Нагрев',C:'Охлаждение',A:'Адиабат. увл.',
-    S:'Пар. увл.',M:'Смешение',R:'После рекуператора',X:'Точка'})[pt];
-  let detail = '';
-  if (pt === 'P' || pt === 'C' || pt === 'A') {
-    if (Number.isFinite(t2)) detail = ` до ${t2}°C`;
-    else if (Number.isFinite(phi2)) detail = ` до φ${phi2}%`;
-    else if (Number.isFinite(dt)) detail = ` Δt${dt > 0 ? '+' : ''}${dt}°C`;
-    else if (Number.isFinite(Q)) detail = ` Q ${Q > 0 ? '+' : ''}${Q} кВт`;
-  } else if (pt === 'S') {
-    if (Number.isFinite(d2)) detail = ` до d${d2} г/кг`;
-    else if (Number.isFinite(dd)) detail = ` Δd ${dd > 0 ? '+' : ''}${dd} г/кг`;
-    else if (Number.isFinite(qw)) detail = ` qw ${qw} кг/ч`;
-  } else if (pt === 'M') {
-    if (Number.isFinite(ratio)) detail = ` α=${ratio}`;
-  } else if (pt === 'R') {
-    if (Number.isFinite(eta)) detail = ` η=${eta}`;
-  } else if (pt === 'X' && Number.isFinite(t2) && Number.isFinite(phi2)) {
-    detail = ` ${t2}°C / ${phi2}%`;
-  }
-  const newName = baseName + detail;
+  // v0.59.957: role-based имя для целевой точки. По репорту:
+  //   «зачем в имя точки добавлять температуру точки если она не меняется
+  //   после изменения целевой точки. Зачем имени точки давать имя которое
+  //   отождествляется с процессом (Охлаждение до...)».
+  // Раньше имена выглядели как «Нагрев до 22°C» — а если t позже менялось,
+  // имя становилось неправдой. Теперь — описательное имя роли без фикс.
+  // значений: «После нагревателя», «После охладителя», и т.д.
+  // Фиксированные значения отображаются в самой точке (поля t/φ/d/h),
+  // имя описывает РОЛЬ, не конкретное состояние.
+  const newName = PROC_NAME_OUT[pt] || 'Точка';
   const newPoint = { name: newName, nameUser: true, t: '', rh: '', x: '', h: '', V: '' };
   // v0.59.954: Bug-fix: cascade читает target из p.tUser/rhUser/xUser/hUser,
   // а wizard раньше писал только в proc.tgt/tgtVal — cascade их не видел и
