@@ -3025,12 +3025,28 @@ function refreshProcCardComputed(segs) {
         : '—';
       const QColor = s.Q > 0 ? '#c62828' : s.Q < 0 ? '#0277bd' : '#607080';
       const qwColor = s.qw > 0.001 ? '#2e7d32' : s.qw < -0.001 ? '#6a1b9a' : '#607080';
+      // v0.59.979: разделение Q на sensible / latent + SHR.
+      // Стандартные ASHRAE формулы:
+      //   Q_sens = G_да/3600 × cp_air × ΔT [кВт]   (cp_air ≈ 1.006 кДж/кг·К)
+      //   Q_lat  = G_да/3600 × Δd × h_fg / 1000  [кВт] (h_fg ≈ 2501 кДж/кг)
+      //   Q_total = Q_sens + Q_lat (≈ G_да·Δh)
+      //   SHR = Q_sens / Q_total — Sensible Heat Ratio (важно для подбора коил-а)
+      const G_da_h = s.G || 0;
+      const Q_sens = G_da_h / 3600 * 1.006 * (s.dT || 0);          // кВт
+      const Q_lat  = G_da_h / 3600 * (s.dW || 0) * 2501 / 1000;    // кВт (dW в g/kg)
+      const Q_total = s.Q || 0;
+      const showSHR = Math.abs(Q_total) > 0.05;
+      const SHR = showSHR ? (Q_sens / Q_total) : null;
       out.innerHTML =
         `ΔT=<b>${sgn(s.dT, 2)}</b>°C · ` +
         `Δd=<b>${sgn(s.dW, 3)}</b> г/кг · ` +
         `Δh=<b>${sgn(s.dh, 2)}</b> кДж/кг<br>` +
         `Q=<b style="color:${QColor}">${sgn(s.Q, 2)}</b> кВт · ` +
         `q<sub>w</sub>=<b style="color:${qwColor}">${sgn(s.qw, 3)}</b> кг/ч<br>` +
+        `<span title="Q_sens (G_да·cp·ΔT, охл/нагр сухого воздуха) и Q_lat (G_да·ΔW·h_fg, осушение/увлажнение). SHR — sensible heat ratio.">` +
+        `Q<sub>sens</sub>=<b>${sgn(Q_sens, 2)}</b> кВт · Q<sub>lat</sub>=<b>${sgn(Q_lat, 2)}</b> кВт` +
+        (SHR != null ? ` · SHR=<b>${SHR.toFixed(2)}</b>` : '') +
+        `</span><br>` +
         `<span style="color:#607080">V=${fmt(s.V, 0)} м³/ч · G<sub>да</sub>=${fmt(s.G, 0)} кг/ч</span>`;
     });
   });
