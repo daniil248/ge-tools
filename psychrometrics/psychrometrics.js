@@ -1149,14 +1149,17 @@ function cascadePass() {
           if (isTotal) {
             // Энтальпийный — также передаём влагу с тем же η
             W2 = aState.W + eta * (bSrc.W - aState.W);
-            // Clamp к W_sat(t2) — нельзя превысить насыщение
-            const Wsat = humidityRatio(t2, 1.0, S.P);
-            if (W2 > Wsat) W2 = Wsat;
-            if (W2 < 0) W2 = 0;
           } else {
             // Сенсибельный — d=const
             W2 = aState.W;
           }
+          // v0.59.932: ВАЖНО — clamp к W_sat(t2) для ОБОИХ режимов.
+          // Без этого при t2 < Td_in φ выходит >100% (как в скрине user'а где
+          // точка 9 имела φ=200%). Физически — конденсация на пластинах,
+          // W уменьшается до W_sat.
+          const Wsat = humidityRatio(t2, 1.0, S.P);
+          if (W2 > Wsat) W2 = Wsat;
+          if (W2 < 0) W2 = 0;
           const rh2 = Math.max(0, Math.min(100, RHfromW(t2, W2, S.P) * 100));
           const h2  = 1.006 * t2 + W2 * (2501 + 1.86 * t2);
           const anyUser = p.tUser || p.rhUser || p.xUser || p.hUser;
@@ -1449,10 +1452,24 @@ const COMFORT_ZONES = {
 function computeComfortZonePolygon(P, X, Y, zoneId) {
   const z = COMFORT_ZONES[zoneId];
   if (!z) return null;
-  const corners = [
-    [z.Tmin, z.RHmin], [z.Tmax, z.RHmin], [z.Tmax, z.RHmax], [z.Tmin, z.RHmax],
-  ];
+  // v0.59.932: edges по RH=const на i-d являются КРИВЫМИ (W = f(T,RH) нелинейно
+  // через Pws(T)), а не прямыми. Подразбиваем top/bottom edges по T с шагом
+  // 0.5°C → плавные кривые. Left/right edges (T=const) рисуются как прямые.
+  const Tstep = 0.5;
+  const corners = [];
   try {
+    // Bottom edge (RH=RHmin): T от Tmin до Tmax, RH=RHmin
+    for (let T = z.Tmin; T <= z.Tmax + 1e-3; T += Tstep) {
+      corners.push([Math.min(T, z.Tmax), z.RHmin]);
+    }
+    // Right edge (T=Tmax): RH от RHmin до RHmax — straight (in T-coords)
+    // Уже добавили (Tmax, RHmin) в bottom. Теперь добавим (Tmax, RHmax).
+    corners.push([z.Tmax, z.RHmax]);
+    // Top edge (RH=RHmax): T от Tmax до Tmin (обратно), RH=RHmax
+    for (let T = z.Tmax - Tstep; T >= z.Tmin - 1e-3; T -= Tstep) {
+      corners.push([Math.max(T, z.Tmin), z.RHmax]);
+    }
+    // Left edge (T=Tmin): RH от RHmax до RHmin — closed automatically by polygon
     const pts = corners.map(([T, RH]) => {
       const W = humidityRatio(T, RH, P);
       return `${X(W).toFixed(1)},${Y(T).toFixed(1)}`;
