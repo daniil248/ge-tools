@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.927', date: '2026-04-30', items: [
+      '📍 <b>Активный meteo-chip в psychrometrics</b>. Если в проекте загружен и помечен ⭐ meteo-датасет, в верхней части ID-диаграммы появляется голубой chip: «📍 [Локация] · период · T min…max · ср — N часов». Click «↗ Открыть meteo» — переход в /meteo/ для редактирования.',
+      '• Если активного датасета нет — chip скрыт (не занимает место).',
+      '• Renders async через <code>meteo-api.js::getActiveDataset(pid)</code> при init wire().',
+      'Файлы: <code>psychrometrics/index.html</code> (+#psy-meteo-chip), <code>psychrometrics/psychrometrics.css</code> (.psy-meteo-chip styles), <code>psychrometrics/psychrometrics.js</code> (renderMeteoChip async-renderer).',
+    ] },
     { version: '0.59.926', date: '2026-04-30', items: [
       '📁 <b>Named cycles теперь сохраняют canvas view (zoom/pan)</b>. При сохранении цикла под именем (v0.59.921) snapshot включает <code>canvasView { tx, ty, scale }</code>. При загрузке восстанавливается точно такой же ракурс — пользователь видит сцену так же как сохранил.',
       '• Если у сохранённого цикла нет canvasView (старые) — fallback на auto-fit.',

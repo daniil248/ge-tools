@@ -2123,6 +2123,8 @@ function wire() {
   try { update(); } catch (e) { console.error('[psy.wire.update]', e); }
   try { wireInfiniteCanvas(); }
   catch (e) { console.error('[wireInfiniteCanvas]', e); }
+  // v0.59.927: рендер «active meteo» chip
+  try { renderMeteoChip(); } catch (e) { console.error('[renderMeteoChip]', e); }
   // v0.59.919: при инициальной загрузке если есть точки и сохранённого view нет
   // (или он скрывает все точки) — auto-fit чтобы пользователь сразу видел граф.
   try {
@@ -3252,6 +3254,34 @@ function wireInfiniteCanvas() {
 
   // v0.59.912: убрал document-keydown шорткаты — они могли перехватывать
   // ввод в input полях (включая psy-add и др.). Если нужны — навешу на canvas.
+}
+
+// v0.59.927: рендер chip с активным meteo-датасетом проекта.
+// Async — meteo-api.js загружается lazy.
+async function renderMeteoChip() {
+  const chip = document.getElementById('psy-meteo-chip');
+  if (!chip) return;
+  try {
+    const { getActiveDataset } = await import('../meteo/meteo-api.js');
+    const { ensureDefaultProject } = await import('../shared/project-storage.js');
+    const pid = ensureDefaultProject();
+    const ds = getActiveDataset(pid);
+    if (!ds) {
+      chip.hidden = true;
+      return;
+    }
+    const s = ds.stats || {};
+    const period = ds.dateFrom && ds.dateTo ? `${ds.dateFrom}…${ds.dateTo}` : '';
+    chip.hidden = false;
+    chip.innerHTML = `
+      <span class="psy-meteo-chip-icon">📍</span>
+      <span class="psy-meteo-chip-name">${escAttr(ds.locationName || ds.name || 'Активный meteo')}</span>
+      <span class="psy-meteo-chip-stats">${period} · T ${s.tmin ?? '—'}…${s.tmax ?? '—'} °C · средн ${s.tmean ?? '—'} °C · ${ds.hourly?.length || s.n || 0} ч</span>
+      <a class="psy-meteo-chip-link" href="../meteo/" target="_blank" title="Открыть модуль «Метеоданные»">↗ Открыть meteo</a>
+    `;
+  } catch (e) {
+    chip.hidden = true;
+  }
 }
 
 // v0.59.921: named cycles в LS — { name: { points, procs, zones } }

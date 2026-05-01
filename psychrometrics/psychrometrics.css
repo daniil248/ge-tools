@@ -334,6 +334,36 @@
 .psy-formulas code { background: #f0f4fb; padding: 1px 5px; border-radius: 3px; color: #0d47a1; font-family: 'Consolas', monospace; }
 .psy-formulas .note { background: #fff9c4; border: 1px solid #fbc02d; padding: 6px 10px; border-radius: 4px; margin: 6px 0; font-size: 11px; }
 
+/* ─── v0.59.927: Active meteo chip — видимая индикация подгруженного датасета */
+.psy-meteo-chip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  margin: 0 0 8px;
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  font-size: 12.5px;
+  color: #0c4a6e;
+}
+.psy-meteo-chip-icon { font-size: 18px; }
+.psy-meteo-chip-name { font-weight: 600; color: #1e40af; }
+.psy-meteo-chip-stats { color: #0369a1; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.psy-meteo-chip-link {
+  margin-left: auto;
+  padding: 4px 10px;
+  background: #fff;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11.5px;
+  color: #1e40af;
+  font-weight: 500;
+  text-decoration: none;
+}
+.psy-meteo-chip-link:hover { background: #eff6ff; border-color: #4f46e5; color: #4f46e5; }
+
 /* ─── v0.59.924: Print-friendly view */
 @media print {
   body { background: #fff; color: #000; }
