@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.956', date: '2026-05-01', items: [
+      '🧙 <b>«🧙 Через мастер» теперь действительно РЕДАКТИРУЕТ процесс</b>. По репорту v0.59.953: «при открытии карточки процесса внутри можно запустить мастер процесса и изменить данные через мастер».',
+      '• Раньше клик по «🧙 Через мастер» открывал wizard, но создавал НОВЫЙ процесс (дубликат). Пользователю нужно было удалять старый.',
+      '• Теперь: <code>openWizardStep2(procType, editProcIdx)</code> + <code>applyWizard(pt, overlay, fromIdx, editProcIdx)</code> поддерживают edit-mode.',
+      '• Pre-fill: «От точки» — из текущего <code>fromIdx</code>; для R — recupWith/recupEff; для M — mixWith/mixRatio; для C — adp/bf; V из источника edge; user-target (t/φ/d/h) из конечной точки.',
+      '• Header: «🧙 Редактирование <type> — параметры». Кнопка «← Назад» скрыта (нечего возвращаться). Apply: «💾 Сохранить» (вместо «✓ Создать»).',
+      '• Apply UPDATE: проц обновляется in-place в <code>S.procs[editProcIdx]</code>; целевая точка получает обновлённый name + сбрасываются user-флаги, ставится новый target. Cascade пересчитывает остальные параметры. Дубли не создаются.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (openWizardStep2 + applyWizard editProcIdx + openProcessEditor wizard-button).',
+    ] },
     { version: '0.59.955', date: '2026-05-01', items: [
       '🐛 <b>Critical: forwardPoint через cascade игнорировал proc.adp/bf/recupWith/recupEff/etc</b>. По репорту: «как так получается что я охлаждаю воздух с 40 градусов до 22 с помощью DX кондиционера с поверхностью 10 градусов, и у меня не выпадает конденсат».',
       '• Раньше: cascade вызывал <code>forwardPoint(aState, { type, tgt, tgtVal }, V, P)</code> — передавал ТОЛЬКО 3 поля. Все остальные параметры процесса (ADP, BF, recupWith, recupEff, recupMode, mixWith, mixRatio) были <code>undefined</code> внутри forwardPoint → BF-модель охлаждения, R/M-вычисления через cascade pipeline НЕ работали.',

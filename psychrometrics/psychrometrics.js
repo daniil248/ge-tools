@@ -758,8 +758,10 @@ function openProcessEditor(procIdx) {
   overlay.querySelector('.psy-proc-edit-wizard').addEventListener('click', () => {
     overlay.remove();
     rerenderCycle();
+    // v0.59.956: передаём editProcIdx — wizard работает в edit-mode,
+    // обновляет существующий процесс вместо создания дубликата.
     if (pr.type && pr.type !== 'none') {
-      try { openWizardStep2(pr.type); } catch (e) { console.error('[wizardStep2]', e); }
+      try { openWizardStep2(pr.type, procIdx); } catch (e) { console.error('[wizardStep2]', e); }
     } else {
       try { openProcessWizard(); } catch (e) { console.error('[wizard]', e); }
     }
@@ -3471,15 +3473,24 @@ function openProcessWizard() {
   });
 }
 
-// Шаг 2 — данные конкретного процесса
-function openWizardStep2(procType) {
-  const defaultFromIdx = S.points.length - 1;
+// Шаг 2 — данные конкретного процесса.
+// v0.59.956: optional editProcIdx — если задан, wizard работает в режиме
+// редактирования существующего процесса (а не создаёт новый):
+//   • префилл fromIdx из текущего процесса
+//   • префилл type-specific полей (recupWith/recupEff, mixWith/mixRatio, adp/bf)
+//   • applyWizard обновит S.procs[editProcIdx] вместо push
+// По репорту: «при открытии карточки процесса внутри можно запустить мастер
+// процесса и изменить данные через мастер» — теперь wizard действительно
+// редактирует, не дублирует.
+function openWizardStep2(procType, editProcIdx) {
+  const editing = Number.isFinite(editProcIdx) && S.procs[editProcIdx];
+  const editProc = editing ? S.procs[editProcIdx] : null;
+  const defaultFromIdx = editing
+    ? edgeFrom(editProc, editProcIdx)
+    : (S.points.length - 1);
   const PROC_LABELS = { P:'🔥 Нагрев', C:'❄ Охлаждение', A:'💦 Адиабат. увлажн.',
     S:'♨ Паровое увлажн.', M:'🔀 Смешение', R:'♻ Рекуператор', X:'📍 Произвольный' };
 
-  // v0.59.923: dropdown «От точки» — пользователь выбирает stand-точку.
-  // v0.59.948: префикс «N. » с номером точки (по репорту: «добавь везде где
-  // есть ссылка, номера точек, иначе не понятно что это именно та точка»).
   const fromOpts = S.points.map((p, i) =>
     `<option value="${i}" ${i === defaultFromIdx ? 'selected' : ''}>${i+1}. ${escAttr((p.name || ('Точка ' + (i+1))).slice(0, 40))}${p.t ? ` · ${p.t}°C` : ''}</option>`
   ).join('');
@@ -3487,7 +3498,7 @@ function openWizardStep2(procType) {
   const overlay = document.createElement('div');
   overlay.className = 'psy-wiz-overlay';
   overlay.innerHTML = `<div class="psy-wiz-modal" role="dialog">
-    <div class="psy-wiz-head"><h3>🧙 ${PROC_LABELS[procType]} — параметры</h3>
+    <div class="psy-wiz-head"><h3>🧙 ${editing ? 'Редактирование' : ''} ${PROC_LABELS[procType]} — параметры</h3>
       <button type="button" class="psy-wiz-close" title="Закрыть">×</button>
     </div>
     <div class="psy-wiz-body">
@@ -3500,21 +3511,48 @@ function openWizardStep2(procType) {
     </div>
     <div class="psy-wiz-actions">
       <button type="button" class="psy-wiz-btn psy-wiz-cancel">Отмена</button>
-      <button type="button" class="psy-wiz-btn psy-wiz-back">← Назад</button>
-      <button type="button" class="psy-wiz-btn psy-wiz-primary psy-wiz-apply">✓ Создать</button>
+      ${editing ? '' : '<button type="button" class="psy-wiz-btn psy-wiz-back">← Назад</button>'}
+      <button type="button" class="psy-wiz-btn psy-wiz-primary psy-wiz-apply">${editing ? '💾 Сохранить' : '✓ Создать'}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
   const close = () => overlay.remove();
   overlay.querySelector('.psy-wiz-close').addEventListener('click', close);
   overlay.querySelector('.psy-wiz-cancel').addEventListener('click', close);
-  overlay.querySelector('.psy-wiz-back').addEventListener('click', () => { close(); openProcessWizard(); });
+  const backBtn = overlay.querySelector('.psy-wiz-back');
+  if (backBtn) backBtn.addEventListener('click', () => { close(); openProcessWizard(); });
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  // v0.59.956: pre-fill полей из текущего процесса (edit-mode).
+  if (editing) {
+    const setField = (id, val) => {
+      const el = overlay.querySelector('#' + id);
+      if (el && val != null && val !== '') el.value = val;
+    };
+    if (procType === 'M') {
+      setField('wz-mix',   editProc.mixWith);
+      setField('wz-ratio', editProc.mixRatio);
+    } else if (procType === 'R') {
+      setField('wz-recref', editProc.recupWith);
+      setField('wz-eta',    editProc.recupEff);
+    }
+    if (editProc.adp) setField('wz-adp', editProc.adp);
+    if (editProc.bf)  setField('wz-bf',  editProc.bf);
+    // V — из источника edge
+    const srcV = S.points[edgeFrom(editProc, editProcIdx)]?.V;
+    if (srcV) setField('wz-V', srcV);
+    // Текущий target → пред-заполнить соответствующее поле
+    const tgtPt = S.points[edgeTo(editProc, editProcIdx)];
+    if (tgtPt) {
+      if (tgtPt.tUser  && tgtPt.t  !== '') setField('wz-t2',  tgtPt.t);
+      if (tgtPt.rhUser && tgtPt.rh !== '') setField('wz-phi2', tgtPt.rh);
+      if (tgtPt.xUser  && tgtPt.x  !== '') setField('wz-d2',  tgtPt.x);
+      if (tgtPt.hUser  && tgtPt.h  !== '') setField('wz-h2',  tgtPt.h);
+    }
+  }
   overlay.querySelector('.psy-wiz-apply').addEventListener('click', () => {
-    // v0.59.923: читаем актуальный fromIdx из select
     const selFrom = overlay.querySelector('#wz-fromIdx');
     const fromIdx = selFrom ? Number(selFrom.value) : defaultFromIdx;
-    if (applyWizard(procType, overlay, fromIdx)) close();
+    if (applyWizard(procType, overlay, fromIdx, editProcIdx)) close();
   });
   // v0.59.907: preset selector — auto-fill полей при выборе
   const presetSel = overlay.querySelector('#wz-preset');
@@ -3639,13 +3677,17 @@ function wizardFields(pt) {
   return '';
 }
 
-function applyWizard(pt, overlay, fromIdx) {
+function applyWizard(pt, overlay, fromIdx, editProcIdx) {
   const v = (id) => {
     const el = overlay.querySelector('#' + id);
     if (!el) return null;
     return el.value === '' ? null : Number(el.value);
   };
-  const proc = { type: pt, Q: '', qw: '', fromIdx };
+  // v0.59.956: editing-mode — переиспользуем существующий proc; иначе новый.
+  const editing = Number.isFinite(editProcIdx) && S.procs[editProcIdx];
+  const proc = editing
+    ? Object.assign({}, S.procs[editProcIdx], { type: pt, Q: '', qw: '', fromIdx })
+    : { type: pt, Q: '', qw: '', fromIdx };
   let t2 = v('wz-t2'), phi2 = v('wz-phi2'), dt = v('wz-dt'), dd = v('wz-dd'),
       d2 = v('wz-d2'), Q = v('wz-Q'), qw = v('wz-qw'), V = v('wz-V'),
       adp = v('wz-adp'), bf = v('wz-bf'), eta = v('wz-eta'), ratio = v('wz-ratio');
@@ -3778,6 +3820,35 @@ function applyWizard(pt, overlay, fromIdx) {
     newPoint.h = String(pickedVal); newPoint.hUser = true; newPoint.hTs = tNow;
   }
   // Для Q/qw target — proc.Qs/qws уже установлены выше, cascade читает с proc.
+  // v0.59.956: editing-mode — обновляем существующую целевую точку
+  // и проц, не создаём новые. Иначе — стандартный push.
+  if (editing) {
+    const tgtIdx = edgeTo(S.procs[editProcIdx], editProcIdx);
+    const tgtPt = S.points[tgtIdx];
+    if (tgtPt) {
+      // Перезаписываем target-поля из newPoint (cascade пересчитает остальные)
+      tgtPt.name = newPoint.name; tgtPt.nameUser = true;
+      // Сбрасываем ВСЕ user-флаги, потом ставим только заданный target
+      ['t','rh','x','h'].forEach(f => {
+        tgtPt[f] = '';
+        tgtPt[f + 'User'] = false;
+        tgtPt[f + 'Ts'] = 0;
+      });
+      // Применяем target из newPoint
+      ['t','rh','x','h'].forEach(f => {
+        if (newPoint[f + 'User']) {
+          tgtPt[f] = newPoint[f];
+          tgtPt[f + 'User'] = true;
+          tgtPt[f + 'Ts'] = newPoint[f + 'Ts'] || tNow;
+        }
+      });
+    }
+    proc.toIdx = tgtIdx;
+    S.procs[editProcIdx] = proc;
+    rerenderCycle();
+    psyToast(`💾 Обновлено: ${newName}`, 'ok');
+    return true;
+  }
   S.points.push(newPoint);
   proc.toIdx = S.points.length - 1;
   S.procs.push(proc);
