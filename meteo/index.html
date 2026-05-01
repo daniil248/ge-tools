@@ -42,6 +42,61 @@
           <li>FreeCool часы — T &lt; 14°C (прямой) / T &lt; 18°C (косвенный).</li>
           <li>ASHRAE design conditions — heating 99.6%/99% T<sub>db</sub>, cooling 0.4%/1%/2% T<sub>db</sub> с MCWB (упрощённая Stull-формула 2011).</li>
         </ul>
+
+        <h4>Глобальный фильтр периода (v0.59.986)</h4>
+        <p>Все вкладки (Сводка, Графики, Annual hours, ASHRAE design) фильтруются единым селектором «📅 Период» над табами. Режимы: Все годы (среднее по выборке), Конкретный год, Период (от-до). Выбор сохраняется в LocalStorage.</p>
+
+        <h4>Расчёт чиллера / DX-системы (v0.59.987)</h4>
+        <p>Annual hours table → ❄ Chiller / DX → задайте rated capacity и тип системы. Table добавит столбцы Capacity / COP_mech / FC% / COP_eff / Power / Energy.</p>
+
+        <h5>Поддерживаемые типы систем</h5>
+        <ul>
+          <li><b>Чиллер (CHW)</b> — водяной контур охлаждённой воды. Поддерживает free-cooling (dry/wet).</li>
+          <li><b>DX air-cooled (RTU/сплит)</b> — direct expansion с воздушным конденсатором. Без FC.</li>
+          <li><b>DX с pumped refrigerant FC</b> — DX с насосом хладагента (Liebert/Vertiv pumped refrigerant economizer). Когда T<sub>amb</sub> достаточно холодная, компрессор отключается, и хладагент циркулирует насосом через outdoor coil → indoor coil напрямую.</li>
+        </ul>
+
+        <h5>Capacity и COP correction</h5>
+        <ul>
+          <li><code>Capacity(T) = ratedCap × (1 + capCorr × (T<sub>amb</sub> − T<sub>rated</sub>))</code> — холодопроизводительность снижается с ростом T<sub>amb</sub> (горячий конденсатор → хуже теплоотдача). Типично −1.5%/°C для air-cooled.</li>
+          <li><code>COP<sub>mech</sub>(T) = ratedCOP × (1 + 0.02 × (T<sub>rated</sub> − T<sub>amb</sub>))</code> clamp [0.6×; 1.8×]. Carnot-подобная кривая: чем холоднее наружный воздух, тем эффективнее компрессор.</li>
+        </ul>
+
+        <h5>Free-cooling chiller (dry/wet)</h5>
+        <ul>
+          <li><b>dry</b> — drycooler / dry cooler, T<sub>ref</sub> = T<sub>db</sub>. Простой, без водопотребления, но меньше часов FC.</li>
+          <li><b>wet</b> — cooling tower / градирня, T<sub>ref</sub> = T<sub>wb</sub> (Stull 2011 из avg RH в бине). Эффективнее (запас 5–10°C), но требует подпитки.</li>
+          <li>FC fraction (0..1): <code>fc = clamp((CHWS − T<sub>ref</sub>) / approach, 0, 1)</code>.</li>
+          <li>100% когда T<sub>ref</sub> ≤ CHWS − approach; 0% когда T<sub>ref</sub> ≥ CHWS; между — линейный partial FC.</li>
+        </ul>
+
+        <h5>DX pumped refrigerant FC</h5>
+        <ul>
+          <li>Бинарный режим: <code>fc = 1</code> если T<sub>db</sub> ≤ threshold, иначе <code>fc = 0</code>.</li>
+          <li>Threshold обычно T<sub>indoor_supply</sub> − 5°C (для ЦОД supply ≈ 18°C → 13°C).</li>
+          <li>P<sub>aux</sub> = 2–4% от ratedCap (только насос хладагента).</li>
+        </ul>
+
+        <h5>Power и Energy</h5>
+        <ul>
+          <li><code>P<sub>mech</sub> = (1 − fc) × Capacity / COP<sub>mech</sub></code> — компрессор.</li>
+          <li><code>P<sub>aux</sub> = aux% × ratedCap / 100</code> (только если fc &gt; 0) — насосы / вентиляторы FC.</li>
+          <li><code>P<sub>total</sub> = P<sub>mech</sub> + P<sub>aux</sub></code>; COP<sub>eff</sub> = Capacity / P<sub>total</sub> (15–30 при 100% FC).</li>
+          <li><code>Energy = P<sub>total</sub> × hours_in_bin</code>; Σ по всем бинам = годовое потребление.</li>
+        </ul>
+
+        <h5>Источники методики</h5>
+        <ul>
+          <li>ASHRAE Handbook — Fundamentals (2021) гл. 18 «Refrigeration» — capacity correction, COP curves.</li>
+          <li>ASHRAE Standard 90.1 — IPLV bin-method с economizer modifier.</li>
+          <li>Vertiv / Liebert Pumped Refrigerant Economizer whitepapers — DX-FC threshold logic.</li>
+          <li>Stull R. (2011) «Wet-Bulb Temperature from Relative Humidity and Air Temperature» — упрощённая формула T<sub>wb</sub> с погрешностью ±1°C при RH 5–99%.</li>
+          <li>ASHRAE TC 9.9 «Thermal Guidelines for Data Processing Environments» — рекомендуемые CHWS температуры (W3/W4 → 18–22°C).</li>
+        </ul>
+
+        <p style="font-size:11px;color:#94a3b8;margin-top:10px">
+          ⚠ Это упрощённая методика для быстрой оценки. Не учитывает part-load на самой нагрузке (предполагается работа на rated capacity), реальные кривые COP(T_cond) производителя, defrost-циклы. Для точного расчёта используйте симулятор IES / EnergyPlus с performance maps конкретного оборудования.
+        </p>
       `
     });
   </script>

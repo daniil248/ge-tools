@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.988', date: '2026-05-01', items: [
+      '📚 <b>Методика расчёта чиллера / DX / free-cooling в help-панели</b>. По требованию: «все задокументируй, как рассчитывается».',
+      '• Help-панель meteo (кнопка ❓ в шапке) дополнена секцией «Расчёт чиллера / DX-системы»: типы систем, capacity/COP correction формулы, free-cooling (dry/wet) для чиллеров, DX-pumped FC, формулы Power & Energy, ссылки на источники (ASHRAE HoF, 90.1, TC 9.9, Vertiv whitepapers, Stull 2011).',
+      '• Также внутри формы Chiller spec доступен раскрывающийся блок «📐 Методика расчёта (формулы)» с тем же содержанием — для тех кто работает с формой и не хочет открывать help.',
+      'Файлы: <code>meteo/index.html</code> (mountHelp.calcs).',
+    ] },
     { version: '0.59.987', date: '2026-05-01', items: [
       '❄ <b>Free-cooling для чиллеров + DX-системы (air-cooled / pumped refrigerant)</b>. По требованию: «для чиллеров нужно добавить режим фрикулинга. Так же такой же расчёт сделать для простых DX систем, и конденсаторов с фрикулингом (фреоновые насосы)».',
       '• <b>Тип системы</b>: Чиллер (CHW) / DX air-cooled (RTU/сплит) / DX с pumped refrigerant FC (Liebert/Vertiv-style).',
