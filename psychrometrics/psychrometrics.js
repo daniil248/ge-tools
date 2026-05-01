@@ -714,6 +714,41 @@ function openProcessEditor(procIdx) {
   // v0.59.951: триггерим update() чтобы computed-блок (Δ состояний,
   // Q/qw) сразу заполнился актуальными значениями для новой DOM-карточки.
   try { update(); } catch {}
+  // v0.59.955: drag по header. По репорту: «модалки должны перемещаться
+  // мышью». Используем абсолютное позиционирование modal-окна с offset-ом
+  // от центра. Закрытие сбрасывает позицию (modal каждый раз новый).
+  (() => {
+    const head = overlay.querySelector('.psy-proc-edit-head');
+    const modal = overlay.querySelector('.psy-proc-edit-modal');
+    if (!head || !modal) return;
+    let dx = 0, dy = 0, sx = 0, sy = 0, dragging = false;
+    head.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      dragging = true;
+      sx = e.clientX; sy = e.clientY;
+      const rect = modal.getBoundingClientRect();
+      dx = rect.left; dy = rect.top;
+      // Переключаем модалку из flex-center в абсолютное
+      modal.style.position = 'absolute';
+      modal.style.left = dx + 'px';
+      modal.style.top  = dy + 'px';
+      modal.style.margin = '0';
+      overlay.style.alignItems = 'flex-start';
+      overlay.style.justifyContent = 'flex-start';
+      document.body.classList.add('psy-dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      modal.style.left = (dx + e.clientX - sx) + 'px';
+      modal.style.top  = (dy + e.clientY - sy) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      document.body.classList.remove('psy-dragging');
+    });
+  })();
   // v0.59.953: «🧙 Через мастер» — закрывает модалку и открывает
   // wizard step 2 для текущего типа. По репорту: «при открытии
   // карточки процесса внутри можно запустить мастер процесса и
@@ -1501,7 +1536,15 @@ function cascadePass() {
     let V_seg = nNum(src.V);
     if (!(V_seg > 0)) V_seg = S.vBase;
 
-    const bState = forwardPoint(aState, { type: proc.type, tgt: winner.tgt, tgtVal: winner.val }, V_seg, S.P);
+    // v0.59.955: Bug-fix — раньше forwardPoint получал ТОЛЬКО {type, tgt,
+    // tgtVal} → proc.adp/bf/recupWith/recupEff/mixWith/mixRatio/recupMode
+    // были недоступны → BF-модель охлаждения, R/M-вычисления не работали
+    // через cascade pipeline. По репорту: «как так получается что я охлаждаю
+    // воздух с 40 градусов до 22 с помощью DX кондиционера с поверхностью
+    // 10 градусов, и у меня не выпадает конденсат». Передаём ПОЛНЫЙ proc
+    // со spread, добавляя только tgt/tgtVal от winner-кандидата.
+    const procForFP = { ...proc, tgt: winner.tgt, tgtVal: winner.val };
+    const bState = forwardPoint(aState, procForFP, V_seg, S.P);
     if (!bState) continue;
 
     // Победитель остаётся user; остальные кандидаты — пересчитываются (user=false).

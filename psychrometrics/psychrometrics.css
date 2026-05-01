@@ -214,7 +214,13 @@ body.psy-dragging *::after {
   padding: 10px 14px;
   border-bottom: 1px solid #e0e0e0;
   background: #f5f7fa;
+  /* v0.59.955: header можно перетаскивать. По репорту: «модалки должны
+     перемещаться мышью». Курсор в виде «move» подсказывает что header
+     draggable. */
+  cursor: move;
+  user-select: none;
 }
+.psy-proc-edit-head:active { cursor: grabbing; }
 .psy-proc-edit-head h3 {
   margin: 0;
   font-size: 14px;

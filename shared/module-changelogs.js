@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.955', date: '2026-05-01', items: [
+      '🐛 <b>Critical: forwardPoint через cascade игнорировал proc.adp/bf/recupWith/recupEff/etc</b>. По репорту: «как так получается что я охлаждаю воздух с 40 градусов до 22 с помощью DX кондиционера с поверхностью 10 градусов, и у меня не выпадает конденсат».',
+      '• Раньше: cascade вызывал <code>forwardPoint(aState, { type, tgt, tgtVal }, V, P)</code> — передавал ТОЛЬКО 3 поля. Все остальные параметры процесса (ADP, BF, recupWith, recupEff, recupMode, mixWith, mixRatio) были <code>undefined</code> внутри forwardPoint → BF-модель охлаждения, R/M-вычисления через cascade pipeline НЕ работали.',
+      '• Симптом: при cooling 40°C/80% → 20°C с ADP=10/BF=0.15 cascade падал в fallback contact-cooling (W₂=W_sat(20)=14.6 г/кг) вместо BF-mixing (W₂=12.3 г/кг). Q=−12.6 кВт но q<sub>w</sub>=0 — конденсат не считался.',
+      '• Fix: <code>forwardPoint(aState, { ...proc, tgt: winner.tgt, tgtVal: winner.val }, V, P)</code> — spread полного proc-объекта, ADP/BF/recup-* теперь доступны.',
+      '🖱 <b>Modal-редактор перетаскивается мышью</b>. По репорту: «модалки должны перемещаться мышью».',
+      '• Header (полоса с заголовком и ✕) — draggable. Cursor:move + при mousedown переключение в absolute-позицию.',
+      '• <code>document.body.classList.add(\'psy-dragging\')</code> на время drag — текст в полях модалки не выделяется.',
+      'Файлы: <code>psychrometrics/psychrometrics.js</code> (cascadePass forwardPoint spread + openProcessEditor drag handler), <code>psychrometrics/psychrometrics.css</code> (.psy-proc-edit-head cursor:move).',
+    ] },
     { version: '0.59.954', date: '2026-05-01', items: [
       '🐛 <b>Bug-fix: мастер не заполнял конечную точку при заданном target</b>. По репорту: «мастер не заполняет конечную точку, хотя она была задана».',
       '• Раньше: <code>applyWizard</code> устанавливал <code>proc.tgt = \'t2\'</code> и <code>proc.tgtVal = \'20\'</code>, но cascade читает target из <code>p.tUser</code>/<code>p.rhUser</code>/<code>p.xUser</code>/<code>p.hUser</code> на ТОЧКЕ или <code>proc.Qs</code>/<code>proc.qws</code> на ПРОЦЕССЕ — поля <code>tgt</code>/<code>tgtVal</code> игнорировались. Целевая точка оставалась пустой (t/φ — auto-«—»).',
