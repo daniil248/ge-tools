@@ -4,6 +4,10 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.923', date: '2026-04-30', items: [
+      '🧙 <b>Wizard: dropdown «📍 От точки»</b>. Раньше wizard всегда подсоединял новый процесс к ПОСЛЕДНЕЙ точке (S.points.length-1). Теперь в шаге 2 — select со ВСЕМИ точками (с превью t°C), default = последняя. Удобно для ветвистых графов (рециркуляция, рекуператор).',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (openWizardStep2: добавлен select #wz-fromIdx, apply читает его значение).',
+    ] },
     { version: '0.59.922', date: '2026-04-30', items: [
       '🟩 <b>ASHRAE 55-2017 comfort zone overlay на id-chart</b>. На главной i-d диаграмме теперь отрисовывается полупрозрачный зелёный прямоугольник комфорт-зоны для офисов/IT-помещений: 23–26 °C × 30–60% RH. Расчёт через humidityRatio() на 4 угла полигона + конвертация через X(W),Y(T).',
       '• Подпись «ASHRAE 55 comfort» внутри зоны.',

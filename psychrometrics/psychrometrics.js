@@ -2717,10 +2717,14 @@ function openProcessWizard() {
 
 // Шаг 2 — данные конкретного процесса
 function openWizardStep2(procType) {
-  const fromIdx = S.points.length - 1;
-  const fromName = S.points[fromIdx]?.name || `точка ${fromIdx+1}`;
+  const defaultFromIdx = S.points.length - 1;
   const PROC_LABELS = { P:'🔥 Нагрев', C:'❄ Охлаждение', A:'💦 Адиабат. увлажн.',
     S:'♨ Паровое увлажн.', M:'🔀 Смешение', R:'♻ Рекуператор', X:'📍 Произвольный' };
+
+  // v0.59.923: dropdown «От точки» — пользователь выбирает stand-точку (раньше всегда последняя)
+  const fromOpts = S.points.map((p, i) =>
+    `<option value="${i}" ${i === defaultFromIdx ? 'selected' : ''}>${escAttr((p.name || ('Точка ' + (i+1))).slice(0, 40))}${p.t ? ` · ${p.t}°C` : ''}</option>`
+  ).join('');
 
   const overlay = document.createElement('div');
   overlay.className = 'psy-wiz-overlay';
@@ -2729,7 +2733,9 @@ function openWizardStep2(procType) {
       <button type="button" class="psy-wiz-close" title="Закрыть">×</button>
     </div>
     <div class="psy-wiz-body">
-      <p class="psy-wiz-from">Исходная точка: <b>${escAttr(fromName)}</b> (точка ${fromIdx+1})</p>
+      <label class="psy-wiz-from-label" style="display:block;margin-bottom:10px;font-weight:500">📍 От точки:
+        <select id="wz-fromIdx" style="width:100%;margin-top:3px;padding:6px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:13px">${fromOpts}</select>
+      </label>
       <h4>Шаг 2 — введите ОДИН известный параметр (остальное рассчитается)</h4>
       ${wizardFields(procType)}
       <p class="psy-wiz-hint">Поля помечены ⓘ — заполните любое одно. Остальные оставьте пустыми.</p>
@@ -2747,6 +2753,9 @@ function openWizardStep2(procType) {
   overlay.querySelector('.psy-wiz-back').addEventListener('click', () => { close(); openProcessWizard(); });
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
   overlay.querySelector('.psy-wiz-apply').addEventListener('click', () => {
+    // v0.59.923: читаем актуальный fromIdx из select
+    const selFrom = overlay.querySelector('#wz-fromIdx');
+    const fromIdx = selFrom ? Number(selFrom.value) : defaultFromIdx;
     if (applyWizard(procType, overlay, fromIdx)) close();
   });
   // v0.59.907: preset selector — auto-fill полей при выборе
