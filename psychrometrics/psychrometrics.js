@@ -863,6 +863,10 @@ function procArrow(pr, i) {
   const el = document.createElement('div');
   el.className = 'psy-proc-arrow';
   el.dataset.procIdx = String(i);
+  // v0.59.952: accent-цвет слева в цвете процесса.
+  const procColor = PROC_COLOR[pr.type] || '#607080';
+  el.style.borderLeftColor = procColor;
+  el.dataset.procColor = pr.type || 'X';
   const fromI = edgeFrom(pr, i);
   const toI   = edgeTo(pr, i);
   const srcNode = S.points[fromI];

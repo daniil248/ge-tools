@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.952', date: '2026-05-01', items: [
+      '🎴 <b>Карточка процесса визуально похожа на карточку точки</b>. По репорту: «Сама карточка процесса должна быть похожа на карточку точки с естественным различием».',
+      '• Те же background, padding, border-radius, header style, full-width поля и стиль labels — что и у <code>.psy-point</code>.',
+      '• Естественное различие: фон <code>#f8fafc</code> (нейтральный) vs <code>#f5f9ff</code> (светло-голубой у точки) + accent-stripe слева в цвете процесса (P=оранжевый, C=синий, A=зелёный, S=фиолетовый, M=циановый, R=розовый, X=серый).',
+      '• Header «N → M» теперь слева (как «Точка N» у точки), кнопка ✕ — справа.',
+      '• Inputs full-width вместо узких 100px — readable layout.',
+      'Файл: <code>psychrometrics/psychrometrics.css</code> (.psy-proc-arrow → card-style), <code>psychrometrics/psychrometrics.js</code> (procArrow → border-left-color accent).',
+    ] },
     { version: '0.59.951', date: '2026-05-01', items: [
       '📊 <b>Карточка процесса показывает Δ состояний и расчётную нагрузку</b>. По репорту: «в карточке процесса нужно сразу отображать расчетные параметры если пользователь изменил значения в точке».',
       '• Под полями Q/qw/V добавлен блок «📊 Δ состояний и нагрузка»: ΔT, Δd, Δh, Q (с цветом — красный/синий по знаку), q<sub>w</sub> (зелёный/фиолетовый), V и G<sub>да</sub>.',
