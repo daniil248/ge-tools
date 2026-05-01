@@ -736,6 +736,7 @@ function coolControls(pr, i) {
 function recupControls(pr, i) {
   const rw = (pr.recupWith ?? '').toString();
   const eff = (pr.recupEff ?? '0.6').toString();
+  const mode = pr.recupMode || 'sensible';  // v0.59.931
   const opts = S.points.map((pp, pi) =>
     `<option value="${pi}" ${String(pi)===rw?'selected':''}>${pi+1}. ${escAttr((pp.name||'').slice(0,16))}</option>`
   ).join('');
@@ -745,8 +746,14 @@ function recupControls(pr, i) {
         <option value="">— выбрать —</option>${opts}
       </select>
     </label>
-    <label style="font-size:10px;color:#ad1457;margin-top:2px" title="КПД рекуператора по температуре (0…1). t₂ = t₁ + η·(t_ref − t₁), d=const.">η (по t)
+    <label style="font-size:10px;color:#ad1457;margin-top:2px" title="КПД рекуператора (0…1). t₂ = t₁ + η·(t_ref − t₁).">η
       <input type="number" data-col="recupEff" data-i="${i}" value="${eff}" step="0.05" min="0" max="1">
+    </label>
+    <label style="font-size:10px;color:#ad1457;margin-top:2px" title="Режим: sensible — только теплообмен (d=const). total — энтальпийный (роторный) — также передаёт влагу с тем же η.">режим
+      <select data-col="recupMode" data-i="${i}">
+        <option value="sensible"${mode==='sensible'?' selected':''}>Sensible (T-only, пластинч.)</option>
+        <option value="total"${mode==='total'?' selected':''}>Total / энтальпийный (роторный)</option>
+      </select>
     </label>
   `;
 }
@@ -871,6 +878,7 @@ function readInputs() {
     else if (col === 'mixRatio')  { S.procs[i] = S.procs[i] || {}; S.procs[i].mixRatio  = v; }
     else if (col === 'recupWith') { S.procs[i] = S.procs[i] || {}; S.procs[i].recupWith = v; }
     else if (col === 'recupEff')  { S.procs[i] = S.procs[i] || {}; S.procs[i].recupEff  = v; }
+    else if (col === 'recupMode') { S.procs[i] = S.procs[i] || {}; S.procs[i].recupMode = v; }   // v0.59.931
     else if (col === 'adp')       { S.procs[i] = S.procs[i] || {}; S.procs[i].adp       = v; }   // v0.59.905 ADP coil
     else if (col === 'bf')        { S.procs[i] = S.procs[i] || {}; S.procs[i].bf        = v; }   // v0.59.905 Bypass Factor
     else if (col === 'Q' || col === 'qw') {
@@ -1131,8 +1139,24 @@ function cascadePass() {
       if (Number.isFinite(refIdx) && refIdx >= 0 && refIdx < S.points.length && refIdx !== i) {
         const bSrc = pointState(S.points[refIdx], S.P);
         if (bSrc && Number.isFinite(eta)) {
+          // v0.59.931: режим recovery — sensible (по T) или total (по T и W).
+          // proc.recupMode: 'sensible' (default) | 'total' (энтальпийный).
+          // Energy-recovery wheel может передавать и влагу — η_lat = η_sens
+          // в первом приближении.
+          const isTotal = proc.recupMode === 'total';
           const t2 = aState.T + eta * (bSrc.T - aState.T);
-          const W2 = aState.W;
+          let W2;
+          if (isTotal) {
+            // Энтальпийный — также передаём влагу с тем же η
+            W2 = aState.W + eta * (bSrc.W - aState.W);
+            // Clamp к W_sat(t2) — нельзя превысить насыщение
+            const Wsat = humidityRatio(t2, 1.0, S.P);
+            if (W2 > Wsat) W2 = Wsat;
+            if (W2 < 0) W2 = 0;
+          } else {
+            // Сенсибельный — d=const
+            W2 = aState.W;
+          }
           const rh2 = Math.max(0, Math.min(100, RHfromW(t2, W2, S.P) * 100));
           const h2  = 1.006 * t2 + W2 * (2501 + 1.86 * t2);
           const anyUser = p.tUser || p.rhUser || p.xUser || p.hUser;

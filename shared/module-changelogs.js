@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.931', date: '2026-04-30', items: [
+      '♻ <b>Рекуператор: режим sensible vs total (энтальпийный)</b>. В редакторе R-процесса добавлен select «режим»:',
+      '• <b>Sensible (T-only, пластинчатый)</b> — default, передаёт только тепло, d=const.',
+      '• <b>Total / энтальпийный (роторный)</b> — также передаёт влагу с тем же η. W₂ = W₁ + η×(W_ref − W₁), clamp до W_sat при насыщении.',
+      '• Выбор сохраняется в <code>proc.recupMode</code>, влияет на cascade-расчёт и визуализацию.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (recupControls + cascade R-block + handler).',
+    ] },
     { version: '0.59.930', date: '2026-04-30', items: [
       '📊 <b>Стек всех TC 9.9 envelopes на i-d (как в официальной ASHRAE-таблице)</b>. По репорту: «такой вид отображения тоже сделай, когда выбран альбомный вид» — на скрине пользователя видны все 4 зоны вложенными.',
       '• Новая опция в select «🟩 Зона»: «📊 Все TC 9.9 (стек Rec/A1/A2/A3/A4)». Когда выбрано — на диаграмме рисуются все 5 envelopes одновременно (от A4 снаружи до Recommended внутри). Лейблы A4/A3/A2/A1/Recommended у правых углов каждой зоны.',
