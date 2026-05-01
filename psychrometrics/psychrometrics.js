@@ -1661,6 +1661,18 @@ const COMFORT_ZONES = {
   'tc99-a4':   { Tmin:  5, Tmax: 45, RHmin: 0.08, RHmax: 0.90, TdMin: -12, TdMax: 24, label: 'TC 9.9 A4',          stroke: '#b91c1c', fill: 'rgba(185,28,28,0.10)' },
 };
 
+/* v0.59.942: позиция текстовой метки зоны = верхний-правый угол реальной
+   (clipped) envelope. С учётом Td-bound: W_corner = min(W(Tmax, RHmax),
+   W_sat(TdMax)). Раньше использовалось (Tmax, RHmax) без clipping → при
+   stack-mode TC 9.9 метки A1/A2/A3/A4 уходили в пустую область выше
+   фактических envelopes. */
+function zoneLabelPos(z, P, pos) {
+  const W_rh = humidityRatio(z.Tmax, z.RHmax, P);
+  const W_td = Number.isFinite(z.TdMax) ? humidityRatio(z.TdMax, 1.0, P) : Infinity;
+  const W_corner = Math.min(W_rh, W_td);
+  return pos(W_corner, z.Tmax);
+}
+
 function computeComfortZonePolygon(P, pos, zoneId) {
   const z = COMFORT_ZONES[zoneId];
   if (!z) return null;
@@ -1734,20 +1746,26 @@ function renderChart(sts) {
       const cz = computeComfortZonePolygon(S.P, pos, id);
       if (!cz) continue;
       const z = cz.zone;
-      const [labelXc, labelYc] = pos(humidityRatio(z.Tmax, z.RHmax, S.P), z.Tmax);
+      // v0.59.942: метка зоны — в АКТУАЛЬНОМ верхнем-правом углу envelope.
+      // Раньше использовалось (Tmax, RHmax) → с введением Td-clamping
+      // (v0.59.938) этот угол часто ВЫШЕ реальной envelope (W_high =
+      // min(W_RH(Tmax,RHmax), W_sat(TdMax))) → метки уезжали в пустоту.
+      const [labelXc, labelYc] = zoneLabelPos(z, S.P, pos);
       overlay += `<g class="psy-comfort-zone" pointer-events="none">
         <polygon points="${cz.points}" fill="none" stroke="${z.stroke}" stroke-width="1.4"/>
-        <text x="${labelXc + 4}" y="${labelYc + 12}" font-size="11" fill="${z.stroke}" font-weight="700">${escAttr(z.label.replace('TC 9.9 ', ''))}</text>
+        <text x="${labelXc - 4}" y="${labelYc - 4}" text-anchor="end" font-size="11" fill="${z.stroke}" font-weight="700"
+              paint-order="stroke" stroke="#fff" stroke-width="2.5">${escAttr(z.label.replace('TC 9.9 ', ''))}</text>
       </g>`;
     }
   } else if (zoneId) {
     const cz = computeComfortZonePolygon(S.P, pos, zoneId);
     if (cz) {
       const z = cz.zone;
-      const [labelXc, labelYc] = pos(humidityRatio(z.Tmax, z.RHmax, S.P), z.Tmax);
+      const [labelXc, labelYc] = zoneLabelPos(z, S.P, pos);
       overlay += `<g class="psy-comfort-zone" pointer-events="none">
         <polygon points="${cz.points}" fill="${z.fill}" stroke="${z.stroke}" stroke-width="1" stroke-dasharray="5,3"/>
-        <text x="${labelXc + 6}" y="${labelYc - 4}" font-size="10" fill="${z.stroke}" font-weight="700">${escAttr(z.label)}</text>
+        <text x="${labelXc - 4}" y="${labelYc - 4}" text-anchor="end" font-size="10" fill="${z.stroke}" font-weight="700"
+              paint-order="stroke" stroke="#fff" stroke-width="2.5">${escAttr(z.label)}</text>
       </g>`;
     }
   }

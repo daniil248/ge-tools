@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.942', date: '2026-05-01', items: [
+      '🏷 <b>Bug-fix: метки зон ASHRAE TC 9.9 уезжали в пустоту</b>. По репорту: «подписи зон уезжают в таком виде» (скрин TC 9.9 stack-mode где A1, A2, A3, A4 labels были высоко сверху, далеко от своих envelopes).',
+      '• Раньше: метка зоны позиционировалась в <code>(Tmax, RHmax)</code>. С введением Td-clamping (v0.59.938) фактический верхний-правый угол envelope = <code>(Tmax, min(W_RH(Tmax,RHmax), W_sat(TdMax)))</code>, а метка ставилась ВЫШЕ — в области, где envelope больше не доходит.',
+      '• Fix: новый helper <code>zoneLabelPos(z, P, pos)</code> возвращает позицию реального верхнего-правого угла clipped envelope. Метка теперь ставится с text-anchor end + offset −4/−4 от corner-а, плюс белая stroke-обводка для читаемости поверх кривых.',
+      'Файл: <code>psychrometrics/psychrometrics.js</code> (zoneLabelPos helper + использование в обоих ветках overlay — single-zone и tc99-all stack).',
+    ] },
     { version: '0.59.941', date: '2026-05-01', items: [
       '🧹 <b>Дублирующая панель «Связи» скрыта</b>. Управление процессами полностью перенесено в left-sidebar блока «Узлы» (compact-список + modal с детальной настройкой). DOM-узлы <code>#psy-edges</code>, <code>#psy-edges-list</code>, <code>#psy-add-edge</code> сохранены скрытыми для обратной совместимости с JS-селекторами.',
       '🏷 <b>h-isolines labels не наезжают на W-ось в ASHRAE-style</b>. Раньше «head» полилинии для метки h=… выбирался как pts[0], что в ASHRAE-mapping (W-axis вертикально справа) давало точку у ПРАВОЙ границы плот-области → метка наезжала на W-ось labels (5, 10, 15… г/кг).',
