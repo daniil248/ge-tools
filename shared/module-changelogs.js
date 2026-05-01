@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.912', date: '2026-04-30', items: [
+      '🚨 <b>Hotfix: возможная регрессия в кнопках после v0.59.911</b>. По репорту: «перестали работать все кнопки блока, добавление точек, мастер демо циклы; нет связей».',
+      '• <b>Изоляция через try-catch</b>: каждая стадия wire() теперь обёрнута в try-catch. Даже если одна функция бросит ошибку (loadCycle/renderCycle/update/wireInfiniteCanvas), все остальные attachment-listeners attach корректно.',
+      '• <b>Убран global keydown-handler</b> в wireInfiniteCanvas (Ctrl+0/+/−/F шорткаты) — мог перехватывать ввод в input-поля.',
+      '• <b>Сетка теперь действительно бесконечная</b>: grid переехал с <code>.psy-canvas-inner</code> (4000×2400 px, конечен) на сам <code>.psy-canvas</code> viewport. Background-position и background-size динамически обновляются по pan/zoom — следует за камерой, выглядит «infinite».',
+      '• Inner-полотно расширено 4000×2400 → 8000×4800 px (буфер для absolute-узлов, не виден).',
+      'Файлы: <code>psychrometrics/psychrometrics.js</code> (try-catch wrapper в wire + grid update в apply + keydown handler удалён), <code>psychrometrics/psychrometrics.css</code> (grid на .psy-canvas + inner без фона).',
+    ] },
     { version: '0.59.911', date: '2026-04-30', items: [
       '🖼 <b>ID-диаграмма: бесконечный canvas с pan/zoom/fit (CAD-style)</b>. По задаче: «поле должно быть нормальным, бесконечной простыней с зумом и перетаскиванием мыши, без полос прокрутки и вписыванием по клику мышкой».',
       '• <b>Pan</b>: drag пустой области (cursor: grab → grabbing). Не мешает редактированию узлов / зон / инпутов.',

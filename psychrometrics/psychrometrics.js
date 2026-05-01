@@ -2017,12 +2017,15 @@ function rerenderCycle() {
 }
 
 function wire() {
-  loadCycle();                // восстановить цикл из localStorage до синка UI
-  syncTopInputs();
-  renderFormulas();
-  renderCycle();
-  update();
-  wireInfiniteCanvas();       // v0.59.911: pan/zoom/fit для canvas
+  // v0.59.912: каждая стадия в try-catch — даже если одна ломается, остальные
+  // (особенно attachment listeners ниже) обязательно отрабатывают.
+  try { loadCycle(); } catch (e) { console.error('[psy.wire.loadCycle]', e); }
+  try { syncTopInputs(); } catch (e) { console.error('[psy.wire.syncTopInputs]', e); }
+  try { renderFormulas(); } catch (e) { console.error('[psy.wire.renderFormulas]', e); }
+  try { renderCycle(); } catch (e) { console.error('[psy.wire.renderCycle]', e); }
+  try { update(); } catch (e) { console.error('[psy.wire.update]', e); }
+  try { wireInfiniteCanvas(); }
+  catch (e) { console.error('[wireInfiniteCanvas]', e); }
 
   // Верхние поля
   ['psy-alt','psy-P-kpa','psy-rhmax','psy-tevap','psy-vbase','psy-tmin-chart','psy-tmax-chart','psy-dmax-chart'].forEach(id => {
@@ -2760,6 +2763,11 @@ function wireInfiniteCanvas() {
     if (!animate) requestAnimationFrame(() => inner.classList.remove('psy-no-trans'));
     const lab = document.getElementById('psy-canvas-zoom');
     if (lab) lab.textContent = Math.round(v.scale * 100) + '%';
+    // v0.59.912: динамический grid на viewport — следует за pan/zoom,
+    // выглядит «бесконечным». Размер ячейки 20px × scale.
+    const gridSize = 20 * v.scale;
+    canvas.style.backgroundSize = `${gridSize}px ${gridSize}px`;
+    canvas.style.backgroundPosition = `${v.tx}px ${v.ty}px`;
     try { localStorage.setItem('psy.canvasView', JSON.stringify(S.canvasView)); } catch {}
   };
   apply(true);
@@ -2877,23 +2885,8 @@ function wireInfiniteCanvas() {
     fit();
   });
 
-  // Клавиатурные шорткаты: Ctrl+0 = reset, Ctrl++/Ctrl+- = zoom, F = fit
-  document.addEventListener('keydown', (e) => {
-    // Только если фокус на canvas (не в инпуте)
-    if (document.activeElement && document.activeElement.matches('input, select, textarea')) return;
-    if (e.ctrlKey && e.key === '0') { S.canvasView = { tx: 0, ty: 0, scale: 1 }; apply(true); e.preventDefault(); }
-    else if (e.ctrlKey && (e.key === '+' || e.key === '=')) {
-      const btn = canvas.querySelector('[data-cv-act="zoom-in"]'); btn?.click(); e.preventDefault();
-    }
-    else if (e.ctrlKey && (e.key === '-' || e.key === '_')) {
-      const btn = canvas.querySelector('[data-cv-act="zoom-out"]'); btn?.click(); e.preventDefault();
-    }
-    else if (e.key === 'f' || e.key === 'F') {
-      // Только если canvas видим в viewport
-      const rect = canvas.getBoundingClientRect();
-      if (rect.top < window.innerHeight && rect.bottom > 0) { fit(); e.preventDefault(); }
-    }
-  });
+  // v0.59.912: убрал document-keydown шорткаты — они могли перехватывать
+  // ввод в input полях (включая psy-add и др.). Если нужны — навешу на canvas.
 }
 
 // Глобальный psyToast (nested-копия в wire() остаётся для backward-compat).

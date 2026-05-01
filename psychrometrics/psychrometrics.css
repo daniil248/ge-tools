@@ -24,13 +24,22 @@
 /* Карточки цикла */
 /* ПОЛОТНО с узлами (граф-canvas в стиле конструктора схем).
    Узлы позиционируются absolute по p.cx/p.cy; связи — SVG-слой позади. */
-/* v0.59.911: бесконечный canvas с pan/zoom/fit */
+/* v0.59.911: бесконечный canvas с pan/zoom/fit
+ * v0.59.912: grid background теперь на самом viewport с динамическим
+ *  background-position/size — следует за pan/zoom, выглядит бесконечным.
+ */
 .psy-canvas {
   position: relative;
   width: 100%;
   height: 70vh;
   min-height: 480px;
-  background: #fafbfc;
+  background-color: #fafbfc;
+  /* grid задаётся через background-image и обновляется JS-кодом */
+  background-image:
+    linear-gradient(to right,  #e3e8ee 1px, transparent 1px),
+    linear-gradient(to bottom, #e3e8ee 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   overflow: hidden;        /* нет скроллбаров — только pan/zoom */
@@ -41,12 +50,9 @@
 .psy-canvas-inner {
   position: absolute;
   top: 0; left: 0;
-  width: 4000px;
-  height: 2400px;
-  background-image:
-    linear-gradient(to right,  #e3e8ee 1px, transparent 1px),
-    linear-gradient(to bottom, #e3e8ee 1px, transparent 1px);
-  background-size: 20px 20px;
+  width: 8000px;           /* большой буфер для absolute-позиционирования узлов */
+  height: 4800px;
+  /* Без собственного фона — grid рисуется на родителе .psy-canvas */
   transform-origin: 0 0;
   will-change: transform;
   transition: transform 0.05s linear;
