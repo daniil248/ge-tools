@@ -71,6 +71,7 @@ export function saveGlobalCompanyProfile(profile) {
     const clean = { ...DEFAULT_COMPANY, ...(profile || {}) };
     delete clean.overrideEnabled;
     localStorage.setItem(LS_GLOBAL, JSON.stringify(clean));
+    _notifyChange({ scope: 'global', profile: clean });
   } catch {}
 }
 
@@ -80,6 +81,22 @@ export function saveProjectCompanyProfile(pid, profile) {
   try {
     const key = `raschet.project.${pid}.${PROJECT_KEY_SUFFIX}`;
     localStorage.setItem(key, JSON.stringify(profile || { ...DEFAULT_COMPANY, overrideEnabled: false }));
+    _notifyChange({ scope: 'project', pid, profile });
+  } catch {}
+}
+
+/* v0.60.35: pub/sub для auto-refresh любых UI, использующих company-profile.
+   По репорту: «реквизиты автоматически не обновляются». */
+const _listeners = new Set();
+export function onCompanyProfileChange(cb) {
+  _listeners.add(cb);
+  return () => _listeners.delete(cb);
+}
+function _notifyChange(detail) {
+  _listeners.forEach(cb => { try { cb(detail); } catch (e) { console.error('[company-profile listener]', e); } });
+  // Также шлём DOM event для модулей которые не импортируют company-profile.js напрямую
+  try {
+    window.dispatchEvent(new CustomEvent('raschet:company-profile-change', { detail }));
   } catch {}
 }
 

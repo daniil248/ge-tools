@@ -14,6 +14,7 @@ import {
 import { buildModuleHref, clearNavStack } from '../shared/project-context.js';
 import {
   DEFAULT_COMPANY, loadRawProfile, saveProjectCompanyProfile, loadEffectiveCompanyProfile,
+  onCompanyProfileChange,
 } from '../shared/company-profile.js';
 
 /* ---------- inline modal / toast ---------- */
@@ -1386,6 +1387,31 @@ function _initAfterDom() {
       });
     }
   } catch {}
+  // v0.60.35: подписка на изменения company-profile (по репорту: «реквизиты
+  // автоматически не обновляются»). Вызывается при сохранении в global-
+  // settings или per-project override → re-render свойств проекта.
+  try {
+    onCompanyProfileChange(() => {
+      try {
+        const propsHost = document.getElementById('pr-detail-properties');
+        const pid = getPid();
+        const p = pid ? getProject(pid) : null;
+        if (propsHost && p) renderProjectProperties(p, propsHost);
+      } catch (e) { console.warn('[project.js] company-profile re-render failed:', e); }
+    });
+  } catch {}
+  // Также DOM-event если company-profile меняется в другой вкладке (storage event).
+  window.addEventListener('storage', (ev) => {
+    if (!ev.key) return;
+    if (ev.key === 'raschet.companyProfile.global.v1' || ev.key.includes('.companyProfile.v1')) {
+      try {
+        const propsHost = document.getElementById('pr-detail-properties');
+        const pid = getPid();
+        const p = pid ? getProject(pid) : null;
+        if (propsHost && p) renderProjectProperties(p, propsHost);
+      } catch (e) { console.warn('[project.js] storage-event re-render failed:', e); }
+    }
+  });
 }
 
 if (document.readyState === 'loading') {

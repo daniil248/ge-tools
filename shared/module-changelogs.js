@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.35', date: '2026-05-02', items: [
+      '🔄 <b>Auto-refresh реквизитов в свойствах проекта</b>. По репорту: «реквизиты автоматически не обновляются». Если изменить глобальные реквизиты в шестерёнке ⚙ → «🏢 Реквизиты организации» — теперь блок «Реквизиты компании-исполнителя» в Свойствах проекта мгновенно обновляется (effective profile отражает новые глобальные значения).',
+      '• Pub/sub механизм: <code>onCompanyProfileChange(cb)</code> в <code>shared/company-profile.js</code> + DOM-event <code>raschet:company-profile-change</code>.',
+      '• <code>saveGlobalCompanyProfile</code> и <code>saveProjectCompanyProfile</code> вызывают <code>_notifyChange()</code>.',
+      '• <code>projects/project.js</code> подписывается + слушает <code>storage</code>-event (для случая когда профиль меняется в ДРУГОЙ вкладке браузера).',
+      '• Re-render через renderProjectProperties() при получении события.',
+      'Файлы: <code>shared/company-profile.js</code>, <code>projects/project.js</code>.',
+    ] },
     { version: '0.60.34', date: '2026-05-02', items: [
       '🚨 <b>HOTFIX: SyntaxError в cooling.js — модуль не загружался</b>. Корневая причина: в v0.60.30 я добавил <code>await import(...)</code> внутри <code>function init()</code>, забыв добавить <code>async</code>. Парсер падал на reserved word <code>await</code> → весь модуль не выполнялся → пустой sidebar (только defensive inline-init из v0.60.33 спасал базовый currency).',
       '• <code>function init()</code> → <code>async function init()</code>',
