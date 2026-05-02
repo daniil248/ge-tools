@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.3', date: '2026-05-02', items: [
+      '🔌 <b>Phase 22.4: PUE из подбора cooling в Технологе ЦОД</b>. По roadmap: «Технолог тянет годовое эл. потребление чиллера из активной cooling-spec проекта вместо упрощённого Q_IT / COP_const».',
+      '• Новый режим <code>pue.mode = "cooling-module"</code> в Tech-Workspace (наряду с auto / manual).',
+      '• <code>calcPueFromCoolingModule()</code> читает <code>cooling.selections.v1</code> проекта, берёт активный ★-вариант, через dynamic import calc/topology.js + chiller-bin-calc.js считает реальную годовую энергию (с учётом CRAC + free-cooling + redundancy + hot/cold standby).',
+      '• <code>PUE = 1 + (annualKwh/8760 + losses) / IT_kw</code>.',
+      '• UI: новая опция «Из подбора cooling (точный)» в селекторе режима + ссылка «↗ Открыть Cooling».',
+      '• Fallback на auto-режим если подбор недоступен (нет meteo, нет вариантов, dynamic import ещё не загрузился).',
+      '• ROADMAP Phase 22.4 закрыт.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code> (calcPueFromCoolingModule + UI selector + ссылка на cooling).',
+    ] },
     { version: '0.60.2', date: '2026-05-02', items: [
       '🌍 <b>Свойства проекта: место расположения + multi-location</b>. По требованию: «куда-нибудь размести свойства проекта, включая месторасположение объекта. Будут встречаться проекты с возможностью выбора разных мест».',
       '• Новая секция «⚙ Свойства проекта» на странице карточки проекта (выше секции Модули).',

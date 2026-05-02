@@ -2661,9 +2661,15 @@ standalone-приложение в отдельном. Чтобы использ
     refrigerant whitepapers, Stull (2011) Wet-Bulb, ASHRAE TC 9.9
   - Раскрывающаяся секция «📐 Методика расчёта (формулы)» в форме spec
   - Help-панель модуля с полным описанием
-- [ ] **22.4** Интеграция с Технологом ЦОД (Фаза 20.12 — PUE)
-  - Технолог тянет годовое эл. потребление чиллера из активной cooling-spec
-    проекта вместо упрощённого `Q_IT / COP_const`
+- [x] **22.4** Интеграция с Технологом ЦОД (Фаза 20.12 — PUE) — закрыто v0.60.3
+  - Новый режим `pue.mode='cooling-module'` в Tech-Workspace.
+  - calcPueFromCoolingModule() читает `cooling.selections.v1` проекта,
+    берёт активный ★-вариант, через dynamic import calc/topology.js +
+    chiller-bin-calc.js считает реальную годовую энергию (с учётом
+    CRAC + free-cooling + redundancy + hot/cold standby).
+  - PUE = 1 + (annualKwh/8760 + losses) / IT_kw.
+  - UI: новая опция в селекторе режима PUE + ссылка «↗ Открыть Cooling».
+  - Fallback на auto-режим если подбор недоступен.
 - [ ] **22.5** Импорт реальных performance-curves производителей
   - Daikin/Trane/Carrier/Liebert chiller selection software → CSV bin-таблица
   - Замена IPLV-оценки на эмпирическую кривую COP(T) от вендора
@@ -2792,7 +2798,7 @@ standalone-приложение в отдельном. Чтобы использ
   - Можно вынести общий helper: `shared/wheel-zoom.js` →
     `attachWheelZoom(el, { onZoom(zoom, anchorX, anchorY) })`.
 
-- [ ] **22.10** Топология холодоснабжения (chillers ↔ CRACs) 🆕
+- [x] **22.10** Топология холодоснабжения (chillers ↔ CRACs) 🆕 — закрыто v0.60.1
   > Добавлено 2026-05-02 по требованию: «система с несколькими жидкостными
   > кондиционерами … могут ссылаться (подключаться к общему чиллеру в схеме).
   > Чиллеры могут включаться с резервированием — как в общий трубопровод,

@@ -729,7 +729,97 @@ function calcPueAuto(c, meteoSummary) {
 function calcPue(c, meteoSummary) {
   if (!c.pue) return 1.4;
   if (c.pue.mode === 'manual') return Number(c.pue.manualPue) || 1.4;
+  // v0.60.3 (Phase 22.4): mode='cooling-module' — берём годовое
+  // потребление из активного подбора /cooling/ проекта и считаем PUE
+  // по реальной топологии (chillers + CRAC + free-cooling + redundancy).
+  if (c.pue.mode === 'cooling-module') {
+    const v = calcPueFromCoolingModule(c, meteoSummary);
+    if (Number.isFinite(v) && v > 0) return v;
+    // Fallback на auto если cooling-module недоступен.
+    return calcPueAuto(c, meteoSummary);
+  }
   return calcPueAuto(c, meteoSummary);
+}
+
+/**
+ * v0.60.3 (Phase 22.4): Расчёт PUE по реальному cooling-подбору проекта.
+ *
+ * Алгоритм:
+ *   1. Читаем cooling.selections.v1 + activeSelectionId.v1 текущего проекта.
+ *   2. Берём mainOptionId варианта активного подбора.
+ *   3. Если есть ★-вариант с topology — simulateTopology(topo, hourly).
+ *   4. Иначе одиночный вариант — buildBinData(hourly, option.spec).
+ *   5. Annual cooling energy [кВт·ч/год] / 8760 = avg P_cool [кВт].
+ *   6. PUE = 1 + (avg P_cool + lossesKw) / IT_kw.
+ *
+ * Если данных недостаточно — возвращает null (caller фолбэкнется на auto).
+ */
+function calcPueFromCoolingModule(c, meteoSummary) {
+  try {
+    const itKw = calcITTotal(c);
+    if (itKw <= 0) return null;
+    const pid = (typeof window.activeProject === 'function') ? window.activeProject() : null;
+    // Используем глобальный helper если есть; иначе ensureDefaultProject из импорта
+    const projectId = pid?.id || (window._activeProjectId || ensureDefaultProject()?.id);
+    if (!projectId) return null;
+    const selsRaw = localStorage.getItem(`raschet.project.${projectId}.cooling.selections.v1`);
+    const sels = selsRaw ? JSON.parse(selsRaw) : [];
+    if (!sels.length) return null;
+    const activeRaw = localStorage.getItem(`raschet.project.${projectId}.cooling.activeSelectionId.v1`);
+    const activeId = activeRaw ? JSON.parse(activeRaw) : null;
+    const sel = sels.find(s => s.id === activeId) || sels[0];
+    if (!sel || !sel.options?.length) return null;
+    const main = sel.options.find(o => o.id === sel.mainOptionId) || sel.options[0];
+    const hourly = meteoSummary?.hourly || [];
+    if (!hourly.length) return null;
+
+    // Динамически импортируем calc-слой cooling.
+    // (Tech-workspace не может использовать ESM-import top-level — он не модуль;
+    // используем dynamic import + cached promise.)
+    if (!window._coolingCalcPromise) {
+      window._coolingCalcPromise = Promise.all([
+        import('../cooling/calc/chiller-bin-calc.js'),
+        import('../cooling/calc/topology.js'),
+      ]).then(([bin, topo]) => ({ ...bin, ...topo }));
+    }
+    // Так как calcPue — синхронная, используем результат если уже загружен,
+    // иначе fallback. Dynamic import всегда даст результат при следующем render.
+    const calc = window._coolingCalcCache;
+    if (!calc) {
+      window._coolingCalcPromise.then(c => {
+        window._coolingCalcCache = c;
+        // Триггер ре-render через render() если он экспортирован.
+        if (typeof render === 'function') try { render(); } catch {}
+      });
+      return null;
+    }
+
+    let annualEnergyKwh = 0;
+    if (sel.topology && (sel.options.some(o => calc.isCracType ? calc.isCracType(o.spec?.systemType) : false))) {
+      const topo = calc.buildTopologyFromOptions(
+        sel.options,
+        sel.topology.loopMode,
+        sel.topology.redundancyN,
+        sel.topology.redundancyM,
+        sel.topology.standbyMode,
+      );
+      const m = calc.simulateTopology(topo, hourly);
+      annualEnergyKwh = m.totalEnergyKwh;
+    } else {
+      const rows = calc.buildBinData(hourly, main.spec);
+      annualEnergyKwh = rows.reduce((a, r) => a + (r.energy || 0), 0);
+    }
+
+    const avgCoolKw = annualEnergyKwh / 8760;
+    const cs = c.coolingSystem || newCoolingSystem();
+    const lossPct = (TOPOLOGY_DEFAULTS[cs.topology] || TOPOLOGY_DEFAULTS['chiller-fc']).baseLossPct;
+    const lossesKw = itKw * (lossPct / 100);
+    const pue = 1 + (avgCoolKw + lossesKw) / itKw;
+    return Math.round(pue * 100) / 100;
+  } catch (e) {
+    console.warn('[calcPueFromCoolingModule]', e);
+    return null;
+  }
 }
 
 // v0.59.893: чтение summary из mdc-config sub-project. mdc-config хранит
@@ -1143,21 +1233,34 @@ function renderDetails(c, ro) {
     const fc = meteoSum?.stats?.freecoolHours || 0;
     const fcN = meteoSum?.stats?.n || 0;
     const fcPct = fcN > 0 ? (fc / fcN * 100).toFixed(1) : '—';
+    const isCoolingMode = (c.pue.mode === 'cooling-module');
+    const modeLabel = c.pue.mode === 'manual' ? 'вручную' : (c.pue.mode === 'cooling-module' ? 'из подбора cooling' : 'автоматически');
     return `<div class="tw-details-head">
         <h3>📊 Расчёт PUE</h3>
-        <span class="muted tw-details-sub">PUE = ${pueVal.toFixed(2)} (${isAuto ? 'автоматически' : 'вручную'})</span>
+        <span class="muted tw-details-sub">PUE = ${pueVal.toFixed(2)} (${modeLabel})</span>
       </div>
       <div class="tw-details-body">
         <div class="tw-card" data-card-kind="pue" data-card-id="-">
           <div class="tw-grid">
-            <label>Режим:
+            <label title="Режим расчёта PUE:
+• Автоматически — упрощённая формула по топологии охлаждения и meteo (climate fraction).
+• Из подбора cooling — берёт активный ★-вариант подбора /cooling/ проекта и считает PUE по реальной симуляции (chillers + CRAC + free-cooling + redundancy + hot/cold standby).
+• Вручную — введите готовое значение из внешнего расчёта.">Режим:
               <select data-field="pue.mode" ${ro ? 'disabled' : ''}>
-                <option value="auto"${isAuto ? ' selected' : ''}>Автоматически (по meteo)</option>
-                <option value="manual"${!isAuto ? ' selected' : ''}>Вручную</option>
+                <option value="auto"${isAuto ? ' selected' : ''}>Автоматически (упрощ. по meteo)</option>
+                <option value="cooling-module"${isCoolingMode ? ' selected' : ''}>Из подбора cooling (точный)</option>
+                <option value="manual"${c.pue.mode === 'manual' ? ' selected' : ''}>Вручную</option>
               </select>
             </label>
-            ${!isAuto ? `<label>PUE (вручную):<input type="number" step="0.01" min="1.05" max="3.0" data-field="pue.manualPue" value="${c.pue.manualPue}" ${ro ? 'disabled' : ''}></label>` : ''}
+            ${c.pue.mode === 'manual' ? `<label>PUE (вручную):<input type="number" step="0.01" min="1.05" max="3.0" data-field="pue.manualPue" value="${c.pue.manualPue}" ${ro ? 'disabled' : ''}></label>` : ''}
           </div>
+          ${isCoolingMode ? `<div class="tw-pue-breakdown" title="Phase 22.4: PUE считается из реальной топологии активного подбора cooling (через simulateTopology). Если подбора нет — fallback на auto-режим.">
+            <h5>📐 Источник: подбор cooling</h5>
+            <p class="muted tw-details-note">PUE рассчитан из активного ★-варианта подбора холодильных систем проекта. Изменения в /cooling/ (тип чиллера, free-cooling, резервирование, CRAC) — автоматически отражаются здесь.</p>
+            <div class="tw-pue-actions">
+              <a class="tw-pue-link" href="../cooling/" target="_blank" title="Открыть модуль подбора в новой вкладке. Изменения после возврата применятся к PUE автоматически.">↗ Открыть «Подбор холодильных систем»</a>
+            </div>
+          </div>` : ''}
           ${isAuto ? `<div class="tw-pue-breakdown">
             <h5>Разбивка автоматического расчёта</h5>
             <div class="tw-mdc-grid">
