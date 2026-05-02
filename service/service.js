@@ -22,6 +22,7 @@ import * as util from '../meteo/util.js';
 import { CURRENCIES, currencyToIso } from '../cooling/calc/fc-summary.js';
 import { DEFAULT_ORDER, ORDER_TYPES, defaultPosition } from './calc/order-model.js';
 import { renderOrderForm } from './ui/order-form.js';
+import { openWorkCatalogModal } from './ui/work-catalog.js';
 import {
   buildInstallPositionsFromCoolingOption,
   buildMaintenancePositionsFromCoolingOption,
@@ -439,6 +440,10 @@ async function init() {
       renderActive();
     });
   }
+
+  // v0.60.42: open work-catalog button
+  const catBtn = $('sv-open-catalog');
+  if (catBtn) catBtn.addEventListener('click', () => openWorkCatalogModal());
 
   // Add-order button
   const addBtn = $('sv-add-order');

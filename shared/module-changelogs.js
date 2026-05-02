@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.42', date: '2026-05-02', items: [
+      '📚 <b>Phase 24.2 UI: каталог типовых работ в Service</b>. Кнопка «📚 Открыть каталог» в сайдбаре service-модуля → модалка с CRUD пользовательских шаблонов работ.',
+      '• Tabs по типу наряда (Монтаж / ТО / Разовая) — фильтрация шаблонов.',
+      '• Таблица: 📦 встроенные (read-only) + ✏ пользовательские; колонки: Название / Категория / Ед. / Себес/ед / Клиент/ед.',
+      '• Per-row actions: 📋 Скопировать (создать копию для редактирования), ✏ Редактировать (только user-шаблоны), 🗑 Удалить (только user-шаблоны).',
+      '• «+ Добавить шаблон» открывает форму с полями: Название / Категория / Единица / Себес-цена / Клиент-цена.',
+      '• «🗑 Сбросить пользовательские» удаляет ВСЕ user-шаблоны (с подтверждением).',
+      '• Pop-up диалоги используют общий <code>util.modalOpen</code>; persistence через <code>service/catalog/work-templates.js</code> (LS-ключ <code>raschet.service.workTemplates.v1</code>).',
+      '• После создания/редактирования шаблон появляется в picker «📚 Из шаблонов» в форме наряда (с пометкой ✏).',
+      'Файлы: <code>service/ui/work-catalog.js</code> (новый), <code>service/index.html</code>, <code>service/service.js</code>.',
+    ] },
     { version: '0.60.41', date: '2026-05-02', items: [
       '🏢 <b>Service: автозаполнение customer из реквизитов проекта</b>. По требованию: «если модуль запущен из проекта, то все данные о заказчике должны добавиться из свойств проекта».',
       '• <code>service/service.js</code>: новый helper <code>buildOrderDefaultsFromProject()</code> — читает <code>_pid.requisites</code> и возвращает <code>{customer: {name, contact}, notes}</code>.',
