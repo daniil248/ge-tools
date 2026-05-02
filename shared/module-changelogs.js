@@ -4,6 +4,21 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.996', date: '2026-05-02', items: [
+      '🇷🇺 <b>Терминология project-wide: «бин/Bins/Ambient T» → «интервал/Темп. наружн.»</b>. По требованию: «опять бины? Мои замечания обычно касаются всего проекта, должно быть всё однотипно».',
+      '• Заменено во всех файлах cooling/ и meteo/: COLUMNS labels, tooltips, заголовки таблиц, оси чартов, комментарии.',
+      '• Сохранено правило в memory <code>feedback_russian_terms.md</code>: при любом терминологическом замечании — grep по проекту + правка везде + запись правила.',
+      '🔗 <b>Топология холодоснабжения: calc + UI skeleton (Phase 22.10)</b>.',
+      '• <code>cooling/calc/chiller-defaults.js</code>: 3 новых типа CRAC (crac-water / crac-water+compressor [Stulz DX-glycol] / crac-water+fc-loop [Stulz CyberHandler]) + helper isCracType(). Группировка SYSTEM_TYPES по kind=plant|crac.',
+      '• <code>cooling/calc/chiller-bin-calc.js</code>: per-bin расчёт расширен для CRAC-типов. CRAC без компрессора (crac-water) даёт cracCoolingLoadKw на upstream-чиллер; гибрид (crac-water+compressor) переключается DX↔glycol по threshold; двухконтурный (crac-water+fc-loop) — отдельный FC контур (Stulz dual-circuit).',
+      '• <code>cooling/calc/topology.js</code> новый: simulateTopology(chillers, cracs, hourly) распределяет нагрузку по N штатным чиллерам (common-loop), считает aggregate energy + per-equipment breakdown.',
+      '• <code>cooling/ui/topology-view.js</code> новый: renderTopologyConfig (loop mode + redundancy N+M) + renderTopologyResults (per-equipment таблица + Σ + OPEX за год). Вкладка «🔗 Топология» — TODO в следующей итерации.',
+      '🔮 <b>ROADMAP Phase 22.10.1 + 22.11</b> (зафиксированы 2026-05-02):',
+      '• 22.10.1 — Вариант = комплекс оборудования: option перестаёт быть одиночной spec, становится комплексом с equipment[] + topology. CAPEX/OPEX комплекса целиком.',
+      '• 22.11 — Cross-selection comparison: текущая ⚖ Сравнение работает между вариантами одного подбора; добавить вкладку «Сравнение подборов» — между подборами, по их ★-основным вариантам.',
+      'Файлы новые: <code>cooling/calc/topology.js, cooling/ui/topology-view.js</code>; memory <code>feedback_russian_terms.md</code>.',
+      'Файлы изменены: <code>cooling/{calc/chiller-defaults.js, calc/chiller-bin-calc.js, ui/{annual-table-view, chiller-form, energy-chart}.js, index.html}</code>; <code>meteo/{annual-table.js, charts.js}</code>; <code>help/articles/module-meteo.html</code>; <code>ROADMAP.md</code>.',
+    ] },
     { version: '0.59.995', date: '2026-05-02', items: [
       '🏗 <b>Подборы (selections) с вариантами + main-флаг</b>. По требованию: «в одном проекте может быть несколько подборов разных систем, и в каждом несколько вариантов, один из которых основной. Варианты не активные можно удалять».',
       '• Заменена плоская модель <code>_options[]</code> на <code>_selections[].options[]</code>.',

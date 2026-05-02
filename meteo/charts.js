@@ -15,7 +15,7 @@ function register(cvs, chart) { _chartRegistry.set(cvs.id, chart); }
 
 const CHART = () => (typeof window !== 'undefined' && window.Chart) ? window.Chart : null;
 
-// ─── 1. Гистограмма температуры (бины по 1°C) — дни/год
+// ─── 1. Гистограмма температуры (интервалы по 1°C) — дни/год
 export function drawTempHistogram(cvs, hourly) {
   const Chart = CHART();
   if (!Chart || !cvs) return;
@@ -54,14 +54,14 @@ export function drawTempHistogram(cvs, hourly) {
         },
       },
       scales: {
-        x: { title: { display: true, text: 'Ambient T, °C' }, grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 30 } },
+        x: { title: { display: true, text: 'T наружн., °C' }, grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 30 } },
         y: { title: { display: true, text: 'Дней / год' }, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
       },
     },
   }));
 }
 
-// ─── 2. Гистограмма влажности (бины 5% RH)
+// ─── 2. Гистограмма влажности (интервалы 5% RH)
 export function drawHumidityHistogram(cvs, hourly) {
   const Chart = CHART();
   if (!Chart || !cvs) return;

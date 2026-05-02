@@ -36,7 +36,7 @@
         <h4>Tab «❄ Spec»</h4>
         <p>Спецификация одной системы охлаждения: тип (чиллер/DX-air/DX-pumped), rated capacity/COP, T-correction, free-cooling параметры.</p>
         <h4>Tab «📊 Annual energy»</h4>
-        <p>Annual hours table с расчётом capacity/COP/FC%/power/energy по бинам T_amb. Stacked-bar чарт «компрессор + FC aux» по бинам.</p>
+        <p>Сводная таблица годовых часов с расчётом capacity/COP/FC%/power/energy по интервалам температуры наружного воздуха. Стек-бар чарт «компрессор + FC aux» по интервалам.</p>
         <h4>Tab «💰 CAPEX / TCO»</h4>
         <p>CAPEX (equipment + installation), эксплуатационные параметры (ТО, lifetime, discount rate, эскалация). TCO chart по годам.</p>
         <h4>Tab «⚖ Сравнение»</h4>
@@ -170,7 +170,7 @@
           <button type="button" class="cl-tab active" data-tab="spec"
                   title="Спецификация одной системы охлаждения: тип, rated, FC параметры.">❄ Spec</button>
           <button type="button" class="cl-tab" data-tab="energy"
-                  title="Annual hours table + stacked-bar чарт по бинам T_amb. FC + OPEX сводка.">📊 Annual energy</button>
+                  title="Сводная таблица годовых часов + стек-бар чарт по интервалам температуры наружного воздуха. FC + OPEX сводка.">📊 Годовая энергия</button>
           <button type="button" class="cl-tab" data-tab="capex"
                   title="CAPEX (equipment + installation), параметры экономики (ТО, lifetime, discount rate). TCO chart по годам.">💰 CAPEX / TCO</button>
           <button type="button" class="cl-tab" data-tab="compare"
@@ -189,13 +189,13 @@
             <div id="cl-fc-summary"></div>
           </div>
           <div class="cl-section-card">
-            <h3 title="Stacked-bar: годовое эл. потребление по бинам T_amb. Красное — компрессор, зелёное — насосы/вентиляторы FC.">📊 Энергия по бинам T_amb</h3>
+            <h3 title="Стек-бар: годовое эл. потребление по интервалам температуры наружного воздуха. Красное — компрессор, зелёное — насосы/вентиляторы FC.">📊 Энергия по интервалам T наружн.</h3>
             <div class="cl-chart-box"><canvas id="cl-energy-chart"></canvas></div>
           </div>
           <div class="cl-section-card">
             <div class="cl-table-toolbar">
-              <h3 style="margin:0" title="Pivot-таблица: бины Ambient T °C × агрегаты hours/days/RH/twb + chiller-метрики (capacity/COP/FC%/power/energy).">📐 Annual hours table</h3>
-              <span class="muted" style="flex:1;font-size:11.5px">Бины Ambient T °C — данные из активного meteo-датасета</span>
+              <h3 style="margin:0" title="Сводная таблица: интервалы температуры наружного воздуха °C × агрегаты часы/дни/RH/T_wb + метрики чиллера (capacity/COP/FC%/power/energy).">📐 Годовые часы (сводная таблица)</h3>
+              <span class="muted" style="flex:1;font-size:11.5px">Интервалы температуры наружного воздуха — данные из активного meteo-датасета</span>
               <button type="button" class="cl-btn-ghost" id="cl-cols-btn" title="Выбор отображаемых столбцов.">🔧 Столбцы</button>
               <button type="button" class="cl-btn-primary" id="cl-export-btn" title="Экспорт текущей таблицы в CSV (UTF-8 с BOM).">📥 Экспорт CSV</button>
             </div>

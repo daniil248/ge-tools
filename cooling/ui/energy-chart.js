@@ -1,5 +1,5 @@
 // =============================================================================
-// cooling/ui/energy-chart.js — stacked bar чарт по бинам T_amb
+// cooling/ui/energy-chart.js — стек-бар чарт по интервалам температуры наружного воздуха
 // =============================================================================
 // Chart.js (загружается из cooling/index.html через CDN). Вынесено из
 // meteo/charts.js → drawChillerEnergyChart.
@@ -60,14 +60,14 @@ export function drawChillerEnergyChart(cvs, rows) {
         tooltip: {
           callbacks: {
             title: (items) => `T_amb = ${items[0].label} °C`,
-            footer: (items) => `Σ за бин: ${items.reduce((a, it) => a + (it.parsed.y || 0), 0).toFixed(0)} кВт·ч/год`,
+            footer: (items) => `Σ за интервал: ${items.reduce((a, it) => a + (it.parsed.y || 0), 0).toFixed(0)} кВт·ч/год`,
             label: (it) => `${it.dataset.label}: ${it.parsed.y.toFixed(0)} кВт·ч/год`,
           },
         },
-        title: { display: true, text: 'Годовое эл. потребление по бинам T_amb (стек: компрессор + aux)', font: { size: 12, weight: 600 }, color: '#075985' },
+        title: { display: true, text: 'Годовое эл. потребление по интервалам T наружн. (стек: компрессор + aux)', font: { size: 12, weight: 600 }, color: '#075985' },
       },
       scales: {
-        x: { stacked: true, title: { display: true, text: 'Ambient T, °C' }, grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 30 } },
+        x: { stacked: true, title: { display: true, text: 'T наружн., °C' }, grid: { display: false }, ticks: { autoSkip: true, maxTicksLimit: 30 } },
         y: { stacked: true, title: { display: true, text: 'кВт·ч / год' }, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
       },
     },

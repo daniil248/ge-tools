@@ -2,7 +2,7 @@
 // cooling/calc/chiller-bin-calc.js — per-bin расчёт чиллера/DX
 // =============================================================================
 // Pure-функции расчёта capacity / COP_mech / FC fraction / power / energy
-// для одного бина Ambient T при заданной chillerSpec.
+// для одного интервала температуры наружного воздуха при заданной chillerSpec.
 //
 // Эта же логика раньше жила в meteo/annual-table.js → applyChillerCalc.
 // Перенесена в Cooling Systems как часть архитектурной отделки модулей:
@@ -15,7 +15,7 @@
 import { wetBulbStull } from './psychro-formulas.js';
 
 /**
- * Применить расчёт chiller/DX к строке-бину.
+ * Применить расчёт chiller/DX к строке-интервалу.
  *
  * @param {object} row   — { tBin, hours, rhAvg, twbAvg, ... }
  * @param {object} spec  — chiller specification (см. chiller-defaults.js)
@@ -70,21 +70,35 @@ export function applyChillerCalc(row, spec) {
   }
 
   // --- Free-cooling fraction ---
+  // v0.59.996: расширено для CRAC-типов:
+  //   chiller         — FC на стороне чиллера (dry/wet), как раньше
+  //   dx-pumped-fc    — бинарный pumped refrigerant FC
+  //   crac-water       — CRAC без компрессора. Энергия = только fan power
+  //                      + wet-side насосы. Нагрузка на чиллер передаётся
+  //                      в topology.js (этот calc даёт только фан/aux).
+  //   crac-water+comp  — гибрид: при T_amb выше threshold работает компрессор
+  //                      (как DX), ниже — переключается на glycol-loop FC.
+  //   crac-water+fc    — двухконтурный (Stulz). FC по T_amb (как dry chiller),
+  //                      mech по water-loop от чиллера (нагрузка на upstream).
   const sysType = spec.systemType || 'chiller';
   const fcMode = spec.freeCoolingMode || 'none';
   let fcFraction = 0;
   let auxKw = 0;
+
+  // Универсальный helper: linear partial FC по T_ref vs CHWS.
+  function linearFc(tRef, chws, approach) {
+    const thrFull = chws - approach, thrNo = chws;
+    if (tRef <= thrFull)    return 1.0;
+    if (tRef >= thrNo)      return 0.0;
+    return (thrNo - tRef) / (thrNo - thrFull);
+  }
 
   if (sysType === 'chiller' && fcMode !== 'none') {
     const chws = Number(spec.chwsTemp) || 12;
     const approach = Number(spec.freeCoolingApproach) || 5;
     let tRef = T;
     if (fcMode === 'wet' && Number.isFinite(row.twbAvg)) tRef = row.twbAvg;
-    const thrFull = chws - approach;
-    const thrNo   = chws;
-    if (tRef <= thrFull)      fcFraction = 1.0;
-    else if (tRef >= thrNo)   fcFraction = 0.0;
-    else                      fcFraction = (thrNo - tRef) / (thrNo - thrFull);
+    fcFraction = linearFc(tRef, chws, approach);
     if (fcFraction > 0) {
       auxKw = ratedCap * (Number(spec.freeCoolingAuxPctOfRated) || 5) / 100;
     }
@@ -94,15 +108,60 @@ export function applyChillerCalc(row, spec) {
     if (fcFraction > 0) {
       auxKw = ratedCap * (Number(spec.dxPumpedAuxPctOfRated) || 3) / 100;
     }
+  } else if (sysType === 'crac-water') {
+    // CRAC без компрессора — все охлаждение через chiller (upstream).
+    // На стороне CRAC только fan power (~3-5% от ratedCap для EC-fan).
+    // Нагрузка на чиллер обрабатывается в topology.js.
+    fcFraction = 0;
+    auxKw = ratedCap * (Number(spec.cracFanPctOfRated) || 4) / 100;
+    // Compressor power = 0 для CRAC без компрессора → P_mech ниже примем 0.
+    // Помечаем флагом: cooling-load для upstream чиллера = capacity (без COP_mech).
+  } else if (sysType === 'crac-water+compressor') {
+    // Гибрид DX + glycol-loop. При T_amb ≤ threshold (Stulz default ~13°C):
+    // переключается на glycol-loop (требует chiller в топологии). Иначе — DX.
+    const thr = Number(spec.cracHybridThresholdDb) ?? 13;
+    fcFraction = (T <= thr) ? 1.0 : 0.0;
+    if (fcFraction > 0) {
+      auxKw = ratedCap * (Number(spec.cracFanPctOfRated) || 4) / 100;   // только fan + glycol pump
+    }
+  } else if (sysType === 'crac-water+fc-loop') {
+    // Двухконтурный (Stulz CyberHandler): отдельный FC контур (dry cooler) +
+    // отдельный chilled water loop от чиллера. FC включается при T_amb ≤
+    // chws−approach, аналогично chiller-dry, но локально на CRAC.
+    const chws = Number(spec.chwsTemp) || 12;
+    const approach = Number(spec.freeCoolingApproach) || 5;
+    fcFraction = linearFc(T, chws, approach);
+    auxKw = ratedCap * (Number(spec.cracFanPctOfRated) || 4) / 100;     // fan всегда работает
+    if (fcFraction > 0) {
+      auxKw += ratedCap * (Number(spec.freeCoolingAuxPctOfRated) || 3) / 100;  // + dry cooler fan
+    }
   }
 
   // --- Power & energy ---
-  const pMech = capacity > 0 && copMech > 0 ? (1 - fcFraction) * capacity / copMech : 0;
+  // v0.59.996: для CRAC без собственного компрессора (crac-water) механическая
+  // мощность = 0 на стороне CRAC; нагрузка передаётся в topology.js → чиллер.
+  // Поле cracCoolingLoadKw отдаёт эту нагрузку для дальнейшего распределения.
+  let pMech;
+  let cracCoolingLoadKw = null;
+  if (sysType === 'crac-water') {
+    pMech = 0;
+    cracCoolingLoadKw = capacity;   // вся capacity → upstream чиллер
+  } else if (sysType === 'crac-water+fc-loop') {
+    pMech = 0;
+    cracCoolingLoadKw = (1 - fcFraction) * capacity;   // только мех-часть → чиллер
+  } else if (sysType === 'crac-water+compressor') {
+    // В FC-режиме нагрузка идёт на glycol-loop → upstream сухой кулер
+    // (но в топологии chiller тоже может быть). В DX-режиме — на собственный компрессор.
+    if (fcFraction > 0) { pMech = 0; cracCoolingLoadKw = capacity; }
+    else                { pMech = capacity / Math.max(0.01, copMech); cracCoolingLoadKw = 0; }
+  } else {
+    pMech = capacity > 0 && copMech > 0 ? (1 - fcFraction) * capacity / copMech : 0;
+  }
   const pTotal = pMech + auxKw;
   const cop = pTotal > 0 ? capacity / pTotal : 0;
   const energy = pTotal * row.hours;
 
-  return { ...row, capacity, copMech, fcFraction, cop, power: pTotal, energy };
+  return { ...row, capacity, copMech, fcFraction, cop, power: pTotal, energy, cracCoolingLoadKw };
 }
 
 /**

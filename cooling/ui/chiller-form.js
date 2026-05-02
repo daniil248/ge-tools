@@ -29,7 +29,7 @@ export function renderChillerSpecForm(spec, onChange, onClear) {
   const sysDesc = SYSTEM_TYPES.find(t => t.id === sysType)?.desc || '';
 
   wrap.innerHTML = `
-    <h4 title="Спецификация чиллера или DX-системы для расчёта Capacity / COP / Power / Energy по бинам ambient T. Поддерживает фрикулинг (chiller dry/wet) и pumped refrigerant economizer (DX-FC).">❄ Chiller / DX spec</h4>
+    <h4 title="Спецификация чиллера или DX-системы для расчёта Capacity / COP / Power / Energy по интервалам температуры наружного воздуха. Поддерживает фрикулинг (chiller dry/wet) и pumped refrigerant economizer (DX-FC).">❄ Chiller / DX spec</h4>
 
     <div class="cl-chiller-section">
       <div class="cl-chiller-section-title">1️⃣ Тип системы и базовые параметры</div>

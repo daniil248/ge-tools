@@ -1,5 +1,5 @@
 // meteo/annual-table.js — v0.59.991
-// Pivot-таблица бинов Ambient T °C × агрегаты (часы/год, дни/год, RH/wind).
+// Сводная таблица интервалов температуры наружного воздуха °C × агрегаты (часы/год, дни/год, RH/wind).
 // Колонки настраиваются. Экспорт в CSV (Excel-совместимый, с BOM).
 //
 // История: до v0.59.991 здесь жила вся логика chiller/DX расчёта
@@ -103,7 +103,7 @@ export function renderAnnualTable(rows, activeCols) {
     <thead><tr>${cols.map(c => `<th class="${c.id === 'tBin' ? '' : 'num'}" title="${escAttr(c.tip || c.label)}">${escHtml(c.label)}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${c.id === 'tBin' ? '' : 'num'}">${escHtml(c.fmt(r))}</td>`).join('')}</tr>`).join('')}</tbody>
     <tfoot><tr>${cols.map(c => {
-      if (c.id === 'tBin') return `<td title="Сумма по всем бинам"><b>Σ</b></td>`;
+      if (c.id === 'tBin') return `<td title="Сумма по всем интервалам температуры наружного воздуха"><b>Σ</b></td>`;
       if (c.id === 'hours') return `<td class="num" title="Σ часов ≈ 8766"><b>${totalHours.toFixed(0)}</b></td>`;
       if (c.id === 'days') return `<td class="num" title="Σ дней ≈ 365.25"><b>${totalDays.toFixed(1)}</b></td>`;
       if (c.id === 'pct') return `<td class="num"><b>100.00</b></td>`;

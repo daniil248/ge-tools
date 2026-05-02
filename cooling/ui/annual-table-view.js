@@ -28,7 +28,7 @@ export function renderAnnualTable(rows, activeCols) {
     <thead><tr>${cols.map(c => `<th class="${c.id === 'tBin' ? '' : 'num'}" title="${escAttr(c.tip || c.label)}">${escHtml(c.label)}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr>${cols.map(c => `<td class="${c.id === 'tBin' ? '' : 'num'}">${escHtml(c.fmt(r))}</td>`).join('')}</tr>`).join('')}</tbody>
     <tfoot><tr>${cols.map(c => {
-      if (c.id === 'tBin')      return `<td title="Сумма по всем бинам"><b>Σ</b></td>`;
+      if (c.id === 'tBin')      return `<td title="Сумма по всем интервалам температуры наружного воздуха"><b>Σ</b></td>`;
       if (c.id === 'hours')     return `<td class="num" title="Σ часов в году ≈ 8766"><b>${totalHours.toFixed(0)}</b></td>`;
       if (c.id === 'days')      return `<td class="num" title="Σ дней в году ≈ 365.25"><b>${totalDays.toFixed(1)}</b></td>`;
       if (c.id === 'pct')       return `<td class="num"><b>100.00</b></td>`;
