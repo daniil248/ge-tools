@@ -3068,6 +3068,34 @@ standalone-приложение в отдельном. Чтобы использ
 
 ---
 
+## Фаза 28 — Единый shell конфигураторов
+
+> Зафиксировано Пользователем 2026-05-02: «может сделать для всех конфигураторов
+> один вид?». Цель: единая разметка-shell + CSS variables для всех модулей-
+> конфигураторов (cooling, service, scs-design, scs-config, mdc-config,
+> rack-config, panel-config и т.д.). Снижение когнитивной нагрузки оператора.
+
+- [x] **28.1** `shared/configurator-shell.css` — базовый CSS с `.rs-cfg-shell` /
+  `.rs-cfg-sidebar` / `.rs-cfg-content` / `.rs-cfg-tabs` / `.rs-cfg-card`
+  и CSS variables (sidebar-width, accent, border, и т.п.). Подключён в
+  cooling и service. v0.60.28.
+- [ ] **28.2** Миграция cooling — заменить `cl-*` классы на `rs-cfg-*` где
+  возможно (постепенно). Per-module стили остаются для специфики (chart,
+  performance curve и т.п.).
+- [ ] **28.3** Миграция service — заменить `sv-*`.
+- [ ] **28.4** Миграция scs-design + scs-config + mdc-config + rack-config.
+- [ ] **28.5** Миграция остальных конфигураторов.
+- [ ] **28.6** Темизация (light/dark) через CSS variables.
+
+**Acceptance:**
+- Один и тот же визуальный стиль across all configurators (sidebar +
+  content + tabs).
+- Минимальные различия только в иконках/цветах брендов модулей.
+- Любой новый конфигуратор подключает `configurator-shell.css` и сразу
+  получает консистентный вид.
+
+---
+
 ## Фаза 27 — Авторизация Microsoft 365 (deferred)
 
 > Зафиксировано Пользователем 2026-05-02: «Позже добавим авторизацию через

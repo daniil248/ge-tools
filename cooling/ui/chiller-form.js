@@ -14,6 +14,7 @@
 import { DEFAULT_CHILLER, SYSTEM_TYPES, FC_MODES } from '../calc/chiller-defaults.js';
 import { parsePerformanceCurveCsv } from '../calc/chiller-bin-calc.js';
 import { parseDatasheet, applyDatasheetToSpec, getExampleDatasheet, DATASHEET_SCHEMA } from '../calc/datasheet.js';
+import { listDatasheets, listVendors } from '../datasheets/index.js';
 import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
 
 /**
@@ -136,6 +137,8 @@ export function renderChillerSpecForm(spec, onChange, onClear) {
     </div>
 
     <div class="cl-chiller-actions" style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+      <button type="button" class="cl-btn-ghost" data-pick-datasheet
+              title="Выбрать spec из встроенного каталога вендоров (Daikin / York / Carrier / Trane / Stulz / Vertiv). Готовые типичные параметры — заменяет текущую spec.">📚 Готовый даташит</button>
       <button type="button" class="cl-btn-ghost" data-import-datasheet
               title="Импорт полной spec из JSON-даташита производителя (vendor / model / capacity / COP / FC-параметры / performance-curve). Кликните для drag&drop файла, paste JSON или скачивания примера. Формат описан в Справке (❓).">📥 Импорт даташита (JSON)</button>
       <button type="button" class="cl-btn-ghost" data-save-to-catalog
@@ -166,6 +169,15 @@ export function renderChillerSpecForm(spec, onChange, onClear) {
         ? ` (с предупреждениями: ${result.errors.length})`
         : '';
       toast(`✔ Spec импортирована из даташита: ${newSpec.name || 'без имени'}${warns}`, 'ok');
+      return;
+    }
+    // v0.60.28 (Phase 25.3): готовые даташиты вендоров
+    if (e.target.closest('[data-pick-datasheet]')) {
+      const ds = await openVendorDatasheetPicker();
+      if (!ds) return;
+      const newSpec = applyDatasheetToSpec(ds, s);
+      onChange(newSpec);
+      toast(`✔ Загружен ${ds.vendor} ${ds.model}`, 'ok');
       return;
     }
 
@@ -389,4 +401,82 @@ function renderDsErrors(errors) {
       </ul>
     </div>
   `;
+}
+
+/**
+ * Phase 25.3: picker готовых даташитов вендоров.
+ * Возвращает выбранный datasheet или null.
+ */
+async function openVendorDatasheetPicker() {
+  const all = listDatasheets();
+  const vendors = listVendors();
+  const vendorOpts = ['<option value="">-- Все вендоры --</option>',
+    ...vendors.map(v => `<option value="${escAttr(v)}">${escHtml(v)}</option>`),
+  ].join('');
+  const renderRows = (filterVendor) => {
+    const filtered = filterVendor ? all.filter(d => d.vendor === filterVendor) : all;
+    return filtered.map((d, idx) => `
+      <tr data-idx="${idx}" data-orig-idx="${all.indexOf(d)}" style="cursor:pointer">
+        <td>${escHtml(d.vendor)}</td>
+        <td>${escHtml(d.model)}</td>
+        <td>${escHtml(d.kind)}</td>
+        <td class="num">${d.ratedCapKw} кВт</td>
+        <td class="num">${d.ratedCop}</td>
+        <td>${escHtml(d.freeCoolingMode || '—')}</td>
+      </tr>
+    `).join('');
+  };
+  const body = `
+    <p class="muted" style="font-size:11.5px;margin:0 0 8px">
+      Готовые даташиты от популярных вендоров с типичными параметрами. Кликните на строку — spec будет применена.
+      Для проектного использования уточните параметры из официального datasheet производителя на конкретную модель.
+    </p>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px">
+      Фильтр вендор:
+      <select id="vds-vendor-filter" style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">${vendorOpts}</select>
+    </label>
+    <div style="max-height:50vh;overflow:auto;border:1px solid #e2e8f0;border-radius:3px">
+      <table class="cl-annual-table" id="vds-table" style="font-size:12px;width:100%">
+        <thead>
+          <tr><th>Вендор</th><th>Модель</th><th>Тип</th><th class="num">Rated</th><th class="num">COP</th><th>FC</th></tr>
+        </thead>
+        <tbody>${renderRows(null)}</tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:11px;margin-top:6px">Всего ${all.length} даташитов от ${vendors.length} вендоров.</p>
+  `;
+  // Сначала запускаем modalOpen (создаёт overlay синхронно), затем биндим
+  // events в следующем кадре, потом ждём результат.
+  const promise = modalOpen(
+    '<h3>📚 Готовые даташиты вендоров</h3>',
+    body,
+    async () => {
+      const sel = document.querySelector('#vds-table tr.selected');
+      if (!sel) { toast('Выберите даташит из таблицы', 'err'); return null; }
+      const idx = Number(sel.dataset.origIdx);
+      return all[idx] ? { picked: all[idx] } : null;
+    }
+  );
+  requestAnimationFrame(() => {
+    const overlay = document.querySelector('.mt-modal-overlay');
+    if (!overlay) return;
+    const tbody = overlay.querySelector('#vds-table tbody');
+    const filter = overlay.querySelector('#vds-vendor-filter');
+    overlay.addEventListener('click', (ev) => {
+      const tr = ev.target.closest('#vds-table tbody tr[data-idx]');
+      if (!tr) return;
+      tbody.querySelectorAll('tr').forEach(r => r.classList.toggle('selected', r === tr));
+    });
+    overlay.addEventListener('dblclick', (ev) => {
+      const tr = ev.target.closest('#vds-table tbody tr[data-idx]');
+      if (!tr) return;
+      tbody.querySelectorAll('tr').forEach(r => r.classList.toggle('selected', r === tr));
+      overlay.querySelector('.mt-modal-ok')?.click();
+    });
+    if (filter) filter.addEventListener('change', () => {
+      tbody.innerHTML = renderRows(filter.value || null);
+    });
+  });
+  const result = await promise;
+  return result?.picked || null;
 }

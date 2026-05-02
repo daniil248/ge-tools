@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.28', date: '2026-05-02', items: [
+      '🎨 <b>Phase 28.1: Единый shell конфигураторов</b> (foundation). По требованию: «может сделать для всех конфигураторов один вид?».',
+      '• Новый <code>shared/configurator-shell.css</code> с CSS variables (--rs-cfg-sidebar-w, --rs-cfg-accent, --rs-cfg-border) и базовыми классами: <code>.rs-cfg-shell</code> (grid sidebar+content), <code>.rs-cfg-sidebar</code>, <code>.rs-cfg-content</code>, <code>.rs-cfg-context</code>, <code>.rs-cfg-section</code>, <code>.rs-cfg-list / .rs-cfg-list-row</code>, <code>.rs-cfg-tabs / .rs-cfg-tab</code>, <code>.rs-cfg-card</code>, <code>.rs-cfg-focus</code>, <code>.rs-cfg-empty</code>.',
+      '• Подключён в cooling/index.html и service/index.html. Per-module CSS остаётся для специфики (charts, perf curves).',
+      '• Адаптив: на &lt;900px sidebar становится сверху content (один столбец).',
+      '• Roadmap Phase 28: миграция остальных модулей (28.2–28.5) + темизация (28.6).',
+      '📚 <b>Phase 25.3: каталог готовых даташитов вендоров</b> в cooling. По требованию: «бесплатные шаблоны от популярных вендоров для быстрого старта».',
+      '• Кнопка «📚 Готовый даташит» в chiller-form открывает picker с фильтром по вендору. 12 примеров от Daikin / York / Carrier / Trane / Stulz / Vertiv / Generic.',
+      '• Один клик → spec заменена готовым datasheet с типичными параметрами для класса оборудования.',
+      '• Файл: <code>cooling/datasheets/index.js</code>.',
+      'Файлы: <code>shared/configurator-shell.css</code> (новый), <code>cooling/index.html</code>, <code>service/index.html</code>, <code>cooling/datasheets/index.js</code> (новый), <code>cooling/ui/chiller-form.js</code>, <code>ROADMAP.md</code>.',
+      '🛡 <b>Defensive error-handling в Service modules</b>. По репорту: «у сервис-модуля пустой sidebar (нет context picker и валюты)». Изоляция try/catch в каждом sub-render + явная error-панель если init() failed + fallback для CURRENCIES + console.error для диагностики. Если что-то падает — теперь видно красный warning в UI вместо тихо-пустого блока.',
+      'Файлы: <code>service/service.js</code>.',
+    ] },
     { version: '0.60.27', date: '2026-05-02', items: [
       '🏢 <b>«Реквизиты компании» в глобальных настройках платформы</b>. По требованию: «Реквизиты компании должны быть в настройке организации, а не в модуле Сервис».',
       '• Перенесено из <code>service/calc/company-profile.js</code> → <code>shared/company-profile.js</code> (общеплатформенный source-of-truth).',

@@ -84,7 +84,20 @@ function activeOrder() {
 // ---- Render ----
 function renderContextPicker() {
   const el = $('sv-context-picker');
-  if (!el) return;
+  if (!el) {
+    console.warn('[service] sv-context-picker не найден в DOM');
+    return;
+  }
+  try {
+    _renderContextPickerInner(el);
+  } catch (e) {
+    console.error('[service] Ошибка renderContextPicker:', e);
+    // Fallback — показать минимальный picker, чтобы не было пустого блока
+    el.innerHTML = `<div style="padding:6px;background:#fef2f2;border:1px solid #fecaca;border-radius:3px;font-size:11px;color:#b91c1c">⚠ Ошибка загрузки контекста: ${util.escHtml(e.message || String(e))}. Откройте DevTools → Console для деталей.</div>`;
+  }
+}
+
+function _renderContextPickerInner(el) {
   if (_navMode === 'embed' && _navReturn) {
     el.innerHTML = `<span title="Embed-режим: модуль вызван из «${util.escAttr(_navReturn.label)}». После работы нажмите «✓ Применить и вернуться».">🔗 Embed: вернуться в <b>${util.escHtml(_navReturn.label)}</b></span>`;
     return;
@@ -185,9 +198,10 @@ function renderOrdersList() {
 }
 
 function renderActive() {
-  renderContextPicker();
-  renderOrdersList();
-  renderModuleActionsHere();
+  // Изолируем каждый sub-render чтобы ошибка в одном не блокировала остальное
+  try { renderContextPicker(); } catch (e) { console.error('[service] renderContextPicker error:', e); }
+  try { renderOrdersList(); } catch (e) { console.error('[service] renderOrdersList error:', e); }
+  try { renderModuleActionsHere(); } catch (e) { console.error('[service] renderModuleActions error:', e); }
   const empty = $('sv-empty');
   const pane = $('sv-active-pane');
   const order = activeOrder();
@@ -278,9 +292,14 @@ async function init() {
   // Currency picker
   const curSel = $('sv-currency');
   if (curSel) {
-    curSel.innerHTML = CURRENCIES.map(c =>
-      `<option value="${c.code}"${c.code === _currency ? ' selected' : ''} title="${c.label}">${c.code} — ${c.label}</option>`
-    ).join('');
+    if (!Array.isArray(CURRENCIES) || !CURRENCIES.length) {
+      console.error('[service] CURRENCIES не загружены — fallback на default ₽');
+      curSel.innerHTML = '<option value="₽" selected>₽ — Российский рубль</option>';
+    } else {
+      curSel.innerHTML = CURRENCIES.map(c =>
+        `<option value="${c.code}"${c.code === _currency ? ' selected' : ''} title="${c.label}">${c.code} — ${c.label}</option>`
+      ).join('');
+    }
     curSel.addEventListener('change', () => {
       _currency = curSel.value || '₽';
       persist();
@@ -346,4 +365,10 @@ async function init() {
   renderActive();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init().catch(err => {
+    console.error('[service] Fatal init error:', err);
+    const el = document.getElementById('sv-context-picker');
+    if (el) el.innerHTML = `<div style="padding:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:3px;font-size:12px;color:#b91c1c">⚠ Ошибка инициализации: ${util.escHtml(err.message || String(err))}. Откройте DevTools → Console.</div>`;
+  });
+});

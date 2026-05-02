@@ -1,0 +1,365 @@
+/* =============================================================================
+   shared/configurator-shell.css — единый «вид» конфигуратора платформы Raschet
+   =============================================================================
+   По требованию Пользователя 2026-05-02: «может сделать для всех конфигураторов
+   один вид?». Общая разметка-shell для конфигураторов:
+
+     cooling/ — chiller selection
+     service/ — service orders
+     scs-design/ — SCS layout
+     scs-config/ — rack contents
+     mdc-config/ — modular DC
+     ... и т.д.
+
+   Структура:
+     <div class="rs-cfg-shell">
+       <aside class="rs-cfg-sidebar">
+         <div class="rs-cfg-context">  — picker «Контекст / Проект» сверху (опционально)
+         <div class="rs-cfg-section">  — секции с h3
+           <h3>Заголовок</h3>
+           <div class="rs-cfg-list">    — список объектов (подборы / наряды / стойки)
+             <div class="rs-cfg-list-row">...</div>
+           </div>
+       </aside>
+       <section class="rs-cfg-content">
+         <div class="rs-cfg-content-header">
+           <h2>Имя активного объекта</h2>
+           <div class="rs-cfg-content-actions">cross-links / buttons</div>
+         </div>
+         <div class="rs-cfg-focus" data-scope="selection|option">indicator</div>
+         <div class="rs-cfg-tabs">
+           <button class="rs-cfg-tab active" data-tab="...">...</button>
+         </div>
+         <div class="rs-cfg-tab-pane">...</div>
+       </section>
+     </div>
+
+   Применяется ОПЦИОНАЛЬНО — модули могут оставлять свои существующие классы
+   (cl-*/sv-*) пока. CSS rules здесь дают базовый общий вид; per-module стили
+   накладываются сверху для специфики.
+   ============================================================================ */
+
+/* Общие переменные платформы */
+:root {
+  --rs-cfg-sidebar-w: 280px;
+  --rs-cfg-bg: #f8fafc;
+  --rs-cfg-card-bg: #fff;
+  --rs-cfg-border: #e2e8f0;
+  --rs-cfg-border-strong: #cbd5e1;
+  --rs-cfg-accent: #1e40af;
+  --rs-cfg-accent-bg: #dbeafe;
+  --rs-cfg-text: #0f172a;
+  --rs-cfg-text-muted: #64748b;
+  --rs-cfg-h-color: #075985;
+  --rs-cfg-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+
+/* Главная shell-сетка: aside + content */
+.rs-cfg-shell {
+  display: grid;
+  grid-template-columns: var(--rs-cfg-sidebar-w) 1fr;
+  min-height: calc(100vh - 60px);
+  gap: 0;
+  background: var(--rs-cfg-bg);
+}
+
+/* Sidebar */
+.rs-cfg-sidebar {
+  background: var(--rs-cfg-card-bg);
+  border-right: 1px solid var(--rs-cfg-border);
+  padding: 12px;
+  position: sticky;
+  top: 60px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Контекст-блок (project picker / standalone toggle) */
+.rs-cfg-context {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rs-cfg-border);
+}
+.rs-cfg-context-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rs-cfg-text-muted);
+  margin-bottom: 3px;
+  letter-spacing: 0.3px;
+}
+.rs-cfg-context select {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--rs-cfg-border-strong);
+  border-radius: 3px;
+  font: inherit;
+  font-size: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* Секции в sidebar */
+.rs-cfg-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rs-cfg-section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rs-cfg-h-color);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+/* Список объектов в sidebar (подборы / наряды / стойки) */
+.rs-cfg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rs-cfg-list-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  background: var(--rs-cfg-card-bg);
+  border: 1px solid var(--rs-cfg-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.rs-cfg-list-row:hover {
+  background: var(--rs-cfg-bg);
+  border-color: #93c5fd;
+}
+.rs-cfg-list-row.active {
+  border-color: var(--rs-cfg-accent);
+  background: var(--rs-cfg-accent-bg);
+  box-shadow: 0 0 0 1px var(--rs-cfg-accent);
+}
+.rs-cfg-list-row .rs-cfg-list-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rs-cfg-text);
+  grid-column: 1;
+}
+.rs-cfg-list-row .rs-cfg-list-meta {
+  font-size: 11px;
+  color: var(--rs-cfg-text-muted);
+  grid-column: 1 / -1;
+}
+.rs-cfg-list-row .rs-cfg-list-actions {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  gap: 2px;
+}
+.rs-cfg-list-row .rs-cfg-list-actions button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--rs-cfg-text-muted);
+}
+.rs-cfg-list-row .rs-cfg-list-actions button:hover {
+  background: #fff;
+  border-color: var(--rs-cfg-border-strong);
+}
+
+/* Кнопки в sidebar */
+.rs-cfg-btn-primary {
+  padding: 6px 14px;
+  border: 1px solid var(--rs-cfg-accent);
+  background: var(--rs-cfg-accent);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.rs-cfg-btn-primary:hover { background: #1e3a8a; }
+.rs-cfg-btn-ghost {
+  padding: 6px 14px;
+  border: 1px solid var(--rs-cfg-border-strong);
+  background: var(--rs-cfg-card-bg);
+  color: var(--rs-cfg-accent);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+}
+.rs-cfg-btn-ghost:hover {
+  background: #f0f9ff;
+  border-color: #93c5fd;
+}
+
+/* Content area */
+.rs-cfg-content {
+  padding: 16px 20px;
+  max-width: 1400px;
+}
+.rs-cfg-content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.rs-cfg-content-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--rs-cfg-text);
+}
+.rs-cfg-content-meta {
+  font-size: 12px;
+  color: var(--rs-cfg-text-muted);
+  margin-top: 2px;
+}
+.rs-cfg-content-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+  font-size: 12px;
+}
+
+/* Focus indicator (selection vs option scope) */
+.rs-cfg-focus {
+  margin: 0 0 8px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  border-left: 3px solid;
+}
+.rs-cfg-focus[data-scope="selection"] {
+  background: #fef3c7;
+  border-color: #fcd34d;
+  color: #78350f;
+  border-left-color: #f59e0b;
+}
+.rs-cfg-focus[data-scope="option"] {
+  background: var(--rs-cfg-accent-bg);
+  border-color: #93c5fd;
+  color: #1e3a8a;
+  border-left-color: #2563eb;
+}
+
+/* Tabs */
+.rs-cfg-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 2px solid var(--rs-cfg-border);
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+.rs-cfg-tab {
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--rs-cfg-text-muted);
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+.rs-cfg-tab:hover {
+  background: var(--rs-cfg-bg);
+  color: var(--rs-cfg-text);
+}
+.rs-cfg-tab.active {
+  color: var(--rs-cfg-accent);
+  background: var(--rs-cfg-card-bg);
+  border-color: var(--rs-cfg-border);
+  border-bottom: 2px solid var(--rs-cfg-card-bg);
+  margin-bottom: -2px;
+  font-weight: 600;
+}
+
+/* Tab pane */
+.rs-cfg-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rs-cfg-card {
+  background: var(--rs-cfg-card-bg);
+  border: 1px solid var(--rs-cfg-border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  box-shadow: var(--rs-cfg-shadow);
+}
+.rs-cfg-card h3 {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rs-cfg-h-color);
+}
+.rs-cfg-card h4 {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--rs-cfg-h-color);
+}
+
+/* Empty state */
+.rs-cfg-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  color: var(--rs-cfg-text-muted);
+  text-align: center;
+}
+.rs-cfg-empty h3 {
+  margin: 0 0 4px;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* Утилитарные */
+.rs-cfg-muted { color: var(--rs-cfg-text-muted); font-size: 11.5px; }
+.rs-cfg-hint {
+  padding: 6px 10px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-left: 3px solid #f59e0b;
+  border-radius: 3px;
+  font-size: 11.5px;
+  color: #78350f;
+}
+.rs-cfg-info-box {
+  padding: 6px 10px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 3px;
+  font-size: 11.5px;
+  color: #0c4a6e;
+}
+
+/* Адаптив для узких экранов */
+@media (max-width: 900px) {
+  .rs-cfg-shell {
+    grid-template-columns: 1fr;
+  }
+  .rs-cfg-sidebar {
+    position: static;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--rs-cfg-border);
+  }
+}
