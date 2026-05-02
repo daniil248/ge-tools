@@ -43,14 +43,18 @@ function maintenancePriceFor(spec) {
  * Построить позиции МОНТАЖНОГО наряда из cooling-варианта.
  * - Каждая equipment-группа → одна позиция «Монтаж: <spec.name>» с qty из топологии.
  * - Дополнительно: ПНР, опрессовка, заправка хладагента.
+ * - v0.60.45: каждая позиция помечена sourceModule='cooling' + sourceRef для
+ *   дедупа повторных импортов (см. feedback_service_imports.md).
  *
+ * @param {object} sel          — cooling selection (для sourceRef.selectionId)
  * @param {object} option       — cooling option (с equipment[])
  * @param {string} displayCurrency
  * @returns {Array<object>} positions[]
  */
-export function buildInstallPositionsFromCoolingOption(option, displayCurrency = '₽') {
+export function buildInstallPositionsFromCoolingOption(option, displayCurrency = '₽', sel = null) {
   const positions = [];
   const equipment = Array.isArray(option?.equipment) ? option.equipment : [];
+  const baseRef = { selectionId: sel?.id || null, optionId: option?.id || null };
   for (const eq of equipment) {
     if (!eq.spec) continue;
     const qty = Number(eq.qty) || 1;
@@ -64,6 +68,8 @@ export function buildInstallPositionsFromCoolingOption(option, displayCurrency =
       unit: 'комплект',
       costPrice:   { value: p.cost,   currency: '₽' },
       clientPrice: { value: p.client, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, equipmentGroupId: eq.id, kind: 'install-equipment' },
     });
   }
   if (positions.length) {
@@ -73,6 +79,8 @@ export function buildInstallPositionsFromCoolingOption(option, displayCurrency =
       category: 'labor', qty: 1, unit: 'комплект',
       costPrice:   { value: 12000, currency: '₽' },
       clientPrice: { value: 22000, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, kind: 'install-pressure-test' },
     });
     positions.push({
       ...defaultPosition(displayCurrency),
@@ -80,6 +88,8 @@ export function buildInstallPositionsFromCoolingOption(option, displayCurrency =
       category: 'material', qty: 5, unit: 'кг',
       costPrice:   { value: 3500, currency: '₽' },
       clientPrice: { value: 5500, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, kind: 'install-refrigerant' },
     });
     positions.push({
       ...defaultPosition(displayCurrency),
@@ -87,6 +97,8 @@ export function buildInstallPositionsFromCoolingOption(option, displayCurrency =
       category: 'labor', qty: 1, unit: 'комплект',
       costPrice:   { value: 25000, currency: '₽' },
       clientPrice: { value: 45000, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, kind: 'install-pnr' },
     });
   }
   return positions;
@@ -96,9 +108,10 @@ export function buildInstallPositionsFromCoolingOption(option, displayCurrency =
  * Построить позиции наряда ТО (регламент) из cooling-варианта.
  * - Каждая chiller-группа → одна позиция «ТО квартальное» с qty=4 (4 раза в год) × Σ qty группы.
  */
-export function buildMaintenancePositionsFromCoolingOption(option, displayCurrency = '₽') {
+export function buildMaintenancePositionsFromCoolingOption(option, displayCurrency = '₽', sel = null) {
   const positions = [];
   const equipment = Array.isArray(option?.equipment) ? option.equipment : [];
+  const baseRef = { selectionId: sel?.id || null, optionId: option?.id || null };
   for (const eq of equipment) {
     if (!eq.spec) continue;
     const qty = Number(eq.qty) || 1;
@@ -111,6 +124,8 @@ export function buildMaintenancePositionsFromCoolingOption(option, displayCurren
       unit: 'выезд',
       costPrice:   { value: p.cost,   currency: '₽' },
       clientPrice: { value: p.client, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, equipmentGroupId: eq.id, kind: 'maint-equipment' },
     });
   }
   if (positions.length) {
@@ -120,6 +135,8 @@ export function buildMaintenancePositionsFromCoolingOption(option, displayCurren
       category: 'material', qty: equipment.reduce((s, e) => s + (Number(e.qty) || 1), 0) * 4, unit: 'шт',
       costPrice:   { value: 1200, currency: '₽' },
       clientPrice: { value: 2000, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, kind: 'maint-filters' },
     });
     positions.push({
       ...defaultPosition(displayCurrency),
@@ -127,6 +144,8 @@ export function buildMaintenancePositionsFromCoolingOption(option, displayCurren
       category: 'material', qty: 2, unit: 'кг',
       costPrice:   { value: 4000, currency: '₽' },
       clientPrice: { value: 6500, currency: '₽' },
+      sourceModule: 'cooling',
+      sourceRef: { ...baseRef, kind: 'maint-refrigerant' },
     });
   }
   return positions;

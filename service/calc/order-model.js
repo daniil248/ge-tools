@@ -82,8 +82,34 @@ export function defaultPosition(displayCurrency = '₽') {
     unit: 'ч',
     costPrice:   { value: 0, currency: displayCurrency },
     clientPrice: { value: 0, currency: displayCurrency },
+    // v0.60.45 (feedback_service_imports.md): источник позиции для дедупа
+    // повторных импортов и визуального маркера. null/undefined = пользовательская.
+    sourceModule: null,    // 'cooling' | 'ups-config' | 'mdc-config' | 'dgu-config' | ...
+    sourceRef: null,       // {selectionId, optionId, equipmentGroupId, ...} — module-specific
   };
 }
+
+/** Иконки источников для визуального маркера в таблице позиций. */
+export const SOURCE_MODULE_ICONS = {
+  'cooling':            '❄',
+  'ups-config':         '🔋',
+  'mdc-config':         '🏗',
+  'dgu-config':         '⚡',
+  'panel-config':       '⚙',
+  'transformer-config': '🔌',
+  'scs-config':         '🌐',
+};
+
+/** Человекочитаемое название модуля-источника. */
+export const SOURCE_MODULE_LABELS = {
+  'cooling':            'Подбор холодильных систем',
+  'ups-config':         'Конфигурация ИБП',
+  'mdc-config':         'Модульный ЦОД',
+  'dgu-config':         'Дизель-генератор',
+  'panel-config':       'Конфигурация щита',
+  'transformer-config': 'Конфигурация трансформатора',
+  'scs-config':         'Структурированная кабельная система',
+};
 
 /**
  * Подсчитать суммы наряда в displayCurrency с per-cell конвертацией.

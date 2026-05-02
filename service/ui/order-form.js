@@ -7,6 +7,7 @@
 import {
   DEFAULT_ORDER, ORDER_TYPES, POSITION_CATEGORIES, UNITS,
   defaultPosition, computeOrderTotals, CURRENCIES,
+  SOURCE_MODULE_ICONS, SOURCE_MODULE_LABELS,
 } from '../calc/order-model.js';
 import { listTemplates } from '../catalog/work-templates.js';
 import {
@@ -186,18 +187,34 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
       const builderFn = (o.type === 'maintenance')
         ? buildMaintenancePositionsFromCoolingOption
         : buildInstallPositionsFromCoolingOption;
-      const newPositions = builderFn(result.option, displayCurrency);
+      const newPositions = builderFn(result.option, displayCurrency, result.selection);
       if (!newPositions.length) {
         toast('У выбранной опции нет equipment-групп. Сначала задайте оборудование во вкладке Топология.', 'err');
         return;
       }
-      const next = {
-        ...o,
-        coolingSelectionId: result.selection.id,
-        positions: [...o.positions, ...newPositions],
-      };
-      onChange(next);
-      toast(`Добавлено ${newPositions.length} позиций из «${result.selection.name} → ${result.option.name}»`, 'ok');
+      // v0.60.45 (feedback_service_imports.md): дедуп. Если уже есть позиции
+      // с тем же sourceModule='cooling' + sourceRef.optionId — спросить про
+      // обновление вместо дублирования.
+      const existingFromSameSource = (o.positions || []).filter(p =>
+        p.sourceModule === 'cooling' && p.sourceRef?.optionId === result.option.id
+      );
+      let positions;
+      if (existingFromSameSource.length > 0) {
+        const ok = await confirmOverwrite(
+          `Уже есть ${existingFromSameSource.length} позиций, импортированных из «${result.selection.name} → ${result.option.name}». Обновить (удалить старые и добавить актуальные с qty из текущей топологии)?`
+        );
+        if (!ok) return;
+        // Удаляем старые из этого источника и добавляем новые
+        positions = (o.positions || []).filter(p =>
+          !(p.sourceModule === 'cooling' && p.sourceRef?.optionId === result.option.id)
+        );
+        positions.push(...newPositions);
+        toast(`✓ Обновлено: удалено ${existingFromSameSource.length}, добавлено ${newPositions.length} позиций`, 'ok');
+      } else {
+        positions = [...(o.positions || []), ...newPositions];
+        toast(`✓ Добавлено ${newPositions.length} позиций из «${result.selection.name} → ${result.option.name}»`, 'ok');
+      }
+      onChange({ ...o, coolingSelectionId: result.selection.id, positions });
       return;
     }
     const del = ev.target.closest('.sv-pos-del');
@@ -228,9 +245,26 @@ function renderPositionsTable(positions, displayCurrency) {
     return '<p class="muted" style="margin:0;padding:10px;text-align:center">Нет позиций. Добавьте через «+ Позиция» или «📚 Из шаблонов».</p>';
   }
 
-  const rows = positions.map((p, i) => `
-    <tr data-pos="${i}">
-      <td><input type="text" class="sv-pos-label" data-attr="label" value="${escAttr(p.label || '')}" placeholder="Описание работы / материала" title="Описание позиции"></td>
+  const rows = positions.map((p, i) => {
+    // v0.60.45: иконка источника позиции (cooling/ups/mdc/...) с tooltip
+    const srcIcon = p.sourceModule ? SOURCE_MODULE_ICONS[p.sourceModule] : '';
+    const srcLabel = p.sourceModule ? SOURCE_MODULE_LABELS[p.sourceModule] : '';
+    const srcTitle = p.sourceModule
+      ? `Источник: ${srcIcon} ${srcLabel}. При повторном импорте из этого источника позиция будет ОБНОВЛЕНА (не дублирована).`
+      : 'Пользовательская позиция (без источника). Не затрагивается при импорте из модулей.';
+    const srcMarker = `<span class="sv-pos-src" title="${escAttr(srcTitle)}" style="display:inline-block;width:18px;text-align:center;cursor:help;font-size:13px;flex-shrink:0">${srcIcon || '✏'}</span>`;
+    return `<tr data-pos="${i}">
+      <td><span style="display:flex;align-items:center;gap:4px">${srcMarker}<input type="text" class="sv-pos-label" data-attr="label" value="${escAttr(p.label || '')}" placeholder="Описание работы / материала" title="Описание позиции" style="flex:1;min-width:0"></span></td>
+      <td><select class="sv-pos-cat" data-attr="category" title="Категория позиции">${catOpts(p.category)}</select></td>
+      <td><input type="number" min="0" step="0.5" class="sv-pos-qty" data-attr="qty" value="${Number(p.qty) || 1}" title="Количество"></td>
+      <td><select class="sv-pos-unit" data-attr="unit" title="Единица измерения">${unitOpts(p.unit)}</select></td>
+      <td><input type="number" min="0" step="100" class="sv-pos-val" data-col="costPrice" data-attr="value" value="${Number(p.costPrice?.value) || 0}" title="Себестоимость одной единицы"></td>
+      <td><select class="sv-pos-cur" data-col="costPrice" data-attr="currency" title="Валюта себестоимости">${curOpts(p.costPrice?.currency || displayCurrency)}</select></td>
+      <td><input type="number" min="0" step="100" class="sv-pos-val" data-col="clientPrice" data-attr="value" value="${Number(p.clientPrice?.value) || 0}" title="Цена для клиента за единицу"></td>
+      <td><select class="sv-pos-cur" data-col="clientPrice" data-attr="currency" title="Валюта клиент-цены">${curOpts(p.clientPrice?.currency || displayCurrency)}</select></td>
+      <td><button type="button" class="sv-pos-del" title="Удалить позицию">×</button></td>
+    </tr>`;
+  }).join('');
       <td><select class="sv-pos-cat" data-attr="category" title="Категория позиции">${catOpts(p.category)}</select></td>
       <td><input type="number" min="0" step="0.5" class="sv-pos-qty" data-attr="qty" value="${Number(p.qty) || 1}" title="Количество"></td>
       <td><select class="sv-pos-unit" data-attr="unit" title="Единица измерения">${unitOpts(p.unit)}</select></td>
@@ -339,6 +373,16 @@ function setByPath(obj, path, val) {
   }
   cur[parts[parts.length - 1]] = val;
   return obj;
+}
+
+/* v0.60.45: in-page confirm для перезаписи импортированных позиций. */
+async function confirmOverwrite(msg) {
+  const result = await modalOpen(
+    '<h3>⚠ Подтверждение перезаписи</h3>',
+    `<p style="font-size:13px">${escHtml(msg)}</p><p class="muted" style="font-size:11.5px;margin-top:8px">Свободные (пользовательские) позиции и позиции из ДРУГИХ источников НЕ затрагиваются.</p>`,
+    async () => ({ ok: true })
+  );
+  return !!result;
 }
 
 async function pickCoolingOptionModal(orderType, displayCurrency) {
