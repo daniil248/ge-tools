@@ -164,6 +164,11 @@
           <span class="desc">Психрометрический расчёт влажного воздуха (ASHRAE 2021). HVAC-процессы.</span>
           <span class="meta"><span class="tag standalone">standalone</span><span class="tag draft">draft</span></span>
         </a>
+        <a class="mod-card" href="../service/">
+          <span class="title">Сервис: монтаж и ТО</span>
+          <span class="desc">Расчёт стоимости монтажа и техобслуживания. Себес + клиент-цена с маржой и НДС. Импорт работ из cooling-подборов. Per-cell валюты. Каталог типовых работ. Экспорт КП.</span>
+          <span class="meta"><span class="tag standalone">standalone</span></span>
+        </a>
       </div>
     </div>
 
@@ -234,6 +239,103 @@
           <span class="meta"><span class="tag dev">dev</span></span>
         </a>
       </div>
+    </div>
+
+    <!-- v0.60.43: полный технический список модулей (включая без UI).
+         По правилу memory/feedback_modules_index.md — обязателен. -->
+    <div class="mod-section">
+      <h2>📚 Все модули платформы (технический реестр)</h2>
+      <p class="muted" style="font-size:12px;margin:0 0 10px;color:#475569">
+        Полный список ВСЕХ модулей репозитория, включая модули без UI (calc, plugins, каталоги, shared-инфраструктура). Используется для navigate-в-код и audit-полноты регистрации.
+      </p>
+
+      <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Standalone-модули с UI (production)</h3>
+      <ul class="muted" style="font-size:12px;column-count:2;column-gap:24px;margin:0;padding-left:18px">
+        <li><code>projects/</code> — Управление проектами</li>
+        <li><code>schematic/</code> — Схема электроснабжения</li>
+        <li><code>cable/</code> — Расчёт кабельной линии</li>
+        <li><code>battery/</code> — Подбор АКБ для ИБП</li>
+        <li><code>ups-config/</code> — Конфигурация ИБП</li>
+        <li><code>panel-config/</code> — Конфигурация щита</li>
+        <li><code>mv-config/</code> — Конфигурация РУ СН</li>
+        <li><code>transformer-config/</code> — Конфигурация трансформатора</li>
+        <li><code>tech-workspace/</code> — Технолог ЦОД (PUE, концепция)</li>
+        <li><code>mdc-config/</code> — Конфигурация MDC (микро-ЦОД)</li>
+        <li><code>rack-config/</code> — Конфигурация стойки</li>
+        <li><code>scs-config/</code> — Содержимое шкафов и IT-реестр</li>
+        <li><code>scs-design/</code> — Проектирование СКС (план, связи)</li>
+        <li><code>pdu-config/</code> — Конфигурация PDU</li>
+        <li><code>facility-inventory/</code> — Не-IT инвентарь объекта</li>
+        <li><code>meteo/</code> — Метеоданные</li>
+        <li><code>cooling/</code> — Подбор холодильных систем</li>
+        <li><code>psychrometrics/</code> — ID-диаграмма Молье-Рамзина</li>
+        <li><code>service/</code> — Сервис: монтаж и ТО</li>
+        <li><code>suppression-config/</code> — Газовое пожаротушение</li>
+        <li><code>catalog/</code> — Каталог изделий</li>
+        <li><code>logistics/</code> — Рабочее место логиста</li>
+        <li><code>reports/</code> — Шаблоны отчётов</li>
+        <li><code>help/</code> — Справочный центр</li>
+        <li><code>modules/</code> — Этот реестр модулей</li>
+      </ul>
+
+      <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Dev / экспериментальные с UI</h3>
+      <ul class="muted" style="font-size:12px;column-count:2;column-gap:24px;margin:0;padding-left:18px">
+        <li><code>dev/por-playground.html</code> — POR Playground (project objects)</li>
+        <li><code>elements/</code> — Element-library editor</li>
+        <li><code>configurator3d/</code> — 3D-конфигуратор шкафа</li>
+      </ul>
+
+      <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Calc-библиотеки (без UI, переиспользуются модулями)</h3>
+      <ul class="muted" style="font-size:12px;column-count:2;column-gap:24px;margin:0;padding-left:18px">
+        <li><code>cooling/calc/</code> — chiller-bin-calc, capex-tco, fc-summary, topology, comparison, datasheet, psychro-formulas, chiller-defaults</li>
+        <li><code>cooling/datasheets/</code> — каталог даташитов вендоров (Daikin/York/Carrier/Trane/Stulz/Vertiv)</li>
+        <li><code>cooling/ui/</code> — UI-компоненты cooling (chiller-form, capex-form, topology-view, comparison-view, energy-chart)</li>
+        <li><code>service/calc/</code> — order-model, order-builder, export-offer</li>
+        <li><code>service/catalog/</code> — work-templates (типовые работы)</li>
+        <li><code>service/ui/</code> — order-form, work-catalog</li>
+        <li><code>js/calc/</code> — hvac-derate, прочие электрические калькуляторы</li>
+        <li><code>js/engine/</code> — constants, inspector, ports, render</li>
+        <li><code>shared/report/</code> — template, blocks, preview, editor, export-pdf, export-docx, picker</li>
+      </ul>
+
+      <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Shared-инфраструктура (cross-module)</h3>
+      <ul class="muted" style="font-size:12px;column-count:2;column-gap:24px;margin:0;padding-left:18px">
+        <li><code>shared/project-storage.js</code> — управление проектами + LS-namespace</li>
+        <li><code>shared/project-context.js</code> — навигация между модулями с контекстом проекта</li>
+        <li><code>shared/module-nav.js</code> — embed-pattern, return-buttons, cross-links</li>
+        <li><code>shared/element-library.js</code> — общая библиотека изделий</li>
+        <li><code>shared/global-settings.js</code> — модалка глобальных настроек (⚙)</li>
+        <li><code>shared/company-profile.js</code> — реквизиты организации (global + project override)</li>
+        <li><code>shared/currency-rates/</code> — курсы валют (НБ РК / ЦБ РФ / Frankfurter / open.er-api)</li>
+        <li><code>shared/meteo-fetch.js</code> — auto-fetch meteo по координатам проекта (Open-Meteo)</li>
+        <li><code>shared/service-bridge.js</code> — создание service-нарядов из других модулей</li>
+        <li><code>shared/auth-gate.js</code> — авторизация / cloud sync</li>
+        <li><code>shared/backup.js</code> — авто-бэкап в выбранную папку (File System Access API)</li>
+        <li><code>shared/wheel-zoom.js</code> — Ctrl+wheel zoom (для всех canvas-модулей)</li>
+        <li><code>shared/help-panel.js</code> — встроенная справка модуля (❓)</li>
+        <li><code>shared/app-header.js</code> — единая шапка модулей (🏠 Raschet)</li>
+        <li><code>shared/module-footer.js</code> — единый футер с changelog (📋 v.X.Y.Z)</li>
+        <li><code>shared/module-changelogs.js</code> — централизованный changelog всех модулей</li>
+        <li><code>shared/configurator-shell.css</code> — единый CSS-shell конфигураторов</li>
+      </ul>
+
+      <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Plugins (расширяемые источники данных)</h3>
+      <ul class="muted" style="font-size:12px;column-count:2;column-gap:24px;margin:0;padding-left:18px">
+        <li><code>meteo/sources/open-meteo.js</code> — Open-Meteo Historical API</li>
+        <li><code>meteo/sources/rp5.js</code> — rp5.kz / rp5.ru CSV-импорт</li>
+        <li><code>meteo/sources/ashrae.js</code> — ASHRAE design conditions</li>
+        <li><code>meteo/sources/csv.js</code> — универсальный CSV/TSV</li>
+        <li><code>shared/currency-rates/sources/nbk-rk.js</code> — НБ Казахстана</li>
+        <li><code>shared/currency-rates/sources/cbr-rf.js</code> — ЦБ России</li>
+        <li><code>shared/currency-rates/sources/nbu-ua.js</code> — НБ Украины</li>
+        <li><code>shared/currency-rates/sources/nbrb-by.js</code> — НБ Беларуси</li>
+        <li><code>shared/currency-rates/sources/frankfurter.js</code> — ECB через Frankfurter</li>
+        <li><code>shared/currency-rates/sources/exchangerate-host.js</code> — open.er-api.com</li>
+      </ul>
+
+      <p class="muted" style="font-size:11px;margin-top:12px;color:#94a3b8">
+        💡 Правило: при создании нового модуля — обязательно добавить карточку в одну из секций выше + строку в этот технический список (правило <code>feedback_modules_index.md</code>).
+      </p>
     </div>
   </main>
 </body>

@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.43', date: '2026-05-02', items: [
+      '📚 <b>/modules/ — добавлен Service + полный технический реестр</b>. По требованию: «здесь должны быть абсолютно все модули у которых есть интерфейс. Так же отдельно нужно добавить список всех модулей, даже без интерфейса».',
+      '• Карточка «Сервис: монтаж и ТО» добавлена в секцию ❄ Климат и охлаждение (раньше была только в hub.html — нарушение).',
+      '• Новая секция «📚 Все модули платформы (технический реестр)» внизу страницы — полный список:',
+      '  → Standalone-модули с UI (25+ модулей: projects, schematic, cable, battery, ups-config, panel-config, mv-config, transformer-config, tech-workspace, mdc-config, rack-config, scs-config, scs-design, pdu-config, facility-inventory, meteo, cooling, psychrometrics, service, suppression-config, catalog, logistics, reports, help, modules)',
+      '  → Dev / экспериментальные с UI (3 модуля)',
+      '  → Calc-библиотеки без UI (cooling/calc, cooling/datasheets, cooling/ui, service/calc, service/catalog, service/ui, js/calc, js/engine, shared/report)',
+      '  → Shared-инфраструктура (17 модулей: project-storage, module-nav, element-library, global-settings, company-profile, currency-rates, meteo-fetch, service-bridge, auth-gate, backup, wheel-zoom, help-panel, app-header, module-footer, module-changelogs, configurator-shell)',
+      '  → Plugins (4 meteo + 6 currency-sources)',
+      '📋 <b>Архитектурное правило (запомнено)</b>: «при создании нового модуля — обязательно добавить карточку в /modules/ + строку в технический реестр». См. <code>memory/feedback_modules_index.md</code>.',
+      'Файлы: <code>modules/index.html</code>.',
+    ] },
     { version: '0.60.42', date: '2026-05-02', items: [
       '📚 <b>Phase 24.2 UI: каталог типовых работ в Service</b>. Кнопка «📚 Открыть каталог» в сайдбаре service-модуля → модалка с CRUD пользовательских шаблонов работ.',
       '• Tabs по типу наряда (Монтаж / ТО / Разовая) — фильтрация шаблонов.',
