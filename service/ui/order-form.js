@@ -13,6 +13,7 @@ import {
   buildMaintenancePositionsFromCoolingOption,
   loadCoolingSelectionsForContext,
 } from '../calc/order-builder.js';
+import { openOfferPreview } from '../calc/export-offer.js';
 import { fmtMoney } from '../../cooling/calc/fc-summary.js';
 import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
 
@@ -119,6 +120,18 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
       <div class="sv-section-title" title="Свободные примечания к наряду (детали договора, условия гарантии, контактное лицо).">📝 Примечания</div>
       <textarea data-of="notes" rows="3" style="width:100%" placeholder="Дополнительная информация, условия, гарантии...">${escHtml(o.notes || '')}</textarea>
     </div>
+
+    <div class="sv-section">
+      <div class="sv-section-title" title="Экспорт коммерческого предложения для отправки клиенту. Открывается в новом окне, дальше Ctrl+P → Сохранить как PDF.">📤 Экспорт КП клиенту</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button type="button" class="sv-btn-primary" id="sv-export-offer"
+                title="Открыть КП в новом окне для печати или сохранения как PDF. Содержит шапку, состав работ по разделам, итоги с НДС, место для подписей.">📄 Открыть КП (для печати/PDF)</button>
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#475569"
+               title="Если включено — в КП показывается дополнительная служебная колонка «Себес/ед» и блок маржи. НЕ отправляйте клиенту в таком виде! Выключите перед финальной отправкой.">
+          <input type="checkbox" id="sv-show-cost"> показать себес+маржу (служебно)
+        </label>
+      </div>
+    </div>
   `;
 
   wrap.addEventListener('input', (ev) => {
@@ -150,6 +163,17 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
       if (tpl) {
         const next = { ...o, positions: [...o.positions, tpl] };
         onChange(next);
+      }
+      return;
+    }
+    if (ev.target.closest('#sv-export-offer')) {
+      const overlay = wrap;  // closure не имеет доступа к wrap из click? используем DOM
+      const showCost = document.getElementById('sv-show-cost')?.checked || false;
+      try {
+        openOfferPreview(o, displayCurrency, convertFn, { showCostBreakdown: showCost });
+        toast('КП открыто в новом окне. Ctrl+P → Сохранить как PDF.', 'ok');
+      } catch (err) {
+        toast(err.message || 'Не удалось открыть КП', 'err');
       }
       return;
     }
