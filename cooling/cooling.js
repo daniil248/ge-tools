@@ -46,7 +46,7 @@ import { CURRENCIES, currencyToIso } from './calc/fc-summary.js';
 import { open as openRatesDialog } from '../shared/currency-rates/rates-dialog.js';
 import { fetchRates, convert as convertRate } from '../shared/currency-rates/index.js';
 import '../shared/currency-rates/sources/index.js';
-import { detectNavMode, renderModuleActions } from '../shared/module-nav.js';
+import { detectNavMode, renderModuleActions, openEmbed, readEmbedResult } from '../shared/module-nav.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -654,6 +654,36 @@ function init() {
     ratesBtn.addEventListener('click', () => {
       openRatesDialog();
     });
+  }
+
+  // v0.60.1: «📅 Открыть Метеоданные →» в EMBED-режиме.
+  // По требованию: «я так и не смог перейти в модуль Метеоданные и
+  // вернуться с выбором другого местоположения».
+  const openMeteoBtn = $('cl-open-meteo');
+  if (openMeteoBtn) {
+    openMeteoBtn.addEventListener('click', () => {
+      // openEmbed: записывает return URL+sessionId в URL → location.href
+      // редиректит в /meteo/?return=...&returnSession=...&returnLabel=Cooling
+      openEmbed(location.pathname, '../meteo/', 'Подбор холодильных систем');
+    });
+  }
+
+  // v0.60.1: при возврате из embed-меteo — применить выбранный датасет.
+  // readEmbedResult() читает payload из LS-bridge и удаляет ключ.
+  const embedResult = readEmbedResult();
+  if (embedResult && embedResult.datasetId) {
+    util.toast(`✔ Получено из Метеоданных: ${embedResult.datasetName || embedResult.datasetId}${embedResult.locationName ? ` (${embedResult.locationName})` : ''}`, 'ok');
+    // Активный датасет meteo переключается через project-storage. Найдём
+    // и пометим ⭐ для проекта (тогда meteo-bridge.getActiveMeteoDataset
+    // на следующем чтении вернёт этот датасет).
+    try {
+      const KEY_META_DATA = ['meteo', 'datasets.v1'];
+      const KEY_META_ACTIVE = ['meteo', 'activeId.v1'];
+      const datasets = JSON.parse(localStorage.getItem(projectKey(_pid, ...KEY_META_DATA)) || '[]');
+      for (const d of datasets) d.activeForProject = (d.id === embedResult.datasetId);
+      localStorage.setItem(projectKey(_pid, ...KEY_META_DATA), JSON.stringify(datasets));
+      localStorage.setItem(projectKey(_pid, ...KEY_META_ACTIVE), JSON.stringify(embedResult.datasetId));
+    } catch {}
   }
 
   // Tab navigation

@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.1', date: '2026-05-02', items: [
+      '🔥 <b>Cooling: горячий vs холодный резерв чиллеров</b>. По требованию: «чиллеры могут быть как в горячем резерве, то есть работают вместе, так и в холодном резерве, когда оборудование полностью отключено».',
+      '• Новое поле <code>standbyMode: cold | hot</code> в topology config.',
+      '• <b>Холодный</b> (default): резерв полностью off, energy=0. Активны только N чиллеров, каждый берёт load/N.',
+      '• <b>Горячий</b>: резерв работает параллельно с активными. Активны все N+M, каждый берёт load/(N+M) — ниже part-load на каждом + быстрый failover.',
+      '• Per-equipment таблица: новые kind <code>chiller-hot-standby</code> (🔥 «горячий резерв», нагрузка > 0) и <code>chiller-cold-standby</code> (⏸ «холодный резерв», energy=0).',
+      '🔄 <b>Meteo ↔ Cooling embed-flow: возврат с выбранным датасетом</b>. По требованию: «я так и не смог перейти в модуль Метеоданные и вернуться с выбором другого местоположения».',
+      '• «📅 Открыть Метеоданные →» в cooling-sidebar теперь вызывает <code>openEmbed()</code>. URL meteo получает <code>?return=...&returnSession=...&returnLabel=Подбор холодильных систем</code>.',
+      '• В meteo появляются кнопки «✓ Применить и вернуться» / «✗ Отмена» в content-header.',
+      '• При Apply: payload (datasetId/name/locationName/lat/lon/dates) пишется в LS-bridge, redirect назад.',
+      '• Cooling на возврате через <code>readEmbedResult()</code> читает payload, помечает выбранный датасет как ⭐ для проекта, перерендеривает.',
+      'Файлы: <code>cooling/calc/topology.js</code> (standbyMode + ACTIVE_COUNT), <code>cooling/ui/topology-view.js</code> (selector «Режим резерва» + новые kind labels), <code>cooling/index.html</code> (button cl-open-meteo), <code>cooling/cooling.js</code> (openEmbed + readEmbedResult handlers).',
+    ] },
     { version: '0.60.0', date: '2026-05-02', items: [
       '🔢 <b>Версия 0.60</b>. По требованию Пользователя — переход с длинного 0.59.1001 на компактное 0.60.0 (sub-version reset).',
       '💱 <b>Per-field currency: каждая цена в своей валюте + дата курса</b>. По требованию: «при вводе любой цены, пользователь может выбрать в какой валюте; при замене валюты, цена пересчитывается по курсу на выбранную дату; в отчётах выводим в валюте проекта».',

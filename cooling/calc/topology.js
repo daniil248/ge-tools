@@ -53,8 +53,15 @@ export const DEFAULT_TOPOLOGY = {
   chillers: [],
   cracs: [],
   loopMode: 'common-loop',
-  redundancyN: 1,
-  redundancyM: 0,
+  redundancyN: 1,        // штатно работающих чиллеров
+  redundancyM: 0,        // в резерве (всего N+M в системе)
+  // v0.60.1: режим резерва (по требованию Пользователя):
+  //   'cold' — резерв полностью отключён, energy=0, ждёт failover.
+  //            Активные = N, каждый берёт load/N.
+  //   'hot'  — резерв работает параллельно с активными, делит нагрузку.
+  //            Активные = N+M, каждый берёт load/(N+M) → ниже part-load
+  //            на каждом + быстрый failover без ramp-up.
+  standbyMode: 'cold',
 };
 
 /**
@@ -62,7 +69,7 @@ export const DEFAULT_TOPOLOGY = {
  * (chiller/dx-air/dx-pumped-fc) → chillers. Опции с kind='crac' → cracs.
  * Используется для лёгкой интеграции с существующей моделью selections.
  */
-export function buildTopologyFromOptions(options, loopMode = 'common-loop', redundancyN = 1, redundancyM = 0) {
+export function buildTopologyFromOptions(options, loopMode = 'common-loop', redundancyN = 1, redundancyM = 0, standbyMode = 'cold') {
   const chillers = [];
   const cracs = [];
   for (const opt of options || []) {
@@ -70,7 +77,7 @@ export function buildTopologyFromOptions(options, loopMode = 'common-loop', redu
     if (isCracType(sysType)) cracs.push(opt);
     else chillers.push(opt);
   }
-  return { chillers, cracs, loopMode, redundancyN: Math.max(1, redundancyN), redundancyM };
+  return { chillers, cracs, loopMode, redundancyN: Math.max(1, redundancyN), redundancyM, standbyMode };
 }
 
 /**
@@ -85,6 +92,11 @@ export function simulateTopology(topo, hourly) {
     return { totalEnergyKwh: 0, totalCoolingKw: 0, perEquipment: [], bins: [] };
   }
   const N = Math.max(1, topo.redundancyN || 1);
+  const M = Math.max(0, topo.redundancyM || 0);
+  const standbyMode = topo.standbyMode || 'cold';
+  // v0.60.1: горячий резерв = резервы работают параллельно с активными,
+  //   делят нагрузку (всего N+M активных). Холодный = только N.
+  const ACTIVE_COUNT = standbyMode === 'hot' ? (N + M) : N;
 
   // Сначала считаем bin-данные для CRAC (чтобы получить cracCoolingLoadKw на чиллер).
   const cracPerEquipment = (topo.cracs || []).map(crac => {
@@ -113,35 +125,32 @@ export function simulateTopology(topo, hourly) {
   // Теперь для каждого чиллера: распределяем нагрузку (equally между N штатных).
   // Важно: сохраняем оригинальную capacity-долю в каждом интервале через scaling.
   const chillersList = (topo.chillers || []);
-  const activeChillers = chillersList.slice(0, N);   // первые N штатно работают
-  const standbyChillers = chillersList.slice(N);     // остальные — резерв
+  // v0.60.1: при горячем резерве работают все N+M; при холодном — только N.
+  const workingChillers = chillersList.slice(0, ACTIVE_COUNT);
+  const coldStandbyChillers = chillersList.slice(ACTIVE_COUNT);
 
-  const chillerPerEquipment = activeChillers.map(ch => {
+  const chillerPerEquipment = workingChillers.map((ch, idx) => {
     let energyKwh = 0;
     let peakKw = 0;
     for (const bin of chillerBins) {
-      // Доля этого чиллера = 1/N (равномерное распределение по active).
-      const sharedLoad = bin.load / N;
-      // Создаём виртуальный row с capacity = sharedLoad (вместо ratedCap).
-      // Используем applyChillerCalc для интервального расчёта со спецификой именно этого чиллера.
-      // Подменяем ratedCapKw временно на sharedLoad для корректного COP/power.
-      const tempSpec = { ...ch.spec, ratedCapKw: ch.spec.ratedCapKw };  // оставляем оригинал
+      // Доля каждого работающего чиллера = 1 / ACTIVE_COUNT.
+      const sharedLoad = bin.load / ACTIVE_COUNT;
       const baseRow = { tBin: bin.tBin, hours: bin.hours, twbAvg: bin.twbAvg };
-      const calc = applyChillerCalc(baseRow, tempSpec);
-      // Скейлим power пропорционально нагрузке: power ≈ sharedLoad / COP_eff.
-      // calc.cop посчитан для full ratedCap; для частичной нагрузки power
-      // упрощённо ≈ sharedLoad / cop (предполагаем линейную зависимость).
+      const calc = applyChillerCalc(baseRow, ch.spec);
       const power = calc.cop > 0 ? sharedLoad / calc.cop : 0;
       const energy = power * bin.hours;
       energyKwh += energy;
       if (power > peakKw) peakKw = power;
     }
-    return { kind: 'chiller', name: ch.name, ratedCapKw: ch.spec?.ratedCapKw || 0, energyKwh, peakKw };
+    // Маркер: чиллеры с index ≥ N — это резервы. В горячем режиме они
+    // тоже работают (помечаем «горячий резерв»). В холодном они не попали
+    // в workingChillers вовсе.
+    const kind = (idx >= N && standbyMode === 'hot') ? 'chiller-hot-standby' : 'chiller';
+    return { kind, name: ch.name, ratedCapKw: ch.spec?.ratedCapKw || 0, energyKwh, peakKw };
   });
 
-  // Standby чиллеры — энергия = 0 (горячий резерв предполагает только idle losses,
-  // которые в этом упрощённом расчёте не учитываются).
-  for (const ch of standbyChillers) {
+  // Холодный резерв — энергия = 0 (выключены, ждут failover).
+  for (const ch of coldStandbyChillers) {
     chillerPerEquipment.push({ kind: 'chiller-standby', name: ch.name, ratedCapKw: ch.spec?.ratedCapKw || 0, energyKwh: 0, peakKw: 0 });
   }
 
