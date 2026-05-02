@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.992', date: '2026-05-02', items: [
+      '💱 <b>Реальная конвертация валют при смене символа</b>. Расширение v0.59.991 (multi-currency).',
+      '• При смене валюты в селекторе (если есть введённые суммы) — диалог «Конвертировать все CAPEX/OPEX/тариф из X в Y по текущему курсу?».',
+      '• При подтверждении: загружаются курсы из активного источника (НБ РК / ЦБ РФ / ECB / exchangerate.host) на сегодня (или из кеша), все суммы (equipmentCost, installationCost, maintenanceRubPerYear, tariff) умножаются на factor = convert(1, fromIso, toIso, rates).',
+      '• При отказе или ошибке загрузки курса — заменяется только символ валюты, числа остаются (с уведомлением через toast).',
+      '• Toast подтверждения: «Конвертировано по курсу 1 X = N.NNNN Y на YYYY-MM-DD».',
+      '• Каждая валюта в CURRENCIES расширена ISO-кодом (RUB/USD/EUR/KZT/CNY/GBP/BYN/TRY/UAH/CHF) для корректной идентификации в API курсов.',
+      '• Новый helper <code>currencyToIso(symbol)</code> для маппинга символ → ISO 4217.',
+      'Файлы: <code>cooling/calc/fc-summary.js</code> (CURRENCIES + iso, currencyToIso), <code>cooling/cooling.js</code> (async curSel handler с конвертацией).',
+    ] },
     { version: '0.59.991', date: '2026-05-02', items: [
       '🆕 <b>Новый модуль «Подбор холодильных систем» (/cooling)</b>. По требованию: «вынеси подбор чиллеров и холодильных систем … в отдельный модуль». Архитектурно разделён на pure-calc и UI слои.',
       '<b>Архитектура модуля</b>:',

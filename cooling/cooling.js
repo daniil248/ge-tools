@@ -40,8 +40,10 @@ import { renderComparisonTable } from './ui/comparison-view.js';
 
 import { tableToCsv, downloadCsv } from '../meteo/charts.js';
 import { getActiveMeteoDataset, getMeteoFilter, applyFilter } from './meteo-bridge.js';
-import { CURRENCIES } from './calc/fc-summary.js';
+import { CURRENCIES, currencyToIso } from './calc/fc-summary.js';
 import { open as openRatesDialog } from '../shared/currency-rates/rates-dialog.js';
+import { fetchRates, convert as convertRate } from '../shared/currency-rates/index.js';
+import '../shared/currency-rates/sources/index.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -259,8 +261,50 @@ function init() {
     curSel.innerHTML = CURRENCIES.map(c =>
       `<option value="${c.code}"${c.code === _currency ? ' selected' : ''} title="${c.label}">${c.code} — ${c.label}</option>`
     ).join('');
-    curSel.addEventListener('change', () => {
-      _currency = curSel.value || '₽';
+    curSel.addEventListener('change', async () => {
+      const oldCur = _currency;
+      const newCur = curSel.value || '₽';
+      if (oldCur === newCur) return;
+
+      // Если есть введённые суммы — предложить конвертацию по курсу
+      const hasMoney = _options.some(o =>
+        (o.eco?.equipmentCost || 0) > 0 ||
+        (o.eco?.installationCost || 0) > 0 ||
+        (o.eco?.maintenanceRubPerYear || 0) > 0
+      ) || _tariffRubKwh > 0;
+
+      let factor = 1;
+      if (hasMoney) {
+        const ok = await clConfirm(`Конвертировать все CAPEX/OPEX/тариф из ${oldCur} в ${newCur} по текущему курсу? (Иначе — заменится только символ валюты, числа сохранятся.)`);
+        if (ok) {
+          try {
+            const rates = await fetchRates(null, null, false);
+            const fromIso = currencyToIso(oldCur);
+            const toIso   = currencyToIso(newCur);
+            const f = convertRate(1, fromIso, toIso, rates);
+            if (Number.isFinite(f) && f > 0) {
+              factor = f;
+              for (const o of _options) {
+                if (!o.eco) continue;
+                o.eco.equipmentCost         = Math.round((o.eco.equipmentCost         || 0) * factor);
+                o.eco.installationCost      = Math.round((o.eco.installationCost      || 0) * factor);
+                o.eco.maintenanceRubPerYear = Math.round((o.eco.maintenanceRubPerYear || 0) * factor);
+              }
+              _tariffRubKwh = +(((_tariffRubKwh || 0) * factor).toFixed(3));
+              util.toast(`Конвертировано по курсу 1 ${oldCur} = ${factor.toFixed(4)} ${newCur} на ${rates.date}`, 'ok');
+            } else {
+              util.toast(`Курс ${fromIso}→${toIso} не найден в источнике. Числа не конвертированы, заменён только символ.`, 'err');
+            }
+          } catch (e) {
+            util.toast(`Не удалось загрузить курсы: ${e.message}. Числа не конвертированы.`, 'err');
+          }
+        }
+      }
+
+      _currency = newCur;
+      // Обновить input тарифа после конвертации
+      const tInp = $('cl-tariff');
+      if (tInp) tInp.value = _tariffRubKwh;
       persist();
       renderActiveTab();
     });

@@ -91,17 +91,23 @@ export function fmtRub(v) { return fmtMoney(v, '₽'); }
 
 /**
  * Каталог поддерживаемых валют для UI-селектора.
- * code — символ для отображения; label — полное название.
+ * code — символ для отображения; iso — ISO 4217 код для конвертации;
+ * label — полное название.
  */
 export const CURRENCIES = [
-  { code: '₽',   label: 'RUB · российский рубль' },
-  { code: '$',   label: 'USD · доллар США' },
-  { code: '€',   label: 'EUR · евро' },
-  { code: '₸',   label: 'KZT · казахстанский тенге' },
-  { code: '¥',   label: 'CNY · юань (КНР)' },
-  { code: '£',   label: 'GBP · фунт стерлингов' },
-  { code: 'Br',  label: 'BYN · белорусский рубль' },
-  { code: '₺',   label: 'TRY · турецкая лира' },
-  { code: '₴',   label: 'UAH · украинская гривна' },
-  { code: 'CHF', label: 'CHF · швейцарский франк' },
+  { code: '₽',   iso: 'RUB', label: 'RUB · российский рубль' },
+  { code: '$',   iso: 'USD', label: 'USD · доллар США' },
+  { code: '€',   iso: 'EUR', label: 'EUR · евро' },
+  { code: '₸',   iso: 'KZT', label: 'KZT · казахстанский тенге' },
+  { code: '¥',   iso: 'CNY', label: 'CNY · юань (КНР)' },
+  { code: '£',   iso: 'GBP', label: 'GBP · фунт стерлингов' },
+  { code: 'Br',  iso: 'BYN', label: 'BYN · белорусский рубль' },
+  { code: '₺',   iso: 'TRY', label: 'TRY · турецкая лира' },
+  { code: '₴',   iso: 'UAH', label: 'UAH · украинская гривна' },
+  { code: 'CHF', iso: 'CHF', label: 'CHF · швейцарский франк' },
 ];
+
+/** Получить ISO-код валюты по её символу (₽ → RUB, $ → USD, ...). */
+export function currencyToIso(code) {
+  return CURRENCIES.find(c => c.code === code)?.iso || code;
+}
