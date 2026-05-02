@@ -16,7 +16,7 @@
 //                           источник, регистрирующийся через registry.
 // =========================================================================
 
-import { ensureDefaultProject, projectKey } from '../shared/project-storage.js';
+import { ensureDefaultProject, projectKey, getProject, setActiveProjectId } from '../shared/project-storage.js';
 import { detectNavMode, renderModuleActions, completeReturn, cancelReturn } from '../shared/module-nav.js';
 import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
@@ -419,7 +419,55 @@ function init() {
   _navMode = nav.mode;
   _navReturn = nav.return;
 
-  _pid = ensureDefaultProject();
+  // v0.60.37: уважать ?pid=<id> в URL (был баг — meteo всегда брал
+  // ensureDefaultProject, поэтому при embed из cooling с pid=p_qarmet
+  // датасеты сохранялись в default-проект, а cooling видел старое для
+  // p_qarmet). Дополнительно: вытащить pid из ?return=... если своего pid нет.
+  const params = new URLSearchParams(location.search);
+  const urlPid = params.get('pid') || (function tryFromReturnUrl() {
+    try {
+      const ret = params.get('return');
+      if (!ret) return null;
+      // ret = "/cooling/?pid=p_qarmet&..." — парсим query-string
+      const decoded = decodeURIComponent(ret);
+      const qIdx = decoded.indexOf('?');
+      if (qIdx < 0) return null;
+      const inner = new URLSearchParams(decoded.slice(qIdx + 1));
+      return inner.get('pid');
+    } catch { return null; }
+  })();
+  if (urlPid) {
+    const proj = getProject(urlPid);
+    if (proj) {
+      setActiveProjectId(urlPid);
+      _pid = urlPid;  // meteo использует pid как строку (не объект)
+    } else {
+      _pid = ensureDefaultProject().id;
+    }
+  } else {
+    const dp = ensureDefaultProject();
+    _pid = typeof dp === 'string' ? dp : dp.id;
+  }
+  // v0.60.37: миграция legacy-данных meteo из 'raschet.project.[object Object].meteo.*'
+  // в правильный pid-namespace. Был баг до v0.60.37 — meteo передавал object вместо
+  // .id в projectKey, всё писалось под единым [object Object] namespace.
+  try {
+    const legacyPrefix = 'raschet.project.[object Object].meteo.';
+    const targetPrefix = `raschet.project.${_pid}.meteo.`;
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(legacyPrefix)) keys.push(k);
+    }
+    let migrated = 0;
+    for (const lk of keys) {
+      const tk = targetPrefix + lk.slice(legacyPrefix.length);
+      if (localStorage.getItem(tk) != null) continue;  // уже есть — не перетираем
+      const v = localStorage.getItem(lk);
+      if (v != null) { localStorage.setItem(tk, v); migrated++; }
+    }
+    if (migrated) console.info(`[meteo v0.60.37] Мигрировано ${migrated} legacy-ключей из [object Object] → ${_pid}`);
+  } catch {}
   _datasets = loadJson(KEY_DATA, []) || [];
   _activeId = loadJson(KEY_ACTIVE, null);
   _activeCols = loadJson(KEY_COLS, _activeCols);

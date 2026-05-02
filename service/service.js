@@ -12,6 +12,9 @@
 //   - content: форма активного наряда (ui/order-form.js)
 //   - per-context state: orders[], activeOrderId
 
+// v0.60.37: explicit load-marker для диагностики кеша/import-проблем
+console.info('%c[service v0.60.37] script LOADED', 'color:#16a34a;font-weight:bold');
+
 import { detectNavMode, renderModuleActions, completeReturn, cancelReturn } from '../shared/module-nav.js';
 import { ensureDefaultProject, projectKey, listProjects, getProject, setActiveProjectId, createProject } from '../shared/project-storage.js';
 import { fetchRates, convert as convertRate, currencyToIso } from '../shared/currency-rates/index.js';

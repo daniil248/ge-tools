@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.37', date: '2026-05-02', items: [
+      '🐛 <b>Fix: meteo сохранял датасеты в [object Object] namespace</b>. Был тот же баг, что и в cooling до v0.60.18: <code>_pid = ensureDefaultProject()</code> возвращал OBJECT, а <code>storageKey()</code> передавал _pid в projectKey без .id → шаблонный литерал делал toString → "[object Object]". Все meteo-данные писались под одним «default» namespace, независимо от проекта.',
+      '• Fix: <code>_pid</code> теперь хранится как ID-строка. Чтение <code>?pid=</code> из URL + fallback на <code>?return=</code> URL (если cooling embed-ает meteo с pid в return-URL).',
+      '• Migration: legacy-данные из <code>raschet.project.[object Object].meteo.*</code> авто-копируются в <code>raschet.project.&lt;pid&gt;.meteo.*</code> при первом открытии (если новый namespace пуст).',
+      '• Это решает корневую причину «после возврата из meteo cooling видит старый датасет»: теперь meteo сохраняет в правильный pid, cooling читает из того же.',
+      '🔍 <b>Service: console-load marker для диагностики</b>. По репорту «сервис всё ещё не работает»: добавлен <code>console.info("%c[service v0.60.37] script LOADED", ...)</code> в начало service.js. Если в DevTools Console сообщение НЕ появилось — JS-модуль не загрузился (проверьте кеш браузера через Ctrl+Shift+R).',
+      'Файлы: <code>meteo/meteo.js</code>, <code>service/service.js</code>.',
+    ] },
     { version: '0.60.36', date: '2026-05-02', items: [
       '🐛 <b>Fix: Service footer показывал «Raschet vundefined»</b>. По репорту-скрину пользователя. service/index.html передавал в mountFooter только moduleId; appVersion / moduleTitle / entries были undefined. Исправлено: импортированы APP_VERSION + CHANGELOGS, переданы корректные параметры.',
       '📚 <b>Phase 24.2: WORK_TEMPLATES вынесены в каталог</b>. По правилу <code>memory/feedback_use_catalogs.md</code>: «всё что можно вынести в каталоги — в соответствующий каталог».',
