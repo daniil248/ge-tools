@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.990', date: '2026-05-01', items: [
+      '📊 <b>Stacked-bar чарт по бинам T_amb: компрессор + FC aux</b>. Визуализация над таблицей при заданной chillerSpec.',
+      '• X = Ambient T (°C) бины, Y = годовая энергия (кВт·ч/год).',
+      '• Стек 1 (красный) = P_mech × hours — компрессор.',
+      '• Стек 2 (зелёный) = P_aux × hours — насосы/вентиляторы FC.',
+      '• Слева (низкие T) обычно доминирует зелёный = FC работает; справа (высокие T) красный = только компрессор. Мгновенно видно, где FC даёт экономию.',
+      '• Tooltip на бар: «Компрессор: X кВт·ч/год», «FC aux: Y кВт·ч/год», в footer Σ за бин.',
+      '• Скрыт когда chillerSpec не задан или ratedCapKw = 0.',
+      'Файлы: <code>meteo/charts.js</code> (drawChillerEnergyChart), <code>meteo/index.html</code> (canvas + wrap), <code>meteo/meteo.js</code> (рендер в renderActiveTab/reRenderAnnual).',
+    ] },
     { version: '0.59.989', date: '2026-05-01', items: [
       '💰 <b>FC + OPEX сводка над annual table + тариф ₽/кВт·ч</b>. ROI-метрики для подбора free-cooling решений.',
       '• Поле «💰 ₽/кВт·ч» в toolbar Annual hours (default 7.5 — типичный тариф РФ для коммерческих/ЦОД-объектов). Persist в LS.',

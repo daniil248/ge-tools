@@ -19,7 +19,7 @@
 import { ensureDefaultProject, projectKey } from '../shared/project-storage.js';
 import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
-import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, drawWindRose, renderDaysInRangeTable } from './charts.js';
+import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, drawWindRose, renderDaysInRangeTable, drawChillerEnergyChart } from './charts.js';
 import { renderAshraeDatasheet } from './ashrae-datasheet.js';
 import { COLUMNS, DEFAULT_CHILLER, buildBinData, renderAnnualTable, exportAnnualTableCsv, renderColumnPicker, renderChillerSpecForm, renderFreeCoolingSummary } from './annual-table.js';
 
@@ -273,6 +273,14 @@ function renderActiveTab() {
         ? renderFreeCoolingSummary(rows, _chillerSpec, _tariffRubKwh, hourly)
         : '';
     }
+    // v0.59.990: stacked-bar chart по бинам (мех + aux)
+    const chartCvs = $('mt-chiller-energy-chart');
+    const chartWrap = $('mt-chiller-energy-chart-wrap');
+    if (chartCvs && chartWrap) {
+      const hasSpec = !!(_chillerSpec && Number(_chillerSpec.ratedCapKw) > 0);
+      chartWrap.hidden = !hasSpec;
+      if (hasSpec) drawChillerEnergyChart(chartCvs, rows);
+    }
   } else if (_activeTab === 'ashrae') {
     renderAshraeBlock(d, hourly);
   }
@@ -441,6 +449,14 @@ function init() {
       sumEl.innerHTML = (_chillerSpec && Number(_chillerSpec.ratedCapKw) > 0)
         ? renderFreeCoolingSummary(rows, _chillerSpec, _tariffRubKwh, filtered)
         : '';
+    }
+    // v0.59.990: пересчёт stacked-bar чарта
+    const chartCvs = $('mt-chiller-energy-chart');
+    const chartWrap = $('mt-chiller-energy-chart-wrap');
+    if (chartCvs && chartWrap) {
+      const hasSpec = !!(_chillerSpec && Number(_chillerSpec.ratedCapKw) > 0);
+      chartWrap.hidden = !hasSpec;
+      if (hasSpec) drawChillerEnergyChart(chartCvs, rows);
     }
   };
 
