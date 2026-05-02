@@ -4,6 +4,11 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.22', date: '2026-05-02', items: [
+      '🐛 <b>Fix: пересчёт по курсу при смене валюты ячейки costItems</b>. По репорту: «пересчёт не работает (надо)». В таблице «Состав оборудования» при изменении select валюты столбца Стоимость оборудования / Монтаж / ТО — value теперь автоматически пересчитывается через convertFn по курсу на «Дату курса», input в DOM обновляется визуально, toast уведомляет о факте конверсии.',
+      '🛠 <b>Phase 24.1 (foundation): service/calc/order-model.js</b> — модель «наряда» сервисных/монтажных работ. ORDER_TYPES (install/maintenance/one-off), POSITION_CATEGORIES (labor/material/travel/subcontract/other), <code>computeOrderTotals</code> (себес → накладные → клиент → НДС → маржа), WORK_TEMPLATES каталог типовых работ. UI и orchestrator — следующий шаг.',
+      'Файлы: <code>cooling/ui/capex-form.js</code>, <code>service/calc/order-model.js</code> (новый).',
+    ] },
     { version: '0.60.21', date: '2026-05-02', items: [
       '📦 <b>Единая таблица costItems[]</b> для CAPEX/OPEX. По уточнению: «Одна строка в которой несколько колонок. Стоимость оборудования, стоимость монтажа, стоимость ТО (всё что нужно), количество, чтобы не вписывать каждый однотипный чиллер много раз. Для каждой цены, выбор валюты. Цена может быть в долларах, а монтаж в тенге… При этом все отдельные затраты в общей форме выводим по разделам».',
       '• Новая модель: <code>eco.costItems = [{id, label, qty, equipmentPrice:{value,currency}, installPrice:{...}, maintenancePerYearPrice:{...}}]</code>.',

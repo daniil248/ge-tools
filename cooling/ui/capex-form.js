@@ -271,7 +271,7 @@ export async function openCostItemsModal(initialItems, displayCurrency, convertF
       repaintTotals();
     });
     overlay.addEventListener('change', (ev) => {
-      // Currency-select fires change (not input)
+      // Currency-select fires change (не input)
       const tr = ev.target.closest('tr[data-row]');
       if (!tr) return;
       const idx = Number(tr.dataset.row);
@@ -280,7 +280,25 @@ export async function openCostItemsModal(initialItems, displayCurrency, convertF
       const attr = ev.target.dataset.attr;
       if (col && attr === 'currency') {
         if (!items[idx][col]) items[idx][col] = { value: 0, currency: displayCurrency };
-        items[idx][col].currency = ev.target.value;
+        const oldCur = items[idx][col].currency;
+        const newCur = ev.target.value;
+        if (oldCur !== newCur) {
+          // v0.60.22 (по требованию: «пересчёт не работает»): авто-пересчитать
+          // value по курсу при смене валюты ячейки.
+          const curVal = Number(items[idx][col].value) || 0;
+          if (curVal > 0 && convertFn) {
+            const v = convertFn(curVal, oldCur, newCur);
+            if (Number.isFinite(v) && v > 0) {
+              items[idx][col].value = +(v.toFixed(2));
+              const valInp = tr.querySelector(`.cl-ci-val[data-col="${col}"]`);
+              if (valInp) valInp.value = items[idx][col].value;
+              if (typeof toast === 'function') {
+                toast(`${oldCur} → ${newCur}: ${curVal} → ${items[idx][col].value}`, 'info');
+              }
+            }
+          }
+          items[idx][col].currency = newCur;
+        }
         repaintTotals();
       }
     });
