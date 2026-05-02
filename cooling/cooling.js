@@ -501,19 +501,37 @@ function renderMeteoStatus() {
     // загрузку через Open-Meteo вместо ручного перехода в /meteo/.
     const projLoc = (!_standalone && _pid?.location) ? _pid.location : null;
     if (projLoc && Number.isFinite(Number(projLoc.lat)) && Number.isFinite(Number(projLoc.lon))) {
+      // v0.60.55: набор кнопок 1/5/10/15/20 лет.
+      // 1 год — primary (самый частый сценарий, быстро).
+      // 5/10/15/20 — для долгосрочной аналитики (TCO, climate-adjusted PUE).
+      // Большие датасеты (10+ лет ≈ 6+ МБ) сохраняются в IDB.
       root.innerHTML = `
         <div style="font-size:11.5px;color:#92400e;margin-bottom:6px">⚠ Нет meteo-датасетов</div>
-        <div style="font-size:11px;color:#475569;margin-bottom:6px" title="Локация проекта (см. Свойства проекта). Один клик — загрузим 1 год почасовых данных через Open-Meteo для этих координат.">
+        <div style="font-size:11px;color:#475569;margin-bottom:6px" title="Локация проекта (см. Свойства проекта). Загрузим почасовые данные через Open-Meteo Historical API для этих координат.">
           📍 ${util.escHtml(projLoc.city || '')} (${Number(projLoc.lat).toFixed(3)}, ${Number(projLoc.lon).toFixed(3)})
         </div>
-        <button type="button" id="cl-fetch-meteo-loc" class="cl-btn-primary" style="width:100%;margin-bottom:4px;padding:6px 10px;font-size:11.5px"
-                title="Загрузить 1 год почасовых данных через Open-Meteo Historical API (бесплатно). Сохранится как ⭐активный датасет проекта.">
-          🌐 Загрузить метео (1 клик)
+        <button type="button" data-yrs="1" id="cl-fetch-meteo-1y" class="cl-btn-primary cl-fetch-meteo-btn" style="width:100%;margin-bottom:4px;padding:6px 10px;font-size:11.5px"
+                title="1 год почасовых данных (~250 КБ). Самый быстрый сценарий — для оперативного подбора. Сохранится как ⭐активный датасет проекта.">
+          🌐 Загрузить метео — 1 год
         </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:4px">
+          <button type="button" data-yrs="5" class="cl-fetch-meteo-btn" style="padding:5px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer"
+                  title="5 лет (~1.3 МБ). Достаточно для анализа сезонной изменчивости и пиковых нагрузок.">5 лет</button>
+          <button type="button" data-yrs="10" class="cl-fetch-meteo-btn" style="padding:5px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer"
+                  title="10 лет (~2.6 МБ, ~88 тыс. часов). Стандарт для climate-adjusted TCO/PUE. Хранится в IndexedDB.">10 лет</button>
+          <button type="button" data-yrs="15" class="cl-fetch-meteo-btn" style="padding:5px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer"
+                  title="15 лет (~4 МБ). Для долгосрочного моделирования free-cooling. Хранится в IndexedDB.">15 лет</button>
+          <button type="button" data-yrs="20" class="cl-fetch-meteo-btn" style="padding:5px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer"
+                  title="20 лет (~5.3 МБ, ~175 тыс. часов). Максимальный набор для climate-baseline. Хранится в IndexedDB.">20 лет</button>
+        </div>
         <div style="font-size:10.5px;color:#64748b">или вручную → кнопка ниже</div>
       `;
-      const btn = root.querySelector('#cl-fetch-meteo-loc');
-      if (btn) btn.addEventListener('click', () => autoFetchMeteoForProject(projLoc));
+      root.querySelectorAll('.cl-fetch-meteo-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const yrs = Math.max(1, Math.min(20, parseInt(btn.dataset.yrs, 10) || 1));
+          autoFetchMeteoForProject(projLoc, yrs);
+        });
+      });
     } else {
       root.textContent = '⚠ Нет meteo-датасетов. Откройте модуль Метеоданные и загрузите хотя бы один.';
     }
@@ -667,25 +685,36 @@ function renderStorageMode() {
    Используется для группировки picker'а контекста подбора. */
 /* v0.60.32: 1-кликовая загрузка meteo-датасета через Open-Meteo
    по координатам проекта. Используется в renderMeteoStatus при пустом
-   списке датасетов. */
-async function autoFetchMeteoForProject(projLoc) {
+   списке датасетов.
+   v0.60.55: добавлен параметр years (1/5/10/15/20). Большие датасеты
+   могут грузиться 10+ секунд — UI блокирует кнопки на время загрузки. */
+async function autoFetchMeteoForProject(projLoc, years = 1) {
   if (!_pid?.id) {
     util.toast('Нет активного проекта (standalone mode) — переключитесь в проект через picker контекста.', 'err');
     return;
   }
-  util.toast('Загрузка 1 года почасовых данных через Open-Meteo…', 'info');
-  const result = await fetchAndSaveMeteoForProject(_pid.id, {
-    lat: Number(projLoc.lat),
-    lon: Number(projLoc.lon),
-    locationName: projLoc.city || `${Number(projLoc.lat).toFixed(3)}, ${Number(projLoc.lon).toFixed(3)}`,
-  });
-  if (!result.ok) {
-    util.toast(`❌ ${result.error}`, 'err');
-    return;
+  // Блокируем все fetch-кнопки пока идёт загрузка
+  const allBtns = document.querySelectorAll('.cl-fetch-meteo-btn');
+  allBtns.forEach(b => { b.disabled = true; b.style.opacity = '0.5'; b.style.cursor = 'wait'; });
+  util.toast(`Загрузка ${years} ${years === 1 ? 'года' : 'лет'} почасовых данных через Open-Meteo…`, 'info');
+  try {
+    const result = await fetchAndSaveMeteoForProject(_pid.id, {
+      lat: Number(projLoc.lat),
+      lon: Number(projLoc.lon),
+      locationName: projLoc.city || `${Number(projLoc.lat).toFixed(3)}, ${Number(projLoc.lon).toFixed(3)}`,
+      years,
+    });
+    if (!result.ok) {
+      util.toast(`❌ ${result.error}`, 'err');
+      return;
+    }
+    util.toast(`✓ Загружено: ${result.dataset.stats.n} часов (${years} ${years === 1 ? 'год' : 'лет'}), T ${result.dataset.stats.tmin}…${result.dataset.stats.tmax} °C`, 'ok');
+    // Обновляем IDB-кэш меteo-bridge перед перерисовкой
+    try { await preloadMeteoForPid(_pid.id); } catch (e) { console.warn('[cooling] preload after fetch failed:', e); }
+    renderActive();
+  } finally {
+    allBtns.forEach(b => { b.disabled = false; b.style.opacity = ''; b.style.cursor = ''; });
   }
-  util.toast(`✓ Загружено: ${result.dataset.stats.n} часов, T ${result.dataset.stats.tmin}…${result.dataset.stats.tmax} °C`, 'ok');
-  // Очищаем кэш meteo-bridge и перерендериваем активную вкладку
-  renderActive();
 }
 
 function projectHasCoolingData(pid) {

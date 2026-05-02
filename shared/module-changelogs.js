@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.55', date: '2026-05-03', items: [
+      '🌐 <b>Cooling: загрузка метео на 1/5/10/15/20 лет в один клик</b>. По запросу Пользователя 2026-05-03: «добавь так же загрузить 5, 10, 15 и 20 лет».',
+      '• Sidebar cooling в empty-state теперь показывает primary-кнопку «🌐 Загрузить метео — 1 год» + 2×2 grid с кнопками 5/10/15/20 лет.',
+      '• Tooltips на каждой кнопке с оценкой объёма (~250 КБ для 1 года, ~5.3 МБ для 20 лет) и сценарием использования.',
+      '• <code>shared/meteo-fetch.js::fetchAndSaveMeteoForProject(pid, {…, years})</code> — параметр years (1–20). End-date с лагом 5 дней (Open-Meteo archive не отдаёт самые свежие).',
+      '• Persist через IDB (если доступен) с auto-fallback на LS. Большие датасеты (10+ лет ≈ 6+ МБ) уже не помещаются в LS — IDB обязателен.',
+      '• Кнопки блокируются на время fetch (10–30 сек для 20 лет), показывается toast с прогрессом.',
+      '• <code>preloadMeteoForPid(pid)</code> вызывается после успешной загрузки → cooling сразу видит новый датасет без F5.',
+      'Файлы: <code>shared/meteo-fetch.js</code>, <code>cooling/cooling.js</code>.',
+    ] },
     { version: '0.60.54', date: '2026-05-03', items: [
       '🚀 <b>Phase 34 EXPRESS: meteo datasets в IndexedDB</b>. По диагностике через Chrome MCP: LocalStorage квота в Chrome ~4-5 МБ. ASHRAE Темиртау 10 лет (87696 точек ≈ 6 МБ JSON) <b>физически не помещался в LS</b> даже при пустом storage. IDB квота 50 МБ — 2 ГБ → решает корневую проблему.',
       '• Новый <code>shared/idb-store.js</code> — минимальный IDB key-value store (idbGet/idbSet/idbDelete/idbKeys, ~80 строк, без зависимостей).',
