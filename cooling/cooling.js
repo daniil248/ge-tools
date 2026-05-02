@@ -545,9 +545,66 @@ function renderMeteoStatus() {
   else if (filter.mode === 'period') filterDesc = `${filter.periodFrom || '?'}—${filter.periodTo || '?'}`;
   else filterDesc = 'все годы';
   root.className = 'cl-meteo-status';
+
+  // v0.60.56: проверка несоответствия активного датасета и локации проекта.
+  // Bug-репорт от Пользователя 2026-05-03: «у меня везде Темиртау, хотя
+  // проект Ташкент». Активный датасет мог быть импортирован раньше когда
+  // проект был привязан к другому городу, или вручную выбран в meteo.
+  // Решение: показать warning + grid кнопок «Загрузить <city проекта>».
+  const projLoc = (!_standalone && _pid?.location) ? _pid.location : null;
+  const hasProjLoc = projLoc && Number.isFinite(Number(projLoc.lat)) && Number.isFinite(Number(projLoc.lon));
+  let mismatchHtml = '';
+  if (hasProjLoc && Number.isFinite(m.dataset.lat) && Number.isFinite(m.dataset.lon)) {
+    const distKm = haversineKm(
+      Number(projLoc.lat), Number(projLoc.lon),
+      Number(m.dataset.lat), Number(m.dataset.lon)
+    );
+    if (distKm > 50) {
+      const cityEsc = util.escHtml(projLoc.city || `${Number(projLoc.lat).toFixed(2)}, ${Number(projLoc.lon).toFixed(2)}`);
+      mismatchHtml = `
+        <div style="margin-top:8px;padding:6px 8px;background:#fef3c7;border:1px solid #fbbf24;border-radius:3px;font-size:11px;color:#92400e"
+             title="Активный meteo-датасет геометрически далеко от локации проекта. Расчёт идёт по климату из датасета, а не по городу проекта.">
+          ⚠ Датасет на ${distKm.toFixed(0)} км от проекта (${cityEsc})
+        </div>
+        <button type="button" data-yrs="1" class="cl-fetch-meteo-btn cl-btn-primary" style="width:100%;margin-top:4px;padding:6px 10px;font-size:11.5px"
+                title="Загрузить 1 год почасовых данных для локации проекта (${cityEsc}) и сделать активным датасетом.">
+          🌐 Загрузить ${cityEsc} — 1 год
+        </button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:3px">
+          <button type="button" data-yrs="5"  class="cl-fetch-meteo-btn" style="padding:4px 6px;font-size:10.5px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer" title="5 лет (~1.3 МБ)">5 лет</button>
+          <button type="button" data-yrs="10" class="cl-fetch-meteo-btn" style="padding:4px 6px;font-size:10.5px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer" title="10 лет (~2.6 МБ). IndexedDB.">10 лет</button>
+          <button type="button" data-yrs="15" class="cl-fetch-meteo-btn" style="padding:4px 6px;font-size:10.5px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer" title="15 лет (~4 МБ). IndexedDB.">15 лет</button>
+          <button type="button" data-yrs="20" class="cl-fetch-meteo-btn" style="padding:4px 6px;font-size:10.5px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer" title="20 лет (~5.3 МБ). IndexedDB.">20 лет</button>
+        </div>
+      `;
+    }
+  }
+
   root.innerHTML = `<b>${util.escHtml(m.dataset.name)}</b><br>
     <span style="font-size:11px">${util.escHtml(m.dataset.locationName || '')} · ${filterDesc}</span><br>
-    <span style="font-size:11px">${filtered} записей${total !== filtered ? ` из ${total}` : ''}</span>`;
+    <span style="font-size:11px">${filtered} записей${total !== filtered ? ` из ${total}` : ''}</span>${mismatchHtml}`;
+
+  if (mismatchHtml && hasProjLoc) {
+    root.querySelectorAll('.cl-fetch-meteo-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const yrs = Math.max(1, Math.min(20, parseInt(btn.dataset.yrs, 10) || 1));
+        autoFetchMeteoForProject(projLoc, yrs);
+      });
+    });
+  }
+}
+
+/* v0.60.56: расстояние по большому кругу (км). Используется для детекции
+   несоответствия meteo-датасета и локации проекта. Земля не идеальный
+   шар, но точности ±0.5% хватает для фильтра «датасет в этом городе или нет». */
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 /* ----- Active panel ----- */
