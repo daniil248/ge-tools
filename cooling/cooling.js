@@ -79,6 +79,10 @@ let _navReturn = null;       // { path, sessionId, label } для embed-mode
 let _selections = [];        // массив подборов
 let _activeSelectionId = null;
 let _activeTab = 'spec';
+// v0.60.8 (Phase 22.11): режим compare-вкладки.
+//   'variants' — варианты текущего подбора (default)
+//   'selections' — главные ★-варианты всех подборов проекта
+let _compareMode = 'variants';
 let _activeCols = [...DEFAULT_COLS, ...CHILLER_COLS];
 let _tariffRubKwh = 7.5;     // тариф в _currency (валюта проекта)
 let _currency = '₽';
@@ -545,7 +549,24 @@ function renderActiveTab() {
     const tbl = $('cl-compare-table');
     if (tbl) {
       const convertFn = makeConvertFn();
-      const ordered = orderedOptionsForCompare(sel);
+      let ordered;
+      if (_compareMode === 'selections') {
+        // v0.60.8 (Phase 22.11): сравнение ★-главных вариантов всех подборов
+        // проекта между собой. Имена в comparison — это имена подборов
+        // (не имена вариантов), чтобы было видно: «Чиллер vs DX vs Mixed»
+        // вместо «Опция 1 vs Опция 1 vs Опция 1».
+        ordered = _selections.map(s => {
+          const main = s.options.find(o => o.id === s.mainOptionId) || s.options[0];
+          if (!main) return null;
+          return { ...main, name: s.name };   // override имени для compare-таблицы
+        }).filter(Boolean);
+        if (!ordered.length) {
+          tbl.innerHTML = '<div class="muted">Нет ★-главных вариантов в подборах проекта.</div>';
+          return;
+        }
+      } else {
+        ordered = orderedOptionsForCompare(sel);
+      }
       const metrics = compareOptions(ordered, hourly, _tariffRubKwh, _currency, convertFn);
       tbl.innerHTML = renderComparisonTable(metrics, _currency);
     }
@@ -743,6 +764,14 @@ function init() {
       _activeTab = btn.dataset.tab;
       renderActiveTab();
     });
+  });
+
+  // v0.60.8 (Phase 22.11): compare-mode select
+  document.addEventListener('change', (e) => {
+    if (e.target?.id === 'cl-compare-mode') {
+      _compareMode = e.target.value || 'variants';
+      if (_activeTab === 'compare') renderActiveTab();
+    }
   });
 
   // Add selection

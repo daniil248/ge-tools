@@ -238,7 +238,22 @@
 
         <div class="cl-tab-pane" data-pane="compare" hidden>
           <div class="cl-section-card">
-            <h3 title="Side-by-side таблица всех опций. Зелёная подсветка — победитель по метрике. Payback относительно первой (baseline).">⚖ Технико-экономическое сравнение опций</h3>
+            <div class="cl-table-toolbar">
+              <h3 style="margin:0" title="Технико-экономическое сравнение. Два режима: «Варианты подбора» — все варианты текущего подбора (для выбора лучшего внутри). «Подборы проекта» — главные ★-варианты всех подборов проекта (для сравнения разных систем).">⚖ Сравнение</h3>
+              <span class="muted" style="flex:1;font-size:11.5px">
+                Зелёная подсветка — победитель по метрике. Payback относительно первой (baseline).
+              </span>
+              <label style="display:inline-flex;gap:4px;align-items:center;font-size:12px"
+                     title="Режим сравнения:
+• Варианты подбора — все варианты В ТЕКУЩЕМ подборе (для выбора лучшего варианта оборудования).
+• Подборы проекта — главные ★-варианты ВСЕХ подборов проекта (для сравнения разных систем охлаждения между собой).">
+                Режим:
+                <select id="cl-compare-mode">
+                  <option value="variants">Варианты подбора</option>
+                  <option value="selections">Подборы проекта</option>
+                </select>
+              </label>
+            </div>
             <div id="cl-compare-table" class="cl-table-scroll"></div>
           </div>
         </div>

@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.8', date: '2026-05-02', items: [
+      '⚖ <b>Phase 22.11: Cross-selection comparison</b>. По roadmap: «то есть сравнивать как опции, так и сами подборы (в подборах сравнивать только главную выбранную опцию)».',
+      '• Toggle «Режим: Варианты подбора / Подборы проекта» в Compare-tab.',
+      '• <b>Variants</b> (default): все варианты ТЕКУЩЕГО подбора (для выбора лучшего варианта оборудования внутри одного подбора).',
+      '• <b>Selections</b>: ★-главные варианты ВСЕХ подборов проекта (для сравнения разных систем — например «Чиллер с FC» vs «DX-pumped» vs «Mixed CRAC + chiller»). Имена в таблице — имена подборов (не вариантов).',
+      '• ROADMAP Phase 22.11 закрыт.',
+      'Файлы: <code>cooling/index.html</code> (toolbar в Compare-tab + select #cl-compare-mode), <code>cooling/cooling.js</code> (_compareMode state + ветвление в renderActiveTab compare branch + wire change-listener).',
+    ] },
     { version: '0.60.7', date: '2026-05-02', items: [
       '🏗 <b>Phase 22.10.1 (часть 1): option = комплекс оборудования — data layer</b>. По roadmap: «Вариант перестаёт быть одиночной spec, становится комплексом оборудования».',
       '• <b>Новая модель option</b>: <code>equipment: [{ id, role, spec, qty }]</code> — массив оборудования с количеством.',
