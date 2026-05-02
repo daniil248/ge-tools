@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.49', date: '2026-05-03', items: [
+      '📦 <b>Phase 32.2: каталог расходных материалов в Service</b>. По требованию: «не хватает каталога расходных материалов с привязкой к видам работ или конкретному оборудованию».',
+      '• <code>service/catalog/materials.js</code>: SEED_MATERIALS (20+ позиций — хладагенты R410A/R32/R134a/R290, масла POE/PAG, фильтры G4/F7/H13, гликоль, медные трубы, изоляция, АКБ VRLA/Li-ion, запчасти ИБП, ДГУ-фильтры/масла, патч-корды Cat6A/OM4) + LS-CRUD пользовательских материалов + pub/sub.',
+      '• Каждый материал имеет: name/sku/unit/defaultPrice (с валютой), compatibleEquipment[] (chiller/crac/dx/ups/pdu/dgu/scs/...), workTypes[] (привязка к видам работ из order-builder), consumptionRate (например R410A: 50г/кВт), notes.',
+      '• <code>service/ui/materials-catalog.js</code>: модалка каталога — фильтр по оборудованию, таблица 7 колонок (Тип/Название+SKU/Ед/Цена/Оборудование/Заметки/Actions), 📦 встроенные / ✏ пользовательские, CRUD через 📋 Скопировать / ✏ Редактировать / 🗑 Удалить + «+ Добавить».',
+      '• <code>pickMaterialModal(equipmentKind?)</code> — picker материала с опциональным фильтром совместимости.',
+      '• Кнопка «📦 Каталог материалов» в сайдбаре service (раздел «📚 Каталоги», рядом с work-catalog).',
+      '• Кнопка «📦 Из материалов» в форме наряда — открывает picker, добавляет позицию с category=material, дефолт-ценой и валютой из каталога. Клиент-цена = себес × 1.4 (40% маржа по умолчанию).',
+      '• <code>EQUIPMENT_KINDS</code> (15 категорий) — справочник для UI.',
+      '🔜 Phase 32.3 (next): auto-suggest материалов при выборе работы — через <code>suggestMaterialsForWork(workType, equipmentKind)</code>.',
+      'Файлы: <code>service/catalog/materials.js</code> (новый), <code>service/ui/materials-catalog.js</code> (новый), <code>service/service.js</code>, <code>service/index.html</code>, <code>service/ui/order-form.js</code>.',
+    ] },
     { version: '0.60.48', date: '2026-05-03', items: [
       '🚨 <b>HOTFIX: meteo не возвращал датасет в cooling из-за двойного «?»</b>. По репорту: «модуль так и не возвращает выбранный город, и не сохраняет загруженные метеоданные».',
       '• Корневая причина: <code>completeReturn(navContext, payload)</code> в shared/module-nav.js делал <code>${navContext.path}?navResult=...</code>. Когда navContext.path уже содержал query (например <code>/cooling/?pid=p_qarmet</code> с v0.60.33) — получалось <code>/cooling/?pid=p_qarmet?navResult=...</code> с двумя «?». Браузер парсил весь хвост как одно value: <code>pid = p_qarmet?navResult=xxxx</code>. Pid ломался, navResult не виделся → cooling не получал payload и не обновлял датасет.',

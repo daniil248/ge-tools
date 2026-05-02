@@ -26,6 +26,7 @@ import { openKpTemplateEditor } from './report/kp-editor.js';
 import { DEFAULT_ORDER, ORDER_TYPES, defaultPosition, formatOrderNumber, DEFAULT_NUMBER_PATTERNS } from './calc/order-model.js';
 import { renderOrderForm } from './ui/order-form.js';
 import { openWorkCatalogModal } from './ui/work-catalog.js';
+import { openMaterialsCatalogModal } from './ui/materials-catalog.js';
 import {
   buildInstallPositionsFromCoolingOption,
   buildMaintenancePositionsFromCoolingOption,
@@ -475,6 +476,10 @@ async function init() {
   // v0.60.42: open work-catalog button
   const catBtn = $('sv-open-catalog');
   if (catBtn) catBtn.addEventListener('click', () => openWorkCatalogModal());
+
+  // v0.60.49 (Phase 32.2): open materials-catalog button
+  const matBtn = $('sv-open-materials');
+  if (matBtn) matBtn.addEventListener('click', () => openMaterialsCatalogModal());
 
   // v0.60.44: open currency-rates dialog (тот же что в cooling)
   const ratesBtn = $('sv-rates-btn');

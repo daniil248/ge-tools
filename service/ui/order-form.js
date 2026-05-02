@@ -10,6 +10,7 @@ import {
   SOURCE_MODULE_ICONS, SOURCE_MODULE_LABELS,
 } from '../calc/order-model.js';
 import { listTemplates } from '../catalog/work-templates.js';
+import { pickMaterialModal } from './materials-catalog.js';
 import {
   buildInstallPositionsFromCoolingOption,
   buildMaintenancePositionsFromCoolingOption,
@@ -82,8 +83,9 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
       <div class="sv-section-title" title="Позиции наряда: одна строка = одна работа/материал/командировка с qty/unit/себес/клиент-ценой.">📦 Состав работ и материалов (${o.positions.length})</div>
       <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap">
         <button type="button" class="sv-btn-primary" id="sv-add-pos" title="Добавить пустую позицию.">+ Позиция</button>
-        <button type="button" class="sv-btn-ghost" id="sv-add-template" title="Открыть каталог типовых работ для текущего типа наряда (${escAttr(ORDER_TYPES.find(t => t.id === o.type)?.label || '')}). Шаблоны имеют дефолтные себес/клиент-цены — можно редактировать после добавления.">📚 Из шаблонов</button>
-        <button type="button" class="sv-btn-ghost" id="sv-import-cooling" title="Импорт работ из cooling-подбора текущего проекта. Для каждой equipment-группы добавится позиция «Монтаж: ...» с qty из топологии (для нарядов типа Монтаж) или «ТО квартальное ...» (для нарядов типа ТО). Цены — дефолтные по типу/мощности; редактируйте после импорта.">❄ Из cooling-подбора</button>
+        <button type="button" class="sv-btn-ghost" id="sv-add-template" title="Открыть каталог типовых работ для текущего типа наряда (${escAttr(ORDER_TYPES.find(t => t.id === o.type)?.label || '')}). Шаблоны имеют дефолтные себес/клиент-цены — можно редактировать после добавления.">📚 Из шаблонов работ</button>
+        <button type="button" class="sv-btn-ghost" id="sv-add-material" title="Добавить позицию из каталога материалов (хладагент, фильтр, масло, АКБ, кабель и т.п.). Дефолтная цена и валюта берутся из каталога; qty по умолчанию 1 — отредактируйте.">📦 Из материалов</button>
+        <button type="button" class="sv-btn-ghost" id="sv-import-cooling" title="Импорт работ из cooling-подбора текущего проекта. Для каждой equipment-группы добавится позиция «Монтаж: ...» с qty из топологии (для нарядов типа Монтаж) или «ТО квартальное ...» (для нарядов типа ТО). Цены — дефолтные по типу/мощности; редактируйте после импорта. При повторном импорте — обновление с подтверждением.">❄ Из cooling-подбора</button>
       </div>
       <div class="sv-table-wrap">
         ${renderPositionsTable(o.positions, displayCurrency)}
@@ -170,6 +172,23 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
         const next = { ...o, positions: [...o.positions, tpl] };
         onChange(next);
       }
+      return;
+    }
+    if (ev.target.closest('#sv-add-material')) {
+      // v0.60.49 (Phase 32.2): добавить позицию из каталога материалов
+      const m = await pickMaterialModal();
+      if (!m) return;
+      const newPos = {
+        ...defaultPosition(displayCurrency, 'material'),
+        label: m.name + (m.sku ? ` (${m.sku})` : ''),
+        category: 'material',
+        unit: m.unit,
+        // Себес = дефолт-цена из каталога; клиент-цена = себес × 1.4 (40% маржа по умолчанию)
+        costPrice:   { value: m.defaultPrice?.value || 0,                        currency: m.defaultPrice?.currency || '₸' },
+        clientPrice: { value: Math.round((m.defaultPrice?.value || 0) * 1.4),    currency: m.defaultPrice?.currency || '₸' },
+      };
+      onChange({ ...o, positions: [...o.positions, newPos] });
+      toast(`✓ «${m.name}» добавлен`, 'ok');
       return;
     }
     if (ev.target.closest('#sv-export-offer')) {
