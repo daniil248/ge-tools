@@ -16,10 +16,28 @@ async function fetchNbkRk(date) {
   // date = YYYY-MM-DD → DD.MM.YYYY
   const [y, m, d] = date.split('-');
   const fdate = `${d}.${m}.${y}`;
-  const url = `https://nationalbank.kz/rss/get_rates.cfm?fdate=${fdate}`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`NBK RK HTTP ${resp.status}`);
-  const xml = await resp.text();
+  const directUrl = `https://nationalbank.kz/rss/get_rates.cfm?fdate=${fdate}`;
+  // NBK не отдаёт CORS-headers → прямой запрос из браузера блокируется.
+  // Пробуем несколько публичных CORS-proxy fallback'ов.
+  const urls = [
+    directUrl,
+    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
+    `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(directUrl)}`,
+  ];
+  let lastErr = null;
+  let xml = null;
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) { lastErr = new Error(`HTTP ${resp.status}`); continue; }
+      xml = await resp.text();
+      if (xml && xml.includes('<item>')) break;   // успех
+      lastErr = new Error('пустой ответ');
+    } catch (e) { lastErr = e; }
+  }
+  if (!xml || !xml.includes('<item>')) throw new Error(`NBK RK недоступен (CORS): ${lastErr?.message || 'unknown'}`);
+
   // Парсим item-блоки: <item> <title>...</title> <description>...</description> <quant>...</quant> </item>
   const rates = {};
   const itemRe = /<item>([\s\S]*?)<\/item>/g;
@@ -39,7 +57,6 @@ async function fetchNbkRk(date) {
       rates[title.toUpperCase()] = quant / rate;
     }
   }
-  // KZT = base, добавляем сам KZT = 1
   rates.KZT = 1;
   return { date, base: 'KZT', rates };
 }

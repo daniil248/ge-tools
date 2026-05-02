@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.59.993', date: '2026-05-02', items: [
+      '🔧 <b>Fix источников курсов валют</b> — 3 из 4 не работали (NBK RK CORS, Frankfurter 404 на будущие даты, exchangerate.host требует ключ).',
+      '• <b>НБ РК</b>: добавлен fallback через публичные CORS-proxy (corsproxy.io, allorigins.win, codetabs.com) — пробуются последовательно если прямой запрос блокируется CORS-policy.',
+      '• <b>Frankfurter</b>: пробуется .app и .dev домены, при 404 (будущие даты, выходные/праздники) автофолбэк на /latest endpoint. Note в UI: «Запрошенная дата X недоступна — возвращены курсы на Y (последняя публикация ECB)».',
+      '• <b>exchangerate.host → open.er-api.com</b>: бывший exchangerate.host теперь требует API-key с 2024 г. Заменён на open.er-api.com (тот же провайдер, бесплатный план, CORS-enabled, USD base). Только latest (без истории) — note в UI.',
+      '• <b>ЦБ РФ</b>: для отсутствующих архивных дат добавлен fallback на /daily_json.js (latest).',
+      '• Rates-dialog показывает _note из источника когда дата заменена на другую.',
+      'Файлы: <code>shared/currency-rates/sources/{nbk-rk,cbr-rf,frankfurter,exchangerate-host}.js</code>, <code>shared/currency-rates/rates-dialog.js</code> (отображение _note).',
+    ] },
     { version: '0.59.992', date: '2026-05-02', items: [
       '💱 <b>Реальная конвертация валют при смене символа</b>. Расширение v0.59.991 (multi-currency).',
       '• При смене валюты в селекторе (если есть введённые суммы) — диалог «Конвертировать все CAPEX/OPEX/тариф из X в Y по текущему курсу?».',

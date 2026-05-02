@@ -12,12 +12,20 @@ import { register } from '../index.js';
 
 async function fetchCbrRf(date) {
   const today = new Date().toISOString().slice(0, 10);
-  const url = (date === today)
-    ? 'https://www.cbr-xml-daily.ru/daily_json.js'
-    : `https://www.cbr-xml-daily.ru/archive/${date.replace(/-/g, '/')}/daily_json.js`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`CBR RF HTTP ${resp.status}`);
-  const json = await resp.json();
+  const tryUrls = (date >= today)
+    ? ['https://www.cbr-xml-daily.ru/daily_json.js']
+    : [`https://www.cbr-xml-daily.ru/archive/${date.replace(/-/g, '/')}/daily_json.js`,
+       'https://www.cbr-xml-daily.ru/daily_json.js'];   // fallback на latest для отсутствующих дат
+  let json = null, lastErr = null;
+  for (const url of tryUrls) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) { lastErr = new Error(`HTTP ${resp.status}`); continue; }
+      json = await resp.json();
+      break;
+    } catch (e) { lastErr = e; }
+  }
+  if (!json) throw new Error(`CBR RF: ${lastErr?.message || 'unknown'}`);
   // json.Valute = { USD: { Value: 91.5, Nominal: 1, ... }, JPY: { Value: 60.1, Nominal: 100 }, ... }
   // base = RUB. Хотим: 1 RUB = ? CUR
   const rates = { RUB: 1 };

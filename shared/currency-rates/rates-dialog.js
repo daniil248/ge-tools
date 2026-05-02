@@ -158,7 +158,8 @@ export function open() {
       try {
         const result = await fetchRates(activeSrcId, activeDate, force);
         lastRates = result;
-        setStatus('ok', `✓ Курсы на ${result.date} от «${listSources().find(s => s.id === activeSrcId)?.label}» (${result.cached ? 'из кеша' : 'свежие'}).`);
+        const noteSuffix = result._note ? ` · ⚠ ${result._note}` : '';
+        setStatus('ok', `✓ Курсы на ${result.date} от «${listSources().find(s => s.id === activeSrcId)?.label}» (${result.cached ? 'из кеша' : 'свежие'})${noteSuffix}.`);
         renderTable(result);
       } catch (e) {
         setStatus('err', `✗ Ошибка: ${e.message}`);
