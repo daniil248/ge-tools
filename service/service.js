@@ -418,8 +418,10 @@ async function init() {
   _standalone = (_navMode === 'standalone');
 
   if (!_standalone) {
+    // v0.60.53 (fix): принимаем как ?pid= (cooling-style), так и ?project=
+    // (project-context.js style из карточки проекта).
     const params = new URLSearchParams(location.search);
-    const urlPid = params.get('pid');
+    const urlPid = params.get('pid') || params.get('project');
     if (urlPid) {
       const proj = getProject(urlPid);
       if (proj) { setActiveProjectId(urlPid); _pid = proj; }

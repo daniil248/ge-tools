@@ -1362,16 +1362,20 @@ async function init() {
   _navReturn = nav.return;
   _standalone = (_navMode === 'standalone');
   if (!_standalone) {
-    // v0.60.18: уважать ?pid=<id> в URL (из переключателя контекста). Если
-    // нет такого id среди проектов — fallback к ensureDefaultProject().
+    // v0.60.18: уважать ?pid=<id> в URL (из переключателя контекста).
+    // v0.60.53 (по репорту «попадаю в другой проект»): ТАКЖЕ принимаем
+    // ?project=<id> из buildModuleHref (project-context.js использует
+    // именно этот key — раньше cooling его игнорировал → defaultil к
+    // первому проекту).
     const params = new URLSearchParams(location.search);
-    const urlPid = params.get('pid');
+    const urlPid = params.get('pid') || params.get('project');
     if (urlPid) {
       const proj = getProject(urlPid);
       if (proj) {
         setActiveProjectId(urlPid);
         _pid = proj;
       } else {
+        console.warn('[cooling v0.60.53] ?pid/project=' + urlPid + ' не найден среди проектов — fallback на default');
         _pid = ensureDefaultProject();
       }
     } else {

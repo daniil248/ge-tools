@@ -451,16 +451,17 @@ function init() {
   // датасеты сохранялись в default-проект, а cooling видел старое для
   // p_qarmet). Дополнительно: вытащить pid из ?return=... если своего pid нет.
   const params = new URLSearchParams(location.search);
-  const urlPid = params.get('pid') || (function tryFromReturnUrl() {
+  // v0.60.53: принимаем pid из ?pid= ИЛИ ?project= (project-context.js style)
+  // ИЛИ из ?return= URL (когда meteo embed-ed из cooling/service).
+  const urlPid = params.get('pid') || params.get('project') || (function tryFromReturnUrl() {
     try {
       const ret = params.get('return');
       if (!ret) return null;
-      // ret = "/cooling/?pid=p_qarmet&..." — парсим query-string
       const decoded = decodeURIComponent(ret);
       const qIdx = decoded.indexOf('?');
       if (qIdx < 0) return null;
       const inner = new URLSearchParams(decoded.slice(qIdx + 1));
-      return inner.get('pid');
+      return inner.get('pid') || inner.get('project');
     } catch { return null; }
   })();
   if (urlPid) {
