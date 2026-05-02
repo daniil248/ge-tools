@@ -1,0 +1,349 @@
+// =============================================================================
+// service/service.js — orchestrator модуля «Сервис: монтаж и ТО»
+// =============================================================================
+// Phase 24.1 (по требованию Пользователя 2026-05-02): «отдельный модуль расчёта
+// стоимости технического обслуживания и стоимости монтажных работ, где инженер
+// сервиса сможет формировать стоимость себеса и стоимости для клиента по
+// монтажным и сервисным работам по проекту или разовые работы».
+//
+// Архитектурный паттерн идентичен cooling/cooling.js:
+//   - 3 режима: standalone (?standalone=1) / project (?pid=...) / embed (?return=...)
+//   - sidebar: список нарядов + переключатель контекста
+//   - content: форма активного наряда (ui/order-form.js)
+//   - per-context state: orders[], activeOrderId
+
+import { detectNavMode, renderModuleActions, completeReturn, cancelReturn } from '../shared/module-nav.js';
+import { ensureDefaultProject, projectKey, listProjects, getProject, setActiveProjectId, createProject } from '../shared/project-storage.js';
+import { fetchRates, convert as convertRate, currencyToIso } from '../shared/currency-rates/index.js';
+import * as util from '../meteo/util.js';
+import { CURRENCIES } from '../cooling/calc/fc-summary.js';
+import { DEFAULT_ORDER, ORDER_TYPES } from './calc/order-model.js';
+import { renderOrderForm } from './ui/order-form.js';
+
+const $ = (id) => document.getElementById(id);
+
+// ---- State ----
+let _pid = null;
+let _standalone = false;
+let _navMode = null;
+let _navReturn = null;
+let _orders = [];
+let _activeOrderId = null;
+let _currency = '₽';
+let _ratesDate = (() => {
+  try { return localStorage.getItem('service.ratesDate.v1') || new Date().toISOString().slice(0, 10); }
+  catch { return new Date().toISOString().slice(0, 10); }
+})();
+let _ratesCache = null;
+let _ratesLoading = false;
+let _seq = 1;
+
+// ---- LS keys ----
+const KEY_ORDERS    = ['service', 'orders.v1'];
+const KEY_ACTIVE_ID = ['service', 'activeOrderId.v1'];
+const KEY_CURRENCY  = ['service', 'currency.v1'];
+
+function storageKey(suffix) {
+  if (_standalone) return `raschet.service.standalone.${suffix.join('.')}`;
+  return projectKey(_pid?.id, ...suffix);
+}
+function loadJson(suffix, fallback) {
+  try { const raw = localStorage.getItem(storageKey(suffix)); return raw ? JSON.parse(raw) : fallback; }
+  catch { return fallback; }
+}
+function saveJson(suffix, value) {
+  try { localStorage.setItem(storageKey(suffix), JSON.stringify(value)); } catch {}
+}
+function persist() {
+  saveJson(KEY_ORDERS, _orders);
+  saveJson(KEY_ACTIVE_ID, _activeOrderId);
+  saveJson(KEY_CURRENCY, _currency);
+}
+
+async function ensureRatesLoaded() {
+  if (_ratesLoading) return;
+  if (_ratesCache && _ratesCache.date === _ratesDate) return;
+  _ratesLoading = true;
+  try { _ratesCache = await fetchRates(null, _ratesDate, false); }
+  catch {} finally { _ratesLoading = false; }
+}
+function makeConvertFn() {
+  if (!_ratesCache) return null;
+  return (amount, from, to) => {
+    const fromIso = currencyToIso(from);
+    const toIso = currencyToIso(to);
+    return convertRate(amount, fromIso, toIso, _ratesCache);
+  };
+}
+
+// ---- Active ----
+function activeOrder() {
+  return _orders.find(o => o.id === _activeOrderId) || null;
+}
+
+// ---- Render ----
+function renderContextPicker() {
+  const el = $('sv-context-picker');
+  if (!el) return;
+  if (_navMode === 'embed' && _navReturn) {
+    el.innerHTML = `<span title="Embed-режим: модуль вызван из «${util.escAttr(_navReturn.label)}». После работы нажмите «✓ Применить и вернуться».">🔗 Embed: вернуться в <b>${util.escHtml(_navReturn.label)}</b></span>`;
+    return;
+  }
+  let projects = [];
+  try { projects = listProjects() || []; } catch {}
+  const currentVal = _standalone ? '__standalone__' : ((_pid && _pid.id) || '__standalone__');
+
+  const groups = { svcLocal: [], withSvc: [], others: [] };
+  for (const p of projects) {
+    if (p.kind === 'sketch' && p.ownerModule === 'service') groups.svcLocal.push(p);
+    else if (projectHasServiceData(p.id)) groups.withSvc.push(p);
+    else groups.others.push(p);
+  }
+  const optEl = (p, icon) =>
+    `<option value="${util.escAttr(p.id)}"${currentVal === p.id ? ' selected' : ''} title="Наряды будут сохранены в проекте «${util.escAttr(p.name || p.id)}»">${icon} ${util.escHtml(p.name || p.id)}</option>`;
+  const grpHtml = (label, opts) => opts.length
+    ? `<optgroup label="${util.escAttr(label)}">${opts.join('')}</optgroup>` : '';
+
+  const optsHtml = `
+    <option value="__standalone__"${currentVal === '__standalone__' ? ' selected' : ''} title="Разовый наряд — данные хранятся в общем LocalStorage без привязки к проекту.">🔓 Без проекта (разовый)</option>
+    <option value="__new_local__" title="Создать новый ЛОКАЛЬНЫЙ контейнер сервисных нарядов (sketch-проект, ownerModule=service).">➕ Создать новый локальный кейс…</option>
+    ${grpHtml('🛠 Локальные кейсы сервиса', groups.svcLocal.map(p => optEl(p, '🛠')))}
+    ${grpHtml('💼 Проекты с нарядами',       groups.withSvc.map(p => optEl(p, '💼')))}
+    ${grpHtml('📁 Прочие проекты',           groups.others.map(p => optEl(p, '📁')))}
+  `;
+  el.innerHTML = `
+    <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:3px" title="Контекст хранения нарядов сервиса.">КОНТЕКСТ КЕЙСА</label>
+    <select id="sv-context-sel" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px;background:#fff;cursor:pointer">${optsHtml}</select>
+  `;
+  const sel = el.querySelector('#sv-context-sel');
+  if (sel) sel.addEventListener('change', async () => {
+    const v = sel.value;
+    if (v === '__standalone__') {
+      const url = new URL(location.href);
+      url.searchParams.set('standalone', '1');
+      url.searchParams.delete('pid');
+      location.href = url.toString();
+      return;
+    }
+    if (v === '__new_local__') {
+      sel.value = currentVal;
+      const name = await svPrompt('Название локального кейса', `Сервис ${new Date().toLocaleDateString('ru-RU')}`);
+      if (!name?.trim()) return;
+      try {
+        const p = createProject({
+          name: name.trim(),
+          description: 'Локальный кейс сервиса (ownerModule=service).',
+          kind: 'sketch', ownerModule: 'service', status: 'draft',
+        });
+        const url = new URL(location.href);
+        url.searchParams.delete('standalone');
+        url.searchParams.set('pid', p.id);
+        location.href = url.toString();
+      } catch (e) {
+        util.toast(`Не удалось создать: ${e.message}`, 'err');
+      }
+      return;
+    }
+    const url = new URL(location.href);
+    url.searchParams.delete('standalone');
+    url.searchParams.set('pid', v);
+    location.href = url.toString();
+  });
+}
+
+function projectHasServiceData(pid) {
+  if (!pid) return false;
+  const prefix = `raschet.project.${pid}.service.`;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix)) {
+        const v = localStorage.getItem(k);
+        if (v && v !== 'null' && v !== '[]') return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
+function renderOrdersList() {
+  const root = $('sv-orders-list');
+  if (!root) return;
+  if (!_orders.length) {
+    root.innerHTML = '<p class="muted" style="font-size:11.5px;padding:6px">Нарядов нет. Кнопка «+ Наряд» создаст первый.</p>';
+    return;
+  }
+  root.innerHTML = _orders.map(o => {
+    const isActive = o.id === _activeOrderId;
+    const tLabel = ORDER_TYPES.find(t => t.id === o.type)?.label || o.type;
+    return `<div class="sv-order-row${isActive ? ' active' : ''}" data-order-id="${util.escAttr(o.id)}" title="Кликните чтобы открыть наряд «${util.escAttr(o.name)}»">
+      <div class="sv-order-name">${util.escHtml(o.name || '(без имени)')}</div>
+      <div class="sv-order-meta">${util.escHtml(tLabel)} · ${util.escHtml(o.date || '')}</div>
+      <button type="button" class="sv-order-del" data-act="delete" data-order-id="${util.escAttr(o.id)}" title="Удалить наряд">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function renderActive() {
+  renderContextPicker();
+  renderOrdersList();
+  renderModuleActionsHere();
+  const empty = $('sv-empty');
+  const pane = $('sv-active-pane');
+  const order = activeOrder();
+  if (!order) {
+    if (empty) empty.style.display = 'flex';
+    if (pane) pane.hidden = true;
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  if (pane) pane.hidden = false;
+  const wrap = $('sv-order-form-wrap');
+  if (wrap) {
+    wrap.innerHTML = '';
+    const cf = makeConvertFn();
+    wrap.appendChild(renderOrderForm(order, (next) => {
+      const idx = _orders.findIndex(o => o.id === order.id);
+      if (idx >= 0) _orders[idx] = next;
+      persist();
+      renderActive();
+    }, _currency, cf));
+  }
+  const headName = $('sv-active-name');
+  if (headName) headName.textContent = `🛠 ${order.name || '(без имени)'}`;
+}
+
+function renderModuleActionsHere() {
+  const root = $('sv-content-actions');
+  if (!root) return;
+  renderModuleActions(root, {
+    moduleId: 'service',
+    moduleTitle: 'Сервис: монтаж и ТО',
+    navMode: _navMode,
+    navReturn: _navReturn,
+    crossLinks: [
+      { id: 'cooling', label: '❄ Подбор холода', path: '../cooling/' },
+      { id: 'projects', label: '📁 Проекты', path: '../projects/' },
+    ],
+    onComplete: () => completeReturn(_navReturn, { module: 'service' }),
+    onCancel: () => cancelReturn(_navReturn),
+  });
+}
+
+// ---- Helpers ----
+function svPrompt(label, def = '') {
+  return util.modalOpen('<h3>Ввод значения</h3>',
+    `<label>${util.escHtml(label)}:<input type="text" id="sv-prompt-input" value="${util.escAttr(def)}" autofocus></label>`,
+    async () => ({ value: document.getElementById('sv-prompt-input').value })
+  ).then(r => r ? r.value : null);
+}
+function svConfirm(msg) {
+  return util.modalOpen('<h3>Подтверждение</h3>', `<p>${util.escHtml(msg)}</p>`,
+    async () => ({ ok: true })).then(r => !!r);
+}
+
+// ---- Init ----
+async function init() {
+  const nav = detectNavMode();
+  _navMode = nav.mode;
+  _navReturn = nav.return;
+  _standalone = (_navMode === 'standalone');
+
+  if (!_standalone) {
+    const params = new URLSearchParams(location.search);
+    const urlPid = params.get('pid');
+    if (urlPid) {
+      const proj = getProject(urlPid);
+      if (proj) { setActiveProjectId(urlPid); _pid = proj; }
+      else _pid = ensureDefaultProject();
+    } else {
+      _pid = ensureDefaultProject();
+    }
+  }
+
+  _orders = loadJson(KEY_ORDERS, []) || [];
+  _activeOrderId = loadJson(KEY_ACTIVE_ID, null);
+  const savedCur = loadJson(KEY_CURRENCY, null);
+  if (typeof savedCur === 'string') _currency = savedCur;
+
+  // Ensure unique seq
+  for (const o of _orders) {
+    const m = /ord-(\d+)/.exec(o.id);
+    if (m) _seq = Math.max(_seq, +m[1] + 1);
+  }
+  if (_activeOrderId && !_orders.some(o => o.id === _activeOrderId)) {
+    _activeOrderId = _orders[0]?.id || null;
+  }
+
+  // Currency picker
+  const curSel = $('sv-currency');
+  if (curSel) {
+    curSel.innerHTML = CURRENCIES.map(c =>
+      `<option value="${c.code}"${c.code === _currency ? ' selected' : ''} title="${c.label}">${c.code} — ${c.label}</option>`
+    ).join('');
+    curSel.addEventListener('change', () => {
+      _currency = curSel.value || '₽';
+      persist();
+      renderActive();
+    });
+  }
+  // Date picker
+  const dateInp = $('sv-rates-date');
+  if (dateInp) {
+    dateInp.value = _ratesDate;
+    dateInp.addEventListener('change', async () => {
+      _ratesDate = dateInp.value;
+      try { localStorage.setItem('service.ratesDate.v1', _ratesDate); } catch {}
+      _ratesCache = null;
+      await ensureRatesLoaded();
+      renderActive();
+    });
+  }
+
+  // Add-order button
+  const addBtn = $('sv-add-order');
+  if (addBtn) addBtn.addEventListener('click', async () => {
+    const name = await svPrompt('Название наряда', `Наряд ${_orders.length + 1}`);
+    if (!name?.trim()) return;
+    const newOrd = {
+      ...DEFAULT_ORDER,
+      id: 'ord-' + (_seq++),
+      name: name.trim(),
+    };
+    _orders.push(newOrd);
+    _activeOrderId = newOrd.id;
+    persist();
+    renderActive();
+    util.toast(`Наряд «${newOrd.name}» создан`, 'ok');
+  });
+
+  // Orders list interactions
+  $('sv-orders-list').addEventListener('click', async (e) => {
+    const delBtn = e.target.closest('button[data-act="delete"]');
+    if (delBtn) {
+      e.stopPropagation();
+      const id = delBtn.dataset.orderId;
+      const o = _orders.find(x => x.id === id);
+      if (!o) return;
+      const ok = await svConfirm(`Удалить наряд «${o.name}»?`);
+      if (!ok) return;
+      _orders = _orders.filter(x => x.id !== id);
+      if (_activeOrderId === id) _activeOrderId = _orders[0]?.id || null;
+      persist();
+      renderActive();
+      util.toast('Наряд удалён', 'info');
+      return;
+    }
+    const row = e.target.closest('.sv-order-row');
+    if (row && !e.target.closest('button')) {
+      _activeOrderId = row.dataset.orderId;
+      persist();
+      renderActive();
+    }
+  });
+
+  await ensureRatesLoaded();
+  renderActive();
+}
+
+document.addEventListener('DOMContentLoaded', init);

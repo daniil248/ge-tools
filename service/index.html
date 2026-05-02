@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сервис: монтаж и ТО — Raschet</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="stylesheet" href="../shared/app-header.css">
+  <link rel="stylesheet" href="../shared/auth-gate.css">
+  <link rel="stylesheet" href="service.css">
+  <script src="../shared/auth-gate.js" defer></script>
+</head>
+<body>
+  <div id="rs-header-mount"></div>
+  <script type="module">
+    import { mountHeader } from '../shared/app-header.js';
+    import { mountHelp } from '../shared/help-panel.js';
+    mountHeader({ title: 'Сервис: монтаж и ТО', home: '../hub.html', moduleId: 'service', moduleTitle: 'Сервис: монтаж и ТО' });
+    mountHelp({
+      module: 'service',
+      title: 'Модуль «Сервис: монтаж и ТО»',
+      usage: `
+        <h4>Назначение</h4>
+        <p>Расчёт стоимости монтажных и сервисных работ для инженера сервиса. Формирование себестоимости + клиент-цены с маржой по проекту или для разовых работ.</p>
+        <h4>Структура</h4>
+        <ul>
+          <li><b>Наряд</b> — единица работы. Тип: Монтаж / ТО / Разовая.</li>
+          <li><b>Позиции</b> — таблица: одна строка = одна работа/материал/командировка с qty/unit/себес-ценой/клиент-ценой и валютой.</li>
+          <li><b>Накладные</b> (% от себеса) и <b>НДС</b> (% от клиент-цены) — параметры наряда.</li>
+        </ul>
+        <h4>Шаблоны</h4>
+        <p>Кнопка «📚 Из шаблонов» предлагает базовый каталог типовых работ для текущего типа наряда (монтаж чиллера, ТО квартальное, заправка хладагента и т.п.) с дефолтными ценами в ₽. После добавления — отредактируйте.</p>
+        <h4>Расчёт маржи</h4>
+        <ul>
+          <li><b>Себес итого</b> = Σ qty × cost + накладные.</li>
+          <li><b>К оплате</b> = Σ qty × client + НДС.</li>
+          <li><b>Маржа абс</b> = Клиент-без-НДС − Себес-итого.</li>
+          <li><b>Маржа %</b> = Маржа / Себес × 100.</li>
+        </ul>
+        <p style="font-size:11.5px;color:#94a3b8">Целевая маржа ≥ 30% для устойчивого бизнеса; 15–30% — приемлемо; &lt; 15% — пересмотрите цены / снизьте себес.</p>
+        <h4>Контекст</h4>
+        <p>Кейсы хранятся в выбранном «Контексте» (см. picker сверху сайдбара). Доступны режимы: «🔓 Без проекта (разовый)», «🛠 Локальный кейс сервиса» (sketch-проект), «💼 Проект с нарядами», «📁 Прочие проекты». При смене контекста — страница перезагружается с подгрузкой нарядов выбранного контекста.</p>
+      `,
+      calcs: `
+        <h4>Формулы</h4>
+        <pre style="background:#f8fafc;padding:8px;border-radius:3px;font-size:12px">Σ Себес        = Σ_positions  qty × costPrice (с per-cell currency-конверсией)
+Σ Накладные    = Σ Себес × overheadPct / 100
+Себес итого    = Σ Себес + Σ Накладные
+
+Σ Клиент       = Σ_positions  qty × clientPrice
+Σ НДС          = Σ Клиент × vatPct / 100
+К оплате       = Σ Клиент + Σ НДС
+
+Маржа абс.    = Σ Клиент − Себес итого
+Маржа %       = Маржа абс. / Себес итого × 100</pre>
+        <h4>Конвертация валют</h4>
+        <p>Каждая ячейка цены (cost / client) имеет свою валюту. При расчёте Σ — каждая позиция конвертируется отдельно из своей native-валюты в валюту проекта по курсу на «Дату курса» (см. picker сверху сайдбара). Курсы тянутся через <code>shared/currency-rates</code> (НБ РК / ЦБ РФ / Frankfurter / open.er-api).</p>
+      `
+    });
+  </script>
+
+  <main class="sv-main">
+    <aside class="sv-sidebar rs-sidebar">
+      <div id="sv-context-picker" class="sv-context-picker"></div>
+
+      <div class="sv-section">
+        <h3 title="Валюта проекта/отчёта. Все суммы в нарядах конвертируются в эту валюту по курсу на «Дату курса».">💰 Валюта и курсы</h3>
+        <label style="font-size:12px;color:#374151;display:block;margin-bottom:6px"
+               title="Валюта в которой считаются итоги нарядов.">
+          <span style="display:block;margin-bottom:4px">Валюта:</span>
+          <select id="sv-currency" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px"></select>
+        </label>
+        <label style="font-size:12px;color:#374151;display:block"
+               title="Дата на которую брать курсы валют. Применяется ко всем конвертациям в текущей сессии.">
+          <span style="display:block;margin-bottom:4px">📅 Дата курса:</span>
+          <input type="date" id="sv-rates-date" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+        </label>
+      </div>
+
+      <div class="sv-section">
+        <h3 title="Список нарядов — один наряд = одна работа (или их пакет: 1 монтаж + ПНР + ТО на год).">🛠 Наряды</h3>
+        <div id="sv-orders-list" class="sv-orders-list"></div>
+        <div style="margin-top:6px">
+          <button type="button" class="sv-btn-primary" id="sv-add-order" style="width:100%"
+                  title="Создать новый наряд. Откроется prompt для имени.">+ Наряд</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="sv-content">
+      <div class="sv-content-header" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div>
+          <h2 id="sv-active-name">— нет активного наряда —</h2>
+        </div>
+        <div id="sv-content-actions" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;font-size:12px"></div>
+      </div>
+
+      <div id="sv-empty" class="sv-empty">
+        <div>
+          <h3>Нет активного наряда</h3>
+          <p class="muted">Слева — добавьте новый наряд через «+ Наряд».</p>
+        </div>
+      </div>
+
+      <div id="sv-active-pane" class="sv-active-pane" hidden>
+        <div id="sv-order-form-wrap"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="service.js"></script>
+  <div id="rs-footer-mount"></div>
+  <script type="module">
+    import { mountFooter } from '../shared/module-footer.js';
+    mountFooter({ moduleId: 'service' });
+  </script>
+</body>
+</html>

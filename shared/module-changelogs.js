@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.24', date: '2026-05-02', items: [
+      '🐛 <b>Fix: суммы не пересчитываются при изменении валюты в costItems</b>. По репорту: «суммы не просчитываются при изменении валюты». Корневая причина: <code>&lt;select&gt;</code> срабатывал input-event ДО change, и input-handler перезаписывал currency → к моменту change oldCur === newCur → конверсия не выполнялась. Теперь input полностью игнорирует currency, всё в change. Toast сообщает результат конвертации.',
+      '📈 <b>TCO/Payback переехал на ПОДБОР-уровень</b>. По требованию: «сравнение CAPEX TCO должно относиться к Подбору, а не к опции». Новая selection-scope вкладка «📈 TCO / Payback» содержит: KPI основного (★) варианта + TCO chart по годам всех вариантов + сводная таблица CAPEX/OPEX/TCO/Payback. Опция-вкладка переименована в «💰 CAPEX (входные)» — только форма для текущей опции с напоминанием куда ушёл TCO.',
+      '🛠 <b>Service модуль (Phase 24.1) полностью развёрнут</b>: <code>service/service.js</code> orchestrator + <code>service/index.html</code> + <code>service/service.css</code> + карточка в hub.html. Поддерживает 3 режима (standalone / project / embed), picker контекста с группировкой («🛠 Локальные кейсы сервиса» / «💼 Проекты с нарядами» / «📁 Прочие»), список нарядов в сайдбаре, форма наряда с positions table (категория/qty/unit/себес-цена/клиент-цена/валюта), totals по разделам (себес → накладные → клиент → НДС → маржа), цветовая индикация маржи (зелёная ≥30%, жёлтая 15–30%, красная &lt;15%).',
+      '🎯 <b>Tab click переключает focus</b>: клик по selection-scope tab → focus=\'selection\', по option-scope → focus=\'option\'. Теперь можно явно переключаться между уровнями через сами tabs (не только через сайдбар).',
+      'Файлы: <code>cooling/ui/capex-form.js</code>, <code>cooling/cooling.js</code>, <code>cooling/index.html</code>, <code>service/*</code> (новый модуль), <code>hub.html</code>.',
+    ] },
     { version: '0.60.23', date: '2026-05-02', items: [
       '🎯 <b>Tabs разделены по scope: подбор / опция</b>. По требованию: «не очевидно какие вкладки к чему относятся, давай раздели, при выборе подбора, вкладки для подбора и общие данные, а при выборе опции, только данные по опции».',
       '• Tabs scoped: <code>data-scope="selection"</code> (Свойства подбора + Сравнение) vs <code>data-scope="option"</code> (Spec + Энергия + CAPEX + Топология).',

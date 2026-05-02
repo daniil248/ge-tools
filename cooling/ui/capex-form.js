@@ -276,12 +276,14 @@ export async function openCostItemsModal(initialItems, displayCurrency, convertF
       if (!items[idx]) return;
       const attr = ev.target.dataset.attr;
       const col = ev.target.dataset.col;
+      // v0.60.24: input НЕ обрабатывает currency (это было причиной что conversion
+      // не работал — input для <select> срабатывал ДО change → oldCur === newCur).
+      if (attr === 'currency') return;
       if (attr === 'label')     items[idx].label = ev.target.value;
-      else if (attr === 'qty')  items[idx].qty   = Number(ev.target.value) || 1;
-      else if (col && attr) {
+      else if (attr === 'qty' && !items[idx].linkedGroupId) items[idx].qty = Number(ev.target.value) || 1;
+      else if (col && attr === 'value') {
         if (!items[idx][col]) items[idx][col] = { value: 0, currency: displayCurrency };
-        if (attr === 'value')         items[idx][col].value    = Number(ev.target.value) || 0;
-        else if (attr === 'currency') items[idx][col].currency = ev.target.value;
+        items[idx][col].value = Number(ev.target.value) || 0;
       }
       repaintTotals();
     });
@@ -298,17 +300,23 @@ export async function openCostItemsModal(initialItems, displayCurrency, convertF
         const oldCur = items[idx][col].currency;
         const newCur = ev.target.value;
         if (oldCur !== newCur) {
-          // v0.60.22 (по требованию: «пересчёт не работает»): авто-пересчитать
-          // value по курсу при смене валюты ячейки.
+          // v0.60.24 (по требованию: «суммы не пересчитываются при изменении
+          // валюты»): авто-пересчитать value по курсу. Раньше input-event
+          // <select> срабатывал ДО change → oldCur === newCur. Теперь input
+          // полностью игнорирует currency, а change делает конверсию.
           const curVal = Number(items[idx][col].value) || 0;
-          if (curVal > 0 && convertFn) {
-            const v = convertFn(curVal, oldCur, newCur);
-            if (Number.isFinite(v) && v > 0) {
-              items[idx][col].value = +(v.toFixed(2));
-              const valInp = tr.querySelector(`.cl-ci-val[data-col="${col}"]`);
-              if (valInp) valInp.value = items[idx][col].value;
-              if (typeof toast === 'function') {
-                toast(`${oldCur} → ${newCur}: ${curVal} → ${items[idx][col].value}`, 'info');
+          if (curVal > 0) {
+            if (!convertFn) {
+              toast(`Курсы валют не загружены (${oldCur}→${newCur}). Откройте справочник 💱 в сайдбаре.`, 'err');
+            } else {
+              const v = convertFn(curVal, oldCur, newCur);
+              if (Number.isFinite(v) && v > 0) {
+                items[idx][col].value = +(v.toFixed(2));
+                const valInp = tr.querySelector(`.cl-ci-val[data-col="${col}"]`);
+                if (valInp) valInp.value = items[idx][col].value;
+                toast(`${curVal} ${oldCur} → ${items[idx][col].value} ${newCur}`, 'ok');
+              } else {
+                toast(`Курс ${oldCur}→${newCur} не найден. Значение сохранено как есть.`, 'err');
               }
             }
           }

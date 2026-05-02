@@ -945,14 +945,12 @@ function renderActiveTab() {
     const tbl = $('cl-annual-table');
     if (tbl) tbl.innerHTML = renderAnnualTable(rows, _activeCols);
   } else if (_activeTab === 'capex') {
+    // v0.60.24: option-tab «CAPEX (входные)» — только форма для текущей опции.
+    // TCO chart/KPI/Payback переехали в selection-tab «📈 TCO / Payback».
     const fwrap = $('cl-capex-form-wrap');
     if (fwrap) {
       fwrap.innerHTML = '';
       const cf = makeConvertFn();
-      // v0.60.23: синхронизируем costItems с option.equipment[] перед рендером —
-      // основные «железки» получают qty из топологии (linkedGroupId), label
-      // авто-обновляется. Пользовательские позиции (без linkedGroupId)
-      // сохраняются как есть.
       opt.eco = { ...opt.eco, costItems: syncCostItemsFromEquipment(opt.eco, opt.equipment, _currency) };
       persist();
       fwrap.appendChild(renderCapexForm(opt.eco, (next) => {
@@ -961,33 +959,28 @@ function renderActiveTab() {
         renderActiveTab();
       }, _currency, cf));
     }
+  } else if (_activeTab === 'tco') {
+    // v0.60.24: ПОДБОР-уровень. TCO chart + KPI основного + сводка по всем вариантам.
     const convertFn = makeConvertFn();
-    const pSpec = primarySpec(opt);
-    const rows = buildBinData(hourly, pSpec);
     const tariffDisp = tariffInDisplayCurrency();
-    const fc = computeFcSummary(rows, pSpec, tariffDisp, hourly);
-    const ecoConv = convertEcoToCurrency(opt.eco, _currency, convertFn);
-    const tco = computeTco({ annualEnergyKwh: fc ? fc.energyKwh : 0, tariffRubKwh: tariffDisp, eco: ecoConv });
-    // Payback относительно ОСНОВНОГО варианта подбора (а не первого).
-    let payback = null;
-    const main = sel.options.find(o => o.id === sel.mainOptionId);
-    if (main && main.id !== opt.id) {
-      const mainSpec = primarySpec(main);
-      const bRows = buildBinData(hourly, mainSpec);
-      const bFc = computeFcSummary(bRows, mainSpec, tariffDisp, hourly);
-      const bEcoConv = convertEcoToCurrency(main.eco, _currency, convertFn);
-      const bTco = computeTco({ annualEnergyKwh: bFc ? bFc.energyKwh : 0, tariffRubKwh: tariffDisp, eco: bEcoConv });
-      payback = discountedPaybackYears(tco, bTco);
+    const reqKw = requiredCoolingKwOf(sel);
+    const ordered = orderedOptionsForCompare(sel);
+    const allMetrics = compareOptions(ordered, hourly, tariffDisp, _currency, convertFn, reqKw);
+
+    // KPI по основному (★) варианту
+    const main = sel.options.find(o => o.id === sel.mainOptionId) || sel.options[0];
+    if (main) {
+      const mainMetrics = allMetrics.find(m => m.name === main.name) || allMetrics[0];
+      const kpi = $('cl-tco-kpi');
+      if (kpi && mainMetrics) kpi.innerHTML = renderTcoKpi(mainMetrics.tco, null, _currency);
     }
-    const kpi = $('cl-tco-kpi');
-    if (kpi) kpi.innerHTML = renderTcoKpi(tco, payback, _currency);
+
     const cvs = $('cl-tco-chart');
-    if (cvs) {
-      // TCO chart по всем вариантам ТЕКУЩЕГО подбора (с основным первым).
-      const ordered = orderedOptionsForCompare(sel);
-      const allMetrics = compareOptions(ordered, hourly, tariffDisp, _currency, convertFn, requiredCoolingKwOf(sel));
-      drawTcoChart(cvs, allMetrics, _currency);
-    }
+    if (cvs) drawTcoChart(cvs, allMetrics, _currency);
+
+    // Сводная таблица по вариантам подбора
+    const sumWrap = $('cl-tco-summary');
+    if (sumWrap) sumWrap.innerHTML = renderTcoSummaryTable(allMetrics, _currency);
   } else if (_activeTab === 'topology') {
     // v0.60.15 (refined): Топология теперь per-OPTION; равзвертка из equipment[].
     // Свойства подбора (selection.general): requiredCoolingKw + safetyMarginPct.
@@ -1156,6 +1149,36 @@ function orderedOptionsForCompare(sel) {
   const main = sel.options.find(o => o.id === sel.mainOptionId);
   if (!main) return sel.options;
   return [main, ...sel.options.filter(o => o.id !== main.id)];
+}
+
+/* v0.60.24: компактная сводная таблица TCO для всех вариантов подбора. */
+function renderTcoSummaryTable(metrics, currency) {
+  if (!metrics || !metrics.length) return '<p class="muted">Нет вариантов для сводки.</p>';
+  const cur = currency || '₽';
+  const fmt = (v) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(v) + ' ' + cur;
+  const rows = metrics.map((m, i) => `
+    <tr ${i === 0 ? 'style="background:#fef3c7"' : ''}>
+      <td title="${i === 0 ? 'Основной (★) вариант — baseline для payback' : ''}">${i === 0 ? '★ ' : ''}${util.escHtml(m.name)}</td>
+      <td class="num" title="Σ qty × ratedCap активных единиц">${Math.round(m.installedKw || 0)} кВт</td>
+      <td class="num" title="Capital expenses (год 0)">${fmt(m.tco.capex || 0)}</td>
+      <td class="num" title="Годовое OPEX = energy × tariff в первый год">${fmt(m.fc.costRub || 0)}</td>
+      <td class="num" title="Total Cost of Ownership (NPV)">${fmt(m.tco.tco || 0)}</td>
+      <td class="num" title="Среднегодовая стоимость владения">${fmt(m.tco.averageRubPerYear || 0)}</td>
+      <td title="Discounted payback относительно основного варианта">${i === 0 ? 'baseline' : (m.payback ? (m.payback.neverPaysBack ? `> ${m.tco.projectLifetimeYears} лет` : `${m.payback.exact.toFixed(1)} лет`) : '—')}</td>
+    </tr>
+  `).join('');
+  return `<table class="cl-annual-table" style="font-size:12px;width:100%">
+    <thead><tr>
+      <th title="Имя варианта">Вариант</th>
+      <th class="num" title="Установленная мощность системы">Установлено</th>
+      <th class="num" title="CAPEX (год 0)">CAPEX</th>
+      <th class="num" title="OPEX за первый год">OPEX/год</th>
+      <th class="num" title="TCO (NPV)">TCO</th>
+      <th class="num" title="Σ TCO / lifetime">Средн./год</th>
+      <th title="Discounted payback">Payback</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 
 /* ----- Init ----- */
@@ -1372,7 +1395,10 @@ function init() {
   document.querySelectorAll('.cl-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       _activeTab = btn.dataset.tab;
-      renderActiveTab();
+      // v0.60.24: клик по tab переключает focus в соответствии со scope
+      const scope = btn.dataset.scope;
+      if (scope) _focus = scope;
+      renderActive();
     });
   });
 
