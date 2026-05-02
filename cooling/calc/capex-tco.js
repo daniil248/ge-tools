@@ -52,16 +52,24 @@
  * Default-параметры экономической модели.
  */
 export const DEFAULT_ECONOMICS = {
-  currency: '₽',                                // дефолт-валюта новых полей
+  currency: '₸',                                // v0.60.48: дефолт валюта проекта
   costItems: [],                                // v0.60.21: единая таблица статей
   // legacy (поддерживаем чтение, но новые опции не пишут):
-  equipmentCost:        { value: 0, currency: '₽' },
-  installationCost:     { value: 0, currency: '₽' },
-  maintenanceRubPerYear:{ value: 0, currency: '₽' },
+  // v0.60.48: equipment в USD (импорт), install/maintenance в ₸ (местные работы).
+  equipmentCost:        { value: 0, currency: '$' },
+  installationCost:     { value: 0, currency: '₸' },
+  maintenanceRubPerYear:{ value: 0, currency: '₸' },
   projectLifetimeYears: 20,
   discountRatePct: 8,
   escalationEnergyPct: 5,
   escalationMaintPct: 4,
+};
+
+/* v0.60.48: дефолтная валюта для НОВОЙ ячейки costItems по типу затрат. */
+export const DEFAULT_COST_ITEM_CURRENCY = {
+  equipmentPrice:          '$',   // Оборудование — импорт, USD
+  installPrice:            '₸',   // Монтаж — местные тенге
+  maintenancePerYearPrice: '₸',   // ТО — местные тенге
 };
 
 /** Колонки таблицы costItems (для генерации UI и расчёта). */
@@ -213,9 +221,10 @@ export function syncCostItemsFromEquipment(eco, equipment, defaultCur = '₽') {
         linkedGroupId: grp.id,
         label: grp.spec.name || `Группа ${grp.id}`,
         qty,
-        equipmentPrice:          { value: 0, currency: defaultCur },
-        installPrice:            { value: 0, currency: defaultCur },
-        maintenancePerYearPrice: { value: 0, currency: defaultCur },
+        // v0.60.48: USD для оборудования, ₸ для монтажа/ТО.
+        equipmentPrice:          { value: 0, currency: DEFAULT_COST_ITEM_CURRENCY.equipmentPrice },
+        installPrice:            { value: 0, currency: DEFAULT_COST_ITEM_CURRENCY.installPrice },
+        maintenancePerYearPrice: { value: 0, currency: DEFAULT_COST_ITEM_CURRENCY.maintenancePerYearPrice },
       }, defaultCur));
     }
   }

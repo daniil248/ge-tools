@@ -12,6 +12,7 @@
 // Pure JS / LS utility wrappers.
 
 import { projectKey, getProject } from './project-storage.js';
+import { formatOrderNumber, DEFAULT_NUMBER_PATTERNS } from '../service/calc/order-model.js';
 
 const KEY_ORDERS    = ['service', 'orders.v1'];
 const KEY_ACTIVE_ID = ['service', 'activeOrderId.v1'];
@@ -39,6 +40,23 @@ function buildOrderDefaultsFromProjectRequisites(pid) {
   } catch { return {}; }
 }
 
+/* v0.60.48: учётный номер с per-context per-type counter. */
+const KEY_NUM_COUNTERS = ['service', 'numberCounters.v1'];
+const KEY_NUM_PATTERNS = ['service', 'numberPatterns.v1'];
+
+function nextOrderNumber(pid, type) {
+  const cKey = storageKey(pid, KEY_NUM_COUNTERS);
+  let counters = {};
+  try { const raw = localStorage.getItem(cKey); if (raw) counters = JSON.parse(raw); } catch {}
+  const next = (Number(counters[type]) || 0) + 1;
+  counters[type] = next;
+  try { localStorage.setItem(cKey, JSON.stringify(counters)); } catch {}
+  let patterns = {};
+  try { const raw = localStorage.getItem(storageKey(pid, KEY_NUM_PATTERNS)); if (raw) patterns = JSON.parse(raw); } catch {}
+  const pattern = patterns[type] || DEFAULT_NUMBER_PATTERNS[type] || '{counter}';
+  return formatOrderNumber(pattern, next);
+}
+
 function nextOrderId(pid) {
   let max = 0;
   try {
@@ -62,13 +80,15 @@ function nextOrderId(pid) {
 export function createServiceOrderForProject(pid, orderData = {}) {
   const id = orderData.id || nextOrderId(pid);
   // v0.60.41: автозаполнение customer/notes из реквизитов проекта если caller
-  // не передал. По требованию: «если модуль запущен из проекта, то все
-  // данные о заказчике должны добавиться из свойств проекта».
+  // не передал.
   const projectDefaults = pid ? buildOrderDefaultsFromProjectRequisites(pid) : {};
+  // v0.60.48 (Phase 32.1): учётный номер. Counter — per-context per-type.
+  const number = orderData.number || nextOrderNumber(pid, orderData.type || 'install');
   const order = {
     ...projectDefaults,
     ...orderData,                 // caller-overrides выше project-defaults
     id,
+    number,
     // merge customer без потери частичных полей
     customer: { ...(projectDefaults.customer || {}), ...(orderData.customer || {}) },
   };

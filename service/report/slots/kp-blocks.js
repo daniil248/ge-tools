@@ -67,9 +67,10 @@ export function docTitle(ctx) {
 export function docMeta(ctx) {
   const { B, order } = ctx;
   const date = order.date || new Date().toISOString().slice(0, 10);
-  const orderNum = order.id || 'без №';
+  // v0.60.48: предпочитаем учётный номер (order.number) над internal id.
+  const orderNum = order.number || order.id || 'без №';
   return [
-    B.h2(`№${orderNum} от ${date} · «${order.name || '(без названия)'}»`),
+    B.h2(`№ ${orderNum} от ${date} · «${order.name || '(без названия)'}»`),
     B.spacer(2),
   ];
 }

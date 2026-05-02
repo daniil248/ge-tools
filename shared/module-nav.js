@@ -101,7 +101,12 @@ export function completeReturn(navContext, payload) {
   try {
     localStorage.setItem(LS_PREFIX + navContext.sessionId + '.payload', JSON.stringify(payload || {}));
   } catch {}
-  location.href = `${navContext.path}?navResult=${encodeURIComponent(navContext.sessionId)}`;
+  // v0.60.48 fix: navContext.path может уже содержать query-string (например
+  // /cooling/?pid=p_qarmet). Раньше склеивали через `?navResult=...` →
+  // получался невалидный URL «?pid=...?navResult=...» → pid терялся, navResult
+  // не подхватывался. Теперь корректно: '&' если query уже есть, иначе '?'.
+  const sep = navContext.path.includes('?') ? '&' : '?';
+  location.href = `${navContext.path}${sep}navResult=${encodeURIComponent(navContext.sessionId)}`;
 }
 
 /**

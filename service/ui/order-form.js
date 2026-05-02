@@ -43,8 +43,12 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
     <div class="sv-section">
       <div class="sv-section-title" title="Параметры наряда: имя, тип, заказчик, дата.">📋 Свойства наряда</div>
       <div class="sv-grid">
-        <label class="sv-field" title="Краткое имя наряда (например «Монтаж чиллера York YLAA200 для ЦОД-1»). Появляется в списке нарядов.">
-          <span>Название</span>
+        <label class="sv-field" title="Учётный номер наряда — для учётной системы / 1С. Auto-генерируется при создании наряда по pattern (КП-{year}-{counter:0000}). Можно изменить вручную.">
+          <span>Учётный № (КП/ТО/ЗН)</span>
+          <input type="text" data-of="number" value="${escAttr(o.number || '')}" placeholder="напр. КП-2026-0042">
+        </label>
+        <label class="sv-field" title="Краткое имя/описание наряда (например «Монтаж чиллера York YLAA200 для ЦОД-1»). Появляется в списке нарядов.">
+          <span>Название / описание</span>
           <input type="text" data-of="name" value="${escAttr(o.name || '')}" placeholder="Например: Монтаж чиллера для серверной A">
         </label>
         <label class="sv-field" title="Тип наряда. Влияет на подсказки шаблонов работ.">

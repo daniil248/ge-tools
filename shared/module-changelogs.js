@@ -4,6 +4,22 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.48', date: '2026-05-03', items: [
+      '🚨 <b>HOTFIX: meteo не возвращал датасет в cooling из-за двойного «?»</b>. По репорту: «модуль так и не возвращает выбранный город, и не сохраняет загруженные метеоданные».',
+      '• Корневая причина: <code>completeReturn(navContext, payload)</code> в shared/module-nav.js делал <code>${navContext.path}?navResult=...</code>. Когда navContext.path уже содержал query (например <code>/cooling/?pid=p_qarmet</code> с v0.60.33) — получалось <code>/cooling/?pid=p_qarmet?navResult=...</code> с двумя «?». Браузер парсил весь хвост как одно value: <code>pid = p_qarmet?navResult=xxxx</code>. Pid ломался, navResult не виделся → cooling не получал payload и не обновлял датасет.',
+      '• Fix: <code>const sep = path.includes(\'?\') ? \'&\' : \'?\'</code> — корректное склеивание query.',
+      '🔢 <b>Phase 32.1: учётные номера нарядов</b>. По требованию пользователя: «У нарядов должны быть номера, в учётной системе и отдельно названия (или краткое описание)». Добавлено:',
+      '• <code>order.number</code> — учётный номер (в дополнение к <code>order.name</code>).',
+      '• <code>formatOrderNumber(pattern, counter, date?)</code> в order-model.js: токены <code>{year} {YY} {month} {quarter} {counter} {counter:0000}</code>.',
+      '• <code>DEFAULT_NUMBER_PATTERNS</code>: КП-{year}-{counter:0000} / ТО-{year}-{counter:0000} / ЗН-{year}-{counter:0000}.',
+      '• Per-context per-type counter в LS (<code>service.numberCounters.v1</code>) — auto-инкремент при создании наряда. Через «+ Наряд», quick-create из cooling и cooling→service push.',
+      '• UI: поле «Учётный № (КП/ТО/ЗН)» в форме наряда; номер показывается в sidebar list (синим жирным) и в content header «🛠 № КП-2026-0001 — Название».',
+      '• В КП docMeta теперь использует <code>order.number</code> вместо internal id.',
+      '💵 <b>Default currencies: USD для оборудования, ₸ для работ</b>. По требованию: «валюту по умолчанию для оборудования поставь USD а для работ и сервиса тенге».',
+      '• <code>service/calc/order-model.js::DEFAULT_CURRENCY_BY_CATEGORY</code>: material → $, labor/travel/subcontract/other → ₸. <code>defaultPosition(displayCurrency, category)</code> теперь учитывает категорию.',
+      '• <code>cooling/calc/capex-tco.js</code>: <code>DEFAULT_ECONOMICS</code> + <code>DEFAULT_COST_ITEM_CURRENCY</code> — equipmentPrice → $, installPrice/maintenancePerYearPrice → ₸. <code>syncCostItemsFromEquipment</code> создаёт новые auto-rows с этими дефолтами.',
+      'Файлы: <code>shared/module-nav.js</code>, <code>service/calc/order-model.js</code>, <code>service/service.js</code>, <code>service/ui/order-form.js</code>, <code>service/report/slots/kp-blocks.js</code>, <code>shared/service-bridge.js</code>, <code>cooling/calc/capex-tco.js</code>.',
+    ] },
     { version: '0.60.47', date: '2026-05-03', items: [
       '🧹 <b>ROADMAP cleanup: убран дубль Phase 31 (refrigeration)</b>. По репорту: «у нас уже вроде было запланировано работа с хладагентами, а ты добавил новую фазу». В Phase 12 (Точные расчёты HVAC) ужe был пункт 12.2 — Модуль <code>refrigeration-cycles/</code> с REFPROP-подобной библиотекой хладагентов. Расширил пункт 12.2 подпунктами 12.2.1–12.2.5 (refrigerants каталог, реальные эффекты в цикле, UI Cycle calculator, интеграция с chiller-defaults, подбор компрессоров) — то что я ошибочно положил в новую Phase 31. Phase 31 удалена.',
     ] },

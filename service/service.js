@@ -23,7 +23,7 @@ import '../shared/currency-rates/sources/index.js';
 import * as util from '../meteo/util.js';
 import { CURRENCIES, currencyToIso } from '../cooling/calc/fc-summary.js';
 import { openKpTemplateEditor } from './report/kp-editor.js';
-import { DEFAULT_ORDER, ORDER_TYPES, defaultPosition } from './calc/order-model.js';
+import { DEFAULT_ORDER, ORDER_TYPES, defaultPosition, formatOrderNumber, DEFAULT_NUMBER_PATTERNS } from './calc/order-model.js';
 import { renderOrderForm } from './ui/order-form.js';
 import { openWorkCatalogModal } from './ui/work-catalog.js';
 import {
@@ -244,6 +244,21 @@ function renderRichEmptyState(host) {
   });
 }
 
+/* v0.60.48 (Phase 32.1): сгенерировать учётный номер для нового наряда
+   с auto-инкрементом counter в context-namespace. */
+const KEY_NUMBER_COUNTERS = ['service', 'numberCounters.v1'];
+
+function nextOrderNumber(type) {
+  // Counter — per-context (project pid или standalone) и per-type
+  const counters = loadJson(KEY_NUMBER_COUNTERS, {}) || {};
+  const next = (Number(counters[type]) || 0) + 1;
+  counters[type] = next;
+  saveJson(KEY_NUMBER_COUNTERS, counters);
+  // Pattern: пользовательский в settings, иначе default
+  const pattern = (loadJson(['service', 'numberPatterns.v1'], {}) || {})[type] || DEFAULT_NUMBER_PATTERNS[type] || '{counter}';
+  return formatOrderNumber(pattern, next);
+}
+
 /* v0.60.41: собрать default-поля наряда из реквизитов активного проекта.
    По требованию: «если модуль запущен из проекта, то все данные о
    заказчике должны добавиться из свойств проекта». */
@@ -283,6 +298,7 @@ function quickCreateFromCooling(selId, optId, type) {
   const newOrd = {
     ...DEFAULT_ORDER,
     id: 'ord-' + (_seq++),
+    number: nextOrderNumber(type),  // v0.60.48: учётный номер
     name: `${typeLabel}: ${sel.name} → ${opt.name}`,
     type,
     coolingSelectionId: sel.id,
@@ -322,8 +338,9 @@ function renderOrdersList() {
   root.innerHTML = _orders.map(o => {
     const isActive = o.id === _activeOrderId;
     const tLabel = ORDER_TYPES.find(t => t.id === o.type)?.label || o.type;
-    return `<div class="sv-order-row${isActive ? ' active' : ''}" data-order-id="${util.escAttr(o.id)}" title="Кликните чтобы открыть наряд «${util.escAttr(o.name)}»">
-      <div class="sv-order-name">${util.escHtml(o.name || '(без имени)')}</div>
+    const numStr = o.number ? `<span style="color:#1e40af;font-weight:600">${util.escHtml(o.number)}</span> · ` : '';
+    return `<div class="sv-order-row${isActive ? ' active' : ''}" data-order-id="${util.escAttr(o.id)}" title="Кликните чтобы открыть наряд №${util.escAttr(o.number || '')} «${util.escAttr(o.name)}»">
+      <div class="sv-order-name">${numStr}${util.escHtml(o.name || '(без имени)')}</div>
       <div class="sv-order-meta">${util.escHtml(tLabel)} · ${util.escHtml(o.date || '')}</div>
       <button type="button" class="sv-order-del" data-act="delete" data-order-id="${util.escAttr(o.id)}" title="Удалить наряд">🗑</button>
     </div>`;
@@ -359,7 +376,10 @@ function renderActive() {
     }, _currency, cf));
   }
   const headName = $('sv-active-name');
-  if (headName) headName.textContent = `🛠 ${order.name || '(без имени)'}`;
+  if (headName) {
+    const numPart = order.number ? `№ ${order.number} — ` : '';
+    headName.textContent = `🛠 ${numPart}${order.name || '(без имени)'}`;
+  }
 }
 
 function renderModuleActionsHere() {
@@ -479,6 +499,7 @@ async function init() {
     const newOrd = {
       ...DEFAULT_ORDER,
       id: 'ord-' + (_seq++),
+      number: nextOrderNumber('install'),  // v0.60.48: учётный номер
       name: name.trim(),
       // v0.60.41: автозаполнение customer из реквизитов проекта (по требованию).
       ...buildOrderDefaultsFromProject(),
@@ -487,7 +508,7 @@ async function init() {
     _activeOrderId = newOrd.id;
     persist();
     renderActive();
-    util.toast(`Наряд «${newOrd.name}» создан${newOrd.customer?.name ? ` (заказчик: ${newOrd.customer.name})` : ''}`, 'ok');
+    util.toast(`Наряд № «${newOrd.number}» «${newOrd.name}» создан${newOrd.customer?.name ? ` (заказчик: ${newOrd.customer.name})` : ''}`, 'ok');
   });
 
   // Orders list interactions
