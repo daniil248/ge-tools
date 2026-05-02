@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.4', date: '2026-05-02', items: [
+      '📥 <b>Phase 22.5: Импорт performance-curves производителей</b> — реальная кривая capacity/COP по T_amb из selection software вендоров (Daikin EWAQ, Trane RTAF, Carrier 30XW, Vertiv Liebert и др.).',
+      '• <code>parsePerformanceCurveCsv()</code> — парсер CSV: заголовки T,capacity,cop (или T,capacity,power); разделители , ; tab; авто-сортировка точек по T.',
+      '• <code>lerpPerformanceCurve()</code> — линейная интерполяция между точками; edge-clamping за пределами таблицы.',
+      '• <code>applyChillerCalc()</code> прозрачно использует curve если она задана, иначе fallback на аналитические формулы (capacity correction + IPLV).',
+      '• UI: новая секция «5️⃣ Performance-curve производителя (опц.)» в chiller-form с кнопками «📥 Импорт CSV» / «🗑 Очистить». File-picker → парсинг → запись в spec.perfCurve. Tooltip с примером CSV.',
+      '• Sanity: 4 точки (-5/10/25/35°C; 160/140/120/100 кВт; COP 5.2/4.5/3.8/3.5) → T=17°C: capacity 130.67 кВт, COP 4.17, power 31.31 кВт ✓.',
+      '• ROADMAP Phase 22.5 закрыт.',
+      'Файлы: <code>cooling/calc/chiller-bin-calc.js</code> (lerpPerformanceCurve + parsePerformanceCurveCsv + applyChillerCalc использует curve), <code>cooling/ui/chiller-form.js</code> (секция + import-handler).',
+    ] },
     { version: '0.60.3', date: '2026-05-02', items: [
       '🔌 <b>Phase 22.4: PUE из подбора cooling в Технологе ЦОД</b>. По roadmap: «Технолог тянет годовое эл. потребление чиллера из активной cooling-spec проекта вместо упрощённого Q_IT / COP_const».',
       '• Новый режим <code>pue.mode = "cooling-module"</code> в Tech-Workspace (наряду с auto / manual).',

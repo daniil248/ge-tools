@@ -2670,9 +2670,17 @@ standalone-приложение в отдельном. Чтобы использ
   - PUE = 1 + (annualKwh/8760 + losses) / IT_kw.
   - UI: новая опция в селекторе режима PUE + ссылка «↗ Открыть Cooling».
   - Fallback на auto-режим если подбор недоступен.
-- [ ] **22.5** Импорт реальных performance-curves производителей
-  - Daikin/Trane/Carrier/Liebert chiller selection software → CSV bin-таблица
-  - Замена IPLV-оценки на эмпирическую кривую COP(T) от вендора
+- [x] **22.5** Импорт реальных performance-curves производителей — закрыто v0.60.4
+  - <code>parsePerformanceCurveCsv()</code> — парсер CSV (заголовки T,capacity,cop
+    или T,capacity,power; разделители , ; tab; авто-сортировка по T).
+  - <code>lerpPerformanceCurve()</code> — линейная интерполяция между точками,
+    edge-clamping за пределами таблицы.
+  - applyChillerCalc прозрачно использует curve если она задана, иначе
+    падает на аналитические формулы.
+  - UI: секция «5️⃣ Performance-curve» в chiller-form с кнопками
+    «📥 Импорт CSV» / «🗑 Очистить кривую».
+  - Sanity на синтетике 4 точек (-5/10/25/35°C, 160-100кВт): T=17°C
+    интерполируется в capacity=130.67кВт, COP=4.17, power=31.31кВт ✓.
 - [ ] **22.6** Доп. источники курсов (по запросу)
   - НБ Украины, НБ Беларуси, currencyapi.com, OpenExchangeRates
   - Plugin: новый файл `shared/currency-rates/sources/<id>.js` с register({...})

@@ -8,6 +8,7 @@
 // разделены: расчёт оборудования теперь в Cooling Systems.
 
 import { DEFAULT_CHILLER, SYSTEM_TYPES, FC_MODES } from '../calc/chiller-defaults.js';
+import { parsePerformanceCurveCsv } from '../calc/chiller-bin-calc.js';
 import { escAttr, escHtml } from '../../meteo/util.js';
 
 /**
@@ -111,6 +112,24 @@ export function renderChillerSpecForm(spec, onChange, onClear) {
       </div>
     </div>
 
+    <div class="cl-chiller-section" data-perfcurve-section>
+      <div class="cl-chiller-section-title" title="Реальная performance-curve производителя (Daikin EWAQ, Trane RTAF, Carrier 30XW, Vertiv Liebert, и т.п.). Если задана — заменяет аналитические формулы capacity/COP линейной интерполяцией по T_amb.">5️⃣ Performance-curve производителя (опц.)</div>
+      ${(s.perfCurve && s.perfCurve.length) ? `
+        <p class="muted" style="font-size:11px;margin:0 0 6px">
+          ✔ Задана кривая из ${s.perfCurve.length} точек (T от ${s.perfCurve[0].T}°C до ${s.perfCurve[s.perfCurve.length-1].T}°C). Используется в расчёте вместо формул.
+        </p>
+      ` : `
+        <p class="muted" style="font-size:11px;margin:0 0 6px">
+          Не задана — используются аналитические формулы (capacity correction + IPLV COP). Импорт CSV из selection software производителя даёт точный расчёт.
+        </p>
+      `}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" class="cl-btn-ghost" data-import-perfcurve
+                title="Импорт CSV: заголовок T,capacity,cop (или T,capacity,power) + строки данных. Разделитель , ; или TAB. Минимум 2 точки. Пример: T,capacity,cop\\n−5,160,5.2\\n10,140,4.5\\n25,120,3.8\\n35,100,3.5">📥 Импорт CSV</button>
+        ${(s.perfCurve && s.perfCurve.length) ? `<button type="button" class="cl-btn-ghost" data-clear-perfcurve title="Удалить performance-curve, вернуться к аналитическим формулам.">🗑 Очистить кривую</button>` : ''}
+      </div>
+    </div>
+
     <div class="cl-chiller-actions">
       <button type="button" class="cl-btn-ghost" data-clear-chiller title="Сбросить spec и удалить chiller-колонки.">🗑 Сбросить</button>
     </div>
@@ -123,8 +142,33 @@ export function renderChillerSpecForm(spec, onChange, onClear) {
     const val = inp.type === 'number' ? Number(inp.value) || 0 : inp.value;
     onChange({ ...s, [field]: val });
   });
-  wrap.addEventListener('click', (e) => {
-    if (e.target.closest('[data-clear-chiller]')) onClear();
+  wrap.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-clear-chiller]')) { onClear(); return; }
+    if (e.target.closest('[data-clear-perfcurve]')) {
+      onChange({ ...s, perfCurve: null });
+      return;
+    }
+    if (e.target.closest('[data-import-perfcurve]')) {
+      // Открываем file-picker; парсим CSV; передаём в onChange.
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.accept = '.csv,text/csv,text/plain';
+      inp.onchange = async () => {
+        const f = inp.files?.[0];
+        if (!f) return;
+        try {
+          const text = await f.text();
+          const { points, error } = parsePerformanceCurveCsv(text);
+          if (error) { alert(`❌ Ошибка парсинга CSV: ${error}`); return; }
+          onChange({ ...s, perfCurve: points });
+          alert(`✔ Импортировано ${points.length} точек performance-curve. T от ${points[0].T}°C до ${points[points.length-1].T}°C. Расчёт capacity/COP теперь использует кривую.`);
+        } catch (err) {
+          alert(`❌ Не удалось прочитать файл: ${err.message}`);
+        }
+      };
+      inp.click();
+      return;
+    }
   });
   return wrap;
 }
