@@ -587,8 +587,17 @@ function renderStorageMode() {
   try { projects = listProjects() || []; } catch {}
   const currentVal = _standalone ? '__standalone__' : ((_pid && _pid.id) || '__standalone__');
 
+  // v0.60.46 (feedback_module_scope_pickers.md): фильтр — sketch ДРУГИХ
+  // модулей не должны появляться в cooling-picker (например СКС-sketch
+  // не имеет отношения к холоду). Full-проекты видны всегда.
+  const relevant = projects.filter(p => {
+    if (p.kind === 'full') return true;
+    if (p.kind === 'sketch') return p.ownerModule === 'cooling';
+    return true;  // другие kinds (если появятся) — пропускаем
+  });
+
   const groups = { coolingLocal: [], withCooling: [], others: [] };
-  for (const p of projects) {
+  for (const p of relevant) {
     if (p.kind === 'sketch' && p.ownerModule === 'cooling') groups.coolingLocal.push(p);
     else if (projectHasCoolingData(p.id)) groups.withCooling.push(p);
     else groups.others.push(p);
