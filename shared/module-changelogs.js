@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.40', date: '2026-05-02', items: [
+      '📄 <b>Phase 29.1: убран overlay-overlap в КП</b>. По репорту: «содержимое попадает поверх шаблона». Раньше <code>openTemplateEditor</code> добавлял default header/footer overlays, которые накладывались поверх контента → шапка КП и название наряда наезжали друг на друга.',
+      '• Fix v0.60.40: <code>export-offer.js::openOfferPreview</code> теперь экспортирует PDF напрямую через <code>Report.exportPDF(tpl, fname)</code> без template-editor. Overlays очищены (только page number в footer). Margins расширены (15-18мм).',
+      '• ROADMAP Phase 29 (29.2-29.7): полноценная slot-based template system для документов с возможностью toggle/reorder/styling блоков. Дизайн-док в roadmap.',
+      '🔄 <b>Service: lazy-load курсов валют при смене валюты ячейки</b>. По требованию: «курсы не должны удаляться, они в LS, используются локальные, обновляются через модуль 💱 валюты».',
+      '• Если convertFn=null при смене валюты — order-form.js теперь вызывает <code>fetchRates(null, null, false)</code> которое подтягивает из LS-кэша (или одно сетевое обращение).',
+      '• Toast сообщения переписаны: явно объясняют что курсы persistent в LS и обновляются через «💱 Валюта и курсы».',
+      'Файлы: <code>service/calc/export-offer.js</code>, <code>service/ui/order-form.js</code>, <code>ROADMAP.md</code>.',
+    ] },
     { version: '0.60.39', date: '2026-05-02', items: [
       '🔄 <b>Service: явные toast при смене валюты ячейки</b>. По репорту: «при переключении валюты значения не пересчитываются». Раньше если convertFn был null (курсы не загружены) — ничего не происходило молча.',
       '• Теперь явный toast: <code>«⚠ Курсы валют не загружены (₸→₽). Значение оставлено как есть. Откройте 💱 справочник или подождите загрузки.»</code>',

@@ -3096,6 +3096,69 @@ standalone-приложение в отдельном. Чтобы использ
 
 ---
 
+## Фаза 29 — Слот-ориентированные шаблоны документов
+
+> Зафиксировано Пользователем 2026-05-02: «содержимое попадает поверх шаблона.
+> Сделать шаблон, который содержит блоки конкретного документа, можно
+> основные блоки размещать в любом порядке».
+
+Существующий `shared/report/` editor работает с overlay-зонами (header/footer
+с meta-substitutions) — но накладывает их ПОВЕРХ контента, вызывая overlap.
+Для документов вроде КП нужны **именованные content-slots**, которые
+пользователь может toggle/reorder/styling.
+
+- [x] **29.1** Workaround (v0.60.40): убраны default-overlays из export-offer,
+  PDF рендерится напрямую через `exportPDF` с чистым шаблоном (только page
+  number в footer). Overlap устранён.
+
+- [ ] **29.2** Slot-based template schema:
+  ```js
+  template = {
+    id, name, kind,             // 'commercial-offer' | 'tech-report' | ...
+    pageSettings: { format, margins, font },
+    slots: [
+      { id: 'company-header', enabled, order, options, styles },
+      { id: 'doc-title',      enabled, order, options, styles },
+      { id: 'positions-table',enabled, order, options:{ groupByCategory, showCostColumn }, styles },
+      { id: 'totals',         enabled, order, ... },
+      { id: 'signatures',     enabled, order, ... },
+      ...
+    ]
+  }
+  ```
+
+- [ ] **29.3** Каталог slot-builders в `shared/report/slots/`:
+  - `kp-blocks.js` — builder-функции для слотов КП (companyHeader, docTitle,
+    customerInfo, positionsTable, totals, paymentRequisites, signatures)
+  - Каждый builder: `(data, options, styles) → blocks[]` для shared/report.
+
+- [ ] **29.4** Editor шаблона документа:
+  - Список слотов с drag-to-reorder
+  - Per-slot чекбокс enabled
+  - Per-slot настройки (например для positions-table: «группировать по
+    категориям», «показать колонку себес»)
+  - Сохранение в LS под `raschet.report-templates.<kind>.v1`
+  - Импорт/экспорт шаблонов (для шаринга между установками)
+
+- [ ] **29.5** Renderer:
+  - `renderDocument(template, data)` — итерирует enabled slots, вызывает
+    builder каждого слота, собирает blocks[] → exportPDF.
+
+- [ ] **29.6** UI в Service: «📄 Настроить шаблон КП» в сайдбаре + dropdown
+  «Шаблон для экспорта» в кнопке экспорта.
+
+- [ ] **29.7** Migration: дефолтный КП-шаблон создаётся при первом запуске
+  на основе текущего `buildOfferBlocks()` (10 слотов в обычном порядке).
+
+**Acceptance:**
+- Пользователь может перетащить «Платёжные реквизиты» наверх документа.
+- Можно отключить «Подписи» если не нужны.
+- Можно создать несколько шаблонов под разных заказчиков (с/без логотипа,
+  с/без столбца себестоимости).
+- Никаких overlay-наложений на контент.
+
+---
+
 ## Фаза 27 — Авторизация Microsoft 365 (deferred)
 
 > Зафиксировано Пользователем 2026-05-02: «Позже добавим авторизацию через

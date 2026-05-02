@@ -161,11 +161,13 @@ export function buildOfferBlocks(order, displayCurrency = '₽', convertFn = nul
 }
 
 /**
- * Открыть КП в template editor (reports/) для preview / customization
- * пользователем + экспорт PDF / DOCX.
+ * Экспорт КП напрямую в PDF (без template editor — он накладывал header-overlay
+ * поверх контента, по репорту 2026-05-02 «содержимое попадает поверх шаблона»).
+ *
+ * Phase 29 (TODO в roadmap): полноценная slot-based template system для документов
+ * с возможностью перестановки блоков. Сейчас — clean default template без overlays.
  */
 export async function openOfferPreview(order, displayCurrency, convertFn, opts = {}) {
-  // Динамический импорт — чтобы не тащить весь reports module если не используется.
   let Report, blocks;
   try {
     Report = await import('../../shared/report/index.js');
@@ -181,13 +183,24 @@ export async function openOfferPreview(order, displayCurrency, convertFn, opts =
       kind: 'commercial-offer',
     },
   });
-  tpl.content = buildOfferBlocks(order, displayCurrency, convertFn, { ...opts, blocks });
-  // Открываем editor — пользователь может изменить шаблон (поля, шрифты, лого)
-  // и нажать «Экспорт PDF / DOCX» прямо там.
-  Report.openTemplateEditor(tpl, {
-    onSave: (updated) => {
-      // Если пользователь нажал «Сохранить» — экспортируем PDF.
-      Report.exportPDF(updated, `kp-${(order.id || 'order').replace(/[^\w-]+/g, '_')}.pdf`);
+  // v0.60.40: убираем default overlays (header/footer). Они накладывались
+  // ПОВЕРХ контента, искажая шапку. Только page-number footer оставим, и то
+  // через slim margin-bottom. Phase 29 даст полную слот-систему.
+  tpl.overlays = [
+    {
+      id: 'kp-page-number',
+      area: 'footer',
+      align: 'center',
+      content: 'стр. {{page}} из {{pages}}',
+      fontSize: 8,
+      color: '#888',
     },
-  });
+  ];
+  // Page settings — A4, увеличенные поля чтобы контент не упирался в края.
+  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
+  tpl.margins = { top: 18, right: 15, bottom: 18, left: 18 };  // mm
+  tpl.content = buildOfferBlocks(order, displayCurrency, convertFn, { ...opts, blocks });
+  // Прямой экспорт PDF — без openTemplateEditor.
+  const fname = `kp-${(order.id || 'order').replace(/[^\w-]+/g, '_')}.pdf`;
+  Report.exportPDF(tpl, fname);
 }

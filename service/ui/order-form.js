@@ -261,7 +261,7 @@ function renderPositionsTable(positions, displayCurrency) {
   `;
 }
 
-function handlePositionInput(ev, tr, o, onChange, displayCurrency, convertFn, isChange = false) {
+async function handlePositionInput(ev, tr, o, onChange, displayCurrency, convertFn, isChange = false) {
   const idx = Number(tr.dataset.pos);
   const positions = o.positions.map(p => ({ ...p,
     costPrice: { ...p.costPrice }, clientPrice: { ...p.clientPrice },
@@ -278,21 +278,36 @@ function handlePositionInput(ev, tr, o, onChange, displayCurrency, convertFn, is
     const newCur = targetVal;
     if (oldCur !== newCur) {
       const curVal = Number(positions[idx][col].value) || 0;
-      // v0.60.39 (по репорту: «при переключении валюты значения не пересчитываются»):
-      // явные toast-сообщения если convertFn null или курс не найден.
+      // v0.60.40: курсы persistent в LS-кэше. Если convertFn=null — пробуем
+      // lazy-загрузку через fetchRates(null, null, false) — он подтянет из
+      // LS-кэша если есть, или сделает один сетевой запрос.
+      // По требованию пользователя: «курсы не должны удаляться, они в LS,
+      // используются локальные, обновляются через модуль 💱 валюты».
       if (curVal > 0) {
-        if (!convertFn) {
-          toast(`⚠ Курсы валют не загружены (${oldCur}→${newCur}). Значение оставлено как есть. Откройте 💱 справочник или подождите загрузки.`, 'err');
+        let cf = convertFn;
+        if (!cf) {
+          try {
+            const cr = await import('../../shared/currency-rates/index.js');
+            const fc = await import('../../cooling/calc/fc-summary.js');
+            const cache = await cr.fetchRates(null, null, false);  // false = use cache
+            if (cache) {
+              cf = (amount, from, to) => cr.convert(amount, fc.currencyToIso(from), fc.currencyToIso(to), cache);
+            }
+          } catch (e) {
+            console.warn('[order-form] lazy-load rates failed:', e);
+          }
+        }
+        if (!cf) {
+          toast(`⚠ Курсы валют недоступны (${oldCur}→${newCur}). Откройте модуль «💱 Валюта и курсы» → загрузить курсы. После этого они сохранятся в LS и будут доступны во всех модулях.`, 'err');
         } else {
-          const v = convertFn(curVal, oldCur, newCur);
+          const v = cf(curVal, oldCur, newCur);
           if (Number.isFinite(v) && v > 0) {
             positions[idx][col].value = +(v.toFixed(2));
-            // Также явно обновим input в DOM (на случай если onChange не сразу re-render)
             const valInp = tr.querySelector(`.sv-pos-val[data-col="${col}"]`);
             if (valInp) valInp.value = positions[idx][col].value;
             toast(`✓ ${curVal} ${oldCur} → ${positions[idx][col].value} ${newCur}`, 'ok');
           } else {
-            toast(`⚠ Курс ${oldCur}→${newCur} не найден. Значение оставлено как есть.`, 'err');
+            toast(`⚠ Курс ${oldCur}→${newCur} не найден в локальном кэше. Запустите модуль «💱 Валюта и курсы» для обновления.`, 'err');
           }
         }
       }
