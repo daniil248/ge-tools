@@ -240,7 +240,8 @@
              отображение, видимость тех или иных элементов». -->
         <div class="psy-chart-vis-popup" id="psy-chart-vis-popup" hidden>
           <div class="psy-chart-vis-title">Видимость элементов</div>
-          <label><input type="checkbox" data-vis="rhCurves" checked> RH-кривые (5..100%)</label>
+          <label title="Основные кривые относительной влажности через каждые 10% (10/20/.../90%) + кривая насыщения 100%."><input type="checkbox" data-vis="rhCurves" checked> RH-кривые (10/20/.../90%)</label>
+          <label title="Дополнительные тонкие штриховые кривые между основными — через 10% со сдвигом (5/15/25/.../85%). Подписи к ним появляются только при включённой опции."><input type="checkbox" data-vis="rhMinor" checked> Доп. RH-кривые (5/15/.../85%)</label>
           <label><input type="checkbox" data-vis="rhLabels" checked> Метки φ% по краю рамки</label>
           <label><input type="checkbox" data-vis="hCurves" checked> Линии энтальпии (h=const)</label>
           <label><input type="checkbox" data-vis="hLabels" checked> Метки h=N кДж/кг</label>

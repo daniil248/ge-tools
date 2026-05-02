@@ -73,9 +73,19 @@ export function render(container, opts = {}) {
 
   // --- Saturation curve (RH=100%) ---
   svg += `<g class="psy-svg-sat-curve">` + curvePath(o, pos, 1.0, '#c62828', 1.6) + `</g>`;
-  svg += `<g class="psy-svg-rh-curves">`;
+  // v0.59.998: RH-кривые разделены на 2 группы.
+  //  Major (10,20,...,90) — основные, толщина 0.5, серый.
+  //  Minor (5,15,...,95)  — дополнительные тонкие (0.3, светло-серый, dashed).
+  // Toggle minor через CSS (.psy-vis-no-rh-minor) + соответствующие метки
+  // в той же группе, чтобы при выключении кривых выключались и подписи.
+  svg += `<g class="psy-svg-rh-curves psy-svg-rh-curves-major">`;
   for (let rh = 10; rh < 100; rh += 10) {
     svg += curvePath(o, pos, rh / 100, '#9e9e9e', 0.5);
+  }
+  svg += `</g>`;
+  svg += `<g class="psy-svg-rh-curves psy-svg-rh-curves-minor">`;
+  for (let rh = 5; rh < 100; rh += 10) {
+    svg += curvePath(o, pos, rh / 100, '#bdbdbd', 0.3, '2,2');
   }
   svg += `</g>`;
 
@@ -249,16 +259,17 @@ function rhCurveExistsInPlot(o, phi) {
 }
 
 function rhLabelsAlongCurves(o, pos, isAshrae) {
-  // v0.59.971: метки RH размещаются НА ВНУТРЕННЕЙ СТОРОНЕ РАМКИ —
-  // там где RH-кривая выходит из плот-области (через верх — W=W_max,
-  // или через правый край — T=T_max). По репорту: «значение влажности
-  // размести по краю рамки, с внутренней стороны».
-  // Алгоритм: сканируем T от Tmin до Tmax шагом 0.5°C. Если W при текущем
-  // φ превышает W_max → линейная интерполяция назад до точного W_max
-  // (выход через верх). Иначе — метка у T=Tmax (выход через правый край).
-  const RHs = [5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90];
-  let s = '';
-  for (const rh of RHs) {
+  // v0.59.971: метки RH на внутренней стороне рамки (см. историю).
+  // v0.59.998: метки разделены на major (10/20/.../90) и minor (5/15/.../85)
+  // — обёрнуты в разные SVG-группы (psy-svg-rh-labels-major / -minor)
+  // чтобы CSS-toggle минорных кривых одновременно скрывал и их подписи.
+  // По требованию: «подписи к доп. линиям выводятся только если они сами
+  // включены, иначе их выводить не следует».
+  const MAJOR = [10,20,30,40,50,60,70,80,90];
+  const MINOR = [5,15,25,35,45,55,65,75,85];
+  let majorSvg = '', minorSvg = '';
+  for (const rh of [...MAJOR, ...MINOR]) {
+    const targetGroup = MAJOR.includes(rh) ? 'major' : 'minor';
     const phi = rh / 100;
     // v0.59.972: если линии нет в плот-области — пропускаем метку.
     if (!rhCurveExistsInPlot(o, phi)) continue;
@@ -298,11 +309,17 @@ function rhLabelsAlongCurves(o, pos, isAshrae) {
     const inset = edge === 'top'
       ? (isAshrae ? { dx: 0, dy: 14 } : { dx: 0, dy: 14 })
       : (isAshrae ? { dx: -22, dy: 4 } : { dx: -22, dy: 4 });
-    s += `<text x="${px + inset.dx}" y="${py + inset.dy}" text-anchor="middle"
+    const minorStyle = targetGroup === 'minor'
+      ? 'font-size:8px;fill:#888;font-weight:500;'
+      : 'font-size:9px;fill:#444;font-weight:600;';
+    const txt = `<text x="${px + inset.dx}" y="${py + inset.dy}" text-anchor="middle"
              transform="rotate(${angle.toFixed(1)} ${px + inset.dx} ${py + inset.dy})"
-             style="font-size:9px;fill:#444;font-weight:600;
+             style="${minorStyle}
              paint-order:stroke;stroke:#fff;stroke-width:2.5px;">${rh}%</text>`;
+    if (targetGroup === 'major') majorSvg += txt; else minorSvg += txt;
   }
+  let s = `<g class="psy-svg-rh-labels psy-svg-rh-labels-major">${majorSvg}</g>`
+        + `<g class="psy-svg-rh-labels psy-svg-rh-labels-minor">${minorSvg}</g>`;
   // 100% (saturation) — у её правого-верхнего выхода из плот-области
   const dT = 0.5;
   let T_sat = null;
@@ -333,7 +350,7 @@ function rhLabelsAlongCurves(o, pos, isAshrae) {
   return s;
 }
 
-function curvePath(o, pos, rh, color, width) {
+function curvePath(o, pos, rh, color, width, dashArray) {
   const pts = [];
   for (let T = o.T_min; T <= o.T_max; T += 0.5) {
     const W = humidityRatio(T, rh, o.P);
@@ -341,8 +358,9 @@ function curvePath(o, pos, rh, color, width) {
     pts.push(pos(W, T));
   }
   if (!pts.length) return '';
+  const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : '';
   return `<polyline points="${pts.map(p=>p.join(',')).join(' ')}"
-          fill="none" stroke="${color}" stroke-width="${width}"/>`;
+          fill="none" stroke="${color}" stroke-width="${width}"${dashAttr}/>`;
 }
 
 /* --- Plot a process point or trajectory --- */

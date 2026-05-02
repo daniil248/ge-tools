@@ -1961,10 +1961,16 @@ function renderResults(sts, segs) {
   // Итоговая строка: суммы Q (нагрев / охл) и qw (увл / осуш)
   const anyProc = segs.some(s => s);
   if (anyProc) {
-    // Конденсат = |суммарное осушение| в кг/ч, л/ч, л/сут.
+    // v0.59.998: разделено по знаку.
+    //  Конденсат  = |суммарное осушение| (q_w < 0) — для дренажа.
+    //  Вода на увлажнение = |суммарный влагоприток| (q_w > 0) — для подбора
+    //  бака подпитки увлажнителя.
     const condKgH = sumQwDeh;
     const condLph = condKgH / 0.998;
     const condLpd = condLph * 24;
+    const humKgH  = sumQwHum;
+    const humLph  = humKgH / 0.998;
+    const humLpd  = humLph * 24;
     const fmtE = (v) => v >= 1000 ? `${(v/1000).toFixed(2)} МВт·ч` : `${v.toFixed(0)} кВт·ч`;
     const hyPct = (hY / 8760 * 100).toFixed(0);
     b2.insertAdjacentHTML('beforeend', `
@@ -1994,10 +2000,19 @@ function renderResults(sts, segs) {
         </td>
       </tr>
       ${condKgH > 0.001 ? `
-      <tr style="background:#e1f5fe;border-top:1px solid #4fc3f7">
+      <tr style="background:#e1f5fe;border-top:1px solid #4fc3f7"
+          title="Суммарный конденсат от процессов осушения (q_w < 0). Используется для расчёта диаметра дренажной трубы.">
         <td colspan="7" style="text-align:right;color:#01579b;font-weight:700">💧 Конденсат (суммарно по осушению):</td>
         <td colspan="4" style="color:#01579b;font-weight:700">
           ${condKgH.toFixed(3)} кг/ч ≈ ${condLph.toFixed(3)} л/ч ≈ ${condLpd.toFixed(1)} л/сут
+        </td>
+      </tr>` : ''}
+      ${humKgH > 0.001 ? `
+      <tr style="background:#ecfdf5;border-top:1px solid #6ee7b7"
+          title="Суммарная вода, расходуемая на увлажнение (q_w > 0). Используется для подбора объёма бака подпитки увлажнителя и расчёта водопотребления.">
+        <td colspan="7" style="text-align:right;color:#065f46;font-weight:700">💦 Вода на увлажнение (суммарно):</td>
+        <td colspan="4" style="color:#065f46;font-weight:700">
+          ${humKgH.toFixed(3)} кг/ч ≈ ${humLph.toFixed(3)} л/ч ≈ ${humLpd.toFixed(1)} л/сут
         </td>
       </tr>` : ''}
     `);
@@ -2323,9 +2338,14 @@ function applyChartZoom(z, pan) {
 }
 /* v0.59.977: попап «⚙ Вид» — настройка видимости элементов диаграммы.
    Чекбоксы → toggle CSS-классов на .psy-chart → CSS hides matching SVG groups. */
-const VIS_KEYS = ['rhCurves','hCurves','grid','zones','legend'];
+// v0.59.998: добавлен ключ rhMinor — доп. тонкие RH-кривые (5/15/25/...).
+// При выключении одновременно скрываются и кривые, и их подписи (CSS-класс
+// psy-vis-no-rh-minor → display:none на .psy-svg-rh-curves-minor +
+// .psy-svg-rh-labels-minor).
+const VIS_KEYS = ['rhCurves','rhMinor','hCurves','grid','zones','legend'];
 const VIS_TO_CLASS = {
   rhCurves: 'psy-vis-no-rh-curves',
+  rhMinor:  'psy-vis-no-rh-minor',
   hCurves:  'psy-vis-no-h-curves',
   grid:     'psy-vis-no-grid',
   zones:    'psy-vis-no-comfort-zone',
@@ -3114,21 +3134,20 @@ function refreshProcCardComputed(segs) {
   });
 }
 
-/* Подсказка «сколько будет конденсата» при охлаждении с осушением.
-   При C-процессе (и при A/S/X с отрицательным qw — это физически тоже
-   осушение, если W₂<W₁) выводим под q_w синюю плашку:
-     • кг/ч — модуль qw
-     • л/ч — то же в литрах (ρ_воды ≈ 0.998 кг/л при 20°C, для простоты =1)
-     • л/сут — суточный объём конденсата (важно для дренажа)
-   Плюс суммарная точка росы t_р₁ входного потока — для проверки, что
-   t_поверхности охладителя ниже t_р (иначе осушения просто не будет). */
+/* Подсказка «сколько воды» рядом с процессом.
+   v0.59.998: разделено по знаку q_w:
+     • q_w < 0 → ОСУШЕНИЕ (C-процесс / A/S/X с W₂<W₁) → «💧 Конденсат» (л/сут).
+       Важно для дренажа.
+     • q_w > 0 → УВЛАЖНЕНИЕ (A/S/X с W₂>W₁) → «💦 Вода на увлажнение» (л/сут).
+       Важно для подбора объёма бака подпитки увлажнителя.
+   По требованию Пользователя 2026-05-02: «если увлажнение то должен быть
+   не конденсат, а вода на увлажнение». */
 function fillCondensate(segs) {
-  // v0.59.948: querySelectorAll — обновляем все proc-arrows (см. fillComputedQW)
   segs.forEach((s, i) => {
     document.querySelectorAll(`.psy-proc-arrow[data-proc-idx="${i}"]`).forEach(arr => {
       const box = arr.querySelector('[data-role="condensate"]');
       if (!box) return;
-      if (!s || !(s.qw < -0.001)) {
+      if (!s || Math.abs(s.qw) < 0.001) {
         box.style.display = 'none';
         box.innerHTML = '';
         return;
@@ -3136,9 +3155,17 @@ function fillCondensate(segs) {
       const abs = Math.abs(s.qw);
       const lph = abs / 0.998;
       const lpd = lph * 24;
+      const isHumidify = (s.qw > 0);
+      const label = isHumidify
+        ? '💦 Вода на увлажнение'
+        : '💧 Конденсат';
+      // Цвет под смысл: для воды на увлажнение — зелёный (приход), для конденсата — синий (отвод).
+      box.style.background = isHumidify ? '#ecfdf5' : '#e1f5fe';
+      box.style.borderColor = isHumidify ? '#6ee7b7' : '#4fc3f7';
+      box.style.color = isHumidify ? '#065f46' : '#01579b';
       box.style.display = '';
       box.innerHTML =
-        `💧 Конденсат: <b>${abs.toFixed(3)}</b> кг/ч ≈ `
+        `${label}: <b>${abs.toFixed(3)}</b> кг/ч ≈ `
         + `<b>${lph.toFixed(3)}</b> л/ч ≈ `
         + `<b>${lpd.toFixed(1)}</b> л/сут`;
     });

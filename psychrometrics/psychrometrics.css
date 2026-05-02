@@ -771,7 +771,12 @@ body.psy-dragging *::after {
 
 /* v0.59.977: классы видимости (применяются на .psy-chart) */
 .psy-chart.psy-vis-no-grid svg .psy-svg-grid { display: none; }
-.psy-chart.psy-vis-no-rh-curves svg .psy-svg-rh-curves { display: none; }
+/* rhCurves выключает ВСЕ группы RH-кривых и подписей (major + minor + saturation остаётся отдельно). */
+.psy-chart.psy-vis-no-rh-curves svg .psy-svg-rh-curves,
+.psy-chart.psy-vis-no-rh-curves svg .psy-svg-rh-labels { display: none; }
+/* v0.59.998: rhMinor — только дополнительные тонкие кривые + их подписи. */
+.psy-chart.psy-vis-no-rh-minor svg .psy-svg-rh-curves-minor,
+.psy-chart.psy-vis-no-rh-minor svg .psy-svg-rh-labels-minor { display: none; }
 .psy-chart.psy-vis-no-h-curves svg .psy-svg-h-curves { display: none; }
 .psy-chart.psy-vis-no-comfort-zone svg .psy-comfort-zone { display: none; }
 .psy-chart.psy-vis-no-legend svg .psy-legend { display: none; }
