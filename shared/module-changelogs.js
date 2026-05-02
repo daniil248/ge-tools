@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.27', date: '2026-05-02', items: [
+      '🏢 <b>«Реквизиты компании» в глобальных настройках платформы</b>. По требованию: «Реквизиты компании должны быть в настройке организации, а не в модуле Сервис».',
+      '• Перенесено из <code>service/calc/company-profile.js</code> → <code>shared/company-profile.js</code> (общеплатформенный source-of-truth).',
+      '• Новая секция «🏢 Реквизиты организации» в модалке глобальных настроек (шестерёнка ⚙ в шапке любой страницы) — поля: название, адрес, телефон, email, сайт, БИН/ИНН, руководитель, банковские реквизиты.',
+      '• Auto-save при потере фокуса (change event).',
+      '• Per-project override готов к подключению в Свойствах проекта (storage уже разделён).',
+      '• <code>service/calc/export-offer.js</code> теперь использует <code>loadEffectiveCompanyProfile(pid)</code> — шапка КП с название/адрес/телефон/email/сайт/БИН + новый блок «Платёжные реквизиты» (если заполнено) + ФИО руководителя в подписях.',
+      '• Если профиль не заполнен — в КП показывается красный warning «⚠ Реквизиты компании не заполнены».',
+      'Файлы: <code>shared/company-profile.js</code> (новый), <code>shared/global-settings.js</code> (+ section), <code>service/calc/export-offer.js</code>, <code>service/ui/order-form.js</code>.',
+    ] },
     { version: '0.60.26', date: '2026-05-02', items: [
       '📄 <b>Phase 24.4: Экспорт КП клиенту</b> в Service-модуле. Кнопка «📄 Открыть КП» открывает новое окно с готовой к печати HTML-вёрсткой коммерческого предложения (A4, Times New Roman, ЕСКД-стилистика).',
       '• Шапка с реквизитами компании + КП №id + дата.',

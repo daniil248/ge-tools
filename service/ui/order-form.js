@@ -167,10 +167,12 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
       return;
     }
     if (ev.target.closest('#sv-export-offer')) {
-      const overlay = wrap;  // closure не имеет доступа к wrap из click? используем DOM
       const showCost = document.getElementById('sv-show-cost')?.checked || false;
+      // v0.60.27: pid из URL для подбора company-profile (project override)
+      const params = new URLSearchParams(location.search);
+      const pid = params.get('standalone') === '1' ? null : (params.get('pid') || null);
       try {
-        openOfferPreview(o, displayCurrency, convertFn, { showCostBreakdown: showCost });
+        openOfferPreview(o, displayCurrency, convertFn, { showCostBreakdown: showCost, pid });
         toast('КП открыто в новом окне. Ctrl+P → Сохранить как PDF.', 'ok');
       } catch (err) {
         toast(err.message || 'Не удалось открыть КП', 'err');

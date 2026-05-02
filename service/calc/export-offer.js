@@ -10,6 +10,7 @@
 
 import { computeOrderTotals, ORDER_TYPES, POSITION_CATEGORIES } from './order-model.js';
 import { fmtMoney } from '../../cooling/calc/fc-summary.js';
+import { loadEffectiveCompanyProfile } from '../../shared/company-profile.js';
 
 function escHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -26,7 +27,12 @@ function escHtml(s) {
  */
 export function generateOfferHtml(order, displayCurrency = '₽', convertFn = null, opts = {}) {
   const showCost = opts.showCostBreakdown === true;
-  const company = opts.companyInfo || {};
+  // v0.60.27: компания подтягивается из global-settings (shared/company-profile.js).
+  // Можно override через opts.companyInfo (приоритет).
+  const profile = opts.pid !== undefined
+    ? loadEffectiveCompanyProfile(opts.pid)
+    : loadEffectiveCompanyProfile(null);
+  const company = { ...profile, ...(opts.companyInfo || {}) };
   const t = computeOrderTotals(order, displayCurrency, convertFn);
   const fmt = (v) => fmtMoney(v, displayCurrency);
   const typeLabel = ORDER_TYPES.find(x => x.id === order.type)?.label || order.type;
@@ -127,15 +133,17 @@ export function generateOfferHtml(order, displayCurrency = '₽', convertFn = nu
 
   <div class="header">
     <div class="header-left">
-      ${company.name ? `<div class="company-name">${escHtml(company.name)}</div>` : ''}
+      ${company.name ? `<div class="company-name">${escHtml(company.name)}</div>` : '<div class="company-name" style="color:#dc2626">⚠ Реквизиты компании не заполнены</div>'}
       ${company.address ? `<div>${escHtml(company.address)}</div>` : ''}
-      ${company.contact ? `<div>${escHtml(company.contact)}</div>` : ''}
+      ${[company.phone, company.email, company.website].filter(Boolean).map(escHtml).join(' · ') || ''}
+      ${company.bin ? `<div style="font-size:9pt;color:#555">БИН/ИНН: ${escHtml(company.bin)}</div>` : ''}
     </div>
     <div class="header-right">
       <div><b>КП №${escHtml(orderNum)}</b></div>
       <div>от ${escHtml(date)}</div>
     </div>
   </div>
+  ${!company.name ? `<div class="no-print" style="background:#fef2f2;border-color:#fecaca">⚠ Реквизиты компании не заполнены. Заполните в шестерёнке (⚙) → «🏢 Реквизиты организации».</div>` : ''}
 
   <h1>Коммерческое предложение</h1>
   <h2>«${escHtml(order.name || '(без названия)')}»</h2>
@@ -196,9 +204,14 @@ export function generateOfferHtml(order, displayCurrency = '₽', convertFn = nu
     <p>${escHtml(order.notes).replace(/\n/g, '<br>')}</p>
   ` : ''}
 
+  ${company.bankRequisites ? `
+    <h2>Платёжные реквизиты</h2>
+    <p style="white-space:pre-wrap">${escHtml(company.bankRequisites)}</p>
+  ` : ''}
+
   <div class="signature">
     <div>
-      <div>Исполнитель:</div>
+      <div>Исполнитель${company.director ? ': ' + escHtml(company.director) : ':'}</div>
       <div class="line">подпись / расшифровка / дата</div>
     </div>
     <div>
@@ -216,6 +229,11 @@ export function generateOfferHtml(order, displayCurrency = '₽', convertFn = nu
 
 /**
  * Открыть КП в новом окне для печати/сохранения PDF.
+ *
+ * @param {object} order
+ * @param {string} displayCurrency
+ * @param {function|null} convertFn
+ * @param {object} opts — { showCostBreakdown, pid, companyInfo }
  */
 export function openOfferPreview(order, displayCurrency, convertFn, opts) {
   const html = generateOfferHtml(order, displayCurrency, convertFn, opts);

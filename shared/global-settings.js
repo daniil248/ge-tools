@@ -24,6 +24,9 @@ import {
   pickBackupFolder, downloadBackup, writeBackupToFolder,
   startAutoBackupTimer, stopAutoBackupTimer,
 } from './backup.js';
+import {
+  DEFAULT_COMPANY, loadRawProfile, saveGlobalCompanyProfile,
+} from './company-profile.js';
 
 const STORAGE_KEY = 'raschet.global.v1';
 
@@ -377,6 +380,45 @@ function _renderBackupSection(host) {
   });
 }
 
+/* v0.60.27: рендер секции «Реквизиты организации». */
+function _renderCompanySection(host) {
+  const profile = loadRawProfile(null);
+  const escAttr = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const escHtml = escAttr;
+  const f = (id, label, value, opts = {}) => `
+    <label class="rs-gs-cf-field" title="${escAttr(opts.tip || '')}" style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151">
+      <span style="font-weight:500">${escHtml(label)}</span>
+      <input type="${opts.type || 'text'}" data-cf="${id}" value="${escAttr(value || '')}" placeholder="${escAttr(opts.placeholder || '')}" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
+    </label>
+  `;
+  host.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px">
+      ${f('name', 'Название организации', profile.name, { placeholder: 'ТОО «...» / ООО «...»', tip: 'Полное наименование юридического лица. Отображается в шапке КП.' })}
+      ${f('address', 'Юридический адрес', profile.address, { placeholder: '050000, г. Алматы, ул. ...', tip: 'Адрес для шапки документов.' })}
+      ${f('phone', 'Телефон', profile.phone, { placeholder: '+7 (...)', tip: 'Контактный телефон для клиентов.' })}
+      ${f('email', 'Email', profile.email, { type: 'email', placeholder: 'info@company.kz', tip: 'Email для деловой переписки.' })}
+      ${f('website', 'Сайт', profile.website, { placeholder: 'https://company.kz', tip: 'Корпоративный сайт.' })}
+      ${f('bin', 'БИН / ИНН', profile.bin, { placeholder: '12 цифр', tip: 'БИН (KZ) или ИНН (RU). Используется в счёт-фактурах.' })}
+      ${f('director', 'Руководитель', profile.director, { placeholder: 'Иванов И.И.', tip: 'ФИО руководителя для подписей в КП и договорах.' })}
+    </div>
+    <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151;margin-top:8px"
+           title="Банковские реквизиты для счёта-фактуры. Многострочно, форматирование сохраняется в КП.">
+      <span style="font-weight:500">Банковские реквизиты</span>
+      <textarea data-cf="bankRequisites" rows="3" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px;resize:vertical" placeholder="АО «Банк» БИК ... ИИК ...">${escHtml(profile.bankRequisites)}</textarea>
+    </label>
+    <p class="muted" style="font-size:11px;margin:6px 0 0">
+      💡 Изменения сохраняются автоматически при потере фокуса (input → blur). Per-project override настраивается в Свойствах проекта.
+    </p>
+  `;
+  host.addEventListener('change', (ev) => {
+    const inp = ev.target.closest('[data-cf]');
+    if (!inp) return;
+    const cur = loadRawProfile(null);
+    cur[inp.dataset.cf] = inp.value;
+    saveGlobalCompanyProfile(cur);
+  });
+}
+
 /**
  * Открыть модалку глобальных настроек. Не зависит от наличия main-app.
  */
@@ -395,6 +437,10 @@ export function openSettingsModal() {
         <button type="button" class="rs-gs-close" aria-label="Закрыть">×</button>
       </div>
       <div class="rs-gs-body">
+        <h4>🏢 Реквизиты организации</h4>
+        <div class="muted" style="margin-bottom:8px" title="Реквизиты компании-исполнителя для шапки КП клиенту, договоров и отчётов. Сохраняются глобально для всех проектов; per-project override настраивается в свойствах проекта.">Реквизиты для шапки КП и договоров. Используются модулем «🛠 Сервис: монтаж и ТО» при экспорте КП клиенту.</div>
+        <div id="rs-gs-company-section" style="margin-bottom:18px"></div>
+
         <h4>💾 Резервное копирование</h4>
         <div class="muted" style="margin-bottom:8px">Защита от потери данных. Раз в час (или другой интервал) приложение автоматически записывает JSON-бэкап в выбранную папку.</div>
         <div id="rs-gs-backup-section" style="margin-bottom:18px"></div>
@@ -416,6 +462,10 @@ export function openSettingsModal() {
   // v0.59.855: секция авто-бэкапа.
   const backupHost = overlay.querySelector('#rs-gs-backup-section');
   if (backupHost) _renderBackupSection(backupHost);
+
+  // v0.60.27: секция реквизитов организации.
+  const companyHost = overlay.querySelector('#rs-gs-company-section');
+  if (companyHost) _renderCompanySection(companyHost);
 
   const close = () => overlay.remove();
   overlay.querySelector('.rs-gs-close').addEventListener('click', close);
