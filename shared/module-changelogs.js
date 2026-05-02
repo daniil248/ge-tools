@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.30', date: '2026-05-02', items: [
+      '🐛 <b>Service: fix renderModuleActions сигнатуры</b>. По репорту: «ещё не работает, вообще». В service.js передавал navMode + navReturn отдельно, а API ждёт <code>{ navContext: { mode, return }, crossLinks: [{href,label,title}], getPayload }</code>. Это могло тихо throw → context picker не отрисовывался.',
+      '• Также добавлен version-marker «v0.60.30» в console.warn / error чтобы было видно в DevTools какая версия загружена (помогает диагностике cache-проблем).',
+      '• Fallback warning «service v0.60.30 init: picker не отрендерился» — если innerHTML пустой после render, оранжевый warning виден сразу.',
+      '🏢 <b>Phase 24.5: Per-project company profile override в Свойствах проекта</b>. По требованию (косвенному): нужны разные юр.лица для разных проектов. В <code>projects/project.html</code> → раздел «🏢 Реквизиты компании-исполнителя» с checkbox «Использовать особые реквизиты для этого проекта»: если включён — поля редактируются + сохраняются в project namespace, экспорт КП использует их вместо глобальных.',
+      '📍 <b>Cooling: project.location обновляется из meteo-embed</b>. По репорту: «не обновляется местоположение из модуля метео». Раньше при возврате из embed только переключался активный датасет, координаты в project.location не писались. Теперь meteo payload (lat/lon/locationName) записывается в project.location → пропагация в psychrometrics, tech-workspace и др.',
+      '📋 <b>Архитектурное правило (запомнено)</b>: «все отчёты должны формироваться через модуль reports/. Каждый документ — со своим настраиваемым шаблоном». Зафиксировано в memory <code>feedback_reports_via_module.md</code>.',
+      '🔧 <b>Service: КП экспорт переписан через shared/report/</b>. Раньше собирал HTML напрямую через window.open() — нарушение правила. Теперь <code>buildOfferBlocks()</code> возвращает blocks[] для модуля reports, <code>openOfferPreview()</code> открывает Report.openTemplateEditor — пользователь может настроить поля/шрифты/лого + экспорт PDF/DOCX через reports infrastructure.',
+      'Файлы: <code>service/service.js</code>, <code>service/calc/export-offer.js</code> (rewrite), <code>projects/project.js</code>, <code>cooling/cooling.js</code>, <code>shared/company-profile.js</code> (используется в project.js), <code>shared/module-changelogs.js</code>.',
+    ] },
     { version: '0.60.29', date: '2026-05-02', items: [
       '🚀 <b>Rich empty state в Service-модуле</b>. Новый сервис-модуль теперь стартует с информативным экраном вместо лаконичного «нет активного наряда».',
       '• Большой заголовок и описание модуля.',

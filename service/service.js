@@ -90,15 +90,18 @@ function activeOrder() {
 function renderContextPicker() {
   const el = $('sv-context-picker');
   if (!el) {
-    console.warn('[service] sv-context-picker не найден в DOM');
+    console.warn('[service v0.60.30] sv-context-picker не найден в DOM');
     return;
   }
   try {
     _renderContextPickerInner(el);
   } catch (e) {
-    console.error('[service] Ошибка renderContextPicker:', e);
-    // Fallback — показать минимальный picker, чтобы не было пустого блока
+    console.error('[service v0.60.30] Ошибка renderContextPicker:', e);
     el.innerHTML = `<div style="padding:6px;background:#fef2f2;border:1px solid #fecaca;border-radius:3px;font-size:11px;color:#b91c1c">⚠ Ошибка загрузки контекста: ${util.escHtml(e.message || String(e))}. Откройте DevTools → Console для деталей.</div>`;
+  }
+  // v0.60.30: явный маркер версии — если виден «service v0.60.30», то JS работает
+  if (!el.innerHTML || el.innerHTML.length < 50) {
+    el.innerHTML = `<div style="padding:6px;background:#fff7ed;border:1px solid #fdba74;border-radius:3px;font-size:11px;color:#9a3412">⚠ service v0.60.30 init: picker не отрендерился (innerHTML пустой). Откройте DevTools → Console.</div>`;
   }
 }
 
@@ -329,17 +332,15 @@ function renderActive() {
 function renderModuleActionsHere() {
   const root = $('sv-content-actions');
   if (!root) return;
+  // v0.60.30: правильная сигнатура renderModuleActions — { navContext, crossLinks, getPayload }.
+  // Раньше передавал отдельные navMode/navReturn — потенциально могло throw.
   renderModuleActions(root, {
-    moduleId: 'service',
-    moduleTitle: 'Сервис: монтаж и ТО',
-    navMode: _navMode,
-    navReturn: _navReturn,
+    navContext: { mode: _navMode, return: _navReturn },
     crossLinks: [
-      { id: 'cooling', label: '❄ Подбор холода', path: '../cooling/' },
-      { id: 'projects', label: '📁 Проекты', path: '../projects/' },
+      { href: '../cooling/', label: '❄ Подбор холода', title: 'Перейти в модуль подбора холодильных систем' },
+      { href: '../projects/', label: '📁 Проекты', title: 'Перейти в список проектов' },
     ],
-    onComplete: () => completeReturn(_navReturn, { module: 'service' }),
-    onCancel: () => cancelReturn(_navReturn),
+    getPayload: () => ({ module: 'service' }),
   });
 }
 

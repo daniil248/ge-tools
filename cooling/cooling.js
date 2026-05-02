@@ -1446,6 +1446,29 @@ function init() {
       localStorage.setItem(projectKey(_pid?.id, ...KEY_META_DATA), JSON.stringify(datasets));
       localStorage.setItem(projectKey(_pid?.id, ...KEY_META_ACTIVE), JSON.stringify(embedResult.datasetId));
     } catch {}
+    // v0.60.30 (по репорту: «не обновляется местоположение из модуля метео»):
+    // обновить project.location координатами выбранного датасета. Без этого
+    // другие модули (psychrometrics, tech-workspace) продолжают видеть
+    // старое местоположение проекта.
+    try {
+      if (!_standalone && _pid?.id && (embedResult.lat != null || embedResult.locationName)) {
+        const projModule = await import('../shared/project-storage.js');
+        const proj = projModule.getProject(_pid.id);
+        if (proj) {
+          const newLoc = {
+            city: embedResult.locationName || proj.location?.city || '',
+            country: proj.location?.country || '',
+            lat: embedResult.lat ?? proj.location?.lat ?? null,
+            lon: embedResult.lon ?? proj.location?.lon ?? null,
+          };
+          projModule.updateProject(_pid.id, { location: newLoc });
+          _pid = projModule.getProject(_pid.id);  // refresh _pid object
+          util.toast(`📍 Местоположение проекта обновлено: ${newLoc.city || ''} ${newLoc.lat?.toFixed(3) || '?'}, ${newLoc.lon?.toFixed(3) || '?'}`, 'info');
+        }
+      }
+    } catch (e) {
+      console.error('[cooling] Не удалось обновить project.location:', e);
+    }
   }
 
   // Tab navigation
