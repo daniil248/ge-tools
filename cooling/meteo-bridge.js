@@ -10,7 +10,7 @@
 // Если в Meteo нет ⭐-датасета — Cooling показывает пустое состояние
 // со ссылкой «📅 Открыть Meteo →».
 
-import { ensureDefaultProject, projectKey } from '../shared/project-storage.js';
+import { ensureDefaultProject, projectKey, getActiveProjectId } from '../shared/project-storage.js';
 
 const KEY_DATA = ['meteo', 'datasets.v1'];
 const KEY_ACTIVE = ['meteo', 'activeId.v1'];
@@ -24,14 +24,28 @@ function loadJson(pid, suffix, fallback) {
   } catch { return fallback; }
 }
 
+/* v0.60.50 fix: раньше использовали ensureDefaultProject() — он возвращает
+   ОБЪЕКТ первого проекта, игнорируя setActiveProjectId. Когда cooling
+   работал с pid=p_qarmet через URL, бридж всё равно читал meteo из
+   дефолтного проекта (например TBC Bank) → cooling видел старый Берлин,
+   хотя в Qarmet уже был импортирован ASHRAE Темиртау.
+   Fix: getActiveProjectId() (string id) — уважает setActiveProjectId,
+   который cooling.js вызывает при init из ?pid в URL. */
+function resolvePid() {
+  let id = null;
+  try { id = getActiveProjectId(); } catch {}
+  if (id) return id;
+  // fallback на default
+  const dp = ensureDefaultProject();
+  return typeof dp === 'string' ? dp : (dp?.id || null);
+}
+
 /**
  * Получить активный датасет из meteo.
- *
- * @returns {{dataset, hourly, projectId}|null} { dataset, hourly,
- *          projectId } или null если нет датасетов.
+ * @param {string|null} [pidOverride] — опц. явно задать pid
  */
-export function getActiveMeteoDataset() {
-  const pid = ensureDefaultProject();
+export function getActiveMeteoDataset(pidOverride = null) {
+  const pid = pidOverride || resolvePid();
   const datasets = loadJson(pid, KEY_DATA, []) || [];
   if (!datasets.length) return null;
   const activeId = loadJson(pid, KEY_ACTIVE, null);
@@ -49,10 +63,10 @@ export function getActiveMeteoDataset() {
 
 /**
  * Получить глобальный фильтр периода из meteo (если задан).
- * @returns {{mode, year, periodFrom, periodTo}}
+ * @param {string|null} [pidOverride] — опц.
  */
-export function getMeteoFilter() {
-  const pid = ensureDefaultProject();
+export function getMeteoFilter(pidOverride = null) {
+  const pid = pidOverride || resolvePid();
   const f = loadJson(pid, KEY_FILTER, null);
   return f && typeof f === 'object'
     ? { mode: 'all', year: '', periodFrom: '', periodTo: '', ...f }

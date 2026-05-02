@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.50', date: '2026-05-03', items: [
+      '🚨 <b>HOTFIX: meteo-bridge игнорировал ?pid → cooling видел чужой датасет</b>. По репорту: «не возвращает данные» (cooling в Qarmet проекте показывал Берлин вместо ASHRAE Темиртау).',
+      '• Корневая причина: <code>cooling/meteo-bridge.js::getActiveMeteoDataset()</code> использовал <code>ensureDefaultProject()</code> — это всегда первый проект в списке (TBC Bank), независимо от ?pid в URL. Когда cooling работал в Qarmet, бридж читал meteo из дефолтного проекта.',
+      '• Fix: <code>resolvePid()</code> через <code>getActiveProjectId()</code> (уважает <code>setActiveProjectId()</code>, который cooling.js вызывает при init из ?pid). Также <code>getActiveMeteoDataset(pidOverride)</code> и <code>getMeteoFilter(pidOverride)</code> принимают явный pid override — cooling.js передаёт <code>_pid?.id</code> во всех вызовах.',
+      '🔧 <b>Phase 32.3 prep: work-templates расширены</b> для auto-suggest материалов: каждый seed-шаблон теперь имеет <code>workType</code>, <code>equipmentKind</code>, <code>capacityKw</code> (для consumptionRate calc). UI auto-suggest — следующим коммитом.',
+      'Файлы: <code>cooling/meteo-bridge.js</code>, <code>cooling/cooling.js</code>, <code>service/catalog/work-templates.js</code>.',
+    ] },
     { version: '0.60.49', date: '2026-05-03', items: [
       '📦 <b>Phase 32.2: каталог расходных материалов в Service</b>. По требованию: «не хватает каталога расходных материалов с привязкой к видам работ или конкретному оборудованию».',
       '• <code>service/catalog/materials.js</code>: SEED_MATERIALS (20+ позиций — хладагенты R410A/R32/R134a/R290, масла POE/PAG, фильтры G4/F7/H13, гликоль, медные трубы, изоляция, АКБ VRLA/Li-ion, запчасти ИБП, ДГУ-фильтры/масла, патч-корды Cat6A/OM4) + LS-CRUD пользовательских материалов + pub/sub.',

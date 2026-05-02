@@ -433,9 +433,9 @@ function makeNewOption(name, baseSpec, baseEco) {
 
 /* ----- Hourly из meteo с применённым фильтром ----- */
 function getHourly() {
-  const m = getActiveMeteoDataset();
+  const m = getActiveMeteoDataset(_pid?.id);
   if (!m) return { hourly: [], dataset: null };
-  const filter = getMeteoFilter();
+  const filter = getMeteoFilter(_pid?.id);
   return { hourly: applyFilter(m.hourly, filter), dataset: m.dataset, filter };
 }
 
@@ -494,7 +494,7 @@ function renderSelectionsList() {
 function renderMeteoStatus() {
   const root = $('cl-meteo-status');
   if (!root) return;
-  const m = getActiveMeteoDataset();
+  const m = getActiveMeteoDataset(_pid?.id);
   if (!m) {
     root.className = 'cl-meteo-status empty';
     // v0.60.32: если у проекта есть локация — предлагаем 1-кликовую
@@ -519,7 +519,7 @@ function renderMeteoStatus() {
     }
     return;
   }
-  const filter = getMeteoFilter();
+  const filter = getMeteoFilter(_pid?.id);
   const total = m.hourly.length;
   const filtered = applyFilter(m.hourly, filter).length;
   let filterDesc;
