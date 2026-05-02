@@ -531,6 +531,15 @@ const PROJECT_MODULES = [
     desc: 'Технико-экономическое сравнение чиллеров (CHW), DX-систем, free-cooling и CRAC. CAPEX/OPEX/TCO/payback по климатическим данным проекта. Несколько подборов разных систем, в каждом — варианты с ★-основным.',
     color: '#0891b2',
   },
+  {
+    // v0.60.44: Service module — добавлен в карточку проекта по требованию
+    id: 'service',
+    href: '../service/',
+    icon: '🛠',
+    label: 'Сервис: монтаж и ТО',
+    desc: 'Расчёт стоимости монтажа и техобслуживания: себестоимость + клиент-цена с маржой и НДС. Импорт работ из cooling-подборов проекта (1 клик). Per-cell валюты. Каталог типовых работ. Экспорт КП клиенту с настраиваемым шаблоном.',
+    color: '#ea580c',
+  },
 ];
 
 /* ---------- Статусы ---------- */
@@ -697,6 +706,16 @@ function render() {
         meta: `${s.options?.length || 0} вариант${(s.options?.length === 1) ? '' : 'ов'}${s.mainOptionId ? ', есть ★' : ''}`,
       })) : [];
     } catch { subCoolings = []; }
+    // v0.60.44: service orders в проекте — multi-instance.
+    let subServiceOrders = [];
+    try {
+      const raw = localStorage.getItem(projectKey(p.id, 'service', 'orders.v1'));
+      const arr = raw ? JSON.parse(raw) : [];
+      subServiceOrders = Array.isArray(arr) ? arr.map(o => ({
+        id: o.id, name: o.name || '(без имени)',
+        meta: `${o.type || 'install'} · ${o.positions?.length || 0} позиций · ${o.date || ''}`,
+      })) : [];
+    } catch { subServiceOrders = []; }
 
     // v0.59.862: «Карточка модуля появляется только когда есть данные».
     // Singleton-модули (Технолог ЦОД, IT-инвентарь, реестр объекта) видимы
@@ -814,6 +833,25 @@ function render() {
                 <a href="${esc(buildModuleHref('../cooling/', { projectId: p.id, fromModule: 'projects', openSelection: s.id }))}" class="pr-btn-sel" style="font-size:12px;padding:3px 10px" title="Открыть этот подбор в модуле «Подбор холодильных систем»">Открыть →</a>
               </div>`).join('')
           : '',
+      },
+      {
+        // v0.60.44: Service module card в карточке проекта (по требованию).
+        id: 'service', type: 'multi',
+        title: '🛠 Сервис: монтаж и ТО', count: subServiceOrders.length,
+        color: '#ea580c',
+        href: '../service/',
+        visible: subServiceOrders.length > 0,
+        latent: true,
+        addLabel: '🛠 Добавить сервисный наряд',
+        bodyHtml: subServiceOrders.length
+          ? subServiceOrders.map(o => `
+              <div class="pr-sub-row" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:4px">
+                <span style="font-size:16px">🛠</span>
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(o.name)} — ${esc(o.meta)}">${esc(o.name)}</span>
+                <span class="muted" style="font-size:11px">${esc(o.meta)}</span>
+                <a href="${esc(buildModuleHref('../service/', { projectId: p.id, fromModule: 'projects' }))}" class="pr-btn-sel" style="font-size:12px;padding:3px 10px" title="Открыть наряд в модуле «Сервис: монтаж и ТО»">Открыть →</a>
+              </div>`).join('')
+          : `<a href="${esc(buildModuleHref('../service/', { projectId: p.id, fromModule: 'projects' }))}" class="pr-btn-sel" style="display:inline-block;text-decoration:none;padding:5px 10px;font-size:12px;background:#fff7ed;color:#9a3412;border:1px solid #fdba74;border-radius:4px">🛠 Открыть Сервис →</a>`,
       },
       {
         id: 'inventory-it', type: 'singleton',

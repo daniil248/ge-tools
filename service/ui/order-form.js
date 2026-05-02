@@ -298,7 +298,7 @@ async function handlePositionInput(ev, tr, o, onChange, displayCurrency, convert
           }
         }
         if (!cf) {
-          toast(`⚠ Курсы валют недоступны (${oldCur}→${newCur}). Откройте модуль «💱 Валюта и курсы» → загрузить курсы. После этого они сохранятся в LS и будут доступны во всех модулях.`, 'err');
+          toast(`⚠ Курсы валют недоступны (${oldCur}→${newCur}). Нажмите «💱 Курсы валют» в сайдбаре service-модуля (раздел «⚙ Настройки») → загрузить. После этого курсы сохранятся в LS и будут доступны во всех модулях.`, 'err');
         } else {
           const v = cf(curVal, oldCur, newCur);
           if (Number.isFinite(v) && v > 0) {
@@ -307,7 +307,7 @@ async function handlePositionInput(ev, tr, o, onChange, displayCurrency, convert
             if (valInp) valInp.value = positions[idx][col].value;
             toast(`✓ ${curVal} ${oldCur} → ${positions[idx][col].value} ${newCur}`, 'ok');
           } else {
-            toast(`⚠ Курс ${oldCur}→${newCur} не найден в локальном кэше. Запустите модуль «💱 Валюта и курсы» для обновления.`, 'err');
+            toast(`⚠ Курс ${oldCur}→${newCur} не найден. Откройте «💱 Курсы валют» в сайдбаре service для обновления.`, 'err');
           }
         }
       }

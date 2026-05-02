@@ -16,6 +16,8 @@
 import { computeOrderTotals, ORDER_TYPES, POSITION_CATEGORIES } from './order-model.js';
 import { fmtMoney } from '../../cooling/calc/fc-summary.js';
 import { loadEffectiveCompanyProfile } from '../../shared/company-profile.js';
+import { getActiveKpTemplate } from '../report/kp-template.js';
+import { SLOT_BUILDERS } from '../report/slots/kp-blocks.js';
 
 /**
  * Сформировать blocks[] для модуля reports.
@@ -29,134 +31,52 @@ import { loadEffectiveCompanyProfile } from '../../shared/company-profile.js';
  * @returns {Array<object>} blocks для tpl.content
  */
 export function buildOfferBlocks(order, displayCurrency = '₽', convertFn = null, opts = {}) {
-  const B = opts.blocks;  // передаётся caller'ом (modules не должны импортировать report напрямую если возможно)
+  const B = opts.blocks;
   if (!B) throw new Error('buildOfferBlocks: opts.blocks (shared/report/blocks) is required');
 
-  const showCost = opts.showCostBreakdown === true;
   const profile = loadEffectiveCompanyProfile(opts.pid);
   const company = { ...profile, ...(opts.companyInfo || {}) };
-  const t = computeOrderTotals(order, displayCurrency, convertFn);
-  const fmt = (v) => fmtMoney(v, displayCurrency);
-  const typeLabel = ORDER_TYPES.find(x => x.id === order.type)?.label || order.type;
-  const date = order.date || new Date().toISOString().slice(0, 10);
-  const orderNum = order.id || 'без №';
+  const totals = computeOrderTotals(order, displayCurrency, convertFn);
 
-  const positions = Array.isArray(order.positions) ? order.positions : [];
-  const conv = (v, from, to) => {
-    if (!Number.isFinite(v) || v === 0 || from === to || !convertFn) return v;
-    const r = convertFn(v, from, to);
-    return Number.isFinite(r) ? r : v;
+  // v0.60.44 (Phase 29): slot-based renderer. Берём активный шаблон,
+  // итерируем enabled-слоты, для каждого вызываем builder из SLOT_BUILDERS.
+  // Override через opts.template если caller хочет явный шаблон (для preview).
+  const template = opts.template || getActiveKpTemplate();
+  const ctx = {
+    order, displayCurrency, convertFn, company, totals,
+    B,
+    POSITION_CATEGORIES, ORDER_TYPES,
+    fmtMoney,
   };
-
   const blocks = [];
-
-  // Шапка: компания (отображаем как параграфы — в шаблоне можно вынести в overlay)
-  if (company.name) {
-    blocks.push(B.h3(company.name));
-  } else {
-    blocks.push(B.paragraph('⚠ Реквизиты компании не заполнены — заполните в ⚙ → Реквизиты организации.'));
+  for (const slot of (template.slots || [])) {
+    if (!slot.enabled) continue;
+    const builder = SLOT_BUILDERS[slot.id];
+    if (!builder) {
+      console.warn(`[export-offer] Нет builder для слота "${slot.id}"`);
+      continue;
+    }
+    try {
+      const slotBlocks = builder(ctx, slot.options || {});
+      if (Array.isArray(slotBlocks)) blocks.push(...slotBlocks);
+    } catch (e) {
+      console.error(`[export-offer] Ошибка builder слота "${slot.id}":`, e);
+    }
   }
-  const companyLine = [company.address, company.phone, company.email, company.website].filter(Boolean).join(' · ');
-  if (companyLine) blocks.push(B.caption(companyLine));
-  if (company.bin) blocks.push(B.caption(`БИН/ИНН: ${company.bin}`));
-  blocks.push(B.spacer(4));
-
-  // Заголовок документа
-  blocks.push(B.h1('Коммерческое предложение'));
-  blocks.push(B.h2(`№${orderNum} от ${date} · «${order.name || '(без названия)'}»`));
-  blocks.push(B.spacer(2));
-
-  // Информация
-  const infoRows = [['Тип работ:', typeLabel]];
-  if (order.customer?.name) infoRows.push(['Заказчик:', order.customer.name]);
-  if (order.customer?.contact) infoRows.push(['Контакт:', order.customer.contact]);
-  infoRows.push(['Валюта:', displayCurrency]);
-  blocks.push(B.table(['', ''], infoRows));
-  blocks.push(B.spacer(4));
-
-  // Состав работ — группировка по категориям
-  blocks.push(B.h2('Состав работ и материалов'));
-  const byCategory = new Map();
-  for (const p of positions) {
-    const cat = POSITION_CATEGORIES.find(c => c.id === p.category) || POSITION_CATEGORIES.find(c => c.id === 'other');
-    const arr = byCategory.get(cat.id) || { label: cat.label, items: [] };
-    arr.items.push(p);
-    byCategory.set(cat.id, arr);
+  // Backward-compat: если opts.showCostBreakdown=true, override slot-options
+  // для positions-table и totals чтобы показать колонку себестоимости.
+  if (opts.showCostBreakdown === true && !opts.template) {
+    // Re-build с временным шаблоном где у positions-table.showCostColumn=true
+    const overrideTpl = {
+      ...template,
+      slots: template.slots.map(s => {
+        if (s.id === 'positions-table') return { ...s, options: { ...s.options, showCostColumn: true } };
+        if (s.id === 'totals') return { ...s, options: { ...s.options, showCostInTotals: true } };
+        return s;
+      }),
+    };
+    return buildOfferBlocks(order, displayCurrency, convertFn, { ...opts, template: overrideTpl });
   }
-
-  // Заголовки таблицы
-  const tableHeaders = showCost
-    ? ['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена/ед.', 'Себес/ед.', 'Сумма']
-    : ['№', 'Наименование', 'Кол-во', 'Ед.', 'Цена/ед.', 'Сумма'];
-
-  let lineIdx = 0;
-  let grandTotal = 0;
-  for (const c of POSITION_CATEGORIES) {
-    const grp = byCategory.get(c.id);
-    if (!grp || !grp.items.length) continue;
-    blocks.push(B.h3(grp.label));
-    let grpSubtotal = 0;
-    const rows = grp.items.map(p => {
-      lineIdx++;
-      const q = Number(p.qty) || 0;
-      const clientPerUnitDC = conv(Number(p.clientPrice?.value) || 0, p.clientPrice?.currency || displayCurrency, displayCurrency);
-      const lineTotal = q * clientPerUnitDC;
-      grpSubtotal += lineTotal;
-      grandTotal += lineTotal;
-      const baseRow = [
-        String(lineIdx),
-        p.label || '',
-        String(q),
-        p.unit || '',
-        fmt(clientPerUnitDC),
-      ];
-      if (showCost) {
-        const costPerUnitDC = conv(Number(p.costPrice?.value) || 0, p.costPrice?.currency || displayCurrency, displayCurrency);
-        baseRow.push(fmt(costPerUnitDC));
-      }
-      baseRow.push(fmt(lineTotal));
-      return baseRow;
-    });
-    blocks.push(B.table(tableHeaders, rows));
-    blocks.push(B.paragraph(`Итого по разделу «${grp.label}»: ${fmt(grpSubtotal)}`, { style: 'caption' }));
-    blocks.push(B.spacer(3));
-  }
-
-  // Итоги
-  blocks.push(B.h2('Итого'));
-  const totalsRows = [
-    ['Стоимость работ и материалов (без НДС):', fmt(t.sumClientNative)],
-    [`НДС (${order.vatPct}%):`, fmt(t.sumVat)],
-    ['ИТОГО к оплате:', fmt(t.sumClientWithVat)],
-  ];
-  if (showCost) {
-    totalsRows.push(['(служебно) Себестоимость + накладные:', fmt(t.sumCostWithOverhead)]);
-    totalsRows.push(['(служебно) Маржа:', `${fmt(t.marginAbs)} (${t.marginPct.toFixed(1)} %)`]);
-  }
-  blocks.push(B.table(['', ''], totalsRows));
-
-  // Примечания
-  if (order.notes) {
-    blocks.push(B.spacer(4));
-    blocks.push(B.h2('Примечания'));
-    blocks.push(B.paragraph(order.notes));
-  }
-
-  // Платёжные реквизиты
-  if (company.bankRequisites) {
-    blocks.push(B.spacer(4));
-    blocks.push(B.h2('Платёжные реквизиты'));
-    blocks.push(B.paragraph(company.bankRequisites));
-  }
-
-  // Подписи
-  blocks.push(B.spacer(8));
-  const sigRows = [
-    [`Исполнитель${company.director ? ': ' + company.director : ':'}`, 'Заказчик:'],
-    ['_______________________ / подпись / дата', '_______________________ / подпись / дата'],
-  ];
-  blocks.push(B.table(['', ''], sigRows));
-
   return blocks;
 }
 

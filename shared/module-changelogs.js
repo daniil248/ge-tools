@@ -4,6 +4,28 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.44', date: '2026-05-03', items: [
+      '🛠 <b>Карточка Service в свойствах проекта</b>. По репорту: «из проекта нет перехода в модуль сервис и ТО по этому проекту, нужно добавить». Добавлена карточка «🛠 Сервис: монтаж и ТО» в раздел «Модули проекта»: показывает наряды текущего проекта (читает <code>service/orders.v1</code>) с кнопкой «Открыть →» для каждого. Если нарядов нет — кнопка «🛠 Открыть Сервис →» (latent карточка). В меню «+ Добавить» добавлен пункт «🛠 Добавить сервисный наряд».',
+      '💱 <b>Service: добавлены кнопки «💱 Курсы валют» + «📄 Шаблон КП»</b>. По репорту «не знаю где открыть модуль валюта и курсы»: раньше toast обещал несуществующий standalone-модуль. Теперь в сайдбаре «⚙ Настройки» две кнопки — открывают <code>shared/currency-rates/rates-dialog.js</code> и редактор шаблона КП.',
+      '📄 <b>Phase 29: slot-based template editor для КП</b> (рефакторинг по требованию: «настройка вывода отчёта должна настраиваться в самом модуле, так как там есть информация о всех блоках выбранного модуля»).',
+      '• Перенесено из <code>shared/report/</code> в <code>service/report/</code> — модуль владеет своими блок-builderами. <code>shared/report/</code> остаётся для FORMAT-шаблонов (paper/fonts/overlays).',
+      '• Файлы: <code>service/report/kp-template.js</code> (схема + LS-CRUD + pub/sub), <code>service/report/slots/kp-blocks.js</code> (9 builder-функций), <code>service/report/kp-editor.js</code> (модалка с toggle/reorder/per-slot опции).',
+      '• <code>service/calc/export-offer.js</code> переписан под slot-based renderer — итерирует <code>getActiveKpTemplate().slots</code>, вызывает builder каждого enabled-слота. Backward-compat для <code>showCostBreakdown</code>.',
+      '🔢 <b>Полные числа в КП</b>. По репорту: «нужно нормально выводить суммы, с нулями в выбранной валюте». <code>fmtKpMoney</code> через <code>Intl.NumberFormat</code> → «60 000 ₽» / «240 000,50 €» вместо abbreviation «60 тыс».',
+      'Файлы: <code>projects/project.js</code>, <code>service/index.html</code>, <code>service/service.js</code>, <code>service/calc/export-offer.js</code>, <code>service/ui/order-form.js</code>, <code>service/report/*</code> (новые), <code>service/report/slots/*</code> (новые).',
+    ] },
+    { version: '0.60.43', date: '2026-05-02', items: [
+      '💱 <b>Service: добавлены кнопки 💱 Курсы валют и 📄 Шаблон КП</b>. По репорту: «не знаю где открыть модуль валюта и курсы, разве мы делали???». Раньше toast говорил «откройте модуль 💱 Валюта и курсы» — но такого standalone-модуля нет (UI был только в cooling).',
+      '• «💱 Курсы валют» в сайдбаре «⚙ Настройки» открывает <code>shared/currency-rates/rates-dialog.js</code> (тот же что в cooling).',
+      '• Текст toast обновлён: указывает на конкретную кнопку в сайдбаре, не на несуществующий модуль.',
+      '📄 <b>Phase 29: slot-based template editor для КП</b>.',
+      '• <code>shared/report/kp-template.js</code> — schema KP-шаблона + CRUD + LS persistence + pub/sub. 9 слотов в SLOT_CATALOG: company-header, doc-title, doc-meta, customer-info, positions-table, totals, notes, payment-requisites, signatures.',
+      '• <code>shared/report/slots/kp-blocks.js</code> — pure-функции builder для каждого слота (data → blocks[]).',
+      '• <code>shared/report/kp-editor.js</code> — модалка «📄 Настройка шаблона КП»: dropdown шаблонов + clone/delete/reset + таблица слотов с checkbox enabled + ▲▼ reorder + per-slot опции (groupByCategory, showCostColumn, showBin, showDirector, и т.д.).',
+      '• <code>service/calc/export-offer.js::buildOfferBlocks</code> переписан под slot-based renderer — итерирует <code>getActiveKpTemplate().slots</code>, вызывает builder для каждого enabled-слота. Кнопка «📄 Шаблон КП» в сайдбаре service (раздел «⚙ Настройки») открывает редактор.',
+      '• Backward-compat: <code>opts.showCostBreakdown=true</code> (от чекбокса «показать себес+маржу») работает через temporary template-override.',
+      'Файлы: <code>shared/report/kp-template.js</code> (новый), <code>shared/report/slots/kp-blocks.js</code> (новый), <code>shared/report/kp-editor.js</code> (новый), <code>service/calc/export-offer.js</code>, <code>service/service.js</code>, <code>service/index.html</code>, <code>service/ui/order-form.js</code>.',
+    ] },
     { version: '0.60.43', date: '2026-05-02', items: [
       '📚 <b>/modules/ — добавлен Service + полный технический реестр</b>. По требованию: «здесь должны быть абсолютно все модули у которых есть интерфейс. Так же отдельно нужно добавить список всех модулей, даже без интерфейса».',
       '• Карточка «Сервис: монтаж и ТО» добавлена в секцию ❄ Климат и охлаждение (раньше была только в hub.html — нарушение).',

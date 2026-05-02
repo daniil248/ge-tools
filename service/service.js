@@ -18,8 +18,11 @@ console.info('%c[service v0.60.37] script LOADED', 'color:#16a34a;font-weight:bo
 import { detectNavMode, renderModuleActions, completeReturn, cancelReturn } from '../shared/module-nav.js';
 import { ensureDefaultProject, projectKey, listProjects, getProject, setActiveProjectId, createProject } from '../shared/project-storage.js';
 import { fetchRates, convert as convertRate } from '../shared/currency-rates/index.js';
+import { open as openRatesDialog } from '../shared/currency-rates/rates-dialog.js';
+import '../shared/currency-rates/sources/index.js';
 import * as util from '../meteo/util.js';
 import { CURRENCIES, currencyToIso } from '../cooling/calc/fc-summary.js';
+import { openKpTemplateEditor } from './report/kp-editor.js';
 import { DEFAULT_ORDER, ORDER_TYPES, defaultPosition } from './calc/order-model.js';
 import { renderOrderForm } from './ui/order-form.js';
 import { openWorkCatalogModal } from './ui/work-catalog.js';
@@ -444,6 +447,21 @@ async function init() {
   // v0.60.42: open work-catalog button
   const catBtn = $('sv-open-catalog');
   if (catBtn) catBtn.addEventListener('click', () => openWorkCatalogModal());
+
+  // v0.60.44: open currency-rates dialog (тот же что в cooling)
+  const ratesBtn = $('sv-rates-btn');
+  if (ratesBtn) ratesBtn.addEventListener('click', () => openRatesDialog({
+    onApply: async () => {
+      _ratesCache = null;
+      await ensureRatesLoaded();
+      renderActive();
+      util.toast('Курсы обновлены, конверсии пересчитаны', 'ok');
+    },
+  }));
+
+  // v0.60.44 (Phase 29): open KP template editor
+  const kpTplBtn = $('sv-kp-template-btn');
+  if (kpTplBtn) kpTplBtn.addEventListener('click', () => openKpTemplateEditor());
 
   // Add-order button
   const addBtn = $('sv-add-order');
