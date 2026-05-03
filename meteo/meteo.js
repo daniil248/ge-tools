@@ -19,6 +19,7 @@
 import { ensureDefaultProject, projectKey, getProject, setActiveProjectId } from '../shared/project-storage.js';
 import { detectNavMode, renderModuleActions, completeReturn, cancelReturn } from '../shared/module-nav.js';
 import { idbGet, idbSet, idbDelete, idbAvailable } from '../shared/idb-store.js';
+import { historyAppend, historyTrash, historyRestore, historyPurge, historyList } from '../shared/history-log.js';
 import * as util from './util.js';
 import { getAll as getSources } from './sources/index.js';
 import { drawTempHistogram, drawHumidityHistogram, drawMonthlyTempChart, drawWindRose, renderDaysInRangeTable } from './charts.js';
@@ -173,9 +174,22 @@ async function importViaSource(srcId) {
   };
   _datasets.unshift(dataset);
   _activeId = dataset.id;
-  persist();
+  await persist();
   renderDatasetsList();
   renderActive();
+  // Phase 35: записываем в history-log как событие импорта.
+  // payload включает данные для возможности restore из корзины.
+  if (_pid) {
+    historyAppend(_pid, {
+      module: 'meteo',
+      action: 'import',
+      itemKind: 'meteo-dataset',
+      itemId: dataset.id,
+      itemName: dataset.name,
+      source: dataset.source,
+      payload: { dataset },
+    });
+  }
   util.toast(`Загружено ${(ds.hourly || []).length} строк (${ds.stats?.tmin}…${ds.stats?.tmax} °C)`, 'ok');
 }
 
@@ -584,11 +598,26 @@ async function init() {
         d.name = newName.trim() || d.name;
         persist(); renderDatasetsList(); renderActive();
       } else if (act === 'delete') {
-        const ok = await mtConfirm(`Удалить датасет «${_datasets.find(x => x.id === id)?.name}»?`);
+        const ds = _datasets.find(x => x.id === id);
+        if (!ds) return;
+        const ok = await mtConfirm(`Удалить датасет «${ds.name}»? Запись попадёт в Корзину — можно восстановить.`);
         if (!ok) return;
+        // Phase 35: soft-delete — пишем snapshot в историю.
+        if (_pid) {
+          historyAppend(_pid, {
+            module: 'meteo',
+            action: 'delete',
+            itemKind: 'meteo-dataset',
+            itemId: ds.id,
+            itemName: ds.name,
+            source: ds.source,
+            payload: { dataset: ds },
+          });
+        }
         _datasets = _datasets.filter(d => d.id !== id);
         if (_activeId === id) _activeId = _datasets[0]?.id || null;
-        persist(); renderDatasetsList(); renderActive();
+        await persist(); renderDatasetsList(); renderActive();
+        util.toast(`«${ds.name}» в Корзине. Восстановить → 📜 История.`, 'ok');
       }
       return;
     }
@@ -607,6 +636,14 @@ async function init() {
       renderActiveTab();
     });
   });
+
+  // Phase 35: handlers «📜 Журнал» и «🗑 Корзина».
+  const histBtn = $('mt-btn-history');
+  if (histBtn) histBtn.addEventListener('click', openHistoryModal);
+  const trashBtn = $('mt-btn-trash');
+  if (trashBtn) trashBtn.addEventListener('click', openTrashModal);
+  // обновляем счётчик корзины при init
+  refreshTrashCount();
 
   // v0.59.986: глобальный фильтр периода — единая точка изменения
   const onGlobalFilterChange = () => {
@@ -682,6 +719,158 @@ async function init() {
 
 function mtConfirm(msg, title = 'Подтверждение') {
   return util.modalOpen(`<h3>${util.escHtml(title)}</h3>`, `<p>${util.escHtml(msg)}</p>`, async () => true);
+}
+
+// =============================================================================
+// Phase 35: модалки «📜 История» и «🗑 Корзина»
+// =============================================================================
+const ACTION_LABELS = {
+  'import':  { icon: '➕', label: 'Импорт', color: '#0d8a4e' },
+  'update':  { icon: '✏', label: 'Обновлено', color: '#0369a1' },
+  'delete':  { icon: '🗑', label: 'Удалено', color: '#92400e' },
+  'restore': { icon: '↩', label: 'Восстановлено', color: '#7c3aed' },
+  'purge':   { icon: '✕', label: 'Удалено навсегда', color: '#991b1b' },
+};
+
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+async function refreshTrashCount() {
+  if (!_pid) {
+    const span = $('mt-trash-count');
+    if (span) span.textContent = '';
+    return;
+  }
+  try {
+    const trash = await historyTrash(_pid, { module: 'meteo' });
+    const span = $('mt-trash-count');
+    if (span) span.textContent = trash.length ? `(${trash.length})` : '';
+  } catch (e) {
+    console.warn('[meteo] refreshTrashCount failed:', e);
+  }
+}
+
+async function openHistoryModal() {
+  if (!_pid) {
+    util.toast('История доступна только в project-mode (нет активного проекта)', 'err');
+    return;
+  }
+  const events = await historyList(_pid, { module: 'meteo' });
+  events.sort((a, b) => b.ts - a.ts);  // newest first
+  const rowsHtml = events.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;color:#64748b;padding:16px">Нет событий. Импортируйте датасет — он появится в журнале.</td></tr>`
+    : events.map(ev => {
+        const meta = ACTION_LABELS[ev.action] || { icon: '?', label: ev.action, color: '#64748b' };
+        return `<tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:6px 8px;font-size:11.5px;color:#475569;white-space:nowrap" title="${util.escAttr(new Date(ev.ts).toISOString())}">${util.escHtml(fmtTs(ev.ts))}</td>
+          <td style="padding:6px 8px;font-size:12px"><span style="color:${meta.color}">${meta.icon} ${util.escHtml(meta.label)}</span></td>
+          <td style="padding:6px 8px;font-size:12px">${util.escHtml(ev.itemName || ev.itemId || '—')}</td>
+          <td style="padding:6px 8px;font-size:11px;color:#64748b">${util.escHtml(ev.source || '')}</td>
+        </tr>`;
+      }).join('');
+
+  await util.modalOpen(
+    '<h3>📜 История meteo-данных</h3>',
+    `<div style="max-height:60vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:4px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:#f8fafc;z-index:1">
+          <tr>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Время</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Событие</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Датасет</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Источник</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:8px;font-size:11px">Всего событий: ${events.length}. Журнал per-project, append-only. Восстановление удалённых — через 🗑 Корзина.</p>`,
+    async () => null  // только закрытие
+  );
+}
+
+async function openTrashModal() {
+  if (!_pid) {
+    util.toast('Корзина доступна только в project-mode', 'err');
+    return;
+  }
+  const trash = await historyTrash(_pid, { module: 'meteo' });
+  trash.sort((a, b) => b.ts - a.ts);
+
+  const rowsHtml = trash.length === 0
+    ? `<tr><td colspan="4" style="text-align:center;color:#64748b;padding:16px">Корзина пуста.</td></tr>`
+    : trash.map(ev => {
+        const ds = ev.payload?.dataset || {};
+        const n = ds.hourly?.length || 0;
+        return `<tr style="border-bottom:1px solid #f1f5f9" data-ev-id="${util.escAttr(ev.id)}">
+          <td style="padding:6px 8px;font-size:11.5px;color:#475569;white-space:nowrap">${util.escHtml(fmtTs(ev.ts))}</td>
+          <td style="padding:6px 8px;font-size:12px">${util.escHtml(ev.itemName || ev.itemId || '—')}</td>
+          <td style="padding:6px 8px;font-size:11px;color:#64748b">${n} часов · ${util.escHtml(ev.source || '')}</td>
+          <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+            <button type="button" data-trash-act="restore" data-ev-id="${util.escAttr(ev.id)}" style="padding:3px 8px;font-size:11px;border:1px solid #7c3aed;background:#f5f3ff;color:#7c3aed;border-radius:3px;cursor:pointer;margin-right:4px" title="Восстановить датасет в активный список">↩ Восстановить</button>
+            <button type="button" data-trash-act="purge" data-ev-id="${util.escAttr(ev.id)}" style="padding:3px 8px;font-size:11px;border:1px solid #991b1b;background:#fef2f2;color:#991b1b;border-radius:3px;cursor:pointer" title="Удалить навсегда — восстановить будет нельзя">✕ Навсегда</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+  await util.modalOpen(
+    '<h3>🗑 Корзина meteo</h3>',
+    `<div style="max-height:60vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:4px">
+      <table id="mt-trash-table" style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:#f8fafc;z-index:1">
+          <tr>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Удалено</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Датасет</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Размер</th>
+            <th style="padding:6px 8px;text-align:right;font-weight:600;border-bottom:2px solid #cbd5e1">Действие</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:8px;font-size:11px">В корзине: ${trash.length}. Восстановление возвращает датасет в активный список. «Навсегда» — освобождает место в IndexedDB.</p>`,
+    async () => null
+  );
+
+  // Вешаем handlers ПОСЛЕ открытия модалки (table в DOM).
+  const table = document.getElementById('mt-trash-table');
+  if (table) {
+    table.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-trash-act]');
+      if (!btn) return;
+      const evId = btn.dataset.evId;
+      const act = btn.dataset.trashAct;
+      if (act === 'restore') {
+        const r = await historyRestore(_pid, evId);
+        if (!r.ok) { util.toast(`❌ ${r.error}`, 'err'); return; }
+        const ds = r.payload?.dataset;
+        if (ds) {
+          // Возвращаем датасет в _datasets если его там нет
+          if (!_datasets.find(d => d.id === ds.id)) {
+            _datasets.unshift(ds);
+            await persist();
+            renderDatasetsList();
+            renderActive();
+          }
+        }
+        util.toast(`✓ «${r.itemName}» восстановлен`, 'ok');
+        // Удаляем строку из таблицы
+        btn.closest('tr')?.remove();
+        await refreshTrashCount();
+      } else if (act === 'purge') {
+        const ok = await mtConfirm('Удалить навсегда? Восстановить будет нельзя.', 'Permanent delete');
+        if (!ok) return;
+        const r = await historyPurge(_pid, evId);
+        if (!r.ok) { util.toast(`❌ ${r.error}`, 'err'); return; }
+        util.toast('✓ Удалено навсегда', 'ok');
+        btn.closest('tr')?.remove();
+        await refreshTrashCount();
+      }
+    });
+  }
 }
 function mtPrompt(label, def = '') {
   return util.modalOpen(`<h3>Ввод значения</h3>`,

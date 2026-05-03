@@ -111,6 +111,12 @@
         <!-- Кнопки импорта генерируются динамически из meteo/sources/index.js. -->
         <h3>➕ Импорт</h3>
       </div>
+      <!-- Phase 35: история загруженных данных + корзина. -->
+      <div class="mt-section">
+        <h3 title="Журнал всех импортов/удалений датасетов в этом проекте. Удалённые датасеты можно восстановить из Корзины.">📜 История</h3>
+        <button type="button" id="mt-btn-history" class="mt-action-btn" title="Открыть полный журнал событий: импорты, обновления, удаления.">📜 Журнал…</button>
+        <button type="button" id="mt-btn-trash" class="mt-action-btn" title="Корзина: удалённые датасеты, можно восстановить или удалить навсегда.">🗑 Корзина <span id="mt-trash-count" style="margin-left:4px;color:#92400e"></span></button>
+      </div>
     </aside>
 
     <section class="mt-content">

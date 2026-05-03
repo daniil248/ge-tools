@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.57', date: '2026-05-03', items: [
+      '📜 <b>Phase 35 START: история загруженных данных + Корзина</b>. По требованию Пользователя 2026-05-03: «любые загруженные данные должны сохраняться в истории».',
+      '• Новый <code>shared/history-log.js</code> — append-only журнал per-project. API: historyAppend / historyList / historyTrash / historyRestore / historyPurge / historyClear / historyStats.',
+      '• Storage: IDB (приоритет) с auto-fallback на LS. Per-project namespace.',
+      '• События: import / update / delete (soft) / restore / purge (permanent).',
+      '• Soft-delete сохраняет полный snapshot в payload — restore возвращает данные обратно в активный список.',
+      '• <b>meteo интеграция</b>: импорт + удаление пишут события. Sidebar получил кнопки «📜 Журнал» и «🗑 Корзина (N)» с счётчиком.',
+      '• Модалка «📜 Журнал» — таблица всех событий (время / тип / датасет / источник).',
+      '• Модалка «🗑 Корзина» — restore (вернуть) или purge (навсегда). Один клик — датасет снова в активном списке.',
+      'Файлы: <code>shared/history-log.js</code> (новый, ~190 строк), <code>meteo/meteo.js</code>, <code>meteo/index.html</code>.',
+    ] },
     { version: '0.60.56', date: '2026-05-03', items: [
       '⚠ <b>Cooling: warning при несоответствии meteo-датасета и локации проекта</b>. Bug-репорт Пользователя 2026-05-03: «у меня везде Темиртау, хотя проект Ташкент» — старый Темиртау остался активным после переключения проекта/локации.',
       '• <code>renderMeteoStatus()</code> вычисляет haversine-distance между координатами активного датасета и локации проекта. Если &gt;50 км → желтый banner «⚠ Датасет на N км от проекта (city)».',
