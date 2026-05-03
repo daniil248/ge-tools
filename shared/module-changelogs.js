@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.80', date: '2026-05-03', items: [
+      '🔋 <b>Battery catalog: правильное subKind / series / variant</b>. Раньше в столбце «Вариант» появлялись S3-Combiner-2000, S3M040-6C-240-X и др. SKU — мусор. Теперь:',
+      '• <b>subKind:</b> «VRLA» / «Li-Ion» / «NiCd» + system role: «(модуль)» / «(шкаф)» / «(аксессуар)». Например «Li-Ion (шкаф)» для S³C040, «Li-Ion (аксессуар)» для S3-Combiner.',
+      '• <b>series:</b> «S³» для всей kehua-s3 экосистемы (унифицировано), иначе парсится из type/model.',
+      '• <b>variant:</b> для accessories = role (combiner / networking-device / wire-kit). Для модулей и шкафов = capacity bucket (&lt; 50 / 50–100 / 100–200 / &gt; 200 А·ч).',
+      'Файлы: <code>shared/element-schemas.js</code> — fromBatteryRecord полностью переписан + createBatteryElement принимает subKind.',
+    ] },
     { version: '0.60.79', date: '2026-05-03', items: [
       '🔧 <b>Series parser: «MR33150-B» → «MR33» (раньше «MR»)</b>. Smart-handling конкатенированных моделей.',
       '• Heuristic: если digits начинаются с «0» И длина ≥4 → padded capacity (York «YLAA0250HE» → series=«YLAA»). Иначе digits начинаются с цифры суффикса серии (Kehua «MR33150-B» → series=«MR33»).',

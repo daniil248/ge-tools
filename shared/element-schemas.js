@@ -249,12 +249,13 @@ export function createBatteryElement(patch = {}) {
   return {
     id: p.id || makeElementId('battery', [p.manufacturer, p.type]),
     kind: 'battery',
+    subKind: p.subKind || '',
     category: 'equipment',
     label: p.label || [p.manufacturer, p.type].filter(Boolean).join(' ') || 'АКБ',
     description: p.description || '',
     manufacturer: p.manufacturer || p.supplier || '',
     series: p.series || '',
-    variant: p.type || p.variant || '',
+    variant: p.variant || p.type || '',
     electrical: {
       voltageCategory: 'dc',
     },
@@ -776,13 +777,55 @@ export function fromUpsRecord(rec) {
   });
 }
 
-/** BatteryRecord → Element(kind='battery') */
+/** BatteryRecord → Element(kind='battery')
+ *  v0.60.80: правильное subKind / series / variant разделение для batteries.
+ *    subKind: «VRLA» / «Li-Ion» / «NiCd» + system role («модуль» / «шкаф» / «аксессуар»)
+ *    series: «S³» для kehua-s3 ecosystem, иначе парсится из type
+ *    variant: для accessories — accessoryRole; для модулей — capacity bucket
+ *
+ *  Раньше: variant=type (например «S3-Combiner-2000» — мусор в catalog).
+ */
 export function fromBatteryRecord(rec) {
   if (!rec) return null;
+
+  // subKind = химия + (опц.) системная роль
+  const chem = String(rec.chemistry || '').toLowerCase();
+  let subKind = chem === 'vrla' ? 'VRLA'
+              : (chem === 'li-ion' || chem === 'lifepo4') ? 'Li-Ion'
+              : chem === 'nicd' ? 'NiCd' : '';
+  if (rec.systemSubtype === 'accessory') subKind = subKind ? `${subKind} (аксессуар)` : 'Аксессуар';
+  else if (rec.systemSubtype === 'cabinet') subKind = subKind ? `${subKind} (шкаф)` : 'Шкаф';
+  else if (rec.systemSubtype === 'module' && subKind) subKind = `${subKind} (модуль)`;
+
+  // series: для S³ ecosystem явно «S³», иначе парсим letters-prefix из type/model
+  const isS3 = (rec.systemType === 'kehua-s3') || /^S[3³]/i.test(rec.type || rec.model || '');
+  let series = '';
+  if (isS3) series = 'S³';
+  else if (rec.series) series = rec.series;
+  else {
+    const m = String(rec.type || rec.model || '').match(/^([A-Z]+)/i);
+    if (m) series = m[1];
+  }
+
+  // variant: small set
+  let variant = '';
+  if (rec.systemSubtype === 'accessory') {
+    variant = rec.accessoryRole || '';
+  } else if (rec.capacityAh) {
+    const ah = Number(rec.capacityAh);
+    variant = ah < 50 ? '< 50 А·ч'
+            : ah < 100 ? '50–100 А·ч'
+            : ah < 200 ? '100–200 А·ч'
+            : '> 200 А·ч';
+  }
+
   return createBatteryElement({
     id: rec.id,
+    subKind,
     manufacturer: rec.supplier,
     type: rec.type,
+    series,
+    variant,
     chemistry: rec.chemistry,
     capacityAh: rec.capacityAh,
     blockVoltage: rec.blockVoltage,
