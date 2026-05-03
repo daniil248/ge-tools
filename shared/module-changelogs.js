@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.72', date: '2026-05-03', items: [
+      '🐛 <b>Catalog: правильное разделение Производитель / Серия</b>. По репорту Пользователя 2026-05-03: «APC это производитель, а NetShelter это серия» + «crac это не серия а тип оборудования, а MR33 как раз серия».',
+      '• <code>shared/catalogs/racks.js</code>: <code>manufacturer: \'APC NetShelter SX\'</code> → <code>manufacturer: \'APC\', series: \'NetShelter SX\'</code>. То же для Rittal/Hyperline/ЦМО/Kehua. <code>listBuiltinRacks</code> теперь читает <code>p.series</code>.',
+      '• <code>shared/element-schemas.js::fromUpsRecord</code>: автопарсинг <code>series</code> из <code>model</code> через новый helper <code>_parseSeriesFromModel</code> (первое слово до пробела). Kehua MR33 120 (30K module) → series=\'MR33\', variant=\'120 (30K module)\'.',
+      '• <code>cooling/datasheets/index.js::_datasheetToElement</code>: series теперь парсится из model (а не из d.kind). EWAQ-G/KHJA-P30AU/RTAF/MR33 — корректные серии. d.kind/systemType сохранены в tags для фильтрации по типу оборудования.',
+      '• <code>shared/catalog-bridge.js::_loadDguDatasheets</code>: series = product-line код (C18/C32/3516/QSL9/TAD941GE/P200H), variant = детали из parens + nameplate kW.',
+      '• Результат: column-фильтры «Серия» теперь показывают осмысленные значения — продуктовые семейства, а не типы оборудования.',
+      'Файлы: <code>shared/catalogs/racks.js</code>, <code>shared/element-schemas.js</code>, <code>cooling/datasheets/index.js</code>, <code>shared/catalog-bridge.js</code>.',
+    ] },
     { version: '0.60.71', date: '2026-05-03', items: [
       '🐛 <b>Bug-fix Пользователя 2026-05-03 «в каком каталоге у нас кондиционеры??»</b>: cooling-датшиты НЕ были зарегистрированы в /catalog/ — фильтр «Климатическое оборудование» давал 0 элементов.',
       '• <code>cooling/datasheets/index.js::listBuiltinCoolingElements()</code> — конвертер VENDOR_DATASHEETS → element-library: kind=\'climate\', series=systemType_kind, variant=systemType, cooling.* под-объект с ratedCop/capCorr/freeCool параметрами.',

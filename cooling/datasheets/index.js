@@ -593,9 +593,12 @@ export function listVendors() {
 /**
  * Конвертирует cooling-datasheet в формат element-library.
  * kind='climate' — единый kind для каталога (UI label «Климатическое оборудование»).
- * subKind = systemType (chiller / dx-air / crac / dx-pumped-fc и т.п.) сохраняется
- * для cooling-специфичных фильтров. Все cooling-параметры (ratedCop,
- * capCorrPctPerC, freeCoolingMode, и т.д.) сохраняются в `cooling` под-объекте.
+ * series парсится из model (первое слово/префикс): «KHJA-P30AU 30 kW (...)» → 'KHJA-P30AU'.
+ * variant — оставшаяся часть модели после series.
+ * d.kind / d.systemType — equipment-тип (chiller/crac/dx) — НЕ серия (по запросу
+ * Пользователя 2026-05-03 «crac это не серия а тип оборудования»).
+ * Все cooling-параметры (ratedCop, capCorrPctPerC, freeCoolingMode, и т.д.)
+ * сохраняются в `cooling` под-объекте + tag для filter-фильтрации.
  */
 function _datasheetToElement(d, idx) {
   // Стабильный id, чтобы не дублировался при повторных регистрациях.
@@ -603,16 +606,32 @@ function _datasheetToElement(d, idx) {
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   const id = `cooling-ds-${slug}`;
   const ph = d.physical || {};
+
+  // v0.60.72: парсинг series/variant из model. Логика:
+  //   1. Уберём parens-описание в конце: "(air-cooled scroll)" → ""
+  //   2. Возьмём всё до первого пробела как series.
+  //   3. Остаток — variant (с capacity/опциями).
+  // Примеры:
+  //   "EWAQ-G 200 (air-cooled scroll)" → series="EWAQ-G", variant="200"
+  //   "KHJA-P30AU 30 kW (in-room fixed-freq, R410A)" → series="KHJA-P30AU", variant="30 kW"
+  //   "KHNA-X25 25 kW (inter-row air-cooled, R410A)" → series="KHNA-X25", variant="25 kW"
+  //   "MR33 120 (30K module)" → series="MR33", variant="120"
+  const modelClean = String(d.model || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const sp = modelClean.indexOf(' ');
+  const seriesParsed = sp > 0 ? modelClean.slice(0, sp) : modelClean;
+  const variantParsed = sp > 0 ? modelClean.slice(sp + 1).trim() : '';
+
   return {
     id,
     kind: 'climate',
     category: 'equipment',
     label: `${d.vendor} ${d.model}`,
     manufacturer: d.vendor,
-    series: d.kind,           // chiller / crac / dx — отдельная серия для catalog UI
-    variant: d.systemType,    // systemType (dx-air / dx-pumped-fc / chiller / crac-water)
-    powerKw: d.ratedCapKw,    // numeric для сортировки в catalog
+    series: seriesParsed,         // EWAQ-G / KHJA-P30AU / MR33 / RTAF и т.п.
+    variant: variantParsed,       // capacity + опции (без parens-описания)
+    powerKw: d.ratedCapKw,        // numeric для сортировки в catalog
     notes: d.notes || '',
+    // d.kind/d.systemType сохранены в tags для filter-поиска по типу оборудования.
     tags: ['cooling', d.kind, d.systemType, d.refrigerant].filter(Boolean),
     physical: ph,
     // Cooling-специфичные параметры (обращение через element.cooling.*)

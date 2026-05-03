@@ -114,25 +114,37 @@ async function _loadDguDatasheets() {
   try {
     const m = await import('../dgu-config/datasheets/index.js');
     if (!m.DGU_DATASHEETS) return [];
-    return m.DGU_DATASHEETS.map(d => ({
-      id: `dgu-${d.vendor}-${d.model}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
-      kind: 'dgu',
-      category: 'equipment',
-      label: `${d.vendor} ${d.model}`,
-      manufacturer: d.vendor,
-      series: d.engineModel,
-      variant: `${d.nameplateKw} kW (${d.cylinders}cyl ${d.displacement}L)`,
-      powerKw: d.nameplateKw,
-      notes: d.notes || '',
-      tags: ['dgu', d.fuelType, d.engineModel].filter(Boolean),
-      physical: d.physical || {},
-      dgu: {
-        nameplateKw: d.nameplateKw, espKw: d.espKw, prpKw: d.prpKw, copKw: d.copKw,
-        voltage: d.voltage, phase: d.phase, freq: d.freq, rpm: d.rpm,
-        engineModel: d.engineModel, cylinders: d.cylinders, displacement: d.displacement,
-        fuelType: d.fuelType, sfcLkWh: d.sfcLkWh,
-      },
-    }));
+    return m.DGU_DATASHEETS.map(d => {
+      // v0.60.72: парсинг series/variant из model. По запросу Пользователя
+      // «crac это не серия а тип оборудования». series = product-line код
+      // (C18 / C32 / 3516 / QSL9 / TAD941GE / P200H), variant = специфика
+      // (DE220 GC, 220kW, и т.п.).
+      const modelClean = String(d.model || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+      const inParens = (d.model || '').match(/\(([^)]+)\)/)?.[1] || '';
+      const sp = modelClean.indexOf(' ');
+      const seriesParsed = sp > 0 ? modelClean.slice(0, sp) : modelClean;
+      const variantParsed = (inParens || (sp > 0 ? modelClean.slice(sp + 1).trim() : '')) +
+        ` · ${d.nameplateKw} kW`;
+      return {
+        id: `dgu-${d.vendor}-${d.model}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+        kind: 'dgu',
+        category: 'equipment',
+        label: `${d.vendor} ${d.model}`,
+        manufacturer: d.vendor,
+        series: seriesParsed,        // C18, C32, 3516, QSL9-G7, TAD941GE и т.п.
+        variant: variantParsed.trim(),
+        powerKw: d.nameplateKw,
+        notes: d.notes || '',
+        tags: ['dgu', d.fuelType, d.engineModel].filter(Boolean),
+        physical: d.physical || {},
+        dgu: {
+          nameplateKw: d.nameplateKw, espKw: d.espKw, prpKw: d.prpKw, copKw: d.copKw,
+          voltage: d.voltage, phase: d.phase, freq: d.freq, rpm: d.rpm,
+          engineModel: d.engineModel, cylinders: d.cylinders, displacement: d.displacement,
+          fuelType: d.fuelType, sfcLkWh: d.sfcLkWh,
+        },
+      };
+    });
   } catch (e) { console.warn('[catalog-bridge] dgu-datasheets', e.message); return []; }
 }
 

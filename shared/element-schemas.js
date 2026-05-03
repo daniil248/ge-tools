@@ -12,6 +12,18 @@
 
 // ——— Хелперы ———
 
+// v0.60.72: парсер series из строки model. По требованию Пользователя
+// 2026-05-03 «crac это не серия а тип оборудования, MR33 как раз серия».
+// Из «MR33 120 (30K module)» → series='MR33', variant='120 (30K module)'.
+// Если в model нет пробела — series=весь model (single token).
+function _parseSeriesFromModel(modelStr) {
+  const s = String(modelStr || '').trim();
+  if (!s) return { series: '', variant: '' };
+  const sp = s.indexOf(' ');
+  if (sp < 0) return { series: s, variant: '' };
+  return { series: s.slice(0, sp), variant: s.slice(sp + 1).trim() };
+}
+
 function slug(s) {
   return String(s || '')
     .toLowerCase()
@@ -72,6 +84,8 @@ export function createPanelElement(patch = {}) {
 /** ups (источник бесперебойного питания) */
 export function createUpsElement(patch = {}) {
   const p = patch || {};
+  // v0.60.72: если series не указан — парсим из model (первое слово = series).
+  const _parsed = _parseSeriesFromModel(p.model || '');
   return {
     id: p.id || makeElementId('ups', [p.manufacturer, p.model]),
     kind: 'ups',
@@ -79,8 +93,8 @@ export function createUpsElement(patch = {}) {
     label: p.label || [p.manufacturer, p.model].filter(Boolean).join(' ') || 'ИБП',
     description: p.description || '',
     manufacturer: p.manufacturer || p.supplier || '',
-    series: p.series || '',
-    variant: p.model || p.variant || '',
+    series: p.series || _parsed.series || '',
+    variant: p.variant || _parsed.variant || p.model || '',
     electrical: {
       voltageCategory: 'lv',
       capacityKw: Number(p.capacityKw || 0),
