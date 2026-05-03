@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.89', date: '2026-05-03', items: [
+      '🔄 <b>Phase 30.2 PULL: ups-config → TW round-trip завершён</b>.',
+      '• <code>ups-config/ups-config.js::_saveWizardConfiguration</code> — после save через <code>saveConfig</code> теперь дополнительно пишет в <code>raschet.project.&lt;pid&gt;.ups-config.selected.v1</code> с supplier/model/capacityKw/cosPhi/autonomyMin/redundancy.',
+      '• <code>tech-workspace</code> UPS-карточка получает кнопку «↩ Применить &lt;Supplier Model&gt; из ups-config» (зелёная) если есть свежая selected и она отличается от текущего modelRef. Аналог DGU PULL (v0.60.82).',
+      '• Click → us.modelRef = {manufacturer, model, capacityKw, upsType}. Также подтягиваются ratedKva/cosPhi/autonomyMin/redundancy из selected.',
+      '• Round-trip flow: TW «⚙ Подобрать в ups-config» → wizard → save → возврат в TW → «↩ Применить» — modelRef записан.',
+      'Файлы: <code>ups-config/ups-config.js</code>, <code>tech-workspace/tech-workspace.js</code>.',
+    ] },
     { version: '0.60.88', date: '2026-05-03', items: [
       '🔄 <b>TW: автосинхронизация concept.projectData с parent project</b>. По репорту Пользователя 2026-05-03 «модули не синхронизированы по данным объекта».',
       '• Helper <code>_syncProjectDataFromProject(concept)</code> — preserve-on-miss merge: заполняет ТОЛЬКО пустые поля, не затирает пользовательские данные.',

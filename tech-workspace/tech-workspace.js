@@ -527,10 +527,34 @@ function renderUpsCard(us, isReadOnly) {
     <a class="tw-bind-btn" style="text-decoration:none;display:inline-block;margin-left:6px"
        href="../ups-config/?project=${escAttr(_pid || '')}&capacityKw=${upsPrefillKw}&autonomyMin=${us.autonomyMin || 10}&cosPhi=${us.cosPhi || 0.9}&redundancy=${escAttr(us.redundancy || 'N')}&phases=3"
        target="_blank"
-       title="Открыть конфигуратор ИБП с pre-filled параметрами этой системы (loadKw=${upsPrefillKw} кВт, autonomy=${us.autonomyMin || 10} мин, cos φ=${us.cosPhi || 0.9}, ${us.redundancy || 'N'}). Wizard запустится автоматически. После подбора можете вернуться и нажать «📦 Привязать модель».">
+       title="Открыть конфигуратор ИБП с pre-filled параметрами этой системы (loadKw=${upsPrefillKw} кВт, autonomy=${us.autonomyMin || 10} мин, cos φ=${us.cosPhi || 0.9}, ${us.redundancy || 'N'}). Wizard запустится автоматически. После подбора можете вернуться и нажать «↩ Применить» (v0.60.89).">
       ⚙ Подобрать в ups-config →
     </a>
+    ${(() => {
+      // v0.60.89 (Phase 30.2 PULL): читаем selected UPS из ups-config bridge.
+      const sel = _readUpsSelected();
+      if (!sel || !sel.supplier || !sel.model) return '';
+      const cur = us.modelRef || {};
+      const sameAsCur = cur.manufacturer === sel.supplier && cur.model === sel.model;
+      if (sameAsCur) return '';
+      return `<button type="button" class="tw-bind-btn" data-tw-action="apply-ups-selected" data-ups-id="${escAttr(us.id)}"
+        ${ro ? 'disabled' : ''}
+        style="background:#dcfce7;border-color:#16a34a;color:#15803d;margin-left:6px"
+        title="Применить ${escAttr(sel.supplier)} ${escAttr(sel.model)} (${sel.capacityKw} кВт) из ups-config к этой системе. Сохранено там ${ageHint(sel.ts)}.">
+        ↩ Применить ${escHtml(sel.supplier)} ${escHtml(sel.model)} из ups-config
+      </button>`;
+    })()}
   </div>`;
+}
+
+// Phase 30.2 PULL helper (v0.60.89): читает selected UPS из LS-bridge.
+function _readUpsSelected() {
+  if (!_pid) return null;
+  try {
+    const raw = localStorage.getItem(projectKey(_pid, 'ups-config', 'selected.v1'));
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
 }
 
 // ─── Render: cooling unit card
@@ -2180,6 +2204,35 @@ function bindListEvents() {
       } else {
         twToast('Все поля уже заполнены либо в проекте нет данных.', 'info');
       }
+      return;
+    }
+
+    // Phase 30.2 PULL (v0.60.89): «↩ Применить выбранный ИБП из ups-config».
+    const applyUpsSelected = e.target.closest('[data-tw-action="apply-ups-selected"]');
+    if (applyUpsSelected) {
+      const sel = _readUpsSelected();
+      if (!sel) { twToast('Нет сохранённой ИБП-модели в ups-config.', 'warn'); return; }
+      const usId = applyUpsSelected.dataset.upsId;
+      const us = (cur.concept.upsSystems || []).find(x => x.id === usId);
+      if (!us) { twToast('Система ИБП не найдена.', 'warn'); return; }
+      us.modelRef = {
+        id: sel.upsId || `ups-${sel.supplier}-${sel.model}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        manufacturer: sel.supplier,
+        model: sel.model,
+        capacityKw: sel.capacityKw,
+        upsType: sel.upsType,
+      };
+      // Опционально: подтягиваем capacity, efficiency, cosPhi из selected
+      if (sel.capacityKw && (!us.ratedKva || us.ratedKva === 0)) {
+        // Преобразование kW → kVA через cos φ (default 1.0 для современных ИБП с PFC)
+        us.ratedKva = Math.round((sel.capacityKw / (sel.cosPhi || 1.0)));
+      }
+      if (sel.cosPhi) us.cosPhi = sel.cosPhi;
+      if (sel.autonomyMin) us.autonomyMin = sel.autonomyMin;
+      if (sel.redundancy) us.redundancy = sel.redundancy;
+      persistVariants();
+      renderActiveVariant();
+      twToast(`✓ Применён ИБП: ${sel.supplier} ${sel.model} (${sel.capacityKw} кВт)`, 'ok');
       return;
     }
 

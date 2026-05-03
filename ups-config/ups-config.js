@@ -816,6 +816,34 @@ async function _saveWizardConfiguration() {
     flash(`Конфигурация сохранена: ${entry.id} · ${label}`, 'success');
     // Тригернём refresh сайдбара (он подписан на onConfigsChange)
     try { window.dispatchEvent(new CustomEvent('ups-config:configs-changed')); } catch {}
+
+    // v0.60.89 (Phase 36.2 / Phase 30.2 PULL): сохраняем выбранную модель в
+    // LS-bridge для tech-workspace round-trip. TW читает её и предлагает
+    // «↩ Применить из ups-config» как для DGU.
+    try {
+      const qp = new URLSearchParams(location.search);
+      const pid = qp.get('project') || qp.get('pid');
+      if (pid) {
+        const { projectKey } = await import('../shared/project-storage.js');
+        const selectedPayload = {
+          ts: Date.now(),
+          supplier: u.supplier || null,
+          model: u.model || u.id,
+          upsId: u.id,
+          capacityKw: fi.realCapacity || fi.usable,
+          frameKw: u.frameKw, moduleKwRated: u.moduleKwRated,
+          moduleInstalled: fi.installed, moduleWorking: fi.working, moduleRedundant: fi.redundant,
+          efficiency: u.efficiency, cosPhi: u.cosPhi || rq.cosPhi,
+          autonomyMin: rq.autonomyMin,
+          redundancy: rq.redundancy,
+          upsType: rq.upsType || u.upsType,
+          configId: entry.id,
+        };
+        localStorage.setItem(projectKey(pid, 'ups-config', 'selected.v1'), JSON.stringify(selectedPayload));
+      }
+    } catch (err) {
+      console.warn('[ups-config] PULL bridge save failed:', err);
+    }
   } catch (e) {
     flash('Не удалось сохранить: ' + (e.message || e), 'error');
   }
