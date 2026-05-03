@@ -459,6 +459,10 @@ function renderRackGroupCard(rg, isReadOnly) {
 function renderUpsCard(us, isReadOnly) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = _upsAvail(us);
+  // Phase 30.2 (v0.60.69): pre-fill для ups-config wizard.
+  // ups-config принимает ?capacityKw в URL → запускает wizard с этим
+  // значением loadKw. cosPhi и autonomy тоже передаём для точности.
+  const upsPrefillKw = Math.round(kw);  // используем доступную мощность как target
   return `<div class="tw-card" data-card-kind="ups" data-card-id="${us.id}">
     <div class="tw-card-head">
       <input type="text" class="tw-card-name" data-field="name" value="${escAttr(us.name)}" placeholder="Название" ${ro}>
@@ -493,6 +497,12 @@ function renderUpsCard(us, isReadOnly) {
       </label>
     </div>
     ${_bindBtnHtml('ups', us.id, us.modelRef)}
+    <a class="tw-bind-btn" style="text-decoration:none;display:inline-block;margin-left:6px"
+       href="../ups-config/?project=${escAttr(_pid || '')}&capacityKw=${upsPrefillKw}&autonomyMin=${us.autonomyMin || 10}&cosPhi=${us.cosPhi || 0.9}&redundancy=${escAttr(us.redundancy || 'N')}&phases=3"
+       target="_blank"
+       title="Открыть конфигуратор ИБП с pre-filled параметрами этой системы (loadKw=${upsPrefillKw} кВт, autonomy=${us.autonomyMin || 10} мин, cos φ=${us.cosPhi || 0.9}, ${us.redundancy || 'N'}). Wizard запустится автоматически. После подбора можете вернуться и нажать «📦 Привязать модель».">
+      ⚙ Подобрать в ups-config →
+    </a>
   </div>`;
 }
 

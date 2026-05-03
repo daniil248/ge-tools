@@ -3244,14 +3244,11 @@ standalone-приложение в отдельном. Чтобы использ
   - [x] **PULL** (cooling → tech, v0.60.3): через PUE mode=cooling-module — concept автоматически использует данные из подбора при пересчёте.
   - [ ] **Visual:** в концепции под cooling-блоком показать «Связанный подбор: [имя] — Σ установлено N кВт, годовой COP X.X, PUE-cooling Y.YY».
 
-- [ ] **30.2** UPS-config ↔ Tech-workspace:
-  - **shared/ups-bridge.js** — API для cross-module create/load.
-  - **PUSH:** «📤 Подобрать ИБП» из tech-workspace concept → ups-config в
-    embed с pre-filled IT-load, redundancy, autonomy, batteryTech.
-  - **PULL:** ups-config → возвращается с modelRef (конкретная модель ИБП)
-    + battery (АКБ из battery/), к.п.д. → автообновление
-    `concept.upsSystems[i].modelRef + efficiency`.
-  - **PUE учитывает UPS efficiency:** PUE = (IT + Cool + UPS_loss) / IT.
+- [~] **30.2** UPS-config ↔ Tech-workspace (v0.60.69 — частично):
+  - [x] **PUSH:** кнопка «⚙ Подобрать в ups-config →» в UPS-карточке концепции — открывает ups-config с URL ?capacityKw/autonomyMin/cosPhi/redundancy/phases. Wizard auto-launches.
+  - [x] **PUE учитывает UPS efficiency** (Phase 30.4 v0.60.63): PUE = 1 + (P_cool + P_ups-loss + P_tp-loss + P_aux) / P_IT.
+  - [ ] **Не сделано:** PULL — ups-config возвращается с modelRef → автообновление concept.upsSystems[i].modelRef. Сейчас юзер вручную нажимает «📦 Привязать модель».
+  - [ ] **Не сделано:** shared/ups-bridge.js generic API — TW использует URL params напрямую.
 
 - [ ] **30.3** Новый модуль `dgu-config/` (вынести из tech-workspace.feed.dgu):
   - Ввод: P_total (IT + Cooling + UPS_loss + Aux), время автономности (часы).

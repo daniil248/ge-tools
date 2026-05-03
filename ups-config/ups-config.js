@@ -656,13 +656,18 @@ const wizState = {
 function initWizard() {
   const qp = new URLSearchParams(location.search);
   const ctxNodeId = qp.get('nodeId');
-  if (!ctxNodeId) return false; // standalone-режим запускается отдельно
+  // v0.60.69 (Phase 30.2): запуск wizard без nodeId, если передан capacityKw
+  // (PUSH из tech-workspace). standalone-режим с pre-filled параметрами.
+  const hasPrefill = !ctxNodeId && qp.get('capacityKw');
+  if (!ctxNodeId && !hasPrefill) return false; // обычный standalone-mode
 
-  wizState.nodeId = ctxNodeId;
+  wizState.nodeId = ctxNodeId || null;
   // Предзаполнение из query
   const rq = wizState.requirements;
   if (qp.get('capacityKw')) rq.loadKw = Number(qp.get('capacityKw')) || rq.loadKw;
+  // Поддержка старого targetAutonomyMin и нового autonomyMin (PUSH из tech-workspace).
   if (qp.get('targetAutonomyMin')) rq.autonomyMin = Number(qp.get('targetAutonomyMin')) || rq.autonomyMin;
+  if (qp.get('autonomyMin')) rq.autonomyMin = Number(qp.get('autonomyMin')) || rq.autonomyMin;
   if (qp.get('redundancy')) rq.redundancy = qp.get('redundancy');
   if (qp.get('upsType')) rq.upsType = qp.get('upsType');
   if (qp.get('vdcMin')) rq.vdcMin = Number(qp.get('vdcMin')) || rq.vdcMin;

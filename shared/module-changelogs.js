@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.69', date: '2026-05-03', items: [
+      '🔄 <b>Phase 30.2: TW → ups-config PUSH</b>. По roadmap «📤 Подобрать ИБП».',
+      '• tech-workspace UPS-карточка получила кнопку «⚙ Подобрать в ups-config →» рядом с «📦 Привязать модель».',
+      '• Click → URL <code>../ups-config/?project=X&capacityKw=Y&autonomyMin=Z&cosPhi=W&redundancy=R&phases=3</code> → wizard ups-config запускается автоматически с pre-filled параметрами.',
+      '• <code>ups-config/ups-config.js::initWizard()</code> расширен: теперь принимает запуск wizard без nodeId, если передан capacityKw (был обязателен только nodeId раньше). Добавлена поддержка param <code>autonomyMin</code> наряду с legacy <code>targetAutonomyMin</code>.',
+      '• После подбора в ups-config пользователь возвращается в tech-workspace и нажимает «📦 Привязать модель» для записи modelRef в концепцию.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code>, <code>ups-config/ups-config.js</code>.',
+    ] },
     { version: '0.60.68', date: '2026-05-03', items: [
       '🔄 <b>Phase 30.5: TW → Service auto-create ТО-наряд</b>. По roadmap «auto-suggest 📤 Создать ТО-наряды для этого оборудования».',
       '• tech-workspace tab «⚙ Топология охлаждения» — новая секция «🛠 Связь с модулем «Сервис»» (показывается ТОЛЬКО если в проекте уже есть cooling-подбор).',
