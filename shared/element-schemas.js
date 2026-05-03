@@ -60,35 +60,30 @@ function _parseSeriesFromModel(modelStr) {
   return { series: letters, variant: '' };
 }
 
-// v0.60.74: helper для variant ИБП. По запросу Пользователя 2026-05-03
-// «вариант — это про С АВР или без, таких немного». Variant = осмысленная
-// конфигурация (~5 значений across всех UPS), а не SKU/артикул.
-//   Модульный (без АВР) — modular UPS, 1 ввод
-//   Модульный (с АВР) — modular UPS с 2 вводами + ATS
-//   Интегрированный без АВР — kind=ups-integrated, inputs=1
-//   Интегрированный с АВР — kind=ups-integrated, hasIntegratedAts=true
-//   Моноблок — upsType=monoblock
-//   All-in-One — upsType=aio / kind=ups-aio
-// Капасити (90/150/200 кВт) и SKU (MR33150-B) НЕ в variant — они в label и
-// в electrical.capacityKw для сортировки.
+// v0.60.77: ПРАВИЛЬНОЕ разделение subKind / series / variant для UPS
+// (по фидбэку Пользователя 2026-05-03 «модульный/моноблок это подтип,
+// S3 это серия, разберись нормально»).
+//
+// subKind — это ПОДТИП (конструктив ИБП): Модульный / Моноблок /
+//   Интегрированный / All-in-One. ~4 значения. Отдельная колонка в catalog.
+// series — продуктовая линейка: MR33 / S³ / KR / Myria / FR-UK33 / ...
+// variant — small-set distinguishing feature: «С АВР» / «Без АВР» / «»
+//   (только для тех ИБП где это конфигурация ввода имеет смысл).
+function _upsSubKind(p) {
+  if (!p) return '';
+  const upsType = String(p.upsType || '').toLowerCase();
+  const kind = String(p.kind || '').toLowerCase();
+  if (kind === 'ups-aio' || kind === 'ups-all-in-one' || upsType === 'aio') return 'All-in-One';
+  if (kind === 'ups-integrated' || upsType === 'integrated') return 'Интегрированный';
+  if (upsType === 'modular') return 'Модульный';
+  if (upsType === 'monoblock') return 'Моноблок';
+  return '';
+}
 function _upsVariant(p) {
   if (!p) return '';
   const hasAvr = !!p.hasIntegratedAts || (Number(p.inputs) || 1) >= 2;
-  const upsType = String(p.upsType || '').toLowerCase();
-  const kind = String(p.kind || '').toLowerCase();
-  // v0.60.75: kind 'ups-all-in-one' (Kehua S³ AIO) — отдельная категория.
-  // upsType у них может быть 'monoblock' но фактически это AIO с встроенными АКБ.
-  if (kind === 'ups-aio' || kind === 'ups-all-in-one' || upsType === 'aio') return 'All-in-One';
-  if (kind === 'ups-integrated' || upsType === 'integrated') {
-    return hasAvr ? 'Интегрированный (с АВР)' : 'Интегрированный (без АВР)';
-  }
-  if (upsType === 'modular') {
-    return hasAvr ? 'Модульный (с АВР)' : 'Модульный';
-  }
-  if (upsType === 'monoblock') {
-    return hasAvr ? 'Моноблок (с АВР)' : 'Моноблок';
-  }
-  return upsType ? upsType[0].toUpperCase() + upsType.slice(1) : '';
+  // v0.60.77: variant = только distinguishing feature (С/Без АВР) — а не подтип.
+  return hasAvr ? 'С АВР' : 'Без АВР';
 }
 
 // v0.60.74: variant климатического оборудования = systemType (~6-7 значений).
@@ -174,14 +169,14 @@ export function createPanelElement(patch = {}) {
 /** ups (источник бесперебойного питания) */
 export function createUpsElement(patch = {}) {
   const p = patch || {};
-  // v0.60.72: series парсится из model (первое слово = series).
-  // v0.60.74: variant теперь конфигурация (Модульный / Интегрированный с АВР /
-  // Моноблок / All-in-One), а НЕ модель/SKU. По запросу Пользователя
-  // «вариант — это про С АВР или без».
+  // v0.60.72-77: series парсится из model (умный парсер для KHJA / MR33 / S³).
+  // subKind — конструктив ИБП (Модульный / Моноблок / Интегрированный / AIO).
+  // variant — только «С АВР» / «Без АВР» (small set).
   const _parsed = _parseSeriesFromModel(p.model || '');
   return {
     id: p.id || makeElementId('ups', [p.manufacturer, p.model]),
     kind: 'ups',
+    subKind: p.subKind || _upsSubKind(p) || '',
     category: 'equipment',
     label: p.label || [p.manufacturer, p.model].filter(Boolean).join(' ') || 'ИБП',
     description: p.description || '',

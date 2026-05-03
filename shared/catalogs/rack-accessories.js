@@ -100,15 +100,21 @@ export function accessoryMfgList() {
 
 /* ---------- маппинг в element-library ---------- */
 export function listBuiltinRackAccessories() {
-  return ACCESSORY_CATALOG.map(a => ({
+  return ACCESSORY_CATALOG.map(a => {
+    // v0.60.77: subKind = accessory category (mounting/cable/cooling/...),
+    // series = префикс sku. variant убран (sku в id и label).
+    const skuPrefix = String(a.sku || '').match(/^([A-Z]+)/i);
+    const series = skuPrefix ? skuPrefix[1] : '';
+    return {
     id: 'rack-acc.' + _slug(a.sku),
     kind: 'rack-accessory',
+    subKind: ACC_CATEGORIES[a.category] || a.category || '',
     category: 'fitting',
     label: a.name,
     description: a.note || '',
     manufacturer: a.mfg,
-    series: '',
-    variant: a.sku,
+    series: series,
+    variant: '',
     kindProps: {
       sku: a.sku,
       accCategory: a.category,
@@ -117,7 +123,8 @@ export function listBuiltinRackAccessories() {
     },
     tags: [a.mfg, a.category].filter(Boolean),
     source: 'builtin', builtin: true,
-  }));
+    };
+  });
 }
 
 export function getLiveAccessoryCatalog() {

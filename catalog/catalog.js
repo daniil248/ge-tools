@@ -147,7 +147,8 @@ function openModal(title, formHtml, onSave) {
 // ====================== TAB: ЭЛЕМЕНТЫ ======================
 const elFilters = { kind: '', source: '', search: '',
   // v0.60.71: column-level filters (Excel-style, cross-зависимые)
-  manufacturer: '', series: '', variant: '' };
+  // v0.60.77: добавлен subKind (подтип) — для UPS Модульный/Моноблок/etc.
+  manufacturer: '', series: '', variant: '', subKind: '' };
 
 // v0.59.109: предустановка фильтров по URL (?filterKind=…&filterSearch=…
 // &nodeId=…). Используется при открытии каталога из инспектора узла —
@@ -214,6 +215,8 @@ function renderElementsTab() {
     if (elFilters.manufacturer && el.manufacturer !== elFilters.manufacturer) return false;
     if (elFilters.series && el.series !== elFilters.series) return false;
     if (elFilters.variant && el.variant !== elFilters.variant) return false;
+    // v0.60.77: subKind (подтип)
+    if (elFilters.subKind && el.subKind !== elFilters.subKind) return false;
     return true;
   });
   try {
@@ -245,6 +248,7 @@ function renderElementsTab() {
       if (field !== 'manufacturer' && elFilters.manufacturer && el.manufacturer !== elFilters.manufacturer) return false;
       if (field !== 'series' && elFilters.series && el.series !== elFilters.series) return false;
       if (field !== 'variant' && elFilters.variant && el.variant !== elFilters.variant) return false;
+      if (field !== 'subKind' && elFilters.subKind && el.subKind !== elFilters.subKind) return false;
       return true;
     });
     return [...new Set(arr.map(e => e[field]).filter(Boolean))].sort();
@@ -252,6 +256,7 @@ function renderElementsTab() {
   const manufacturerOpts = _uniqueForColumn('manufacturer');
   const seriesOpts = _uniqueForColumn('series');
   const variantOpts = _uniqueForColumn('variant');
+  const subKindOpts = _uniqueForColumn('subKind');
 
   // v0.60.71: build column-filter <select> markup
   function colFilterSelect(field, options, currentVal, label) {
@@ -295,10 +300,11 @@ function renderElementsTab() {
         <thead>
           <tr>
             <th>Тип</th>
+            <th title="Подтип / конструктив. Для UPS: Модульный / Моноблок / Интегрированный / All-in-One. Для cooling: chiller / dx / crac / inrow. v0.60.77.">Подтип</th>
             <th>Название</th>
             <th>Производитель</th>
-            <th title="Серия / семейство моделей. Для cooling: chiller / crac / dx. Для DGU: модель двигателя.">Серия</th>
-            <th title="Вариант / подтип. Для cooling: systemType (dx-air / chiller / dx-pumped-fc). Для DGU: nameplate kW + cylinders.">Вариант</th>
+            <th title="Серия / продуктовая линейка. Для UPS: MR33 / S³ / KR / Myria. Для cooling: KHJA / KHNA / KHCA / EWAQ.">Серия</th>
+            <th title="Вариант. Для UPS: «С АВР» / «Без АВР». Для cooling: capacity bucket. Small set, не SKU.">Вариант</th>
             <th>Последняя цена</th>
             <th title="Минимум / максимум среди цен в одной валюте">Мин / Макс</th>
             <th title="Динамика цены во времени (последние предложения, слева старое → справа новое)">Динамика</th>
@@ -307,6 +313,7 @@ function renderElementsTab() {
           </tr>
           <tr class="cat-col-filters">
             <th></th>
+            <th>${colFilterSelect('subKind', subKindOpts, elFilters.subKind, 'Подтип')}</th>
             <th></th>
             <th>${colFilterSelect('manufacturer', manufacturerOpts, elFilters.manufacturer, 'Производитель')}</th>
             <th>${colFilterSelect('series', seriesOpts, elFilters.series, 'Серия')}</th>
@@ -343,6 +350,7 @@ function renderElementsTab() {
     html.push(`
       <tr data-id="${esc(el.id)}">
         <td>${srcBadge} <span class="muted" style="font-size:11px">${esc(el.kind)}</span></td>
+        <td>${esc(el.subKind || '—')}</td>
         <td><b>${esc(el.label || el.id)}</b><br><span class="muted" style="font-size:10px;font-family:monospace">${esc(el.id)}</span></td>
         <td>${esc(el.manufacturer || '—')}</td>
         <td>${esc(el.series || '—')}</td>
@@ -370,7 +378,7 @@ function renderElementsTab() {
       </tr>`);
   }
   if (!filtered.length) {
-    html.push('<tr><td colspan="10" class="empty">Ничего не найдено</td></tr>');
+    html.push('<tr><td colspan="11" class="empty">Ничего не найдено</td></tr>');
   }
   html.push('</tbody></table></div>');
   container.innerHTML = html.join('');
@@ -380,7 +388,7 @@ function renderElementsTab() {
     elFilters.kind = e.target.value;
     // v0.60.71: при смене kind сбрасываем cross-зависимые фильтры (manufacturer/series/variant)
     // т.к. старые значения могут быть нерелевантны для новой kind.
-    elFilters.manufacturer = ''; elFilters.series = ''; elFilters.variant = '';
+    elFilters.manufacturer = ''; elFilters.series = ''; elFilters.variant = ''; elFilters.subKind = '';
     renderElementsTab();
   };
   document.getElementById('el-filter-source').onchange = e => { elFilters.source = e.target.value; renderElementsTab(); };

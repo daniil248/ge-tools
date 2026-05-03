@@ -129,6 +129,7 @@ async function _loadDguDatasheets() {
       return {
         id: `dgu-${d.vendor}-${d.model}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
         kind: 'dgu',
+        subKind: 'Дизель',           // v0.60.77: только дизель пока в каталоге
         category: 'equipment',
         label: `${d.vendor} ${d.model}`,
         manufacturer: d.vendor,

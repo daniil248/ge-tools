@@ -621,27 +621,43 @@ function _datasheetToElement(d, idx) {
   const id = `cooling-ds-${slug}`;
   const ph = d.physical || {};
 
-  // v0.60.72: series парсится из model (первое слово до пробела).
-  //   "EWAQ-G 200 (air-cooled scroll)" → series="EWAQ-G"
-  //   "KHJA-P30AU 30 kW (in-room fixed-freq, R410A)" → series="KHJA-P30AU"
-  //   "KHNA-X25 25 kW (inter-row air-cooled, R410A)" → series="KHNA-X25"
-  // v0.60.74 (запрос Пользователя «вариант — это С АВР или без, таких немного»):
-  //   variant теперь = systemType (~6-7 значений: Чиллер / DX / CRAC / In-row),
-  //   а не capacity+SKU. Capacity остаётся в label.
+  // v0.60.77: smart series parser (по фидбэку «серия — KHNA или KHCA, без суффикса»).
+  // Берём только буквенный префикс, останавливаемся на первом «-» / digit / space.
+  //   "EWAQ-G 200" → "EWAQ"     (буквы до «-»)
+  //   "KHJA-P30AU 30 kW" → "KHJA"  (буквы до «-»)
+  //   "KHNA-X25E 25 kW" → "KHNA"  (буквы до «-»)
+  //   "KHCA-X4 3.5 kW" → "KHCA"
+  //   "RTAF 400" → "RTAF"
+  //   "30RB AquaForce" → "30RB"
   const modelClean = String(d.model || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-  const sp = modelClean.indexOf(' ');
-  const seriesParsed = sp > 0 ? modelClean.slice(0, sp) : modelClean;
-  // v0.60.74: variant из systemType (small set, удобно для column-фильтра).
-  const variantFromType = _COOLING_VARIANT_MAP[d.systemType] || d.systemType || 'Прочее';
+  let seriesParsed;
+  // Starts with digits (Carrier 30RB, Carrier 30XW)
+  const digitFirst = modelClean.match(/^(\d+[A-Z³]*)/i);
+  if (digitFirst) {
+    seriesParsed = digitFirst[1];
+  } else {
+    // Letters at start, stop at first non-letter
+    const lettersOnly = modelClean.match(/^([A-Z³]+)/i);
+    seriesParsed = lettersOnly ? lettersOnly[1] : modelClean.split(/[\s\-]/)[0];
+  }
+  // v0.60.77: subKind из systemType — категория конструктива (~6-7 значений).
+  // variant — capacity bucket для сортировки/фильтра (~4 значения).
+  const subKindFromType = _COOLING_VARIANT_MAP[d.systemType] || d.systemType || 'Прочее';
+  const cap = Number(d.ratedCapKw) || 0;
+  const variantBucket = cap < 50 ? 'до 50 кВт'
+    : cap < 200 ? '50–200 кВт'
+    : cap < 500 ? '200–500 кВт'
+    : '> 500 кВт';
 
   return {
     id,
     kind: 'climate',
+    subKind: subKindFromType,     // Чиллер / DX (воздушный) / CRAC / In-Row
     category: 'equipment',
     label: `${d.vendor} ${d.model}`,
     manufacturer: d.vendor,
-    series: seriesParsed,         // EWAQ-G / KHJA-P30AU / MR33 / RTAF и т.п.
-    variant: variantFromType,     // Чиллер / DX (воздушный) / CRAC / In-row
+    series: seriesParsed,         // EWAQ-G / KHJA / KHNA / KHCA / RTAF (после умного парсера)
+    variant: variantBucket,       // capacity bucket
     powerKw: d.ratedCapKw,        // numeric для сортировки в catalog
     notes: d.notes || '',
     // d.kind/d.systemType сохранены в tags для filter-поиска по типу оборудования.

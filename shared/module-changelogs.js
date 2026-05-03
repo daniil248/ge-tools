@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.77', date: '2026-05-03', items: [
+      '🏗 <b>Catalog: правильное subKind / series / variant разделение</b>. По фидбэку Пользователя 2026-05-03: «модульный/моноблок это подтип, S3 это серия, разберись нормально».',
+      '• <b>Новая колонка «Подтип» в catalog</b> между «Тип» и «Название», с Excel-style фильтром (cross-зависимым).',
+      '• <b>UPS:</b> subKind = «Модульный» / «Моноблок» / «Интегрированный» / «All-in-One» (~4 значения, конструктив). variant = «С АВР» / «Без АВР» (~2 значения, реальная конфигурация).',
+      '• <b>Cooling:</b> subKind = systemType-label («Чиллер» / «DX (воздушный)» / «DX с FC-насосом» / «CRAC» / «In-Row»). Variant = capacity bucket («до 50 кВт» / «50–200 кВт» / «200–500 кВт» / «&gt; 500 кВт»).',
+      '• <b>Cooling smart series parser:</b> «KHJA-P30AU 30 kW» → series=«KHJA» (раньше «KHJA-P30AU»). Берётся только буквенный префикс перед «-» / digit / space. По запросу «серия — это KHNA или KHCA, без суффикса».',
+      '• <b>PDU:</b> subKind = «basic» / «metered» / «switched» / «hybrid» / «monitored». series = префикс sku (KPDU / AP / PX3 / TS). variant = «3ф 32A» / «1ф 16A». Раньше variant=весь sku — мусор в фильтре.',
+      '• <b>Rack-accessory:</b> subKind = категория («mounting» / «cable» / «cooling»). variant очищен.',
+      '• <b>Rack:</b> subKind = «42U» / «24U». variant = «600×1070 мм».',
+      '• <b>DGU:</b> subKind = «Дизель», series + variant как раньше.',
+      'Файлы: <code>shared/element-schemas.js</code> (subKind для UPS), <code>cooling/datasheets/index.js</code> (smart series parser, subKind), <code>shared/catalog-bridge.js</code> (DGU subKind), <code>shared/catalogs/pdus.js</code> (subKind/series/variant), <code>shared/catalogs/rack-accessories.js</code>, <code>shared/catalogs/racks.js</code>, <code>catalog/catalog.js</code> (UI колонка + filter).',
+    ] },
     { version: '0.60.76', date: '2026-05-03', items: [
       '📁 <b>Технолог ЦОД: project-context picker + ?project= URL</b>. По требованию Пользователя 2026-05-03 «модуль Технолог ЦОД так же должен иметь привязку к проекту».',
       '• tech-workspace::init() теперь читает <code>?project=&lt;id&gt;</code> / <code>?pid=&lt;id&gt;</code> из URL (как cooling/service). Fallback на <code>ensureDefaultProject()</code> если не указано.',

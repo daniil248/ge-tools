@@ -139,12 +139,14 @@ export function listBuiltinRacks() {
     return {
       id: 'rack.' + k.id,
       kind: 'rack',
+      subKind: `${p.u}U`,                    // v0.60.77: подтип = высота (24U / 42U)
       category: 'equipment',
       label: k.name,
       description: `Базовый комплект серверной стойки 19", ${p.u}U ${p.width}×${p.depth} мм`,
       manufacturer: p.manufacturer || '',
       series: p.series || '',
-      variant: k.sku,
+      variant: `${p.width}×${p.depth} мм`,   // v0.60.77: вариант = размер
+      sku: k.sku,                            // sku отдельно (раньше был в variant)
       geometry: {
         widthMm: p.width, depthMm: p.depth,
         heightMm: (p.u || 0) * 44.45 + 150,
