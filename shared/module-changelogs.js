@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.88', date: '2026-05-03', items: [
+      '🔄 <b>TW: автосинхронизация concept.projectData с parent project</b>. По репорту Пользователя 2026-05-03 «модули не синхронизированы по данным объекта».',
+      '• Helper <code>_syncProjectDataFromProject(concept)</code> — preserve-on-miss merge: заполняет ТОЛЬКО пустые поля, не затирает пользовательские данные.',
+      '• Маппинг: <code>p.requisites.code</code> → <code>designation</code>, <code>customer</code> → <code>customer</code>, <code>address</code> → <code>address</code>, <code>gip</code> → <code>designer</code>; <code>p.location.{city,lat,lon}</code> → <code>{city,lat,lon}</code>; <code>p.description</code> → <code>notes</code>.',
+      '• Auto-sync вызывается:',
+      '  1. При создании нового variant через <code>addVariant()</code>.',
+      '  2. На <code>init()</code> для всех существующих вариантов с пустыми полями (single-pass).',
+      '• <b>Manual sync:</b> в блоке «🏷 Объект» добавлена кнопка «🔄 Синхр. с проектом» (рядом с заголовком). Click → перезаполнение пустых полей из проекта с toast.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code>.',
+    ] },
     { version: '0.60.87', date: '2026-05-03', items: [
       '🔗 <b>Phase 36.4 follow-up: inline-ссылки на конфигураторы в block headers</b>. По запросу Пользователя 2026-05-03: «модули свяжи непосредственно с блоками в основном окне Стойки — Конфигуратор стоек, ИБП — Конфигуратор ИБП».',
       '• <b>🗄 Стойки</b> header: иконки 🛠 (rack-config, BOM шкафа) + 📋 (scs-config, компоновщик).',

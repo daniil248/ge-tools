@@ -1212,6 +1212,9 @@ function renderDetails(c, ro) {
     return `<div class="tw-details-head">
         <h3>🏷 Объект (общие данные проекта)</h3>
         <span class="muted tw-details-sub">${escHtml(sub)}</span>
+        <button type="button" class="tw-details-btn" data-tw-action="sync-from-project" ${ro ? 'disabled' : ''}
+                style="margin-left:auto"
+                title="Перезаполнить пустые поля концепции из метаданных родительского проекта (свойства, реквизиты, локация). Заполненные поля не затираются.">🔄 Синхр. с проектом</button>
       </div>
       <div class="tw-details-body">
         <div class="tw-card" data-card-kind="project" data-card-id="-">
@@ -2166,6 +2169,20 @@ function bindListEvents() {
       return;
     }
 
+    // v0.60.88: «🔄 Синхр. с проектом» — перезаполнить пустые поля concept.projectData.
+    const syncFromProj = e.target.closest('[data-tw-action="sync-from-project"]');
+    if (syncFromProj) {
+      const changed = _syncProjectDataFromProject(cur.concept);
+      if (changed) {
+        persistVariants();
+        renderActiveVariant();
+        twToast('✓ Пустые поля заполнены из метаданных проекта.', 'ok');
+      } else {
+        twToast('Все поля уже заполнены либо в проекте нет данных.', 'info');
+      }
+      return;
+    }
+
     // Phase 30.3 PULL (v0.60.82): «↩ Применить выбранную ДГУ из dgu-config».
     const applyDguSelected = e.target.closest('[data-tw-action="apply-dgu-selected"]');
     if (applyDguSelected) {
@@ -2448,6 +2465,8 @@ function addVariant() {
   const name = `Вариант ${_variants.length + 1}`;
   const v = newVariant(name);
   if (_variants.length === 0) v.primary = true;
+  // v0.60.88: автозаполнение projectData из parent project при создании.
+  _syncProjectDataFromProject(v.concept);
   _variants.push(v);
   _activeId = v.id;
   persistVariants(); persistActive();
@@ -3214,6 +3233,13 @@ function init() {
   } else if (!_variants.some(v => v.id === _activeId)) {
     _activeId = _variants[0].id;
   }
+  // v0.60.88: автозаполнение projectData из parent project (preserve-on-miss).
+  // Применяется КО ВСЕМ существующим вариантам где поля пустые.
+  let synced = 0;
+  for (const v of _variants) {
+    if (_syncProjectDataFromProject(v.concept)) synced++;
+  }
+  if (synced > 0) console.info(`[tw v0.60.88] синхронизированы projectData из проекта в ${synced} вариант(ах)`);
   // Сохраним мигрированные данные обратно
   persistVariants();
   renderVariantsList();
@@ -3257,6 +3283,46 @@ function init() {
   renderCrossModulePanel().catch(e => console.warn('[tech-workspace] cross-module panel failed:', e));
   // v0.60.76: project context picker.
   renderProjectContext();
+}
+
+// v0.60.88 (Пользователь 2026-05-03 «модули не синхронизированы по данным
+// объекта»): синхронизация concept.projectData с метаданными parent-project.
+// Заполняем ТОЛЬКО пустые поля concept (preserve-on-miss), чтобы не затирать
+// данные, которые юзер уже изменил вручную.
+function _syncProjectDataFromProject(concept) {
+  if (!concept) return false;
+  if (!concept.projectData) concept.projectData = {};
+  const proj = _pid ? getProject(_pid) : null;
+  if (!proj) return false;
+  const r = proj.requisites || {};
+  const loc = proj.location || {};
+  let changed = false;
+  const setIfEmpty = (key, value) => {
+    if (value && (concept.projectData[key] == null || concept.projectData[key] === '')) {
+      concept.projectData[key] = value;
+      changed = true;
+    }
+  };
+  setIfEmpty('designation', r.code || proj.designation || '');
+  setIfEmpty('customer', r.customer || '');
+  setIfEmpty('address', r.address || '');
+  setIfEmpty('city', loc.city || '');
+  setIfEmpty('designer', r.gip || '');
+  // lat/lon — числа; setIfEmpty не пройдёт null check
+  if (loc.lat != null && (concept.projectData.lat == null)) {
+    concept.projectData.lat = Number(loc.lat);
+    changed = true;
+  }
+  if (loc.lon != null && (concept.projectData.lon == null)) {
+    concept.projectData.lon = Number(loc.lon);
+    changed = true;
+  }
+  // notes: only fill from project description if concept notes empty
+  if (proj.description && (!concept.projectData.notes || concept.projectData.notes === '')) {
+    concept.projectData.notes = proj.description;
+    changed = true;
+  }
+  return changed;
 }
 
 // v0.60.87 (Phase 36.4 follow-up): helpers для прямых ссылок в headers секций.
