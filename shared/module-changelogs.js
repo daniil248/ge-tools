@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.67', date: '2026-05-03', items: [
+      '📄 <b>Phase 30.7: расширенная пояснительная записка</b>. Cross-module данные в отчёте Технолога ЦОД.',
+      '• <b>Раздел 4a — Подбор холодильных систем (связанный):</b> читает <code>cooling.selections.v1</code> + <code>activeSelectionId.v1</code> проекта, показывает основной (★) вариант: тип системы, COP, требуемая холодопроизводительность, Σ установлено, CAPEX (оборудование + монтаж), OPEX обслуживания, lifetime для TCO. Ссылка на /cooling/.',
+      '• <b>Раздел 6a — Расчёт PUE (per-component breakdown):</b> таблица с раскладкой P<sub>cool</sub> / P<sub>ups-loss</sub> / P<sub>tp-loss</sub> / P<sub>aux</sub> в кВт и %, формулы, η<sub>UPS</sub> и η<sub>TP</sub> overrides. Из Phase 30.4 calcPueAutoBreakdown.',
+      '• <b>Раздел 6b — Сервис: монтаж и ТО (связанные наряды):</b> читает <code>service.orders.v1</code>, показывает по типам install/maintenance count + Σ клиент-сумма. Ссылка на /service/.',
+      '• Содержание (TOC) автоматически обновляется — секции 4a / 6a / 6b показываются только при наличии связанных данных.',
+      '• <code>_readCoolingSummary()</code>, <code>_readServiceSummary()</code> — pure helpers для cross-module чтения.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code>.',
+    ] },
     { version: '0.60.66', date: '2026-05-03', items: [
       '🔄 <b>Phase 30.1: PUSH из Технолога ЦОД в Cooling</b>. По roadmap «📤 Подобрать холод для этой концепции».',
       '• tech-workspace tab «⚙ Топология охлаждения» получил кнопку «📤 Подобрать холод для этой концепции →».',

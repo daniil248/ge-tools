@@ -3280,15 +3280,12 @@ standalone-приложение в отдельном. Чтобы использ
   - Сортировка: с данными вверху, пустые внизу.
   - Один клик → переход через <code>buildModuleHref</code> с pid в URL.
 
-- [ ] **30.7** Сводный концептуальный отчёт (через `service/report/` шаблоны):
-  - Title page: проект, климат, локация
-  - IT-нагрузка: rackGroups breakdown, total kW, redundancy
-  - Холодоснабжение: tied-cooling-selection summary, годовая энергия, PUE-cool
-  - Электропитание: схема, ИБП-конфигурация, DGU
-  - Comprehensive PUE с графиком
-  - CAPEX-сводка: оборудование + монтаж (из service)
-  - OPEX-сводка: электричество + ТО (из service maintenance orders)
-  - 5/10/20-летний TCO
+- [~] **30.7** Сводный концептуальный отчёт (v0.60.67 — частично):
+  - [x] Раздел 4a — Подбор холодильных систем (cross-module из cooling.selections.v1: основной вариант, тип, COP, Σ установлено, CAPEX/OPEX/lifetime).
+  - [x] Раздел 6a — PUE per-component breakdown (P_cool / P_ups-loss / P_tp-loss / P_aux) с формулами и КПД.
+  - [x] Раздел 6b — Сервис (cross-module из service.orders.v1: install/maintenance count + Σ суммы).
+  - [ ] **Не сделано:** через service/report/ шаблоны (slot-based, Phase 29.4-29.5) — пока inline HTML с CSS.
+  - [ ] **Не сделано:** 5/10/20-летний TCO с графиком — отложено до Phase 30.4 (12-month chart).
 
 **Acceptance:**
 - В концепции tech-workspace одной кнопкой попадаешь в cooling/ups-config с
