@@ -1054,6 +1054,10 @@ function renderListRail(c, ro) {
     <div class="tw-rail-section">
       <div class="tw-rail-head">
         <span class="tw-rail-title">🗄 Стойки <span class="muted">·${(c.rackGroups || []).length}</span></span>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('rack-config'))}" target="_blank"
+           title="Открыть «Конфигуратор шкафа» (rack-config) с контекстом ${_isSketchPid() ? 'sketch-проекта варианта' : 'основного проекта'}. BOM шкафов: корпус, монтажка, PDU, заглушки.">🛠</a>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('scs-config'))}" target="_blank"
+           title="Открыть «Компоновщик шкафа» (scs-config). Карта юнитов, PDU, внутренние патчкорды, матрица питания.">📋</a>
         <button type="button" class="tw-rail-add" data-add-card="rack" title="Добавить группу стоек" ${ro ? 'disabled' : ''}>➕</button>
       </div>
       <div class="tw-rail-list">${rackRows || '<div class="tw-rail-empty muted">Нет групп</div>'}</div>
@@ -1063,6 +1067,8 @@ function renderListRail(c, ro) {
     <div class="tw-rail-section">
       <div class="tw-rail-head">
         <span class="tw-rail-title">⚡ ИБП <span class="muted">·${(c.upsSystems || []).length}</span></span>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('ups-config'))}" target="_blank"
+           title="Открыть «Конфигуратор ИБП» (ups-config) с контекстом ${_isSketchPid() ? 'sketch-проекта варианта' : 'основного проекта'}. Wizard-подбор моноблочных/модульных/AIO ИБП с АКБ.">🛠</a>
         <button type="button" class="tw-rail-add" data-add-card="ups" title="Добавить систему ИБП" ${ro ? 'disabled' : ''}>➕</button>
       </div>
       <div class="tw-rail-list">${upsRows || '<div class="tw-rail-empty muted">Нет систем</div>'}</div>
@@ -1072,6 +1078,10 @@ function renderListRail(c, ro) {
     <div class="tw-rail-section">
       <div class="tw-rail-head">
         <span class="tw-rail-title">❄ Климат <span class="muted">·${(c.coolingUnits || []).length}</span></span>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('cooling'))}" target="_blank"
+           title="Открыть «Подбор холодильных систем» (cooling) с контекстом ${_isSketchPid() ? 'sketch-проекта варианта' : 'основного проекта'}. Технико-экономическое сравнение чиллеров, DX, free-cooling, CRAC.">🛠</a>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('meteo'))}" target="_blank"
+           title="Открыть «Метеоданные» (meteo). Климатические ряды, FreeCool часы, ASHRAE design conditions.">🌤</a>
         <button type="button" class="tw-rail-add" data-add-card="cool" title="Добавить группу кондиционеров" ${ro ? 'disabled' : ''}>➕</button>
       </div>
       <div class="tw-rail-list">
@@ -1097,6 +1107,8 @@ function renderListRail(c, ro) {
     <div class="tw-rail-section">
       <div class="tw-rail-head">
         <span class="tw-rail-title">🏢 МЦОД <span class="muted">·${(c.mdcBuildings || []).length}</span></span>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('mdc-config'))}" target="_blank"
+           title="Открыть «Конфигуратор МЦОД» (mdc-config) с контекстом ${_isSketchPid() ? 'sketch-проекта варианта' : 'основного проекта'}. Готовые блоки GDM-600 IT-HALL-300 / POWER-1600.">🛠</a>
         <button type="button" class="tw-rail-add" data-add-card="mdc" title="Добавить блок МЦОД" ${ro ? 'disabled' : ''}>➕</button>
       </div>
       <div class="tw-rail-list">${(() => {
@@ -1120,6 +1132,12 @@ function renderListRail(c, ro) {
     <div class="tw-rail-section">
       <div class="tw-rail-head">
         <span class="tw-rail-title">🔌 Ввод</span>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('transformer-config'))}" target="_blank"
+           title="Открыть «Конфигуратор трансформатора» с контекстом проекта. Силовой ТП: S, U₁/U₂, группа, u_k.">🛠</a>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('dgu-config'))}" target="_blank"
+           title="Открыть «Конфигуратор ДГУ». Расчёт по ISO 8528-1 + climate derate + подбор Caterpillar/Cummins/Volvo/FG Wilson.">⚡</a>
+        <a class="tw-rail-cfg" href="${escAttr(_buildConfigLink('mv-config'))}" target="_blank"
+           title="Открыть «Конфигуратор РУ СН» (mv-config). Wizard-подбор ячеек 6-35 кВ.">⚙</a>
       </div>
       <div class="tw-rail-list">
         <button type="button" class="tw-rail-item${_selCls('feed', null)}" data-bk="feed" data-bid="">
@@ -3239,6 +3257,40 @@ function init() {
   renderCrossModulePanel().catch(e => console.warn('[tech-workspace] cross-module panel failed:', e));
   // v0.60.76: project context picker.
   renderProjectContext();
+}
+
+// v0.60.87 (Phase 36.4 follow-up): helpers для прямых ссылок в headers секций.
+// Каждая секция в active-variant view имеет «🛠» иконку, открывающую соотв.
+// модуль с правильным pid (sketch-project варианта если есть, иначе parent).
+const _MODULE_HREF = {
+  'rack-config':        '../rack-config/',
+  'scs-config':         '../scs-config/',
+  'ups-config':         '../ups-config/',
+  'cooling':            '../cooling/',
+  'meteo':              '../meteo/',
+  'mdc-config':         '../mdc-config/',
+  'dgu-config':         '../dgu-config/',
+  'transformer-config': '../transformer-config/',
+  'mv-config':          '../mv-config/',
+  'service':            '../service/',
+  'scs-design':         '../scs-design/',
+};
+function _activePidForModule() {
+  // Если у активного варианта есть linked sketch-project — используем его.
+  // Иначе — parent.
+  const v = _variants.find(x => x.id === _activeId);
+  return v?.linkedSketchProjectId || _pid || '';
+}
+function _isSketchPid() {
+  const v = _variants.find(x => x.id === _activeId);
+  return !!v?.linkedSketchProjectId;
+}
+function _buildConfigLink(moduleId) {
+  const href = _MODULE_HREF[moduleId] || '../';
+  const pid = _activePidForModule();
+  if (!pid) return href;
+  const sep = href.includes('?') ? '&' : '?';
+  return `${href}${sep}project=${encodeURIComponent(pid)}&from=tech-workspace`;
 }
 
 // v0.60.85 (Phase 36.1): создаёт sketch-project для варианта концепции —

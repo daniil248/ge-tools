@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.87', date: '2026-05-03', items: [
+      '🔗 <b>Phase 36.4 follow-up: inline-ссылки на конфигураторы в block headers</b>. По запросу Пользователя 2026-05-03: «модули свяжи непосредственно с блоками в основном окне Стойки — Конфигуратор стоек, ИБП — Конфигуратор ИБП».',
+      '• <b>🗄 Стойки</b> header: иконки 🛠 (rack-config, BOM шкафа) + 📋 (scs-config, компоновщик).',
+      '• <b>⚡ ИБП</b> header: 🛠 (ups-config, wizard ИБП).',
+      '• <b>❄ Климат</b> header: 🛠 (cooling, подбор) + 🌤 (meteo, климат-данные).',
+      '• <b>🏢 МЦОД</b> header: 🛠 (mdc-config, GDM-600 блоки).',
+      '• <b>🔌 Ввод</b> header: 🛠 (transformer-config) + ⚡ (dgu-config) + ⚙ (mv-config, РУ СН).',
+      '• Все ссылки используют контекст активного варианта: если у variant есть linked sketch-project — открывают его, иначе — parent project. URL: <code>../&lt;module&gt;/?project=&lt;pid&gt;&from=tech-workspace</code>.',
+      '• Helper <code>_buildConfigLink(moduleId)</code> + <code>_activePidForModule()</code> + <code>_isSketchPid()</code>.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code>, <code>tech-workspace/tech-workspace.css</code>.',
+    ] },
     { version: '0.60.86', date: '2026-05-03', items: [
       '🔍 <b>Phase 36.4: cross-module panel — per-variant module visibility</b>.',
       '• <code>renderCrossModulePanel()</code> теперь читает данные из <b>sketch-project активного variant</b> (если linked), иначе — из parent-project.',

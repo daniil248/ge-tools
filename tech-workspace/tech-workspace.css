@@ -788,6 +788,29 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 }
 .tw-rail-add:hover { background: #4338ca; }
 .tw-rail-add:disabled { background: #9ca3af; border-color: #9ca3af; cursor: not-allowed; }
+/* v0.60.87 (Phase 36.4 follow-up): прямая ссылка на конфигуратор в header'е блока. */
+.tw-rail-cfg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  margin-right: 2px;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.tw-rail-cfg:hover {
+  background: #e0f2fe;
+  border-color: #38bdf8;
+  color: #0369a1;
+  text-decoration: none;
+}
 .tw-rail-list {
   display: flex;
   flex-direction: column;
