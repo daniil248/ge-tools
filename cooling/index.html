@@ -159,6 +159,16 @@
         <button type="button" class="cl-btn-ghost" id="cl-rates-btn" style="width:100%"
                 title="Открыть справочник курсов валют. Поддерживаемые источники: НБ РК (по умолчанию), ЦБ РФ, ECB через Frankfurter, open.er-api.com. Курсы кешируются по дате.">💱 Курсы валют</button>
       </div>
+
+      <!-- Phase 35: история всех загруженных данных проекта (общий журнал по
+           всем модулям — meteo, cooling и т.д.). Корзина для восстановления. -->
+      <div class="cl-section">
+        <h3 title="Журнал всех загруженных и удалённых данных в этом проекте: метео-датасеты, datasheets, импорты. Удалённое можно восстановить из Корзины.">📜 История</h3>
+        <button type="button" id="cl-btn-history" class="cl-btn-ghost" style="width:100%;margin-bottom:4px"
+                title="Открыть журнал всех событий импорта/обновления/удаления для этого проекта (по всем модулям).">📜 Журнал…</button>
+        <button type="button" id="cl-btn-trash" class="cl-btn-ghost" style="width:100%"
+                title="Корзина: удалённые данные (датасеты, datasheets), которые ещё можно восстановить.">🗑 Корзина <span id="cl-trash-count" style="margin-left:4px;color:#92400e"></span></button>
+      </div>
     </aside>
 
     <section class="cl-content">

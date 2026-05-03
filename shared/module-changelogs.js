@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.58', date: '2026-05-03', items: [
+      '📜 <b>Phase 35 cont.: история+корзина в cooling + tag triggeredFrom</b>.',
+      '• <code>shared/meteo-fetch.js</code>: каждая 1-кликовая загрузка пишется в history-log с itemKind=\'meteo-dataset\' и payload={dataset, triggeredFrom}.',
+      '• <code>cooling/cooling.js::autoFetchMeteoForProject</code>: передаёт <code>triggeredFrom: \'cooling\'</code> — теперь в журнале видно, что Темиртау был загружен из cooling, а не из /meteo/.',
+      '• Sidebar cooling: новая секция «📜 История» с кнопками «📜 Журнал» и «🗑 Корзина (N)» — кросс-модульный журнал ВСЕГО проекта.',
+      '• Модалка cooling-журнала: добавлена колонка «Модуль» (🌤 meteo, ❄ cooling, и т.д.) + tag triggeredFrom рядом с источником.',
+      '• Корзина cooling: показывает удалённое из всех модулей; restore возможен только из исходного модуля (toast подскажет куда идти).',
+      'Файлы: <code>shared/meteo-fetch.js</code>, <code>cooling/cooling.js</code>, <code>cooling/index.html</code>.',
+    ] },
     { version: '0.60.57', date: '2026-05-03', items: [
       '📜 <b>Phase 35 START: история загруженных данных + Корзина</b>. По требованию Пользователя 2026-05-03: «любые загруженные данные должны сохраняться в истории».',
       '• Новый <code>shared/history-log.js</code> — append-only журнал per-project. API: historyAppend / historyList / historyTrash / historyRestore / historyPurge / historyClear / historyStats.',

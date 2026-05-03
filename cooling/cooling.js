@@ -54,6 +54,7 @@ import { open as openRatesDialog } from '../shared/currency-rates/rates-dialog.j
 import { fetchRates, convert as convertRate } from '../shared/currency-rates/index.js';
 import '../shared/currency-rates/sources/index.js';
 import { detectNavMode, renderModuleActions, openEmbed, readEmbedResult } from '../shared/module-nav.js';
+import { historyAppend, historyList, historyTrash, historyRestore, historyPurge } from '../shared/history-log.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -760,6 +761,7 @@ async function autoFetchMeteoForProject(projLoc, years = 1) {
       lon: Number(projLoc.lon),
       locationName: projLoc.city || `${Number(projLoc.lat).toFixed(3)}, ${Number(projLoc.lon).toFixed(3)}`,
       years,
+      triggeredFrom: 'cooling',  // Phase 35: тег источника в history-log
     });
     if (!result.ok) {
       util.toast(`❌ ${result.error}`, 'err');
@@ -1630,6 +1632,13 @@ async function init() {
     });
   }
 
+  // Phase 35: handlers «📜 Журнал» и «🗑 Корзина».
+  const histBtn = $('cl-btn-history');
+  if (histBtn) histBtn.addEventListener('click', openCoolingHistoryModal);
+  const trashBtn = $('cl-btn-trash');
+  if (trashBtn) trashBtn.addEventListener('click', openCoolingTrashModal);
+  refreshCoolingTrashCount();
+
   // v0.60.1: «📅 Открыть Метеоданные →» в EMBED-режиме.
   // По требованию: «я так и не смог перейти в модуль Метеоданные и
   // вернуться с выбором другого местоположения».
@@ -1884,6 +1893,165 @@ function clPrompt(label, def = '') {
     `<label>${util.escHtml(label)}:<input type="text" id="cl-prompt-input" value="${util.escAttr(def)}" autofocus></label>`,
     async () => ({ value: document.getElementById('cl-prompt-input').value })
   ).then(r => r ? r.value : null);
+}
+
+// =============================================================================
+// Phase 35: модалки «📜 История» и «🗑 Корзина» в cooling
+// =============================================================================
+// Cooling показывает ВСЮ историю проекта (cross-module): meteo-импорты,
+// будущие datasheets, BOM-импорты. Сейчас фактически только meteo-events
+// + cooling-импорты с триггером. Удаление meteo-датасета через cooling-UI
+// напрямую не предусмотрено — только через /meteo/.
+
+const CL_ACTION_LABELS = {
+  'import':  { icon: '➕', label: 'Импорт', color: '#0d8a4e' },
+  'update':  { icon: '✏', label: 'Обновлено', color: '#0369a1' },
+  'delete':  { icon: '🗑', label: 'Удалено', color: '#92400e' },
+  'restore': { icon: '↩', label: 'Восстановлено', color: '#7c3aed' },
+  'purge':   { icon: '✕', label: 'Удалено навсегда', color: '#991b1b' },
+};
+const CL_MODULE_ICONS = {
+  'meteo': '🌤',
+  'cooling': '❄',
+  'service': '🛠',
+  'ups-config': '🔋',
+  'mdc-config': '🏗',
+};
+
+function clFmtTs(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+async function refreshCoolingTrashCount() {
+  if (!_pid?.id) {
+    const span = $('cl-trash-count');
+    if (span) span.textContent = '';
+    return;
+  }
+  try {
+    const trash = await historyTrash(_pid.id);
+    const span = $('cl-trash-count');
+    if (span) span.textContent = trash.length ? `(${trash.length})` : '';
+  } catch (e) {
+    console.warn('[cooling] refreshTrashCount failed:', e);
+  }
+}
+
+async function openCoolingHistoryModal() {
+  if (!_pid?.id) {
+    util.toast('История доступна только в project-mode', 'err');
+    return;
+  }
+  const events = await historyList(_pid.id);
+  events.sort((a, b) => b.ts - a.ts);
+
+  const rowsHtml = events.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;color:#64748b;padding:16px">Нет событий. Импортируйте датасет — появится в журнале.</td></tr>`
+    : events.map(ev => {
+        const meta = CL_ACTION_LABELS[ev.action] || { icon: '?', label: ev.action, color: '#64748b' };
+        const modIcon = CL_MODULE_ICONS[ev.module] || '📦';
+        return `<tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:6px 8px;font-size:11.5px;color:#475569;white-space:nowrap">${util.escHtml(clFmtTs(ev.ts))}</td>
+          <td style="padding:6px 8px;font-size:12px" title="Модуль ${util.escAttr(ev.module)}">${modIcon} ${util.escHtml(ev.module)}</td>
+          <td style="padding:6px 8px;font-size:12px"><span style="color:${meta.color}">${meta.icon} ${util.escHtml(meta.label)}</span></td>
+          <td style="padding:6px 8px;font-size:12px">${util.escHtml(ev.itemName || ev.itemId || '—')}</td>
+          <td style="padding:6px 8px;font-size:11px;color:#64748b">${util.escHtml(ev.source || '')}${ev.payload?.triggeredFrom ? ` <span title="Из какого модуля инициирован" style="opacity:0.7">(${util.escHtml(ev.payload.triggeredFrom)})</span>` : ''}</td>
+        </tr>`;
+      }).join('');
+
+  await util.modalOpen(
+    '<h3>📜 История данных проекта</h3>',
+    `<div style="max-height:60vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:4px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:#f8fafc;z-index:1">
+          <tr>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Время</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Модуль</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Событие</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Объект</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Источник</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:8px;font-size:11px">Всего событий: ${events.length}. Журнал per-project, append-only. Кросс-модульная история: meteo, cooling, и др.</p>`,
+    async () => null
+  );
+}
+
+async function openCoolingTrashModal() {
+  if (!_pid?.id) {
+    util.toast('Корзина доступна только в project-mode', 'err');
+    return;
+  }
+  const trash = await historyTrash(_pid.id);
+  trash.sort((a, b) => b.ts - a.ts);
+
+  const rowsHtml = trash.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;color:#64748b;padding:16px">Корзина пуста.</td></tr>`
+    : trash.map(ev => {
+        const modIcon = CL_MODULE_ICONS[ev.module] || '📦';
+        return `<tr style="border-bottom:1px solid #f1f5f9" data-ev-id="${util.escAttr(ev.id)}">
+          <td style="padding:6px 8px;font-size:11.5px;color:#475569;white-space:nowrap">${util.escHtml(clFmtTs(ev.ts))}</td>
+          <td style="padding:6px 8px;font-size:12px" title="${util.escAttr(ev.module)}">${modIcon}</td>
+          <td style="padding:6px 8px;font-size:12px">${util.escHtml(ev.itemName || ev.itemId || '—')}</td>
+          <td style="padding:6px 8px;font-size:11px;color:#64748b">${util.escHtml(ev.source || '')}</td>
+          <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+            <button type="button" data-trash-act="restore" data-ev-id="${util.escAttr(ev.id)}" style="padding:3px 8px;font-size:11px;border:1px solid #7c3aed;background:#f5f3ff;color:#7c3aed;border-radius:3px;cursor:pointer;margin-right:4px" title="Восстановление производится в исходном модуле. Откройте этот модуль и нажмите Restore.">↩ Восстановить</button>
+            <button type="button" data-trash-act="purge" data-ev-id="${util.escAttr(ev.id)}" style="padding:3px 8px;font-size:11px;border:1px solid #991b1b;background:#fef2f2;color:#991b1b;border-radius:3px;cursor:pointer" title="Удалить навсегда — освобождает место в IDB.">✕ Навсегда</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+  await util.modalOpen(
+    '<h3>🗑 Корзина проекта</h3>',
+    `<div style="max-height:60vh;overflow-y:auto;border:1px solid #e2e8f0;border-radius:4px">
+      <table id="cl-trash-table" style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:#f8fafc;z-index:1">
+          <tr>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Удалено</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Модуль</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Объект</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:600;border-bottom:2px solid #cbd5e1">Источник</th>
+            <th style="padding:6px 8px;text-align:right;font-weight:600;border-bottom:2px solid #cbd5e1">Действие</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:8px;font-size:11px">В корзине: ${trash.length}. Восстановление meteo-датасетов: откройте /meteo/ → 🗑 Корзина → ↩.</p>`,
+    async () => null
+  );
+
+  const table = document.getElementById('cl-trash-table');
+  if (table) {
+    table.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-trash-act]');
+      if (!btn) return;
+      const evId = btn.dataset.evId;
+      const act = btn.dataset.trashAct;
+      if (act === 'restore') {
+        // Из cooling восстанавливаем только запись в логе. Возврат данных
+        // в активный store должен делать соответствующий модуль (meteo и т.д.).
+        const r = await historyRestore(_pid.id, evId);
+        if (!r.ok) { util.toast(`❌ ${r.error}`, 'err'); return; }
+        util.toast(`✓ Запись восстановлена. Откройте /meteo/ для возврата датасета в активные.`, 'ok');
+        btn.closest('tr')?.remove();
+        await refreshCoolingTrashCount();
+      } else if (act === 'purge') {
+        const ok = await util.modalOpen('<h3>Удалить навсегда?</h3>', '<p>Восстановить будет нельзя.</p>', async () => true);
+        if (!ok) return;
+        const r = await historyPurge(_pid.id, evId);
+        if (!r.ok) { util.toast(`❌ ${r.error}`, 'err'); return; }
+        util.toast('✓ Удалено навсегда', 'ok');
+        btn.closest('tr')?.remove();
+        await refreshCoolingTrashCount();
+      }
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

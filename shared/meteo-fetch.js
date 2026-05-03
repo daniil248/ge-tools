@@ -19,6 +19,7 @@
 
 import { projectKey } from './project-storage.js';
 import { idbGet, idbSet, idbAvailable } from './idb-store.js';
+import { historyAppend } from './history-log.js';
 
 /**
  * @param {string|null} pid
@@ -116,6 +117,23 @@ export async function fetchAndSaveMeteoForProject(pid, loc) {
   }
   // activeId — в LS (маленький, всегда вмещается)
   try { localStorage.setItem(projectKey(pid, 'meteo', 'activeId.v1'), JSON.stringify(dsId)); } catch {}
+
+  // Phase 35: пишем в историю проекта. Caller передаёт source, но
+  // мы ставим module='meteo' (датасет логически принадлежит meteo).
+  // sourceTriggeredFrom — кто инициировал (cooling / meteo / tech-workspace).
+  try {
+    await historyAppend(pid, {
+      module: 'meteo',
+      action: 'import',
+      itemKind: 'meteo-dataset',
+      itemId: dsId,
+      itemName: dataset.name,
+      source: 'open-meteo',
+      payload: { dataset, triggeredFrom: loc.triggeredFrom || 'meteo-fetch' },
+    });
+  } catch (e) {
+    console.warn('[meteo-fetch] historyAppend failed (non-fatal):', e);
+  }
 
   return { ok: true, dataset };
 }
