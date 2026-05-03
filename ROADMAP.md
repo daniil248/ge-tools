@@ -3034,44 +3034,38 @@ standalone-приложение в отдельном. Чтобы использ
 
 ---
 
-## Фаза 24 — Модуль «Сервис: монтаж и ТО»
+## Фаза 24 — Модуль «Сервис: монтаж и ТО» (🟢 в проде с v0.60.30)
 
 > Зафиксировано Пользователем 2026-05-02: «отдельный модуль Расчет стоимости
 > технического обслуживания и стоимости монтажных работ, где инженер сервиса
 > сможет формировать стоимость себеса и стоимости для клиента по монтажным и
 > сервисным работам по проекту или разовые работы».
 
-- [ ] **24.1** Скаффолд `service/` модуля по тому же паттерну, что и cooling:
-  - `service/index.html` — sidebar (список «нарядов» / списков работ) +
-    content-tabs (ваб «Монтаж», «ТО», «Себестоимость», «КП клиенту»).
-  - `service/service.js` — orchestrator (state, persist, render).
-  - `service/calc/` — расчёт себестоимости (трудозатраты × ставка + материалы
-    + командировочные + накладные%) и формирование цены клиенту
-    (себес × маржа% / фикс-наценка).
-  - `service/ui/` — формы наряда + таблица позиций (категория / описание /
-    кол-во / ед.изм. / себес-цена / клиент-цена / валюта).
-  - Каждое денежное поле — line-items (Фаза 23.2 shared/money-items).
-  - Standalone / project / embed режимы (как в cooling).
-- [ ] **24.2** Каталог типовых работ (с дефолтной себес-ценой и норматив-часами):
-  - Монтаж чиллера (Pump-around / Direct), Монтаж DX, Монтаж CRAC,
-    Опрессовка, Заправка хладагента (R410A/R32/R134a), ПНР,
-    ТО ежемесячное / квартальное / годовое.
-- [ ] **24.3** Связь с проектом — выбор подбора cooling → автоматически
-  предлагается список работ по составу оборудования (qty чиллеров →
-  N×Монтаж чиллера, и т.п.). Standalone разовый наряд — без проекта.
-- [ ] **24.4** Экспорт КП клиенту PDF (через печать) с разбивкой материалы /
-  работы / итого + НДС.
+- [x] **24.1** Скаффолд `service/` модуля (v0.60.30): sidebar/orderForm/calc/ui.
+- [x] **24.2** Каталог типовых работ — `service/catalog/work-templates.js` с
+      seed-шаблонами (монтаж/ТО/одноразовые) + расширение с workType/equipmentKind/capacityKw для auto-suggest материалов (v0.60.50).
+- [x] **24.3** Связь с проектом: импорт из cooling через
+      <code>buildInstallPositionsFromCoolingOption / buildMaintenancePositionsFromCoolingOption</code> +
+      дедуп по sourceModule+sourceRef (v0.60.45).
+- [x] **24.4** Экспорт КП — slot-based template в `service/report/` (v0.60.40).
 
 ---
 
-## Фаза 25 — Импорт даташитов климатического оборудования
+## Фаза 25 — Импорт даташитов климатического оборудования (🟢 в проде с v0.60.20)
 
 > Зафиксировано Пользователем 2026-05-02: «для климатического оборудования
 > добавь возможность загружать даташиты конкретного оборудования (описание
 > формата добавь в справку модуля и поля импорта) или вводить все необходимые
 > данные (с подсказками)».
 
-- [ ] **25.1** JSON-формат даташита (документировать в справке cooling-модуля):
+- [x] **25.1** JSON-формат даташита, реализован в <code>cooling/calc/datasheet.js</code>.
+- [x] **25.2** UI «📥 Импорт даташита (JSON)» в <code>chiller-form.js</code> с drag&drop, paste, preview.
+- [x] **25.3** Каталог seed-даташитов (Daikin / York / Carrier / Trane / Stulz) в <code>cooling/datasheets/</code>.
+- [x] **25.4** CSV-импорт performanceCurve (заголовок T,capacity,cop) — кнопка «📥 Импорт CSV» в форме.
+- [x] **25.5** Help-секция «Формат даташита» в модуле + кнопка «Скачать пример».
+
+**Спецификация JSON-формата (для справки):**
+- [x] **25.1-spec** JSON-формат даташита (документировать в справке cooling-модуля):
   ```json
   {
     "schema": "raschet-chiller-datasheet/v1",
@@ -3276,12 +3270,11 @@ standalone-приложение в отдельном. Чтобы использ
   - Bridge `shared/dgu-bridge.js` для cross-module (как cooling/service-bridge).
   - Карточка в /modules/, /projects/.
 
-- [ ] **30.4** Comprehensive PUE расчёт:
-  - Текущий: PUE = (IT + Cool) / IT.
-  - Расширить: PUE = (IT + Cool + UPS_loss + TP_loss + Aux_lighting) / IT.
-  - UI breakdown: «PUE = (X кВт·ч IT + Y кВт·ч cool + Z кВт·ч ups-loss + W
-    кВт·ч tp-loss) / X» с per-component bar chart.
-  - 12-месячный график PUE (helps demonstrate seasonal variation).
+- [x] **30.4** Comprehensive PUE расчёт (v0.60.63 — частично):
+  - PUE = 1 + (P<sub>cool</sub> + P<sub>ups-loss</sub> + P<sub>tp-loss</sub> + P<sub>aux</sub>) / P<sub>IT</sub>.
+  - <code>calcPueAutoBreakdown</code> возвращает per-component массу/долю.
+  - UI tab PUE: 8 строк breakdown с tooltip\'ами + override η_ups / η_tp / aux %.
+  - **Не сделано:** 12-месячный график PUE (seasonal) — отложено до подходящей задачи.
 
 - [ ] **30.5** Service ↔ Tech-workspace:
   - В концепции суммарный «Сервис в год» = Σ service.orders[type=maintenance].

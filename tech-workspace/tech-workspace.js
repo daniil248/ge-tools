@@ -677,9 +677,28 @@ const TOPOLOGY_DEFAULTS = {
   'immersion':   { copBase: 8.0, copFC: 0,    hasFC: false, baseLossPct: 8,  label: 'Погружное охлаждение' },
 };
 
-function calcPueAuto(c, meteoSummary) {
+/* v0.60.63 (Phase 30.4): comprehensive breakdown defaults — раскладываем
+   старый topo.baseLossPct (5–10%) на физически осмысленные компоненты:
+   UPS_loss = (1 − η_ups) × P_IT, типичный η = 96% online double-conversion;
+   TP_loss = (1 − η_tp) × (P_IT + P_cool), типичный η = 99% масляный 1000 кВА;
+   Aux = aux_pct × P_IT (освещение, безопасность, мониторинг);
+   Sum ≈ старый baseLossPct, но теперь видно где сколько уходит. */
+const PUE_LOSS_DEFAULTS = {
+  upsEfficiency: 0.96,   // 96% online (типовой transformerless modular)
+  tpEfficiency:  0.99,   // 99% масляный distribution-transformer
+  auxFraction:   0.02,   // 2% от IT (освещение, БСК, ПОЖ-СС, СКУД-CCTV, серверы мониторинга)
+};
+
+/**
+ * Phase 30.4: расчёт PUE с per-component breakdown.
+ * Возвращает { pue, breakdown: { itKw, coolKwAvg, upsLossKw, tpLossKw, auxKw, freecoolFraction } }.
+ * calcPueAuto обёрнут — возвращает только число (для backward-compat).
+ */
+function calcPueAutoBreakdown(c, meteoSummary) {
   const itKw = calcITTotal(c);
-  if (itKw <= 0) return 1.4;
+  if (itKw <= 0) {
+    return { pue: 1.4, breakdown: { itKw: 0, coolKwAvg: 0, upsLossKw: 0, tpLossKw: 0, auxKw: 0, freecoolFraction: 0 } };
+  }
 
   const cs = c.coolingSystem || newCoolingSystem();
   const topo = TOPOLOGY_DEFAULTS[cs.topology] || TOPOLOGY_DEFAULTS['chiller-fc'];
@@ -687,31 +706,25 @@ function calcPueAuto(c, meteoSummary) {
   const fcEnabled = topo.hasFC && fc.enabled;
   const tCut = Number(fc.tCutoffC) || 14;
 
-  // Доля часов с фрикулингом: считаем по meteo, если есть; иначе fallback.
   let freecoolFraction = 0;
   if (fcEnabled) {
     if (meteoSummary?.stats?.n) {
-      // Если в датасете есть hourly — считаем точно по T < tCut
       const hourly = meteoSummary.hourly || [];
       if (hourly.length > 0) {
         const fcHours = hourly.filter(h => Number.isFinite(Number(h.T)) && Number(h.T) < tCut).length;
         freecoolFraction = fcHours / Math.max(1, hourly.length);
       } else {
-        // Только stats — используем существующее freecoolHours (T<14)
         freecoolFraction = (meteoSummary.stats.freecoolHours || 0) / Math.max(1, meteoSummary.stats.n);
       }
     } else {
-      freecoolFraction = 0.55; // среднестат. умеренной полосы
+      freecoolFraction = 0.55;
     }
   }
 
-  // COP чиллера (rated если задан, иначе типовой по топологии)
   const copBase = (cs.chillerSpec && Number(cs.chillerSpec.ratedCOP) > 0)
     ? Number(cs.chillerSpec.ratedCOP)
     : topo.copBase;
   const copFC = topo.copFC || 15;
-
-  // Type-correction для freecool (indirect/glycol хуже direct из-за теплообменника)
   const fcTypeFactor = ({ direct: 1.0, indirect: 0.85, glycol: 0.75, none: 0 }[fc.type]) || 1.0;
   const effectiveCopFC = copFC * fcTypeFactor;
 
@@ -724,9 +737,34 @@ function calcPueAuto(c, meteoSummary) {
   } else {
     coolKwAvg = itKw / copBase;
   }
-  const lossesKw = itKw * (topo.baseLossPct / 100);
-  const pue = 1 + (coolKwAvg + lossesKw) / itKw;
-  return Math.round(pue * 100) / 100;
+
+  // Per-component breakdown (Phase 30.4):
+  // - UPS-потери: ИБП кормит только IT-нагрузку (cooling питается напрямую от секции).
+  //   η_ups = доля КПД (override через c.pue.upsEfficiency, иначе default 96%).
+  const etaUps = Number(c.pue?.upsEfficiency) || PUE_LOSS_DEFAULTS.upsEfficiency;
+  const upsLossKw = itKw * (1 / etaUps - 1);  // = itKw × (1 − η)/η
+  // - TP-потери (понижающий трансформатор): кормит ВСЁ — IT + cooling + aux.
+  const etaTp = Number(c.pue?.tpEfficiency) || PUE_LOSS_DEFAULTS.tpEfficiency;
+  const auxFraction = Number(c.pue?.auxFraction) || PUE_LOSS_DEFAULTS.auxFraction;
+  const auxKw = itKw * auxFraction;
+  // TP кормит итог = IT + cool + aux + ups_loss → потери = (1 − η)/η × этот итог.
+  const downstreamKw = itKw + coolKwAvg + auxKw + upsLossKw;
+  const tpLossKw = downstreamKw * (1 / etaTp - 1);
+
+  const totalNonItKw = coolKwAvg + upsLossKw + tpLossKw + auxKw;
+  const pue = 1 + totalNonItKw / itKw;
+  return {
+    pue: Math.round(pue * 100) / 100,
+    breakdown: {
+      itKw, coolKwAvg, upsLossKw, tpLossKw, auxKw, totalNonItKw,
+      freecoolFraction,
+      etaUps, etaTp, auxFraction,
+    },
+  };
+}
+
+function calcPueAuto(c, meteoSummary) {
+  return calcPueAutoBreakdown(c, meteoSummary).pue;
 }
 function calcPue(c, meteoSummary) {
   if (!c.pue) return 1.4;
@@ -1276,17 +1314,52 @@ function renderDetails(c, ro) {
               <a class="tw-pue-link" href="../cooling/" target="_blank" title="Открыть модуль подбора в новой вкладке. Изменения после возврата применятся к PUE автоматически.">↗ Открыть «Подбор холодильных систем»</a>
             </div>
           </div>` : ''}
-          ${isAuto ? `<div class="tw-pue-breakdown">
-            <h5>Разбивка автоматического расчёта</h5>
+          ${isAuto ? (() => {
+            // Phase 30.4 (v0.60.63): per-component breakdown с overridable
+            // вводами для UPS efficiency / TP efficiency / Aux %.
+            const bd = calcPueAutoBreakdown(c, meteoSum).breakdown;
+            const pct = (kw, ref = bd.itKw) => ref > 0 ? `${(kw / ref * 100).toFixed(1)}%` : '—';
+            return `<div class="tw-pue-breakdown">
+            <h5>Per-component breakdown расчёта</h5>
             <div class="tw-mdc-grid">
-              <div><span class="muted">IT-нагрузка:</span> <b>${itKw.toFixed(1)} кВт</b></div>
-              <div><span class="muted">Источник meteo:</span> <b>${meteoSum ? escHtml(meteoSum.locationName || meteoSum.source) : '<i>нет (среднестат. 55%)</i>'}</b></div>
-              <div><span class="muted">Часы FreeCool (T &lt; 14 °C):</span> <b>${fc} ч (${fcPct}%)</b></div>
-              <div><span class="muted">PUE расчётный:</span> <b>${pueVal.toFixed(2)}</b></div>
+              <div title="Электрическая нагрузка серверного оборудования (IT) — knd. поле P_IT в формуле PUE = 1 + (P_не-IT) / P_IT">
+                <span class="muted">P<sub>IT</sub>:</span> <b>${bd.itKw.toFixed(1)} кВт</b> <span class="muted" style="font-size:11px">(100%)</span>
+              </div>
+              <div title="Среднегодовое потребление системы охлаждения. Учитывает freecool fraction × COP_fc + (1−ff) × COP_base. См. tab «Cooling system».">
+                <span class="muted">P<sub>cooling</sub>:</span> <b>${bd.coolKwAvg.toFixed(1)} кВт</b> <span class="muted" style="font-size:11px">(${pct(bd.coolKwAvg)})</span>
+              </div>
+              <div title="Потери в ИБП = (1 − η_ups)/η_ups × P_IT. По умолчанию η = 96% (online double-conversion modular).">
+                <span class="muted">P<sub>ups-loss</sub>:</span> <b>${bd.upsLossKw.toFixed(2)} кВт</b> <span class="muted" style="font-size:11px">(η ${(bd.etaUps * 100).toFixed(0)}%, ${pct(bd.upsLossKw)})</span>
+              </div>
+              <div title="Потери в понижающем трансформаторе = (1 − η_tp)/η_tp × P_total_downstream. По умолчанию η = 99% (масляный).">
+                <span class="muted">P<sub>tp-loss</sub>:</span> <b>${bd.tpLossKw.toFixed(2)} кВт</b> <span class="muted" style="font-size:11px">(η ${(bd.etaTp * 100).toFixed(0)}%, ${pct(bd.tpLossKw)})</span>
+              </div>
+              <div title="Aux = aux_fraction × P_IT. Освещение, ОПС, СКУД-CCTV, серверы мониторинга.">
+                <span class="muted">P<sub>aux</sub>:</span> <b>${bd.auxKw.toFixed(2)} кВт</b> <span class="muted" style="font-size:11px">(${(bd.auxFraction * 100).toFixed(1)}%)</span>
+              </div>
+              <div title="Сумма всех не-IT компонентов / P_IT = PUE − 1">
+                <span class="muted">Σ не-IT:</span> <b>${bd.totalNonItKw.toFixed(1)} кВт</b> <span style="color:#0d8a4e">(${pct(bd.totalNonItKw)})</span>
+              </div>
+              <div title="Источник климатических данных (если есть). От этого зависит P_cooling.">
+                <span class="muted">Meteo:</span> <b>${meteoSum ? escHtml(meteoSum.locationName || meteoSum.source) : '<i>нет (55%)</i>'}</b>
+              </div>
+              <div title="PUE = 1 + Σ не-IT / IT. Цель проектирования — минимизировать.">
+                <span class="muted">PUE:</span> <b style="color:#1e40af;font-size:14px">${pueVal.toFixed(2)}</b>
+              </div>
             </div>
-            <p class="tw-pue-note muted">Формула: PUE = 1 + (P<sub>cooling</sub> + P<sub>losses</sub>) / P<sub>IT</sub>.<br>
-              P<sub>cooling</sub> зависит от доли FreeCool часов (COP ≈ 15) и часов с компрессорным охлаждением (COP ≈ 3.5).<br>
-              P<sub>losses</sub> ≈ 10% × P<sub>IT</sub> (5% UPS + 5% прочее).</p>
+            <details style="margin-top:8px">
+              <summary style="cursor:pointer;font-size:12px;color:#475569" title="Раскройте для тонкой настройки defaults">⚙ Тонкая настройка КПД (override)</summary>
+              <div class="tw-grid" style="margin-top:8px">
+                <label title="КПД ИБП. Online double-conversion modular: 95-97%. Bypass-режим: ~99%. Default 96%.">η<sub>UPS</sub>:
+                  <input type="number" step="0.01" min="0.85" max="1.0" data-field="pue.upsEfficiency" value="${bd.etaUps}" ${ro ? 'disabled' : ''} placeholder="0.96"></label>
+                <label title="КПД понижающего трансформатора. Масляный 1000 кВА: 98–99%. Сухой: 97–98%. Default 99%.">η<sub>TP</sub>:
+                  <input type="number" step="0.01" min="0.90" max="1.0" data-field="pue.tpEfficiency" value="${bd.etaTp}" ${ro ? 'disabled' : ''} placeholder="0.99"></label>
+                <label title="Доля aux от IT (освещение, ОПС, СКУД-CCTV, серверы мониторинга). Default 2%.">Aux %:
+                  <input type="number" step="0.001" min="0" max="0.10" data-field="pue.auxFraction" value="${bd.auxFraction}" ${ro ? 'disabled' : ''} placeholder="0.02"></label>
+              </div>
+            </details>
+            <p class="tw-pue-note muted">Формула: PUE = 1 + (P<sub>cool</sub> + P<sub>ups-loss</sub> + P<sub>tp-loss</sub> + P<sub>aux</sub>) / P<sub>IT</sub>.<br>
+              Каждый компонент выводится из физики: η_ups, η_tp — каталогованные КПД; aux — % от IT.</p>
             ${!meteoSum ? `<div class="tw-pue-warning">
               <p>⚠ Нет загруженных метеоданных. PUE считается по среднестатистическому климату (FreeCool 55%).</p>
               <div class="tw-pue-actions">
@@ -1294,7 +1367,7 @@ function renderDetails(c, ro) {
                 <a class="tw-pue-link" href="../meteo/" target="_blank">↗ Открыть модуль «Метеоданные»</a>
               </div>
             </div>` : `<p class="muted tw-details-note">📍 Источник: <a href="../meteo/" target="_blank">${escHtml(meteoSum.locationName || meteoSum.source)}</a></p>`}
-          </div>` : '<p class="muted tw-details-note">В ручном режиме введите PUE напрямую — он будет использован в отчётах и BOM как-есть.</p>'}
+          </div>`; })() : '<p class="muted tw-details-note">В ручном режиме введите PUE напрямую — он будет использован в отчётах и BOM как-есть.</p>'}
         </div>
       </div>`;
   }

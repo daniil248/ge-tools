@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.63', date: '2026-05-03', items: [
+      '📊 <b>Phase 30.4: comprehensive PUE breakdown</b>. Раньше отчёт показывал PUE одним числом + общий «losses ≈ 10%». Теперь — per-component breakdown по физике.',
+      '• Новый <code>calcPueAutoBreakdown(c, meteoSummary)</code> возвращает {pue, breakdown:{itKw, coolKwAvg, upsLossKw, tpLossKw, auxKw, totalNonItKw, etaUps, etaTp, auxFraction}}.',
+      '• PUE = 1 + (P<sub>cool</sub> + P<sub>ups-loss</sub> + P<sub>tp-loss</sub> + P<sub>aux</sub>) / P<sub>IT</sub>.',
+      '• P<sub>ups-loss</sub> = (1 − η_ups)/η_ups × P<sub>IT</sub>; default η = 96% (online double-conversion).',
+      '• P<sub>tp-loss</sub> = (1 − η_tp)/η_tp × P<sub>downstream</sub>; default η = 99% (масляный).',
+      '• P<sub>aux</sub> = aux_fraction × P<sub>IT</sub>; default 2% (освещение/ОПС/СКУД-CCTV/мониторинг).',
+      '• Tab «📊 Расчёт PUE» в концепции теперь показывает 8 строк breakdown с tooltip\'ами + расширяемый блок «⚙ Тонкая настройка КПД» (override default-КПД ИБП/ТП/aux).',
+      '• Override-вводы пишутся в <code>concept.pue.upsEfficiency / tpEfficiency / auxFraction</code> через существующий <code>_setNested</code>-handler.',
+      '• calcPueAuto обёрнут — возвращает только число (backward-compat для существующих вызовов).',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code>.',
+    ] },
     { version: '0.60.62', date: '2026-05-03', items: [
       '🔗 <b>Phase 30.6: кросс-модульная панель в Технолог ЦОД</b>. Sidebar получил секцию «🔗 Связанные модули проекта» — список 8 модулей со счётчиками связанных элементов проекта.',
       '• Модули: ❄ Cooling, 🛠 Service, ⚡ Schematic, 🌐 СКС-design, 🏗 МЦОД-config, 🌤 Meteo, 🔥 АГПТ, 🗄 Шкафы.',
