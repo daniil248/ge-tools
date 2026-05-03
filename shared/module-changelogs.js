@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.60', date: '2026-05-03', items: [
+      '🔄 <b>Phase 35.6: cross-module restore</b>. Восстановление meteo-датасета прямо из cooling-корзины — без перехода в /meteo/.',
+      '• cooling Trash: при restore с itemKind=\'meteo-dataset\' пишет dataset обратно в IDB и помечает ⭐activeForProject=true.',
+      '• preloadMeteoForPid вызывается после restore → cooling сразу видит датасет в активном списке без F5.',
+      '• Если в meteo уже есть датасет с таким id — обновляется, иначе добавляется сверху.',
+      'Файлы: <code>cooling/cooling.js</code>.',
+    ] },
     { version: '0.60.59', date: '2026-05-03', items: [
       '📜 <b>Phase 35 cont.: история+корзина в service</b> (наряды).',
       '• Создание наряда вручную → history event \'import\' (source=\'manual\').',

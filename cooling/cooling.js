@@ -2034,11 +2034,36 @@ async function openCoolingTrashModal() {
       const evId = btn.dataset.evId;
       const act = btn.dataset.trashAct;
       if (act === 'restore') {
-        // Из cooling восстанавливаем только запись в логе. Возврат данных
-        // в активный store должен делать соответствующий модуль (meteo и т.д.).
         const r = await historyRestore(_pid.id, evId);
         if (!r.ok) { util.toast(`❌ ${r.error}`, 'err'); return; }
-        util.toast(`✓ Запись восстановлена. Откройте /meteo/ для возврата датасета в активные.`, 'ok');
+        // Cross-module restore: для meteo-dataset пишем данные обратно
+        // в IDB и обновляем кэш bridge → cooling сразу увидит.
+        // Для других типов пока просим открыть исходный модуль.
+        if (r.itemKind === 'meteo-dataset' && r.payload?.dataset) {
+          try {
+            const { idbGet, idbSet, idbAvailable } = await import('../shared/idb-store.js');
+            const idbKey = `meteo.datasets.${_pid.id}`;
+            let datasets = idbAvailable() ? (await idbGet(idbKey, [])) : [];
+            if (!Array.isArray(datasets)) datasets = [];
+            // Снимаем activeForProject со всех остальных — восстанавливаем как ⭐.
+            for (const d of datasets) d.activeForProject = false;
+            const restored = { ...r.payload.dataset, activeForProject: true };
+            // Если уже есть с таким id — обновляем; иначе — добавляем сверху.
+            const idx = datasets.findIndex(d => d.id === restored.id);
+            if (idx >= 0) datasets[idx] = restored;
+            else datasets.unshift(restored);
+            if (idbAvailable()) await idbSet(idbKey, datasets);
+            // Обновляем bridge-кэш → cooling сразу видит без F5.
+            await preloadMeteoForPid(_pid.id);
+            renderActive();
+            util.toast(`✓ «${r.itemName}» восстановлен в meteo как ⭐активный`, 'ok');
+          } catch (e) {
+            console.error('[cooling] meteo-dataset restore failed:', e);
+            util.toast(`⚠ Запись в логе восстановлена, но датасет не записан в IDB: ${e.message}`, 'err');
+          }
+        } else {
+          util.toast(`✓ Запись восстановлена. Для возврата данных откройте исходный модуль.`, 'ok');
+        }
         btn.closest('tr')?.remove();
         await refreshCoolingTrashCount();
       } else if (act === 'purge') {
