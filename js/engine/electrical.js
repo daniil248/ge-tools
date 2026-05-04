@@ -92,6 +92,41 @@ export function nodeCalcVoltage(n) {
   return isThreePhase(n) ? nodeVoltage(n) : nodeVoltageLN(n);
 }
 
+// v0.60.219 (по TODO из v0.60.205-206 «Setting calcVoltageMode пока не
+// применяется в pipeline — placeholder. В следующих версиях расширим:
+// будет влиять на cable VD calc + терминальное напряжение узлов»).
+//
+// Возвращает «эффективное» напряжение узла с учётом GLOBAL.calcVoltageMode:
+//   • 'nominal' — Unom (vLL для 3ф / vLN для 1ф) — БЕЗ ΔU.
+//                 Идентичные щиты в активном/резервном плече дают
+//                 идентичные числа Макс.
+//   • 'real'    — Unom × (1 − ΔU%/100), где ΔU = n._deltaUPct из
+//                 предыдущего recalc-прохода. Реальное терминальное
+//                 напряжение. Идентичные щиты в активном/резервном
+//                 плече дают разные числа Макс (в активном — больше I).
+//
+// ΔU из предыдущего прохода: однопроходный recalc заполняет _deltaUPct
+// в финале, поэтому в текущем проходе мы видим значения с прошлого
+// действия пользователя. На каждое изменение пайплайн сходится за 1-2
+// recalc-цикла. Кабельный sizing (где U критичен для VD) продолжает
+// использовать Unom через nodeCalcVoltage — это сделано осознанно:
+// габарит кабеля выбирается по nominal-параметрам, а вот «Макс» в
+// карточках узлов отражает реальную физику для 'real'-режима.
+//
+// fallback: если _deltaUPct отсутствует или пустой — возвращаем Unom
+// (т.е. ведёт себя как 'nominal').
+export function nodeCalcVoltageEff(n) {
+  const Unom = nodeCalcVoltage(n);
+  const mode = (typeof GLOBAL.calcVoltageMode === 'string') ? GLOBAL.calcVoltageMode : 'real';
+  if (mode !== 'real') return Unom;
+  const dPct = Number(n && n._deltaUPct);
+  if (!Number.isFinite(dPct) || dPct <= 0) return Unom;
+  // Защита от ввода: ΔU не может быть ≥ 100% — clamp в 50% для безопасности
+  // (выше — узел всё равно нерабочий; recalc должен был пометить overload).
+  const eff = Unom * (1 - Math.min(dPct, 50) / 100);
+  return eff > 0 ? eff : Unom;
+}
+
 // Фазность: из n.phase, затем voltage level, затем дефолт 3ph.
 // 3ph → true, 2ph/1ph/A/B/C → false (для расчёта тока и жил)
 export function isThreePhase(n) {

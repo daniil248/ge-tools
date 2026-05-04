@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.219', date: '2026-05-04', items: [
+      '🧮 <b>calcVoltageMode подключён в pipeline</b>. По TODO из v0.60.205-206 («Setting calcVoltageMode пока не применяется в pipeline — placeholder. В следующих версиях расширим»).',
+      '• <code>nodeCalcVoltageEff(n)</code> в <code>electrical.js</code> — возвращает Unom × (1 − _deltaUPct/100) при <b>real</b>-режиме, либо Unom при <b>nominal</b>. Защита: ΔU clamp до 50%, fallback на Unom если _deltaUPct отсутствует.',
+      '• <code>recalc.js</code>: <code>_maxLoadA</code> для panel/UPS теперь использует <code>nodeCalcVoltageEff</code>. Идентичные щиты в активном/резервном плече: при <b>real</b> — разные «Макс» (физика ΔU), при <b>nominal</b> — одинаковые «Макс».',
+      '• Cable sizing и <code>_loadA</code> продолжают использовать Unom через <code>nodeCalcVoltage</code> — кабель подбирается по nominal-параметрам, иначе iterative convergence была бы нужна. ΔU из ПРЕДЫДУЩЕГО recalc-прохода (на каждое изменение пайплайн сходится за 1-2 цикла).',
+      '• <code>GLOBAL.calcVoltageMode</code> инициализирован дефолтом <code>\'real\'</code> в <code>constants.js</code>, чтобы <code>setGlobal</code> мог его перезаписывать (он set-ит только ключи которые уже в GLOBAL).',
+      'Файлы: <code>js/engine/electrical.js</code> (новая <code>nodeCalcVoltageEff</code>), <code>js/engine/recalc.js</code> (2 места), <code>js/engine/constants.js</code> (GLOBAL.calcVoltageMode).',
+    ] },
     { version: '0.60.218', date: '2026-05-04', items: [
       '✓ <b>Инспектор: сводка применённой ДГУ</b>. Аналогично сводке rack-шаблона (v0.58.81), для генератора с <code>appliedConfig.dgu</code> теперь показывается зелёный блок «✓ ДГУ сконфигурирована» с производителем, моделью, nameplateKw, режимом ESP/PRP, кол-вом, двигателем, SFC, climate-derate и timestamp («только что» / «N мин назад» / «N ч назад»). Чтобы Пользователь видел статус привязки без открытия конфигуратора заново.',
       'Файл: <code>js/engine/inspector.js</code>.',

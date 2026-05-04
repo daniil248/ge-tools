@@ -3,7 +3,7 @@ import { GLOBAL, CHANNEL_TYPES, BUSBAR_SERIES, BREAKER_SERIES, INSTALL_METHODS, 
 import { selectCableSize, selectBreaker, selectFuse, kTempLookup, kGroupLookup, kBundlingFactor, kBundlingIgnoresGrouping, cableTable, hvCableTable, selectHvBreaker } from './cable.js';
 import { getMethod, calcVoltageDrop, findMinSizeForVdrop } from '../methods/index.js';
 import { getEcoMethod } from '../methods/economic/index.js';
-import { nodeVoltage, nodeVoltageLN, nodeCalcVoltage, isThreePhase, nodeWireCount, cableWireCount, computeCurrentA,
+import { nodeVoltage, nodeVoltageLN, nodeCalcVoltage, nodeCalcVoltageEff, isThreePhase, nodeWireCount, cableWireCount, computeCurrentA,
          consumerNominalCurrent, consumerRatedCurrent, consumerInrushCurrent,
          consumerTotalDemandKw, consumerCountEffective, consumerCalcDemandKw, consumerGroupItems,
          upsChargeKw, sourceImpedance, isNodeDC, effectiveUpsCapacity } from './electrical.js';
@@ -3114,7 +3114,9 @@ function recalc() {
         break; // один генератор управляет этим щитом
       }
       n._maxLoadKw = panelMaxKw !== null ? panelMaxKw : maxDownstreamLoad(n.id);
-      n._maxLoadA = n._maxLoadKw > 0 ? computeCurrentA(n._maxLoadKw, nodeCalcVoltage(n), n._cosPhi || GLOBAL.defaultCosPhi, isThreePhase(n)) : 0;
+      // v0.60.219: «Макс» использует nodeCalcVoltageEff — учитывает
+      // GLOBAL.calcVoltageMode ('real' с ΔU vs 'nominal' без ΔU).
+      n._maxLoadA = n._maxLoadKw > 0 ? computeCurrentA(n._maxLoadKw, nodeCalcVoltageEff(n), n._cosPhi || GLOBAL.defaultCosPhi, isThreePhase(n)) : 0;
 
       // Проверка номинала шкафа — в амперах (основная единица для щитов).
       // margin% = (In - Iрасч) / Iрасч × 100
@@ -3256,7 +3258,8 @@ function recalc() {
       n._powerS = Math.sqrt(n._powerP * n._powerP + n._powerQ * n._powerQ);
       n._cosPhi = n._powerS > 0 ? (n._powerP / n._powerS) : (Number(n.cosPhi) || GLOBAL.defaultCosPhi);
       n._loadA = n._loadKw > 0 ? computeCurrentA(n._loadKw, nodeCalcVoltage(n), n._cosPhi, isThreePhase(n)) : 0;
-      n._maxLoadA = n._maxLoadKw > 0 ? computeCurrentA(n._maxLoadKw, nodeCalcVoltage(n), n._cosPhi, isThreePhase(n)) : 0;
+      // v0.60.219: «Макс» использует nodeCalcVoltageEff (см. panel-ветку).
+      n._maxLoadA = n._maxLoadKw > 0 ? computeCurrentA(n._maxLoadKw, nodeCalcVoltageEff(n), n._cosPhi, isThreePhase(n)) : 0;
     } else if (n.type === 'source' || n.type === 'generator') {
       // cos φ из downstream PQ, но P/S привязаны к _loadKw (walkUp result)
       const pq = downstreamPQ(n.id);
