@@ -3519,6 +3519,35 @@ function recalc() {
           n._maxLoadKwClampedToSiblings = true;
           // Пересчёт _maxLoadA с обновлённым _maxLoadKw.
           n._maxLoadA = computeCurrentA(n._maxLoadKw, nodeCalcVoltageEff(n), n._cosPhi || GLOBAL.defaultCosPhi, isThreePhase(n));
+          // v0.60.230 (по репорту Пользователя 2026-05-05 «один определяется
+          // как достаточный, вторая определяется как чрезмерно большая,
+          // хотя номинальный ток и максимальный ток одинаковые»):
+          // _marginPct / _marginWarn были выставлены в первом проходе со
+          // старыми значениями _maxLoadA. После clamp пересчитываем эти
+          // поля — иначе статус «достаточный» / «избыточен» будет stale,
+          // и sibling-панели с одинаковым _maxLoadA получат разные warn-ы.
+          const capA = Number(n.capacityA) || 0;
+          const newMaxA = Number(n._maxLoadA) || 0;
+          if (capA > 0 && newMaxA > 0) {
+            const margin = ((capA - newMaxA) / newMaxA) * 100;
+            n._marginPct = margin;
+            const hi = Number(n.marginMaxPct);
+            const maxP = isFinite(hi) ? hi : 30;
+            if (margin < 0) n._marginWarn = 'undersize';
+            else if (margin > maxP) n._marginWarn = 'oversize';
+            else n._marginWarn = null;
+          } else {
+            n._marginPct = null;
+            n._marginWarn = null;
+          }
+          // Пересчёт _capacityKwFromA — может зависеть от capA × U × cos.
+          // (Сама формула не зависит от _maxLoadA, но cos φ мог поменяться
+          //  из-за пересчёта downstream — оставляем как есть, в первом
+          //  проходе формула уже отработала.)
+          // Также _overload — флаг от capA < maxA.
+          if (capA > 0 && newMaxA > 0 && newMaxA > capA) {
+            n._overload = true;
+          }
         }
       }
     }

@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.230', date: '2026-05-05', items: [
+      '🩹 <b>Fix v0.60.229: пересчёт _marginWarn / _marginPct после sibling-clamp</b>. По репорту Пользователя 2026-05-05 «один определяется как достаточный, вторая определяется как чрезмерно большая, хотя номинальный ток и максимальный ток одинаковые».',
+      '• Корень: v0.60.229 обновлял <code>_maxLoadKw</code>/<code>_maxLoadA</code> во ВТОРОМ проходе, но <code>_marginPct</code>/<code>_marginWarn</code> были выставлены в ПЕРВОМ проходе со старыми _maxLoadA. Sibling-панели с одинаковым новым _maxLoadA имели разные stale статусы.',
+      '• Фикс: после clamp пересчитываем margin = (capA − newMaxA) / newMaxA × 100, _marginWarn (undersize/oversize/null) и _overload — обновляются согласованно. Теперь sibling-панели с одинаковым capA + одинаковым _maxLoadA получают одинаковые статусы.',
+      'Файл: <code>js/engine/recalc.js</code> (extended sibling-clamp).',
+    ] },
     { version: '0.60.229', date: '2026-05-05', items: [
       '⚖ <b>Parallel-sibling panels: выравнивание _maxLoadKw</b>. По репорту Пользователя 2026-05-05 «панель UPS1.IT1 и UPS1.IT2 питают одну и туже нагрузку с двух сторон, почему параметр Макс у них разный».',
       '• Корень: <code>maxDownstreamLoad(panelId)</code> делал BFS только от данной панели. Для двух parallel-feeder PDM-щитов одного ИБП (IT1/IT2 с conns to consumers через P1/P2) сумма зависела от того, к каким consumer-ам из общего пула вели conns именно от этой панели. Если связи асимметричны — max получался разный. Текущая (Текущая) согласовывалась с активным сценарием, а Макс — нет.',
