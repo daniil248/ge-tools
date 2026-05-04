@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.171', date: '2026-05-04', items: [
+      '🔗 <b>«Sketch\'и проекта и их связи»</b> — обзорный раздел в карточке проекта (project.html). Phase 3.5 follow-up: вместо чипов возле каждого entity — единая страница «что где упоминается» на уровне проекта.',
+      '• <b>projects/project.html</b>: новая секция <code>&lt;section class="pr-card"&gt;</code> с заголовком «🔗 Sketch\'и проекта и их связи». Mount-point — <code>#pr-detail-sketch-refs</code>.',
+      '• <b>projects/project.js</b>: <code>renderProjectSketchRefs(p, host)</code> — рендерит список sketch\'ей проекта; для каждого sketch\'a — карточка с его именем (link → открыть в новой вкладке) + цветные chip-ссылки на entity, на которые он ссылается.',
+      '• <b>Auto-resolve label</b>: каждый ref-chip показывает actual-label из исходного модуля (через <code>resolveLabel</code>). Если объект удалён — ⚠ + line-through.',
+      '• <b>Cross-link</b>: chip — ссылка на исходный модуль (<code>buildOpenUrl</code> по refType+refId). Имя sketch\'a — ссылка на sketch с <code>?sketch=&lt;sid&gt;</code> deep-link.',
+      '• <b>Stats</b>: «N sketch\'ей · M связей с данными модулей» — total для проекта.',
+      'Файлы: <code>projects/project.html</code> (+section), <code>projects/project.js</code> (+renderProjectSketchRefs ~70 строк, +import sketch-refs).',
+    ] },
     { version: '0.60.170', date: '2026-05-04', items: [
       '🔗 <b>Sketch URL-deep-link</b>: <code>?sketch=&lt;sid&gt;</code> поддержка в sketch.js init. Когда reverse-link chip (<code>shared/sketch-refs-reverse.js</code>) открывает sketch из popover\'a — приходит уже с этим sketch\'ем выбранным, а не на первом из списка. Phase 3.5 follow-up.',
       'Файл: <code>sketch/sketch.js</code> (init читает <code>?sketch=</code> URL-param, fallback на <code>list[0]?.id</code>).',

@@ -19,6 +19,13 @@ import {
 // v0.60.142: «📋 Действующие нормативы» badges под местоположением проекта.
 // Visible reference какие стандарты будут применены в каждом расчётном модуле.
 import { NORM_MATRIX, detectCountryCode, countryLabel } from '../shared/auto-norm.js';
+// v0.60.171 (Phase 3.5): «🔗 Sketch'и проекта и их связи» — обзорный раздел
+// в карточке проекта. Перечисляет все sketch'и + entity, на которые они
+// ссылаются. resolveLabel — actual-label из исходного модуля (если
+// переименовали — обновляется). buildOpenUrl — переход в исходный модуль.
+import {
+  loadRefs, getRefType, resolveLabel, buildOpenUrl, buildSketchOpenUrl,
+} from '../shared/sketch-refs.js';
 
 /* ---------- inline modal / toast ---------- */
 function prToast(msg, kind = 'info') {
@@ -176,6 +183,92 @@ function _renderNormBadgesForCountry(country) {
       <p class="muted" style="font-size:10.5px;margin:6px 0 0;color:#475569">Override в каждом модуле через локальный dropdown «Методика». Изменение страны → изменение всех нормативов.</p>
     </div>
   `;
+}
+
+// v0.60.171 (Phase 3.5 follow-up): обзор всех sketch'ей проекта и их связей.
+// Вместо чипа возле каждого entity (3.5.1-3.5.4) — единая страница в карточке
+// проекта: «sketch X ссылается на: [стойка R-12] [НКУ A-1] [главную схему]».
+// Группировка по sketch'у. Click на ссылку → открывает исходный модуль.
+function renderProjectSketchRefs(p, host) {
+  const pid = p.id;
+  let sketchList = [];
+  try {
+    const raw = localStorage.getItem(`raschet.sketch.${pid}.list.v1`);
+    sketchList = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(sketchList)) sketchList = [];
+  } catch {}
+
+  if (!sketchList.length) {
+    host.innerHTML = `
+      <div class="pr-empty" style="padding:14px;color:#64748b;font-size:13px">
+        В этом проекте пока нет sketch'ей.
+        <a href="../sketch/?project=${esc(pid)}" target="_blank" style="color:#1e40af;font-weight:500">Открыть модуль Скетч ↗</a>
+      </div>`;
+    return;
+  }
+
+  // Собираем для каждого sketch'a его refs
+  const sketchData = sketchList.map(sk => {
+    const refs = loadRefs(pid, sk.id);
+    return { sketch: sk, refs };
+  });
+
+  // Total stats
+  const totalRefs = sketchData.reduce((sum, s) => sum + s.refs.length, 0);
+
+  let html = `
+    <div style="margin-bottom:10px;font-size:12px;color:#64748b">
+      ${sketchList.length} sketch${sketchList.length === 1 ? '' : 'ей'} ·
+      ${totalRefs} связ${totalRefs === 1 ? 'ь' : (totalRefs >= 2 && totalRefs <= 4 ? 'и' : 'ей')} с данными модулей ·
+      <a href="../sketch/?project=${esc(pid)}" target="_blank" style="color:#1e40af;font-weight:500">Открыть модуль Скетч ↗</a>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">`;
+
+  for (const { sketch, refs } of sketchData) {
+    const sketchUrl = buildSketchOpenUrl(sketch.id, pid);
+    html += `
+      <div style="border:1px solid #e2e8f0;border-radius:6px;padding:10px;background:#f8fafc">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:${refs.length ? '8px' : '0'}">
+          <span style="font-size:14px">✏</span>
+          <a href="${esc(sketchUrl)}" target="_blank"
+             style="font-weight:600;color:#0f172a;text-decoration:none;flex:1;font-size:13.5px"
+             title="Открыть sketch в новой вкладке">${esc(sketch.name || sketch.id)}</a>
+          ${refs.length === 0
+            ? '<span style="color:#94a3b8;font-size:11px;font-style:italic">нет связей</span>'
+            : `<span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">📎 ${refs.length}</span>`}
+        </div>`;
+    if (refs.length) {
+      html += `<div style="display:flex;flex-wrap:wrap;gap:6px">`;
+      for (const ref of refs) {
+        const t = getRefType(ref.refType);
+        const liveLabel = (() => {
+          try { return resolveLabel(ref.refType, ref.refId, pid) || ref.label; }
+          catch { return ref.label; }
+        })();
+        const stale = liveLabel === '(удалён)' || liveLabel === '(удалена)';
+        const url = buildOpenUrl(ref, pid);
+        const fill = t ? t.fill : '#f1f5f9';
+        const color = t ? t.color : '#475569';
+        const icon = t ? t.icon : '?';
+        html += `
+          <a href="${esc(url || '#')}" target="_blank"
+             style="display:inline-flex;align-items:center;gap:5px;
+                    padding:3px 10px;border-radius:12px;
+                    background:${fill};color:${color};
+                    text-decoration:none;font-size:11.5px;font-weight:500;
+                    border:1px solid ${color};${stale ? 'opacity:0.6;text-decoration:line-through' : ''}"
+             title="${esc(t ? t.label : ref.refType)}: ${esc(liveLabel)}${ref.note ? ' — ' + esc(ref.note) : ''}${stale ? ' (объект удалён в источнике)' : ''}">
+            <span>${icon}</span>
+            <span>${esc(liveLabel)}</span>
+            ${stale ? '<span style="color:#b45309">⚠</span>' : ''}
+          </a>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  host.innerHTML = html;
 }
 
 function renderProjectProperties(p, host) {
@@ -2036,6 +2129,9 @@ function render() {
   if (economicsHost) renderProjectEconomics(p, economicsHost);
   // v0.60.97 (Phase 38.1 START): рендер плана задач
   if (planHost) renderProjectPlan(p, planHost);
+  // v0.60.171 (Phase 3.5): обзор всех sketch'ей проекта и их связей
+  const sketchRefsHost = document.getElementById('pr-detail-sketch-refs');
+  if (sketchRefsHost) renderProjectSketchRefs(p, sketchRefsHost);
 
   if (metaHost) {
     metaHost.innerHTML = `
