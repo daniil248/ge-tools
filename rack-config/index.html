@@ -192,6 +192,29 @@
           </div>
         </section>
 
+        <section class="rc-section" data-sec="clearances">
+          <h2 title="Эксплуатационные зазоры перед/за стойкой — для расчёта площади помещения, валидации коридоров между рядами стоек, и определения доступа сервиса. Передаются в Технолог ЦОД для расчёта площади машзала.">📐 Эксплуатационные зазоры</h2>
+          <p class="muted rc-hint">Клиренсы (зазоры) от граней стойки до препятствий — для обслуживания. Применяются: ASHRAE TC 9.9 для cold aisle (перед = ≥1200 мм), TIA-942 для hot aisle (зад = ≥900 мм; для двойных дверей ≤600 мм). Для стативов (стендов с доступом только спереди) — снимите «Доступ сзади».</p>
+          <div class="rc-row">
+            <label class="rc-field" title="Зазор от фасада стойки до препятствия (стены / соседнего ряда). Холодный коридор (ASHRAE TC 9.9): ≥1200 мм рекомендовано. Используется для расчёта площади помещения в Технологе ЦОД и валидации проходов.">
+              <span>Перед стойкой, мм</span>
+              <input type="number" id="rc-front-clearance" min="0" max="3000" step="50" value="1200" data-lock="frontClearanceMm">
+            </label>
+            <label class="rc-field" title="Зазор от тыла стойки до препятствия. Горячий коридор (TIA-942): ≥900 мм. Если задние двери двустворчатые — допустимо ≤600 мм (открываются по обе стороны, не требуют углового открытия). Если accessRear=false — это просто запас на кабель-менеджмент.">
+              <span>Сзади стойки, мм</span>
+              <input type="number" id="rc-rear-clearance" min="0" max="3000" step="50" value="900" data-lock="rearClearanceMm">
+            </label>
+            <label class="rc-field rc-check" title="Доступ к стойке спереди для обслуживания (стандартно для всех стоек со снимаемой передней дверью).">
+              <input type="checkbox" id="rc-access-front" checked data-lock="accessFront">
+              <span>Доступ спереди</span>
+            </label>
+            <label class="rc-field rc-check" title="Доступ к стойке сзади. Для статива (открытая 19″ рама / стенд с пристенной установкой) — снимите. Тогда задний клиренс используется только для подвода кабеля.">
+              <input type="checkbox" id="rc-access-rear" checked data-lock="accessRear">
+              <span>Доступ сзади</span>
+            </label>
+          </div>
+        </section>
+
         <section class="rc-section" data-sec="entries">
           <h2>Кабельные вводы</h2>
           <div class="rc-row">

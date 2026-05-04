@@ -4,6 +4,23 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.138', date: '2026-05-04', items: [
+      '📐 <b>rack-config: эксплуатационные клиренсы (front/rear + accessFront/Rear)</b>. Реализация правила <code>feedback_rack_clearances.md</code> на per-rack уровне.',
+      '• <b>rack-config/index.html</b> — новая секция «📐 Эксплуатационные зазоры» (между «Боковые стенки» и «Кабельные вводы»):',
+      '  • «Перед стойкой, мм» — default 1200 (ASHRAE TC 9.9 cold aisle).',
+      '  • «Сзади стойки, мм» — default 900 (TIA-942 hot aisle; ≤600 для двойных дверей).',
+      '  • Чекбокс «Доступ спереди» — default true.',
+      '  • Чекбокс «Доступ сзади» — default true; снимается для статива (открытая 19″ рама с пристенной установкой).',
+      '  • Tooltips объясняют нормативные референсы и где значения используются.',
+      '• <b>rack-config/rack-config.js</b>:',
+      '  • Дефолтный шаблон стойки получил поля <code>frontClearanceMm</code>, <code>rearClearanceMm</code>, <code>accessFront</code>, <code>accessRear</code>.',
+      '  • Migration в renderForm — legacy-шаблоны без полей получают defaults (preserve-on-miss для существующих значений).',
+      '  • readForm записывает значения с clamp [0..3000 мм].',
+      '  • bind подключает change-listener на 4 новых input\'а.',
+      '• <b>Memory rule</b> <code>feedback_group_consumers_placement.md</code> — статус обновлён на ✅ FIXED (v0.60.108 + v0.59.828 + v0.59.821 + v0.60.127). Memory.md также обновлён.',
+      '• <b>Использование данных</b>: TW (tech-workspace) уже читает эти поля для расчёта площади помещения и валидации коридоров (v0.60.128). Теперь Пользователь может задать клиренсы per-rack в rack-config — и они автоматически попадают в концепцию ЦОД при handoff.',
+      'Файлы: <code>rack-config/index.html</code> (+section clearances ~25 строк), <code>rack-config/rack-config.js</code> (+default fields, +migration, +readForm/renderForm, +bind ids).',
+    ] },
     { version: '0.60.137', date: '2026-05-04', items: [
       '🎫 <b>Phase 44.2 final: plan-badge в шапке + locks в hub + defence-in-depth в internal-модулях</b>. Закрытие открытых пунктов Phase 44.2.',
       '• <b>shared/app-header.js</b> — plan-badge в right-зоне шапки:',

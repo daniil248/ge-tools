@@ -118,6 +118,15 @@ function makeBlankTemplate(name = 'Новый шкаф') {
     // открытии конфигуратора с ?nodeId=… через bridge-ключ.
     feeds: [],
     accessories: [], // [{ sku, qty }] — дополнительные аксессуары из ACCESSORY_CATALOG
+    // v0.60.138 (правило feedback_rack_clearances.md): эксплуатационные
+    // клиренсы перед/за стойкой для расчёта площади помещения и валидации
+    // коридоров. По умолчанию: front 1200мм (ASHRAE TC 9.9 cold aisle),
+    // rear 900мм (TIA-942 hot aisle, ≤600 для двойных дверей).
+    // accessRear=false для статива (стенда с доступом только спереди).
+    frontClearanceMm: 1200,
+    rearClearanceMm: 900,
+    accessFront: true,
+    accessRear: true,
     comment: '',
   };
 }
@@ -854,6 +863,16 @@ function renderForm() {
   el('rc-entry-top').value    = t.entryTop;
   el('rc-entry-bot').value    = t.entryBot;
   el('rc-entry-type').value   = t.entryType;
+  // v0.60.138: эксплуатационные клиренсы (правило feedback_rack_clearances.md).
+  // Migration: если у legacy-шаблона нет полей — задать default.
+  if (typeof t.frontClearanceMm !== 'number') t.frontClearanceMm = 1200;
+  if (typeof t.rearClearanceMm !== 'number')  t.rearClearanceMm = 900;
+  if (typeof t.accessFront !== 'boolean')     t.accessFront = true;
+  if (typeof t.accessRear !== 'boolean')      t.accessRear = true;
+  if (el('rc-front-clearance')) el('rc-front-clearance').value = t.frontClearanceMm;
+  if (el('rc-rear-clearance'))  el('rc-rear-clearance').value  = t.rearClearanceMm;
+  if (el('rc-access-front'))    el('rc-access-front').checked = !!t.accessFront;
+  if (el('rc-access-rear'))     el('rc-access-rear').checked  = !!t.accessRear;
   el('rc-occupied').value     = t.occupied;
   el('rc-blank-type').value   = t.blankType;
   el('rc-demand-kw').value    = t.demandKw;
@@ -941,6 +960,15 @@ function readForm() {
   t.entryTop     = Math.max(0, parseInt(el('rc-entry-top').value, 10) || 0);
   t.entryBot     = Math.max(0, parseInt(el('rc-entry-bot').value, 10) || 0);
   t.entryType    = el('rc-entry-type').value;
+  // v0.60.138: эксплуатационные клиренсы.
+  if (el('rc-front-clearance')) {
+    t.frontClearanceMm = Math.max(0, Math.min(3000, parseInt(el('rc-front-clearance').value, 10) || 1200));
+  }
+  if (el('rc-rear-clearance')) {
+    t.rearClearanceMm = Math.max(0, Math.min(3000, parseInt(el('rc-rear-clearance').value, 10) || 900));
+  }
+  if (el('rc-access-front')) t.accessFront = !!el('rc-access-front').checked;
+  if (el('rc-access-rear'))  t.accessRear  = !!el('rc-access-rear').checked;
   t.occupied     = Math.max(0, parseInt(el('rc-occupied').value, 10) || 0);
   t.blankType    = el('rc-blank-type').value;
   t.demandKw     = Math.max(0, parseFloat(el('rc-demand-kw').value) || 0);
@@ -2197,6 +2225,8 @@ function bind() {
     'rc-door-front','rc-door-rear','rc-door-with-lock','rc-lock',
     'rc-sides','rc-top','rc-base','rc-combo-top-base',
     'rc-entry-top','rc-entry-bot','rc-entry-type',
+    // v0.60.138: эксплуатационные клиренсы.
+    'rc-front-clearance','rc-rear-clearance','rc-access-front','rc-access-rear',
     'rc-occupied','rc-blank-type','rc-demand-kw','rc-cosphi',
     'rc-pdu-redundancy','rc-comment'];
   ids.forEach(id => {
