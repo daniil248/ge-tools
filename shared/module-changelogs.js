@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.115', date: '2026-05-04', items: [
+      '👥 <b>Phase 41 START: Организация + UI default-валюты/НДС в global-settings</b>. По запросу Пользователя 2026-05-04 «нужно еще добавить настройки организации (группа людей работающих над общими проектами и имеющая общий настройки шаблонов и общих данных)». Закрывает TODO с v0.60.112 «Global-settings UI для company.defaultVat».',
+      '• <b>⚙ → Глобальные настройки → 🏢 Реквизиты компании</b> расширены: новая секция «💱 Финансовые дефолты компании» — default-валюта (10 опций или «не задано») + НДС-пресет (KZ-2026 / KZ-pre / RU / BY / Экспорт без НДС / Custom) + ставка % + чекбокс «Учитывать в КП». Custom разблокирует ручной ввод.',
+      '• <b>⚙ → Глобальные настройки → 👥 Организация (Phase 41 START)</b>: новая секция. Минимальный org-profile — имя / страна / часовой пояс. LS-ключ <code>raschet.org.profile.v1</code> через <code>getOrgProfile</code> / <code>saveOrgProfile</code> (геттеры в <code>currency-defaults.js</code>).',
+      '• <b>Каскад теперь полный</b>: project → company → <b>org</b> → user → fallback. Если в проекте VAT/валюта не задана — используется company; если и там нет — org; и так далее.',
+      '• <b>Backward-compat</b>: пустые поля в company/org означают «наследовать с уровня выше» (default null). Существующие проекты без company-defaults продолжают работать как раньше.',
+      '• ROADMAP: Phase 41.1 (org data-model start) и Phase 41.3 (UI настроек) отмечены ✅. Phase 41.2 (общие каталоги) / 41.4 (роли) / 41.5 (multi-org switcher) — следующими итерациями. Полный multi-user — Phase 40 Cloud Sync.',
+      'Файлы: <code>shared/global-settings.js</code> (~120 строк: расширение _renderCompanySection с currency/vat dropdowns + новая _renderOrgSection + monitor-секция в модалке), <code>ROADMAP.md</code> (отметки ✅).',
+    ] },
     { version: '0.60.114', date: '2026-05-04', items: [
       '🏠 <b>TW Rooms UI Step 3: pickers в карточках стоек/ИБП/климата</b>. Завершение rooms-концепции (data-model v0.60.111, rail+editor v0.60.113).',
       '• <b>Картка стойки</b>: новое поле «🏠 Помещение» — dropdown со списком rooms. Если в проекте только одно помещение — readonly text «Главный зал» (picker излишен).',

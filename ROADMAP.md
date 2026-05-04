@@ -3863,10 +3863,12 @@ v0.60.105 (`shared/currency-defaults.js::resolveDefaultCurrency`).
 
 ### 41.1 — Data model
 - [x] `shared/currency-defaults.js` (v0.60.105) — каскад валюты.
-- [ ] `shared/org-profile.js` — единая точка хранения org-настроек:
-  `org.id, org.name, org.legalName, org.country, org.timezone,
-  org.defaultCurrency, org.members[], org.settings.allowedModules[],
-  org.brand.{logoDataUrl, colorPrimary}`. LS-ключ: `raschet.org.profile.v1`.
+- [x] **v0.60.115 START**: org-profile минимальный — `name`, `country`,
+  `timezone`, `defaultCurrency`, `defaultVat`. LS-ключ
+  `raschet.org.profile.v1`. Геттеры/сеттеры `getOrgProfile` /
+  `saveOrgProfile` в `currency-defaults.js`.
+- [ ] Расширение org-profile (members[], settings.allowedModules[],
+  brand.{logoDataUrl, colorPrimary}, parentOrgId для иерархии).
 
 ### 41.2 — Shared catalogs
 - [ ] `org.catalogs.workTemplates` — общий каталог шаблонов работ.
@@ -3877,7 +3879,10 @@ v0.60.105 (`shared/currency-defaults.js::resolveDefaultCurrency`).
 - [ ] UI: в catalog-pickerе фильтр «Личные | 👥 Организация | 📦 Системные».
 
 ### 41.3 — UI настроек организации
-- [ ] В `⚙ Глобальные настройки` — новая вкладка «👥 Организация».
+- [x] **v0.60.115**: В `⚙ Глобальные настройки` — новая секция
+  «👥 Организация» (имя/страна/часовой пояс) + расширение
+  «🏢 Реквизиты компании» с default-валютой и default-НДС для каскада.
+- [ ] Полный редактор: members + brand + permissions.
 - [ ] В work-catalog — toggle «🔒 личное / 👥 в организацию» per-template.
 
 ### 41.4 — Permissions & roles

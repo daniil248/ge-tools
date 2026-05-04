@@ -27,6 +27,11 @@ import {
 import {
   DEFAULT_COMPANY, loadRawProfile, saveGlobalCompanyProfile,
 } from './company-profile.js';
+// v0.60.115 (Phase 41 START): организация + расширение company-секции.
+import {
+  CURRENCIES, getOrgProfile, saveOrgProfile,
+  resolveDefaultCurrencyWithSource, resolveDefaultVatWithSource,
+} from './currency-defaults.js';
 
 const STORAGE_KEY = 'raschet.global.v1';
 
@@ -380,7 +385,8 @@ function _renderBackupSection(host) {
   });
 }
 
-/* v0.60.27: рендер секции «Реквизиты организации». */
+/* v0.60.27: рендер секции «Реквизиты организации». v0.60.115 расширено
+   default-currency и default-vat (TODO с v0.60.112). */
 function _renderCompanySection(host) {
   const profile = loadRawProfile(null);
   const escAttr = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -391,6 +397,28 @@ function _renderCompanySection(host) {
       <input type="${opts.type || 'text'}" data-cf="${id}" value="${escAttr(value || '')}" placeholder="${escAttr(opts.placeholder || '')}" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
     </label>
   `;
+  // v0.60.115: default currency / vat для компании. Используются в каскаде
+  // resolveDefaultCurrency / resolveDefaultVat (project → company → org →
+  // user → fallback). Если поле пустое — компания не задаёт свой default,
+  // используется уровень выше (org или user).
+  const defCur = profile.defaultCurrency || '';
+  const defVat = profile.defaultVat || null;
+  const VAT_PRESETS = [
+    { id: '',          label: '— не задано (наследовать) —', pct: 0,  enabled: true,  jurisdiction: '' },
+    { id: 'kz-2026',   label: '🇰🇿 Казахстан 2026+ (16%)',   pct: 16, enabled: true,  jurisdiction: 'KZ' },
+    { id: 'kz-pre2026',label: '🇰🇿 Казахстан до 2026 (12%)', pct: 12, enabled: true,  jurisdiction: 'KZ' },
+    { id: 'ru',        label: '🇷🇺 Россия (20%)',            pct: 20, enabled: true,  jurisdiction: 'RU' },
+    { id: 'by',        label: '🇧🇾 Беларусь (20%)',          pct: 20, enabled: true,  jurisdiction: 'BY' },
+    { id: 'export',    label: '🌍 Экспорт (без НДС)',        pct: 0,  enabled: false, jurisdiction: 'export' },
+    { id: 'custom',    label: '⚙ Пользовательский',          pct: 0,  enabled: true,  jurisdiction: 'custom' },
+  ];
+  function detectVatPreset(vat) {
+    if (!vat) return '';
+    if (!vat.enabled) return 'export';
+    const found = VAT_PRESETS.find(p => p.enabled && p.id !== '' && p.id !== 'custom' && p.pct === Number(vat.pct));
+    return found ? found.id : 'custom';
+  }
+  const vatPreset = detectVatPreset(defVat);
   host.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px">
       ${f('name', 'Название организации', profile.name, { placeholder: 'ТОО «...» / ООО «...»', tip: 'Полное наименование юридического лица. Отображается в шапке КП.' })}
@@ -406,16 +434,128 @@ function _renderCompanySection(host) {
       <span style="font-weight:500">Банковские реквизиты</span>
       <textarea data-cf="bankRequisites" rows="3" style="padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px;resize:vertical" placeholder="АО «Банк» БИК ... ИИК ...">${escHtml(profile.bankRequisites)}</textarea>
     </label>
+    <hr style="border:none;border-top:1px dashed #cbd5e1;margin:14px 0">
+    <h5 style="margin:0 0 8px;font-size:12px;color:#075985;text-transform:uppercase;letter-spacing:0.4px" title="Default-параметры компании по валюте и налогам. Применяются ко всем проектам этой компании, если в свойствах проекта явно не задано иное. Каскад: project → company → org → user → fallback.">💱 Финансовые дефолты компании</h5>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 12px">
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Валюта по умолчанию для проектов и КП этой компании. Если у конкретного проекта валюта задана явно — используется она; иначе подтягивается отсюда. Пусто = использовать org / user default.">
+        <span style="font-weight:500">Валюта по умолчанию:</span>
+        <select data-cf="defaultCurrency" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
+          <option value=""${defCur === '' ? ' selected' : ''}>— не задано (наследовать) —</option>
+          ${CURRENCIES.map(c => `<option value="${escAttr(c.code)}"${c.code === defCur ? ' selected' : ''} title="${escAttr(c.label)}">${escAttr(c.code)} — ${escAttr(c.label)}</option>`).join('')}
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Юрисдикция / пресет НДС по умолчанию для компании. Применяется к новым проектам если в свойствах не задано иное.">
+        <span style="font-weight:500">📊 НДС по умолчанию:</span>
+        <select data-cf="vatPreset" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
+          ${VAT_PRESETS.map(vp => `<option value="${escAttr(vp.id)}"${vp.id === vatPreset ? ' selected' : ''}>${escHtml(vp.label)}</option>`).join('')}
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Ставка НДС, %. Доступно для редактирования только при «Пользовательский» пресете.">
+        <span style="font-weight:500">Ставка НДС, %:</span>
+        <input type="number" data-cf="vatPct" min="0" max="50" step="0.5" value="${defVat ? Number(defVat.pct) || 0 : 0}" ${vatPreset !== 'custom' ? 'readonly style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px;background:#f8fafc;color:#64748b;cursor:not-allowed"' : 'style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px"'}>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Если включено — НДС добавляется в итог КП. Выключено = «без НДС» (для экспортных клиентов).">
+        <span style="font-weight:500">Учитывать в КП:</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;background:#fff;cursor:pointer;font-size:12.5px">
+          <input type="checkbox" data-cf="vatEnabled"${defVat?.enabled !== false ? ' checked' : ''}>
+          <span>${defVat?.enabled !== false ? '✓ Включён' : '✗ Без НДС'}</span>
+        </label>
+      </label>
+    </div>
     <p class="muted" style="font-size:11px;margin:6px 0 0">
-      💡 Изменения сохраняются автоматически при потере фокуса (input → blur). Per-project override настраивается в Свойствах проекта.
+      💡 Изменения сохраняются автоматически при потере фокуса. Per-project override настраивается в Свойствах проекта (📊 НДС / 💰 Экономика).
     </p>
   `;
+  // v0.60.115: пресеты VAT — при выборе сразу применяем pct/enabled.
+  function saveVatPreset() {
+    const presetSel = host.querySelector('[data-cf="vatPreset"]');
+    const presetId = presetSel?.value || '';
+    if (!presetId) {
+      // «не задано» → defaultVat=null (наследовать с уровня выше).
+      const cur = loadRawProfile(null);
+      cur.defaultVat = null;
+      saveGlobalCompanyProfile(cur);
+      _renderCompanySection(host);  // re-render
+      return;
+    }
+    const preset = VAT_PRESETS.find(p => p.id === presetId);
+    if (!preset || preset.id === 'custom') {
+      // Custom: значения берём из vatPct/vatEnabled inputs.
+      const pctInp = host.querySelector('[data-cf="vatPct"]');
+      const enChk = host.querySelector('[data-cf="vatEnabled"]');
+      const cur = loadRawProfile(null);
+      cur.defaultVat = {
+        pct: Number(pctInp?.value) || 0,
+        enabled: !!enChk?.checked,
+        jurisdiction: 'custom',
+        label: 'НДС',
+      };
+      saveGlobalCompanyProfile(cur);
+      return;
+    }
+    const cur = loadRawProfile(null);
+    cur.defaultVat = {
+      pct: preset.pct,
+      enabled: preset.enabled,
+      jurisdiction: preset.jurisdiction,
+      label: 'НДС',
+    };
+    saveGlobalCompanyProfile(cur);
+    _renderCompanySection(host);  // re-render с новым preset / readonly
+  }
   host.addEventListener('change', (ev) => {
     const inp = ev.target.closest('[data-cf]');
     if (!inp) return;
+    const fieldId = inp.dataset.cf;
+    if (fieldId === 'vatPreset') { saveVatPreset(); return; }
+    if (fieldId === 'vatPct' || fieldId === 'vatEnabled') {
+      // Применяется только если preset === custom (поле не readonly).
+      saveVatPreset();
+      return;
+    }
     const cur = loadRawProfile(null);
-    cur[inp.dataset.cf] = inp.value;
+    cur[fieldId] = (inp.type === 'checkbox') ? inp.checked : inp.value;
     saveGlobalCompanyProfile(cur);
+  });
+}
+
+/* v0.60.115 (Phase 41 START): рендер секции «Организация».
+   Группа людей с общими настройками (валюта/налоги по умолчанию,
+   общий каталог шаблонов, brand). Полный multi-user — Phase 40 Cloud Sync. */
+function _renderOrgSection(host) {
+  const escAttr = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const escHtml = escAttr;
+  const org = getOrgProfile() || {};
+  host.innerHTML = `
+    <p class="muted" style="font-size:11.5px;margin:0 0 10px">
+      Организация — группа людей с общими проектами, шаблонами и данными.
+      Phase 41 START: пока локально (один org per устройство), мульти-пользователь
+      будет в Phase 40 (Cloud Sync). Каскад: project → company → <b>org</b> → user → fallback.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px">
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Имя команды/организации. Например, «ГенезисЭнерго» или «Отдел проектирования ЦОД».">
+        <span style="font-weight:500">Имя организации:</span>
+        <input type="text" data-org="name" value="${escAttr(org.name || '')}" placeholder="ГенезисЭнерго / Отдел ЦОД / ..." style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Страна организации. Используется для подсказки юрисдикции по умолчанию.">
+        <span style="font-weight:500">Страна:</span>
+        <input type="text" data-org="country" value="${escAttr(org.country || '')}" placeholder="Казахстан / Россия / ..." style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;color:#374151" title="Часовой пояс — для timestamps в журнале изменений и КП. Например, Asia/Almaty или Europe/Moscow.">
+        <span style="font-weight:500">Часовой пояс:</span>
+        <input type="text" data-org="timezone" value="${escAttr(org.timezone || '')}" placeholder="Asia/Almaty / Europe/Moscow / ..." style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px">
+      </label>
+    </div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">
+      🚧 Phase 41.2-41.5 (общий каталог шаблонов, роли, мульти-org switcher) — следующими итерациями. Сейчас — базовые поля для каскада (currency / vat).
+    </p>
+  `;
+  host.addEventListener('change', (ev) => {
+    const inp = ev.target.closest('[data-org]');
+    if (!inp) return;
+    const cur = getOrgProfile() || {};
+    cur[inp.dataset.org] = (inp.type === 'checkbox') ? inp.checked : inp.value;
+    saveOrgProfile(cur);
   });
 }
 
@@ -437,9 +577,13 @@ export function openSettingsModal() {
         <button type="button" class="rs-gs-close" aria-label="Закрыть">×</button>
       </div>
       <div class="rs-gs-body">
-        <h4>🏢 Реквизиты организации</h4>
-        <div class="muted" style="margin-bottom:8px" title="Реквизиты компании-исполнителя для шапки КП клиенту, договоров и отчётов. Сохраняются глобально для всех проектов; per-project override настраивается в свойствах проекта.">Реквизиты для шапки КП и договоров. Используются модулем «🛠 Сервис: монтаж и ТО» при экспорте КП клиенту.</div>
+        <h4>🏢 Реквизиты компании-исполнителя</h4>
+        <div class="muted" style="margin-bottom:8px" title="Реквизиты компании-исполнителя для шапки КП клиенту, договоров и отчётов. Сохраняются глобально для всех проектов; per-project override настраивается в свойствах проекта.">Реквизиты для шапки КП и договоров. Используются модулем «🛠 Сервис: монтаж и ТО» при экспорте КП клиенту. v0.60.115: добавлены default-валюта и default-НДС для каскада в калькуляторах.</div>
         <div id="rs-gs-company-section" style="margin-bottom:18px"></div>
+
+        <h4>👥 Организация (Phase 41 START)</h4>
+        <div class="muted" style="margin-bottom:8px" title="Организация — группа людей с общими проектами и настройками. Уровень между «компанией» (юр.лицом) и «пользователем». Для каскада общих параметров (валюта / НДС / бренд / шаблоны).">Команда / отдел проектирования. Каскадные параметры используются если ни проект, ни компания их не задают.</div>
+        <div id="rs-gs-org-section" style="margin-bottom:18px"></div>
 
         <h4>💾 Резервное копирование</h4>
         <div class="muted" style="margin-bottom:8px">Защита от потери данных. Раз в час (или другой интервал) приложение автоматически записывает JSON-бэкап в выбранную папку.</div>
@@ -466,6 +610,10 @@ export function openSettingsModal() {
   // v0.60.27: секция реквизитов организации.
   const companyHost = overlay.querySelector('#rs-gs-company-section');
   if (companyHost) _renderCompanySection(companyHost);
+
+  // v0.60.115 (Phase 41 START): секция «Организация».
+  const orgHost = overlay.querySelector('#rs-gs-org-section');
+  if (orgHost) _renderOrgSection(orgHost);
 
   const close = () => overlay.remove();
   overlay.querySelector('.rs-gs-close').addEventListener('click', close);
