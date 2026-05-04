@@ -25,6 +25,18 @@
     import { mountHeader } from '../shared/app-header.js';
     mountHeader({ title: 'Проекты', home: '../hub.html' });
   </script>
+  <!-- v0.60.137 (Phase 44.2 final): defence-in-depth для прямого URL.
+       /projects/ — internalOnly (см. modules.json). Для внешних клиентов
+       показываем «🏢 Корпоративный модуль» вместо самого модуля. -->
+  <script type="module">
+    import { requireModuleAccess } from '../shared/subscriptions.js';
+    requireModuleAccess('projects', 'Управление проектами').then(allowed => {
+      if (!allowed) {
+        // showLockedModal не дал доступ — скрываем основной контент.
+        document.querySelectorAll('main').forEach(el => el.style.display = 'none');
+      }
+    });
+  </script>
 
   <main class="pr-wrap">
     <!-- v0.59.858: backup-nudge banner mount — показывает напоминание о бэкапе. -->

@@ -3951,15 +3951,14 @@ v0.60.105 (`shared/currency-defaults.js::resolveDefaultCurrency`).
   kind='ui'; calc-libs (cooling/calc/, dgu-config/calc/, shared/calc-modules/)
   свободно импортируются.
 
-### 44.2 — Soft-enforcement в UI [v0.60.132 ✅]
+### 44.2 — Soft-enforcement в UI [v0.60.132 + v0.60.137 ✅]
 
 - [x] <code>/modules/index.html</code>: для locked модулей — иконка 🔒,
   затемнение карточки, click → showLockedModal с upsell.
 - [x] Plan-badge под H1 в /modules/ — кликабельный chip «🎫 ⭐ Pro · триал 13 дн.».
-- [ ] <code>hub.html</code>: те же визуальные локи.
-- [ ] Каждый <code>&lt;module&gt;/index.html</code> в начале вызывает
-  <code>requireModuleAccess(moduleId)</code> — defence-in-depth для
-  прямых URL.
+- [x] **v0.60.137** — <code>hub.html</code>: те же визуальные локи (script читает modules.json + walking через .hub-card).
+- [x] **v0.60.137** — Plan-badge в shared/app-header.js (right-зона шапки) — единый chip во всех модулях. Internal → 🏢 фиолетовый. Click → global-settings.
+- [x] **v0.60.137** — Defence-in-depth для прямого URL в internal-only модулях (projects/reports/logistics) через <code>requireModuleAccess</code>. Для остальных модулей — TODO (приоритет low т.к. /modules/ и /hub.html уже блокируют).
 
 ### 44.3 — Plan management + Internal/RBAC UI [v0.60.132–135 ✅]
 

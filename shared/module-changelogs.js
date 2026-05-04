@@ -4,6 +4,26 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.137', date: '2026-05-04', items: [
+      '🎫 <b>Phase 44.2 final: plan-badge в шапке + locks в hub + defence-in-depth в internal-модулях</b>. Закрытие открытых пунктов Phase 44.2.',
+      '• <b>shared/app-header.js</b> — plan-badge в right-зоне шапки:',
+      '  • Показывает текущий план («🎫 ⭐ Pro · триал 13 дн.» / «🎫 Free» / «🏢 Internal»).',
+      '  • Цвета per-plan: free=серый, starter=голубой, pro=жёлтый, enterprise=зелёный, trial=пульсирующий оранжевый, internal=фиолетовый.',
+      '  • Click → global-settings → секция «🎫 Подписка».',
+      '  • Не показываем на hub / /modules/ / /projects/ (там свои plan-badges или они не нужны).',
+      '• <b>hub.html</b> — visual locks для модулей вне подписки:',
+      '  • Тот же паттерн что и в /modules/index.html: чтение modules.json + walking через .hub-card.',
+      '  • Locked → opacity 0.65 + 🔒 chip в правом верхнем углу + click → showLockedModal с upsell.',
+      '  • Internal-only модули — фиолетовый chip вместо жёлтого.',
+      '• <b>shared/subscriptions.js</b> — <code>requireModuleAccess(id, name, manifest=null)</code> теперь auto-fetches modules.json если manifest не передан → корректная internalOnly-проверка для defence-in-depth.',
+      '• <b>defence-in-depth в internal-модулях</b> (для прямого URL):',
+      '  • <code>projects/index.html</code> — requireModuleAccess(\'projects\').',
+      '  • <code>reports/index.html</code> — requireModuleAccess(\'reports\').',
+      '  • <code>logistics/index.html</code> — requireModuleAccess(\'logistics\').',
+      '  • Если access denied → main скрывается, остаётся только showLockedModal.',
+      '• ROADMAP Phase 44.2 — все позиции отмечены ✅.',
+      'Файлы: <code>shared/app-header.js</code> (+plan-badge в HTML, click-handler), <code>shared/app-header.css</code> (+~50 строк стилей plan-badge с per-plan цветами), <code>hub.html</code> (+CSS .hub-card-locked, +script с lock-walking), <code>shared/subscriptions.js</code> (requireModuleAccess получил manifest auto-fetch + 3-й параметр), <code>modules/index.html</code> (передаём manifest в hasModuleAccess/showLockedModal), <code>projects/index.html</code> + <code>reports/index.html</code> + <code>logistics/index.html</code> (+requireModuleAccess defence-in-depth).',
+    ] },
     { version: '0.60.136', date: '2026-05-04', items: [
       '👥 <b>Phase 44.3 follow-up: расширение RBAC guard\'ов на TW + catalog + service economics</b>. Продолжение v0.60.135 — TODO-список из ROADMAP закрыт.',
       '• <b>tech-workspace</b> — guard на «✓ Утвердить вариант»:',

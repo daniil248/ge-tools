@@ -440,9 +440,31 @@ export async function showLockedModal(moduleId, moduleName, moduleManifest) {
  *     return;
  *   }
  */
-export async function requireModuleAccess(moduleId, moduleName) {
-  if (hasModuleAccess(moduleId)) return true;
-  await showLockedModal(moduleId, moduleName);
+// v0.60.137: requireModuleAccess для defence-in-depth в <module>/index.html.
+// Раньше принимал только id+name; теперь опционально manifest или auto-fetch
+// modules.json и передаёт его в hasModuleAccess/showLockedModal — нужно
+// для проверки internalOnly (без manifest проверка идёт только по подписке).
+let _manifestCache = null;
+async function _fetchManifest() {
+  if (_manifestCache) return _manifestCache;
+  try {
+    // Путь до modules.json относительно текущего модуля. Каждый модуль —
+    // в своём подкаталоге, корневой — modules.json в parent.
+    const res = await fetch('../modules.json').catch(() => fetch('./modules.json'));
+    if (!res || !res.ok) return null;
+    _manifestCache = await res.json();
+    return _manifestCache;
+  } catch { return null; }
+}
+
+export async function requireModuleAccess(moduleId, moduleName, moduleManifest = null) {
+  let manifest = moduleManifest;
+  if (!manifest) {
+    const m = await _fetchManifest();
+    if (m) manifest = (m.modules || []).find(x => x.id === moduleId) || null;
+  }
+  if (hasModuleAccess(moduleId, manifest)) return true;
+  await showLockedModal(moduleId, moduleName, manifest);
   // Если триал активировали — будет reload и второй проход.
-  return hasModuleAccess(moduleId);
+  return hasModuleAccess(moduleId, manifest);
 }

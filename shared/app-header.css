@@ -196,6 +196,64 @@ button.rs-proj-badge {
   cursor: pointer;
 }
 
+/* v0.60.137: plan-badge — текущий план подписки в шапке.
+   Click → global-settings → секция «🎫 Подписка».
+   Цвет зависит от плана: free=серый, starter=голубой, pro=жёлтый,
+   enterprise=зелёный, internal=фиолетовый, trial=оранжевый. */
+.rs-plan-badge {
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid;
+  margin-right: 6px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.rs-plan-badge.rs-plan-free {
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+.rs-plan-badge.rs-plan-free:hover { background: #e5e7eb; }
+.rs-plan-badge.rs-plan-starter {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #93c5fd;
+}
+.rs-plan-badge.rs-plan-starter:hover { background: #bfdbfe; }
+.rs-plan-badge.rs-plan-pro {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fbbf24;
+}
+.rs-plan-badge.rs-plan-pro:hover { background: #fde68a; }
+.rs-plan-badge.rs-plan-enterprise {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+.rs-plan-badge.rs-plan-enterprise:hover { background: #a7f3d0; }
+.rs-plan-badge.rs-plan-trial {
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #fdba74;
+  animation: rs-plan-trial-pulse 2.5s infinite;
+}
+.rs-plan-badge.rs-plan-trial:hover { background: #fed7aa; }
+@keyframes rs-plan-trial-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(253, 186, 116, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(253, 186, 116, 0.3); }
+}
+.rs-plan-badge.rs-plan-internal {
+  background: #ede9fe;
+  color: #6d28d9;
+  border-color: #c4b5fd;
+}
+.rs-plan-badge.rs-plan-internal:hover { background: #ddd6fe; }
+
 /* v0.59.780: storage-mode badge & modal */
 .rs-storage-mode-btn {
   border: 1px solid #d1d5db;

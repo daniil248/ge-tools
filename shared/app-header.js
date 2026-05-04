@@ -19,6 +19,9 @@ import {
   buildModuleHref,
 } from './project-context.js';
 import { getProject, getActiveProjectId, setActiveProjectId, listProjects, createProject, ensureDefaultProject } from './project-storage.js';
+// v0.60.137 (Phase 44.2 final): plan-badge в шапке. По ROADMAP Phase 44.2.
+// planBadge возвращает строку «⭐ Pro · триал 13 дн.» или 'Free'.
+import { planBadge, getSubscription, isInternalUser } from './subscriptions.js';
 
 // Известные пути модулей — для авто-ребайнда ссылок (см. _wireModuleLinks).
 const MODULE_PATH_RX = /\/(schematic|cable|scs-design|scs-config|facility-inventory|rack-config|mv-config|ups-config|panel-config|pdu-config|transformer-config|mdc-config|suppression-config|projects|tech-workspace|meteo|help)\//;
@@ -145,6 +148,25 @@ export function mountHeader(opts = {}) {
         ? `<button type="button" class="rs-proj-badge rs-proj-badge-standalone" data-proj-mode="standalone" title="Standalone-режим. Все локальные данные пишутся в проект «${esc(standaloneProj.name || standaloneProj.id)}». Кликните чтобы переключить проект, создать новый или работать в режиме «без проекта».">🔒&nbsp;${esc(standaloneProj.name || standaloneProj.id)}</button>`
         : `<button type="button" class="rs-proj-badge rs-proj-badge-empty" data-proj-mode="empty" title="Активный проект не выбран. Кликните чтобы выбрать или создать локальный проект.">📂&nbsp;Без проекта</button>`);
 
+  // v0.60.137 (Phase 44.2 final): plan-badge — отображает текущий план
+  // подписки в шапке. Click → открывает global-settings → секция «Подписка».
+  // Не показываем на hub и /modules/ (там уже есть свой plan-badge).
+  // Internal-Пользователю показываем «🏢 Internal» вместо плана подписки.
+  let planBadgeHtml = '';
+  if (!isHub && moduleId !== 'projects' && moduleId !== 'modules') {
+    try {
+      if (isInternalUser()) {
+        planBadgeHtml = `<button type="button" class="rs-plan-badge rs-plan-internal" title="Внутрикорпоративный режим. Доступны internal-only модули. Кликните для управления ролью и подпиской.">🏢 Internal</button>`;
+      } else {
+        const sub = getSubscription();
+        const label = planBadge();
+        const trialClass = sub && sub.isTrial ? ' rs-plan-trial' : '';
+        const planClass = (sub?.plan === 'free') ? ' rs-plan-free' : (sub?.plan === 'enterprise' ? ' rs-plan-enterprise' : (sub?.plan === 'pro' ? ' rs-plan-pro' : ' rs-plan-starter'));
+        planBadgeHtml = `<button type="button" class="rs-plan-badge${trialClass}${planClass}" title="Текущий план подписки. Кликните для управления планом, активации триала или апгрейда.">🎫 ${esc(label)}</button>`;
+      }
+    } catch (e) { /* subscriptions.js may fail in legacy contexts; не критично */ }
+  }
+
   const header = document.createElement('header');
   header.className = 'rs-header';
   header.innerHTML =
@@ -156,6 +178,7 @@ export function mountHeader(opts = {}) {
       projBadgeHtml +
     `</div>` +
     `<div class="rs-header-right">` +
+      planBadgeHtml +
       `<button type="button" class="rs-storage-mode-btn" aria-label="Режим хранения" title="Режим хранения данных — локальный или облачный (Firebase)"></button>` +
       `<button type="button" class="rs-icon-btn rs-help-btn" aria-label="Помощь" title="Открыть Центр помощи на статью о текущем модуле">❓</button>` +
       `<button type="button" class="rs-icon-btn rs-gear-btn" aria-label="Глобальные настройки" title="Глобальные настройки платформы">${GEAR_SVG}</button>` +
@@ -282,6 +305,12 @@ export function mountHeader(opts = {}) {
     projBadge.addEventListener('click', () => _openStandaloneProjectMenu(moduleId, {
       linkedPid: ctx.projectId || null,
     }));
+  }
+
+  // v0.60.137: plan-badge клик → global-settings → секция «Подписка».
+  const planBadgeEl = header.querySelector('.rs-plan-badge');
+  if (planBadgeEl) {
+    planBadgeEl.addEventListener('click', () => openSettingsModal());
   }
 
   // Auth widget — привязываем к window.Auth если доступен

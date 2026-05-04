@@ -21,6 +21,10 @@
     import { mountHeader } from '../shared/app-header.js';
     import { mountHelp } from '../shared/help-panel.js';
     mountHeader({ title: 'Шаблоны отчётов', home: '../hub.html' });
+    // v0.60.137: defence-in-depth для прямого URL. reports — internalOnly.
+    import('../shared/subscriptions.js').then(m => m.requireModuleAccess('reports', 'Шаблоны отчётов').then(allowed => {
+      if (!allowed) document.querySelectorAll('main').forEach(el => el.style.display = 'none');
+    }));
     mountHelp({
       module: 'reports',
       title: 'Шаблоны отчётов (PDF / DOCX / HTML)',

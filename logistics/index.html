@@ -22,6 +22,10 @@
     import { mountFooter } from '../shared/app-footer.js';
     import { mountHelp } from '../shared/help-panel.js';
     mountHeader({ title: 'Логистика', home: '../hub.html' });
+    // v0.60.137: defence-in-depth для прямого URL. logistics — internalOnly.
+    import('../shared/subscriptions.js').then(m => m.requireModuleAccess('logistics', 'Рабочее место логиста').then(allowed => {
+      if (!allowed) document.querySelectorAll('main').forEach(el => el.style.display = 'none');
+    }));
     mountHelp({
       module: 'logistics',
       title: 'Рабочее место логиста',

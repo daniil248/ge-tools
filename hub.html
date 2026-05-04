@@ -189,6 +189,19 @@
     }
     .badge.active { background: #e8f5e9; color: #2e7d32; }
     .badge.new { background: #fff3e0; color: #e65100; }
+    /* v0.60.137 (Phase 44.2): visual locks для модулей вне подписки. */
+    .hub-card-locked { opacity: 0.65; background: #fafbfc; position: relative; }
+    .hub-card-locked h2::after { content: ' 🔒'; }
+    .hub-card-locked .lock-chip {
+      position: absolute; top: 12px; right: 12px;
+      background: #fbbf24; color: #78350f; font-size: 10.5px; font-weight: 700;
+      padding: 3px 8px; border-radius: 10px; text-transform: uppercase;
+      letter-spacing: 0.4px; pointer-events: none;
+    }
+    .hub-card-locked.hub-card-internal .lock-chip {
+      background: #c4b5fd; color: #5b21b6;
+    }
+    .hub-card-locked:hover { transform: none; box-shadow: 0 2px 8px rgba(217,119,6,0.2); border-color: #fcd34d; }
     @media (max-width: 700px) {
       .hub-grid, .hub-grid[data-cols] { grid-template-columns: 1fr; gap: 20px; }
       .hub-card { padding: 28px 20px; }
@@ -204,6 +217,58 @@
     if (window.Auth && typeof window.Auth.init === 'function') {
       window.Auth.init().catch(e => console.warn('[hub] auth init failed', e));
     }
+  </script>
+
+  <!-- v0.60.137 (Phase 44.2 final): subscription locks на hub.html.
+       Раньше locks были только в /modules/index.html — но hub это
+       основной entry point для большинства Пользователей. Без локов на
+       hub Пользователь увидел бы все карточки как доступные, а после
+       клика — модалку с upsell, что плохо UX. Теперь locks одинаковые. -->
+  <script type="module">
+    import { hasModuleAccess, showLockedModal, PLANS } from './shared/subscriptions.js';
+    document.addEventListener('DOMContentLoaded', async () => {
+      let manifest = { modules: [] };
+      try {
+        const res = await fetch('./modules.json');
+        manifest = await res.json();
+      } catch (e) { console.warn('[hub] manifest fetch failed:', e); }
+      const idToMod = new Map();
+      for (const m of (manifest.modules || [])) idToMod.set(m.id, m);
+
+      // Извлекаем moduleId из href: «cooling/» → 'cooling', «index.html» → 'constructor'.
+      const extractId = (href) => {
+        if (!href) return null;
+        if (href === 'index.html' || href === './index.html' || href === '/') return 'constructor';
+        const m = href.match(/^([a-z-]+)\/?$/) || href.match(/^\.\/([a-z-]+)\/?$/);
+        return m ? m[1] : null;
+      };
+
+      document.querySelectorAll('.hub-card').forEach(card => {
+        const href = card.getAttribute('href') || '';
+        const moduleId = extractId(href);
+        if (!moduleId) return;
+        const mod = idToMod.get(moduleId);
+        if (!mod) return;
+        if (mod.kind === 'calc-lib') return;
+        if (hasModuleAccess(moduleId, mod)) return;  // доступ есть — не блокируем
+
+        // Доступа нет → визуальный лок + intercept click.
+        card.classList.add('hub-card-locked');
+        if (mod.internalOnly) card.classList.add('hub-card-internal');
+        const planLabel = mod.internalOnly ? '🏢 Internal' : (PLANS[mod.subscriptionPlan]?.label || mod.subscriptionPlan);
+        const lockChip = document.createElement('span');
+        lockChip.className = 'lock-chip';
+        lockChip.textContent = '🔒 ' + planLabel;
+        lockChip.title = mod.internalOnly
+          ? 'Внутрикорпоративный модуль. Доступен только сотрудникам организации.'
+          : 'Доступно с плана ' + planLabel + '. Click → активировать триал.';
+        card.appendChild(lockChip);
+        card.addEventListener('click', async (ev) => {
+          ev.preventDefault();
+          await showLockedModal(moduleId, mod.name, mod);
+        });
+      });
+    });
   </script>
 
   <main>

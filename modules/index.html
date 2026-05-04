@@ -85,11 +85,13 @@
         // утилитный без подписки).
         if (!mod) return;
         if (mod.kind === 'calc-lib') return;  // calc-libs не имеют UI-локов
-        if (hasModuleAccess(moduleId)) return;  // доступ есть, не блокируем
+        // v0.60.137: передаём manifest для проверки internalOnly.
+        if (hasModuleAccess(moduleId, mod)) return;  // доступ есть, не блокируем
 
         // Доступа нет → визуальный лок + intercept click.
         card.classList.add('mod-card-locked');
-        const planLabel = PLANS[mod.subscriptionPlan]?.label || mod.subscriptionPlan;
+        if (mod.internalOnly) card.classList.add('mod-card-internal');
+        const planLabel = mod.internalOnly ? '🏢 Internal' : (PLANS[mod.subscriptionPlan]?.label || mod.subscriptionPlan);
         const lockChip = document.createElement('span');
         lockChip.className = 'lock-info';
         lockChip.textContent = '🔒 ' + planLabel;
@@ -97,7 +99,8 @@
         card.appendChild(lockChip);
         card.addEventListener('click', async (ev) => {
           ev.preventDefault();
-          await showLockedModal(moduleId, mod.name);
+          // v0.60.137: передаём manifest для internalOnly-сообщения.
+          await showLockedModal(moduleId, mod.name, mod);
         });
       });
 
