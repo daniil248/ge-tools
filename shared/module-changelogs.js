@@ -4,6 +4,21 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.168', date: '2026-05-04', items: [
+      '🔗 <b>Sketch (drawio) ⇆ данные Raschet — полноценная связь</b>. По репорту Пользователя 2026-05-04 «нам тем более нужно связывать файлы (данные), которые мы будем генерировать в этом модуле».',
+      '• <b>Что было</b>: sketch (drawio) был изолированным холстом — рисуй что хочешь, но никак не привязан к стойкам / схемам / конфигурациям проекта.',
+      '• <b>Что стало</b>: sketch — первоклассный participant проектных данных. Может ссылаться на: проект, стойку (rack-config), главную схему (Конструктор), листы РД (schematic), НКУ (panel-config), ИБП (ups-config), РУ-СН (mv-config), трансформатор (transformer-config), кабельную линию (cable), другой sketch.',
+      '• <b>Архитектура</b>:',
+      '  • <code>shared/sketch-refs.js</code> (новый) — registry ref-типов с discovery-функциями (что доступно в проекте) + URL-builders + label-resolvers + drawio-cell-XML-builder.',
+      '  • <code>sketch/sketch-refs-ui.js</code> (новый) — правый sidebar «🔗 Связи» + picker-modal для добавления связи. Каждая ссылка: тип (icon+цвет), актуальный label (resolveLabel — если в исходном модуле переименовали, обновляется), действия 🔗 открыть / ➕ в холст / 🗑 удалить.',
+      '  • Persistence per-sketch: <code>raschet.sketch.&lt;pid&gt;.&lt;sid&gt;.refs.v1</code> — массив ссылок sketch\'a.',
+      '• <b>Вставка в drawio</b>: метка-ссылка добавляется как <code>UserObject</code> с custom-атрибутами <code>raschet.refType</code> / <code>raschet.refId</code> / <code>raschet.refLabel</code> + <code>link</code> на исходный модуль. drawio сохраняет эти атрибуты в XML диаграммы при export/import — связь переносится между installations.',
+      '• <b>UI</b>: новая кнопка <code>🔗 Связи (N)</code> в toolbar с counter-badge. Toggle открывает/закрывает sidebar (320px), состояние запоминается в LS.',
+      '• <b>Auto-resolve label</b>: каждый рендер sidebar\'a — actual-label из исходного модуля (через <code>resolveLabel</code>). Если объект удалён в источнике → ⚠ stale-индикатор.',
+      '• <b>Detection actual entities</b>: discovery каждого ref-типа знает свой LS-key для текущего проекта (rack-config instances, schematic sheets, sub-projects через listSubProjects, и т.д.) с graceful-fallback на legacy глобальные ключи.',
+      '• <b>Дедуп</b>: повторное добавление ссылки на тот же refType+refId — не дублирует, обновляет label/note.',
+      'Файлы: <code>shared/sketch-refs.js</code> (новый, ~340 строк), <code>sketch/sketch-refs-ui.js</code> (новый, ~250 строк), <code>sketch/index.html</code> (sidebar layout + 200+ строк CSS), <code>sketch/sketch.js</code> (RefsUI integration).',
+    ] },
     { version: '0.60.167', date: '2026-05-04', items: [
       '🩹 <b>sketch hotfix v0.60.166</b>: silent self-hosted detection + iframe-load fallback. По репорту Пользователя «что то не работает».',
       '• <b>Self-hosted detection через VERSION-файл</b>: вместо HEAD-check на <code>./drawio-app/index.html</code> (который шумел 404 в консоли при отсутствии self-hosted) — теперь GET на <code>./drawio-app/VERSION</code> (легче и tighter detection).',

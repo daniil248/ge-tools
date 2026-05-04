@@ -1,6 +1,16 @@
 // =============================================================================
 // sketch/sketch.js — интеграция с drawio (jgraph/drawio).
 // =============================================================================
+// v0.60.168 (по репорту Пользователя 2026-05-04 «нам тем более нужно связывать
+// файлы (данные), которые мы будем генерировать в этом модуле»):
+// Sketch теперь полноценный participant проектных данных Raschet — может
+// ссылаться на стойки, схемы, конфигурации НКУ/ИБП/РУ-СН/трансформаторов,
+// кабельные линии и другие sketch'и того же проекта. Управление ссылками
+// — через правый sidebar «🔗 Связи» (sketch-refs-ui.js). Каждая ссылка
+// при желании вставляется в drawio-холст как метка-ссылка (UserObject с
+// raschet.refType / raschet.refId / raschet.refLabel — drawio сохраняет
+// эти атрибуты в XML диаграммы при export/import).
+//
 // v0.60.166 (по репорту Пользователя 2026-05-04 «давай drawio просто заберем
 // с гитхаба и интегрируем в наш продукт https://github.com/jgraph/drawio,
 // вместо нашего псевдо drawio» + «обновлять так же будем с гитхаба»):
@@ -31,6 +41,7 @@
 
 import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
 import { getActiveProjectId } from '../shared/project-storage.js';
+import * as RefsUI from './sketch-refs-ui.js';
 
 const _pid = (() => { try { return getActiveProjectId() || 'default'; } catch { return 'default'; } })();
 
@@ -277,6 +288,7 @@ function wireToolbar() {
     if (!sid || sid === _activeSketchId) return;
     _activeSketchId = sid;
     loadActiveIntoDrawio();
+    RefsUI.renderRefsSidebar();
   });
 
   $('sk-new-sketch')?.addEventListener('click', async () => {
@@ -290,6 +302,7 @@ function wireToolbar() {
     _activeSketchId = sid;
     renderSketchSelect();
     loadActiveIntoDrawio();
+    RefsUI.renderRefsSidebar();
     rsToast(`✓ Создан «${name.trim()}»`, 'ok');
   });
 
@@ -326,6 +339,7 @@ function wireToolbar() {
     saveSketchList(next);
     renderSketchSelect();
     loadActiveIntoDrawio();
+    RefsUI.renderRefsSidebar();
     rsToast('✓ Удалено', 'info');
   });
 
@@ -336,6 +350,31 @@ function wireToolbar() {
       $('sk-save-btn')?.click();
     }
   });
+
+  // ─── Refs sidebar toggle (v0.60.168) ────────────────────────────────────
+  $('sk-refs-toggle')?.addEventListener('click', () => {
+    const aside = $('sk-refs-aside');
+    if (!aside) return;
+    aside.classList.toggle('hidden');
+    if (!aside.classList.contains('hidden')) {
+      RefsUI.renderRefsSidebar();
+      try { localStorage.setItem('raschet.sketch.refs.sidebar.open.v1', '1'); } catch {}
+    } else {
+      try { localStorage.setItem('raschet.sketch.refs.sidebar.open.v1', '0'); } catch {}
+    }
+  });
+  $('sk-refs-aside-close')?.addEventListener('click', () => {
+    $('sk-refs-aside')?.classList.add('hidden');
+    try { localStorage.setItem('raschet.sketch.refs.sidebar.open.v1', '0'); } catch {}
+  });
+
+  // Restore sidebar state (default: open).
+  try {
+    const open = localStorage.getItem('raschet.sketch.refs.sidebar.open.v1');
+    if (open === '0') {
+      $('sk-refs-aside')?.classList.add('hidden');
+    }
+  } catch {}
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -361,6 +400,14 @@ async function init() {
   _activeSketchId = list[0]?.id;
   renderSketchSelect();
   wireToolbar();
+
+  // v0.60.168: refs UI получает контекст для discovery / postMessage в drawio.
+  RefsUI.setContext({
+    pid: _pid,
+    getActiveSketchId: () => _activeSketchId,
+    postToDrawio,
+  });
+  RefsUI.renderRefsSidebar();
 
   // Resolve drawio source: self-hosted first, fallback to embed.diagrams.net.
   setLoadingVisible(true);

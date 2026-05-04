@@ -1633,10 +1633,13 @@ Phase 10 (`mdc-config/`) желательна для импорта коорди
 
 ### ⏳ Фаза 3 — drawio-режим (после Фазы 2, 2 недели)
 
+- [x] **3.0** Заменить псевдо-drawio на ОФИЦИАЛЬНЫЙ drawio (jgraph/drawio) через embed iframe + postMessage protocol. Self-hosted (drawio-app/) с fallback на embed.diagrams.net. Update: `bash sketch/update-drawio.sh`. ✅ v0.60.166-167.
+- [x] **3.0.1** Sketch ⇆ данные Raschet — связи с другими модулями. shared/sketch-refs.js (registry ref-типов: project / rack / schema / schematic-sheet / panel / ups / mv / transformer / cable / sketch). Правый sidebar «🔗 Связи» + picker-modal. Метка-ссылка вставляется в drawio-холст как UserObject с raschet.refType / raschet.refId / raschet.refLabel + link на исходный модуль (drawio сохраняет custom-атрибуты в XML). Auto-resolve label при render — если в источнике переименовали entity, обновляется. ✅ v0.60.168.
 - [ ] **3.1** Переключение view mode: `canvas` (бесконечный) ↔ `sheet` (A3/A4)
 - [ ] **3.2** В sheet-mode: ISO 7200 основная надпись, рамка, штамп
 - [ ] **3.3** Переиспользовать `schematic/iso-paper.js`
 - [ ] **3.4** Авто-layout для новых элементов (packing слева)
+- [ ] **3.5** Reverse-link UI: в исходных модулях (rack-config / schematic / panel-config / ups-config) показывать чип «📎 N sketch'ей ссылаются на этот объект» с дропдауном → открыть sketch.
 
 ---
 

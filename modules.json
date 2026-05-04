@@ -71,7 +71,7 @@
     {
       "id": "sketch",
       "name": "Скетч (drawio)",
-      "description": "Полнофункциональный drawio (jgraph/drawio, Apache 2.0) интегрирован через embed iframe + postMessage protocol. Все библиотеки drawio (BPMN, AWS, Azure, GCP, networking, electrical, UML, ...). Multi-page, undo/redo, экспорт SVG/PNG/XML. Self-hosted из GitHub release или fallback на embed.diagrams.net. Update: bash sketch/update-drawio.sh",
+      "description": "Полнофункциональный drawio (jgraph/drawio, Apache 2.0) интегрирован через embed iframe + postMessage protocol. Все библиотеки drawio (BPMN, AWS, Azure, GCP, networking, electrical, UML, ...). Multi-page, undo/redo, экспорт SVG/PNG/XML. Self-hosted из GitHub release или fallback на embed.diagrams.net. Update: bash sketch/update-drawio.sh. v0.60.168: связи с данными других модулей Raschet (стойки, схемы, НКУ, ИБП, РУ-СН, трансформаторы, кабели) — sidebar «🔗 Связи» + метка-ссылка в drawio-холсте.",
       "path": "sketch/",
       "icon": "purple",
       "badge": "new",
