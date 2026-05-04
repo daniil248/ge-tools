@@ -823,19 +823,14 @@ function autoRecalcLengths(plan) {
    или на удалённое устройство) НЕ показываются в UI Проектирования СКС —
    отображаются только «действующие» кабели. В storage исходные записи
    остаются: если стойка/устройство вернётся, связь снова станет видимой.
-   v0.60.156 (по репорту Пользователя 2026-05-04 «Пропал список кабелей
-   между стойками»): relaxed-check — если оба rack id присутствуют
-   (instIds) и devId хотя бы НЕ-пустой (валидный ref), линк считается
-   действующим. Раньше требовалось точное совпадение devId с
-   getContents — но при перерендеринге scs-config содержимое могло
-   получать другие id, и линки массово исчезали. Теперь линк сохраняется
-   даже если конкретное устройство временно не findable; в UI выводится
-   tag rack + label из linka. */
+   v0.60.156 / v0.60.157 (по репортам «Пропал список кабелей между
+   стойками» + «и списка связей нет»): максимально lenient — линк live
+   если оба rack id в project-instances. Никаких доп. требований к
+   devId / contents — иначе при пере-рендеринге scs-config содержимое
+   получало другие id, и линки массово исчезали. */
 function isLinkLive(l, instIds) {
-  if (!instIds.has(l.fromRackId) || !instIds.has(l.toRackId)) return false;
-  // Минимальное требование: rack id оба присутствуют.
-  // Дополнительно проверяем что devId не пустые (sanity-check).
-  return !!(l.fromDevId && l.toDevId);
+  if (!l) return false;
+  return instIds.has(l.fromRackId) && instIds.has(l.toRackId);
 }
 function getVisibleLinks() {
   const raw = getLinks();
@@ -4484,8 +4479,18 @@ function escapeSvg(s) {
       aisle, рассчитано из plan.step). Между разными ПАРАМИ рядов — 2 клетки.
 */
 function autoLayout() {
-  const racks = getRacks();
-  if (!racks.length) return;
+  // v0.60.157 (по репорту Пользователя 2026-05-04 «автораскладка в ряды
+  // сломалась»): используем getProjectInstances() (не getRacks()) —
+  // фильтруем только реальные размещаемые экземпляры (inst-* + POR).
+  // getRacks() мог включать виртуальные scheme-* / por-group-* / templates,
+  // которые заведомо не помещаются в план и portion-блоком ломали логику
+  // pair-row layout (next pair открывался преждевременно из-за переполнения
+  // от шаблонной стойки, которая на план не попадает).
+  const racks = getProjectInstances();
+  if (!racks.length) {
+    updateStatus('⚠ Нет стоек проекта для автораскладки. Добавьте стойки во вкладке «Стойки проекта».');
+    return;
+  }
   const plan = getPlan();
   const tags = {};
   racks.forEach(r => { tags[r.id] = (getRackTag(r.id) || '').trim(); });

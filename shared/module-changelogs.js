@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.157', date: '2026-05-04', items: [
+      '🔗 <b>scs-design follow-up: 3 фикса по повторным репортам Пользователя 2026-05-04</b>.',
+      '• <b>«сверху линий не видно»</b>: добавлен <code>padding-top:60px</code> к <code>.sd-racks-wrap</code> — резерв над стойками для over-rack channel линий. Раньше racks начинались с y=8px, channelY уходил в отрицательные координаты и обрезался SVG-viewBox\'ом. Теперь над стойками 60px свободного пространства, channel виден.',
+      '• <b>«и списка связей нет»</b>: <code>isLinkLive</code> сделан maximally lenient — линк live если оба rack id в project-instances. Никаких доп. требований к devId/contents. Раньше: при пере-рендеринге scs-config содержимое получало другие id, и свежесозданные batch-связи массово исчезали из списка.',
+      '• <b>«автораскладка в ряды сломалась»</b>: <code>autoLayout()</code> теперь использует <code>getProjectInstances()</code> вместо <code>getRacks()</code>. Фильтруются только реальные размещаемые экземпляры (inst-* + POR). Раньше getRacks() мог включать virtual scheme-* / por-group-* / templates, которые заведомо не помещаются в план и portion-блоком ломали логику pair-row layout (следующая пара открывалась преждевременно из-за переполнения от шаблонной стойки, которая на план не попадает).',
+      'Файлы: <code>scs-design/scs-design.css</code> (.sd-racks-wrap padding-top:60px), <code>scs-design/scs-design.js</code> (isLinkLive lenient + autoLayout uses getProjectInstances).',
+    ] },
     { version: '0.60.156', date: '2026-05-04', items: [
       '🔗 <b>scs-design: routing меж-шкафных линий + список кабелей</b>. По репорту Пользователя 2026-05-04 «связь над стойками выполнить согласно нескольким правилам... Пропал список кабелей между стойками».',
       '• <b>Routing «над стойками» переписан по 6-сегментной схеме</b> (раньше линия выходила из ВЕРХА центра шкафа и пересекала весь шкаф сверху вниз):',

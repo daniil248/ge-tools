@@ -252,7 +252,14 @@
   border-radius: 8px;
 }
 
-.sd-racks-wrap { position: relative; }
+.sd-racks-wrap {
+  position: relative;
+  /* v0.60.157 (по повторному репорту Пользователя 2026-05-04 «сверху
+     линий не видно»): padding-top 60px — резерв над стойками для over-rack
+     channel линий. Раньше racks начинались с y=8px, channelY уходил в
+     отрицательные координаты и обрезался SVG-viewBox'ом. */
+  padding-top: 60px;
+}
 .sd-racks-row {
   /* v0.59.285: выравнивание карточек по низу — U1 всегда на одной линии,
      независимо от разной высоты стоек (42U vs 47U и т.п.). */
