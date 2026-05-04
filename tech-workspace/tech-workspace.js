@@ -496,7 +496,26 @@ function _bindBtnHtml(domain, refId, modelRef) {
 }
 
 // ─── Render: rack group card
-function renderRackGroupCard(rg, isReadOnly) {
+// v0.60.114: helper для room picker'а в карточках стоек/ИБП/климата.
+// Скрывается если в проекте всего одно помещение (picker излишен).
+function _roomPickerHtml(rooms, currentRoomId, isReadOnly, kindHint) {
+  const ro = isReadOnly ? 'disabled' : '';
+  const list = Array.isArray(rooms) ? rooms : [];
+  if (list.length <= 1) {
+    const name = list[0]?.name || 'Главный зал';
+    return `<label title="Привязка к помещению объекта. Добавить помещения можно в секции «🏠 Помещения» слева.">🏠 Помещение:
+      <input type="text" value="${escAttr(name)}" disabled style="background:#f8fafc;color:#475569"></label>`;
+  }
+  const opts = list.map(r => `<option value="${escAttr(r.id)}"${currentRoomId === r.id ? ' selected' : ''}>${escHtml(r.name || r.id)}</option>`).join('');
+  const tip = kindHint === 'ups'
+    ? 'В каком помещении стоят ИБП. Могут быть в одном зале со стойками или в отдельной электрощитовой / UPS-room.'
+    : 'В каком помещении расположена эта группа стоек.';
+  return `<label title="${escAttr(tip)}">🏠 Помещение:
+    <select data-field="roomId" ${ro}>${opts}</select>
+  </label>`;
+}
+
+function renderRackGroupCard(rg, isReadOnly, rooms) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = calcRackGroupKw(rg);
   return `<div class="tw-card" data-card-kind="rack" data-card-id="${rg.id}">
@@ -506,6 +525,7 @@ function renderRackGroupCard(rg, isReadOnly) {
       <button type="button" class="tw-card-del" data-card-action="delete" title="Удалить группу" ${ro}>×</button>
     </div>
     <div class="tw-grid">
+      ${_roomPickerHtml(rooms, rg.roomId, isReadOnly, 'rack')}
       <label>Кол-во стоек:<input type="number" data-field="count" min="0" step="1" value="${rg.count}" ${ro}></label>
       <label>Мощность на стойку, кВт:<input type="number" data-field="kwPerRack" min="0" step="0.5" value="${rg.kwPerRack}" ${ro}></label>
       <label>Профиль:
@@ -560,7 +580,7 @@ function renderRackGroupCard(rg, isReadOnly) {
 }
 
 // ─── Render: ups system card
-function renderUpsCard(us, isReadOnly) {
+function renderUpsCard(us, isReadOnly, rooms) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = _upsAvail(us);
   // Phase 30.2 (v0.60.69): pre-fill для ups-config wizard.
@@ -574,6 +594,7 @@ function renderUpsCard(us, isReadOnly) {
       <button type="button" class="tw-card-del" data-card-action="delete" title="Удалить систему" ${ro}>×</button>
     </div>
     <div class="tw-grid">
+      ${_roomPickerHtml(rooms, us.roomId, isReadOnly, 'ups')}
       <label>Назначение:
         <select data-field="purpose" ${ro}>
           <option value="it"${us.purpose === 'it' ? ' selected' : ''}>⚡ IT-нагрузка</option>
@@ -635,9 +656,34 @@ function _readUpsSelected() {
 }
 
 // ─── Render: cooling unit card
-function renderCoolCard(cu, isReadOnly) {
+// v0.60.114: scope picker (room|shared) + room/rooms picker.
+//   'room'   — закреплён за одним залом (CRAC/InRow per room) → roomId.
+//   'shared' — обслуживает несколько залов (chiller-plant, AHU) → roomIds[].
+function renderCoolCard(cu, isReadOnly, rooms) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = _coolAvail(cu);
+  const list = Array.isArray(rooms) ? rooms : [];
+  const scope = cu.scope || 'room';
+  // Scope-specific picker
+  let scopePickerHtml = '';
+  if (list.length > 0) {
+    if (scope === 'shared') {
+      const ids = Array.isArray(cu.roomIds) ? cu.roomIds : [];
+      const checks = list.map(r => {
+        const checked = ids.includes(r.id);
+        return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;margin-right:10px"><input type="checkbox" data-cool-room-toggle="${escAttr(r.id)}"${checked ? ' checked' : ''} ${ro}> ${escHtml(r.name || r.id)}</label>`;
+      }).join('');
+      scopePickerHtml = `<div style="grid-column:1/-1" title="Какие помещения обслуживает эта общая система. Например, чиллер-плант на крыше может обслуживать все залы стоек одновременно.">
+        <div style="font-size:11.5px;color:#475569;margin-bottom:4px">🏠 Обслуживает помещения:</div>
+        <div>${checks || '<span class="muted">(нет помещений)</span>'}</div>
+      </div>`;
+    } else {
+      const opts = list.map(r => `<option value="${escAttr(r.id)}"${cu.roomId === r.id ? ' selected' : ''}>${escHtml(r.name || r.id)}</option>`).join('');
+      scopePickerHtml = `<label title="В каком помещении установлен этот кондиционер. CRAC/InRow обычно стоит в самом IT-зале.">🏠 Помещение:
+        <select data-field="roomId" ${ro}>${opts}</select>
+      </label>`;
+    }
+  }
   return `<div class="tw-card" data-card-kind="cool" data-card-id="${cu.id}">
     <div class="tw-card-head">
       <input type="text" class="tw-card-name" data-field="name" value="${escAttr(cu.name)}" placeholder="Название" ${ro}>
@@ -645,6 +691,13 @@ function renderCoolCard(cu, isReadOnly) {
       <button type="button" class="tw-card-del" data-card-action="delete" title="Удалить" ${ro}>×</button>
     </div>
     <div class="tw-grid">
+      <label title="Зона обслуживания: «В помещении» — CRAC/InRow закреплён за одним залом. «Общая» — chiller-plant/AHU обслуживает несколько залов.">📍 Зона обслуживания:
+        <select data-field="scope" ${ro}>
+          <option value="room"${scope === 'room' ? ' selected' : ''}>В помещении (CRAC/InRow per room)</option>
+          <option value="shared"${scope === 'shared' ? ' selected' : ''}>Общая (chiller-plant, AHU)</option>
+        </select>
+      </label>
+      ${scopePickerHtml}
       <label>Кол-во кондиционеров:<input type="number" data-field="count" min="1" step="1" value="${cu.count}" ${ro}></label>
       <label>Холод на единицу, кВт:<input type="number" data-field="kwPerUnit" min="0" step="5" value="${cu.kwPerUnit}" ${ro}></label>
       <label>Тип:
@@ -1456,20 +1509,20 @@ function renderDetails(c, ro) {
     const rg = (c.rackGroups || []).find(x => x.id === sel.id);
     if (!rg) return '<div class="tw-details-empty muted">Группа удалена. Выберите блок слева.</div>';
     return _detailsHeaderHtml('🗄 Группа стоек', rg.id, ro, 'rack', `${rg.count} × ${rg.kwPerRack} кВт = ${calcRackGroupKw(rg).toFixed(1)} кВт`)
-      + renderRackGroupCard(rg, ro)
+      + renderRackGroupCard(rg, ro, c.rooms)
       + _bulkRackToolbar(c, ro);
   }
   if (sel.kind === 'ups') {
     const us = (c.upsSystems || []).find(x => x.id === sel.id);
     if (!us) return '<div class="tw-details-empty muted">Система удалена. Выберите блок слева.</div>';
     return _detailsHeaderHtml('⚡ Система ИБП', us.id, ro, 'ups', `${us.count} × ${us.ratedKva} кВА · ${_upsAvail(us).toFixed(1)} кВт доступно`)
-      + renderUpsCard(us, ro);
+      + renderUpsCard(us, ro, c.rooms);
   }
   if (sel.kind === 'cool') {
     const cu = (c.coolingUnits || []).find(x => x.id === sel.id);
     if (!cu) return '<div class="tw-details-empty muted">Группа удалена. Выберите блок слева.</div>';
     return _detailsHeaderHtml('❄ Группа кондиционеров', cu.id, ro, 'cool', `${cu.count} × ${cu.kwPerUnit} кВт · ${_coolAvail(cu).toFixed(1)} кВт доступно`)
-      + renderCoolCard(cu, ro);
+      + renderCoolCard(cu, ro, c.rooms);
   }
   // v0.59.901: топология охлаждения
   if (sel.kind === 'coolsys') {
@@ -1947,19 +2000,19 @@ function renderAllCardsLayout(c, ro) {
       <div class="tw-section-head"><h3>🗄 Группы стоек</h3>
         <button type="button" class="tw-add-btn" data-add-card="rack" ${ro ? 'disabled' : ''}>➕ Группа стоек</button>
       </div>
-      ${(c.rackGroups || []).map(rg => renderRackGroupCard(rg, ro)).join('') || '<p class="muted">Нет групп.</p>'}
+      ${(c.rackGroups || []).map(rg => renderRackGroupCard(rg, ro, c.rooms)).join('') || '<p class="muted">Нет групп.</p>'}
     </section>
     <section class="tw-cards-section">
       <div class="tw-section-head"><h3>⚡ Системы ИБП</h3>
         <button type="button" class="tw-add-btn" data-add-card="ups" ${ro ? 'disabled' : ''}>➕ Система ИБП</button>
       </div>
-      ${(c.upsSystems || []).map(us => renderUpsCard(us, ro)).join('') || '<p class="muted">Нет.</p>'}
+      ${(c.upsSystems || []).map(us => renderUpsCard(us, ro, c.rooms)).join('') || '<p class="muted">Нет.</p>'}
     </section>
     <section class="tw-cards-section">
       <div class="tw-section-head"><h3>❄ Климат</h3>
         <button type="button" class="tw-add-btn" data-add-card="cool" ${ro ? 'disabled' : ''}>➕ Группа</button>
       </div>
-      ${(c.coolingUnits || []).map(cu => renderCoolCard(cu, ro)).join('') || '<p class="muted">Нет.</p>'}
+      ${(c.coolingUnits || []).map(cu => renderCoolCard(cu, ro, c.rooms)).join('') || '<p class="muted">Нет.</p>'}
     </section>
     <section class="tw-cards-section">
       <div class="tw-section-head"><h3>🔌 Ввод</h3></div>
@@ -2159,9 +2212,25 @@ function bindListEvents() {
     const cur = _variants.find(x => x.id === _activeId);
     if (!cur || cur.readOnly) return;
     const target = e.target;
-    if (!target || (!target.matches('input, select'))) return;
+    if (!target || (!target.matches('input, select, textarea'))) return;
     const card = target.closest('.tw-card');
     const field = target.dataset.field;
+    // v0.60.114: чек-боксы roomIds в shared-cooling карточке.
+    const coolRoomToggle = target.dataset.coolRoomToggle;
+    if (coolRoomToggle && card && card.dataset.cardKind === 'cool') {
+      const cuId = card.dataset.cardId;
+      const cuObj = (cur.concept.coolingUnits || []).find(x => x.id === cuId);
+      if (cuObj) {
+        if (!Array.isArray(cuObj.roomIds)) cuObj.roomIds = [];
+        if (target.checked) {
+          if (!cuObj.roomIds.includes(coolRoomToggle)) cuObj.roomIds.push(coolRoomToggle);
+        } else {
+          cuObj.roomIds = cuObj.roomIds.filter(x => x !== coolRoomToggle);
+        }
+        persistVariants(); renderActiveVariant();
+      }
+      return;
+    }
     // BOM-цены не имеют data-field (они идентифицируются через data-bom-key)
     if (!field && !target.classList.contains('tw-bom-price')) return;
     const value = (target.type === 'checkbox') ? target.checked

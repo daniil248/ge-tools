@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.114', date: '2026-05-04', items: [
+      '🏠 <b>TW Rooms UI Step 3: pickers в карточках стоек/ИБП/климата</b>. Завершение rooms-концепции (data-model v0.60.111, rail+editor v0.60.113).',
+      '• <b>Картка стойки</b>: новое поле «🏠 Помещение» — dropdown со списком rooms. Если в проекте только одно помещение — readonly text «Главный зал» (picker излишен).',
+      '• <b>Карточка ИБП</b>: аналогично — поле «🏠 Помещение». Tooltip объясняет что ИБП могут быть в зале со стойками или в отдельной электрощитовой / UPS-room.',
+      '• <b>Карточка климата</b>: новый «📍 Зона обслуживания» (room | shared) + scope-зависимый picker:',
+      '  • <b>В помещении</b> (room) — single dropdown «🏠 Помещение» (CRAC/InRow per room).',
+      '  • <b>Общая</b> (shared) — чек-боксы по всем помещениям, выбираем какие обслуживает (chiller-plant, AHU обслуживающие несколько залов).',
+      '• <b>Helper <code>_roomPickerHtml(rooms, currentRoomId, isReadOnly, kindHint)</code></b>: единая логика для rack/ups (kindHint меняет только tooltip).',
+      '• <b>Чек-бокс toggle handler</b> (<code>data-cool-room-toggle</code>) для shared-cooling — добавляет/удаляет roomId из массива roomIds.',
+      '• <b>matches\' textarea</b>: bindListEvents теперь принимает textarea (раньше только input/select) — для notes-поля в room editor.',
+      '• Сигнатуры расширены: <code>renderRackGroupCard(rg, ro, rooms)</code>, <code>renderUpsCard(us, ro, rooms)</code>, <code>renderCoolCard(cu, ro, rooms)</code>. Все 6 call-sites обновлены.',
+      '• Cooling scope-switch (room↔shared миграция roomId↔roomIds) уже работает с v0.60.113 — теперь UI триггерит её автоматически при выборе scope в picker.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code> (~70 строк: _roomPickerHtml + scope-picker логика в renderCoolCard + checkbox toggle в bindListEvents + сигнатуры карточек + 6 call-sites).',
+    ] },
     { version: '0.60.113', date: '2026-05-04', items: [
       '🏠 <b>TW Rooms UI: rail-блок «Помещения» + редактор помещения + room CRUD</b>. Продолжение data-model из v0.60.111 — теперь с интерактивным интерфейсом. По запросу Пользователя 2026-05-03: «для технолога цод нужно учитывать что ИБП могут быть как в одном помещении со стойками так и в разных, кондиционеры могут быть как общими, так и независимыми системами с разной технологией».',
       '• <b>Rail-блок «🏠 Помещения»</b> между «🏷 Объект» и «🗄 Стойки». Список помещений с иконкой по типу (🗄 IT / ⚡ UPS-room / 🛠 mech / 🏢 office / 📦 other) + счётчик «N ст · M ИБП · K клим» + chip площади (если задана).',
