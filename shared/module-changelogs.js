@@ -4,6 +4,11 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.189', date: '2026-05-04', items: [
+      '🚫 <b>«×: N шт.» убрано из body карточки (все пресеты)</b>. По репорту Пользователя 2026-05-04 «не в одном пресете в карточке не должно быть количества единиц (×: 8 шт.)». Информация о количестве уже отображается в footer-метке снаружи карточки («8 × 7 kW = 56 kW»). Дублировать в body нет смысла.',
+      '• <b>Применено</b>: count = null для consumer И consumer-container во всех пресетах.',
+      'Файл: <code>js/engine/render.js</code> (valueMap.count для consumer + consumer-container).',
+    ] },
     { version: '0.60.188', date: '2026-05-04', items: [
       '🔢 <b>Icalc для consumer теперь из Pcalc (как у container)</b>. По репорту Пользователя 2026-05-04 «да почему они у тебя опять разные???». Single consumer показывал «Расчёт: 3.5 кВт / 0 A» — нулевой ток.',
       '• <b>Корень bug</b>: для single consumer Icalc читался из <code>n._loadA</code>. Но recalc.js не выставляет _loadA на consumer-узле (consumer = leaf, ток вычисляется только на upstream-узлах после walkUp). → Icalc=0.',

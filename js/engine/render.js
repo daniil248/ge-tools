@@ -2642,7 +2642,11 @@ export function renderNodes() {
           breakerIn:  { v: null },
           cableSpec:  { v: n._cableSpec || null },
           deltaUPct:  { v: null },
-          count:      { v: cnt > 1 ? String(cnt) : null }, // Количество (только в группе)
+          // v0.60.189 (по репорту Пользователя 2026-05-04 «не в одном пресете
+          // в карточке не должно быть количества единиц (×: 8 шт.)»):
+          // count скрыт. Информация о количестве уже в footer-метке
+          // «8 × 7 kW = 56 kW» снаружи карточки.
+          count:      { v: null },
         };
         labelMap = null;
       } else if (n.type === 'consumer') {
@@ -2681,7 +2685,8 @@ export function renderNodes() {
           breakerIn:  { v: Number.isFinite(Number(n.breakerIn)) && n.breakerIn ? String(n.breakerIn) : null },
           cableSpec:  { v: n._cableSpec || null },
           deltaUPct:  { v: null },                        // ΔU — скрыт
-          count:      { v: (Number(n.count) || 1) > 1 ? String(n.count) : null },
+          // v0.60.189: count скрыт во всех пресетах — есть в footer-метке.
+          count:      { v: null },
         };
         labelMap = null;
       } else if (n.type === 'panel') {
