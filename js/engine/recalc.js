@@ -2546,51 +2546,48 @@ function recalc() {
       continue;
     }
 
-    // v0.60.159 (по репорту Пользователя 2026-05-04 «у трансформатора
+    // v0.60.159/160 (по репорту Пользователя 2026-05-04 «у трансформатора
     // обычно нет автомата на выходе»): кабель ОТ трансформатора (secondary
-    // side, LV) защищается ВВОДНЫМ автоматом downstream-щита (main
-    // breaker первого ЩС после ТП). По ПУЭ-7.3.1 / IEC 60364-4-43 защита
-    // на стороне НН ставится в первом распределительном щите.
-    // На самой обмотке вторички автомата нет.
+    // side, LV) физически не имеет автомата на ТП. По ПУЭ-7.3.1 / IEC
+    // 60364-4-43 защита ставится в ВВОДНОМ автомате первого распред-щита
+    // после ТП (main breaker downstream-ЩС). На самой обмотке вторички
+    // автомата нет.
     //
-    // Поведение:
-    //   • Если в downstream-узле (toN) задан inputBreakerIn (panel.mainBreaker
-    //     или panel.inputBreakerIn) — используем его для проверки кабеля.
-    //   • Иначе — кабель помечается как «защищён downstream'ом» без проверки
-    //     (аналогично utility infeed). Защита подбирается в downstream-щите.
+    // Поведение (упрощено в v0.60.160 — раньше пытались найти panel.mainBreakerIn
+    // которого не существует как поля):
+    //   • Никакого breaker'а на этом кабеле — он защищён через DOWNSTREAM щит.
+    //   • Breaker-error checks отключены (как для utility-infeed).
     //   • Manual override (c.manualBreakerIn) допускается — экзотика
-    //     (промежуточный автомат на cable run > 3м).
+    //     (промежуточный автомат на cable run > 3м по ПУЭ).
+    //   • _breakerExcludeFromBom = true — автомат не попадает в BOM
+    //     отдельной позицией (защита перекрывается main breaker'ом ЩС,
+    //     который уже учитывается).
     const _isTransformerOutput = fromN.type === 'source'
       && (fromN.sourceSubtype || 'transformer') === 'transformer'
       && fromN.sourceSubtype !== 'utility' && fromN.sourceSubtype !== 'grid';
     if (_isTransformerOutput) {
-      // Ищем main breaker у downstream-узла (panel/ups input).
-      let downBrk = null;
-      if (toN.type === 'panel') {
-        downBrk = Number(toN.mainBreakerIn) || Number(toN.inputBreakerIn) || null;
-      } else if (toN.type === 'ups') {
-        downBrk = Number(toN.inputBreakerIn) || null;
-      }
       if (c.manualBreakerIn) {
         // Manual override — это и есть защита (промежуточный автомат).
         c._breakerIn = Number(c.manualBreakerIn);
         c._breakerInternal = false;
         c._breakerExcludeFromBom = false;
         c._breakerCount = 1;
+        const IzTr = c._cableIz || 0;
+        const parTr = Math.max(1, c._cableParallel || 1);
+        c._breakerAgainstCable = !!(c._breakerIn && IzTr > 0 && c._breakerIn > IzTr * parTr);
+        c._breakerUndersize = !!(c._breakerIn && c._maxA && c._breakerIn < c._maxA);
       } else {
+        // Нет автомата — защита через main breaker downstream-ЩС.
         c._breakerInternal = true;
         c._breakerInternalSource = 'transformer-secondary-passthrough';
         c._breakerExcludeFromBom = true;
-        c._breakerIn = downBrk;
+        c._breakerIn = null;
         c._breakerCount = 0;
+        c._breakerAgainstCable = false;
+        c._breakerUndersize = false;
+        c._transformerInfeed = true;  // marker для отчётов / UI
       }
       c._breakerPerLine = null;
-      const IzTr = c._cableIz || 0;
-      const parTr = Math.max(1, c._cableParallel || 1);
-      // Если downstream-щит имеет inputBreakerIn — проверяем кабель против него.
-      // Если нет — не помечаем как ошибку (защита подберётся в downstream).
-      c._breakerAgainstCable = !!(c._breakerIn && IzTr > 0 && c._breakerIn > IzTr * parTr);
-      c._breakerUndersize = !!(c._breakerIn && c._maxA && c._breakerIn < c._maxA);
       c._breakerCurveEff = 'MCCB';
       continue;
     }

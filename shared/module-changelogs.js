@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.160', date: '2026-05-04', items: [
+      '⚡ <b>Трансформатор: hotfix v0.60.159 — упрощена логика «без автомата»</b>. v0.60.159 пыталась читать <code>panel.mainBreakerIn</code> которого не существует как поля (panel использует <code>channelProtection[]</code> per-input). В результате downBrk всегда был null и проверка не работала корректно.',
+      '• <b>Упрощено</b>: кабель transformer→panel/ups не имеет _breakerIn (= null) и не помечается как «In > Iz» ошибка. Защита через main breaker downstream-ЩС подбирается уже в downstream-узле (там его собственная логика).',
+      '• <b>_transformerInfeed marker</b> добавлен для UI/отчётов — кабель помечен как «защищён downstream».',
+      '• <b>manualBreakerIn override</b> остаётся для экзотики (промежуточный автомат на cable run >3м по ПУЭ).',
+      'Файлы: <code>js/engine/recalc.js</code> (упрощение _isTransformerOutput блока).',
+    ] },
     { version: '0.60.159', date: '2026-05-04', items: [
       '⚡ <b>Трансформатор: нет автомата на выходе (по ПУЭ)</b>. По репорту Пользователя 2026-05-04 «у трансформатора обычно нет автомата на выходе».',
       '• <b>Контекст</b>: на secondary side трансформатора (LV) автомата нет — защита ставится в ВВОДНОМ автомате downstream-ЩС (по ПУЭ-7.3.1 / IEC 60364-4-43, первый распределительный щит после ТП).',
