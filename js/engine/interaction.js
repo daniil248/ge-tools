@@ -1557,7 +1557,16 @@ export function initInteraction() {
           const copy = state.nodes.get(copyId);
           if (copy) {
             const p = clientToSvg(e.clientX, e.clientY);
-            state.drag = { nodeId: copyId, dx: p.x - copy.x, dy: p.y - copy.y };
+            // v0.60.178 (по репорту Пользователя 2026-05-04 «почему двойной
+            // клик с ctrl создал группу»): запоминаем стартовую позицию,
+            // чтобы при mouseup без реального движения НЕ срабатывал
+            // drop-merge (клон перекрывает оригинал → создавалась группа).
+            state.drag = {
+              nodeId: copyId,
+              dx: p.x - copy.x, dy: p.y - copy.y,
+              startX: copy.x, startY: copy.y,
+              isClone: true,
+            };
           }
           render();
           return;
@@ -1926,6 +1935,10 @@ export function initInteraction() {
       const wasLength = !!state.drag.lengthNodeId;
       const draggedNodeId = state.drag.nodeId;
       const hadChildren = !!(state.drag.children && state.drag.children.length);
+      // v0.60.178: захватываем стартовую позицию для anti-spurious-merge
+      // (см. ниже в drop-merge блоке).
+      const _dragStartX = state.drag.startX;
+      const _dragStartY = state.drag.startY;
       svg.classList.remove('panning');
       state.drag = null;
       // Членство в зоне обновляется только в момент отпускания мыши после
@@ -1987,7 +2000,15 @@ export function initInteraction() {
       // Группа-tab инспектора.
       if (wasNodeDrag && draggedNodeId) {
         const dragged = state.nodes.get(draggedNodeId);
-        if (dragged && dragged.type === 'consumer') {
+        // v0.60.178: skip drop-merge если узел не двигали (Ctrl+click без
+        // движения создаёт клон в (0,0) → он перекрывает оригинал → ранее
+        // запускался _mergeIntoContainer и создавалась группа). Проверяем
+        // фактическое смещение от стартовой позиции драга.
+        const _movedDistSq = (dragged && Number.isFinite(_dragStartX) && Number.isFinite(_dragStartY))
+          ? (dragged.x - _dragStartX) ** 2 + (dragged.y - _dragStartY) ** 2
+          : Infinity;
+        const _didMove = _movedDistSq > 25; // 5px threshold
+        if (dragged && dragged.type === 'consumer' && _didMove) {
           const target = _findConsumerOverlapAt(dragged);
           if (target && _isCompatibleConsumer(target, dragged)) {
             try { snapshot('consumer-container:' + target.id + '←' + dragged.id); } catch {}
