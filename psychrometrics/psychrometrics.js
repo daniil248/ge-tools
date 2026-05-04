@@ -779,7 +779,35 @@ function wireGraphHost(hostOrId) {
     if (col === 'proc-type') {
       const i = +e.target.dataset.i;
       S.procs[i] = S.procs[i] || {};
-      S.procs[i].type = e.target.value;
+      const newType = e.target.value;
+      const oldType = S.procs[i].type;
+      S.procs[i].type = newType;
+      // v0.60.104: при переключении на полностью детерминированный
+      // процесс (R, M) на выходной точке очищаем User-флаги
+      // соответствующих полей, чтобы recalc подставил вычисленные
+      // значения. Иначе старый ввод оператора блокировал бы computed.
+      if ((newType === 'R' || newType === 'M') && newType !== oldType) {
+        const toI = edgeTo(S.procs[i], i);
+        const dest = S.points[toI];
+        if (dest) {
+          ['t','rh','x','h'].forEach(f => {
+            dest[f+'User'] = false;
+            dest[f+'Ts'] = 0;
+          });
+        }
+      }
+      // P → выход: d=const → очищаем xUser (d-поле)
+      if (newType === 'P' && newType !== oldType) {
+        const toI = edgeTo(S.procs[i], i);
+        const dest = S.points[toI];
+        if (dest) { dest.xUser = false; dest.xTs = 0; }
+      }
+      // A → выход: h=const → очищаем hUser
+      if (newType === 'A' && newType !== oldType) {
+        const toI = edgeTo(S.procs[i], i);
+        const dest = S.points[toI];
+        if (dest) { dest.hUser = false; dest.hTs = 0; }
+      }
       rerenderCycle();
       return;
     }
@@ -992,9 +1020,68 @@ function pointCard(p, i) {
     d:   `d, г/кг${ru?' <em style="color:#90a4ae;font-style:normal">(влагосодерж.)</em>':''}`,
     h:   `h, кДж/кг${ru?' <em style="color:#90a4ae;font-style:normal">(энтальпия)</em>':''}`,
   };
+  // v0.60.104: блокируем поля точки, если она — выход полностью
+  // детерминированного процесса. По репорту Пользователя 2026-05-04:
+  // «пластинчатым рекуператором особо не по управляешь, зависимость
+  // только от количества воздуха в двух каналах и коэффициентах
+  // передачи, а у меня по факту могу задать характеристики точки
+  // после рекуператора».
+  //
+  // Правила блокировки по типу входящего процесса:
+  //   R (рекуператор) — все 4 поля {t, φ, d, h} computed; знакомер
+  //                      настраиваются только η, V, ref, режим на стрелке.
+  //   P (нагрев)      — d=const (=d входа). d-поле зафиксировано.
+  //                      Если задан Q — t тоже computed (уже работает
+  //                      через Qs-флаг). Здесь не блокируем t/φ/h
+  //                      жёстко — оператор может задать целевое t_2 и
+  //                      получить нужный Q.
+  //   A (адиабат.)    — h=const (=h входа). h-поле зафиксировано.
+  //   S (пар)         — t≈const. (мягкая блокировка пока не делаем)
+  //   C (охлажд.)     — bypass + ADP, многомерный — не блокируем.
+  //   M (смешение)    — линия смешения двух потоков, computed целиком.
+  //                      Блокируем все 4 как у R.
+  //
+  // Точка может быть выходом нескольких процессов (multi-edge). Берём
+  // СТРОЖАЙШИЙ режим: если хоть один процесс полностью детерминирует
+  // outlet — блокируем все поля.
+  const _incomingProcs = (S.procs || []).filter((pr, pi) => edgeTo(pr, pi) === i);
+  let _lockReason = '';
+  let _locked = { t: false, rh: false, x: false, h: false };
+  for (const pr of _incomingProcs) {
+    if (pr.type === 'R') {
+      _locked = { t: true, rh: true, x: true, h: true };
+      _lockReason = 'Точка — выход рекуператора. Все параметры (t, φ, d, h) определяются автоматически из: входной точки, опорной (вытяжка), КПД η, расхода V и режима (sensible/total). Управляйте процессом через η/V/ref/mode на стрелке выше.';
+      break;
+    }
+    if (pr.type === 'M') {
+      _locked = { t: true, rh: true, x: true, h: true };
+      _lockReason = 'Точка — выход смесителя. Параметры рассчитываются как взвешенное среднее по массовым расходам входящих потоков. Управляйте через V каждого входящего потока.';
+      break;
+    }
+    if (pr.type === 'P') {
+      // d=const, остальное оператор может задать (или вычисляется через Q)
+      _locked.x = true;
+      if (!_lockReason) _lockReason = 'Точка — выход калорифера/нагрева (P). d (влагосодержание) сохраняется = d входа. t/φ/h можно задать (или будут получены из Q на стрелке).';
+    }
+    if (pr.type === 'A') {
+      // h=const
+      _locked.h = true;
+      if (!_lockReason) _lockReason = 'Точка — выход адиабатического увлажнителя (A). h (энтальпия) сохраняется = h входа. t/φ/d можно задать (или будут получены из q_w на стрелке).';
+    }
+  }
+  const _hasAnyLock = _locked.t || _locked.rh || _locked.x || _locked.h;
+  const lockHint = _hasAnyLock
+    ? `<div class="pt-locked-hint" style="font-size:10.5px;color:#92400e;background:#fef3c7;border-left:3px solid #d97706;padding:6px 8px;margin:4px 0;border-radius:3px" title="${escAttr(_lockReason)}">🔒 ${escAttr(_lockReason)}</div>`
+    : '';
+  const _attr = (field) => {
+    if (!_locked[field]) return '';
+    return ` readonly disabled style="background:#f1f5f9;color:#64748b;cursor:not-allowed" title="${escAttr(_lockReason)}"`;
+  };
   const hint = i === 0
     ? `<span class="pt-hint">Начало цикла: задайте любые 2 из {t, φ, d, h}.</span>`
-    : `<span class="pt-hint">Задайте любую из {t, φ, d, h} — остальное посчитается от процесса ${i}→${i+1}. Либо задайте Q или q<sub>w</sub> на стрелке выше.</span>`;
+    : (_hasAnyLock
+        ? `<span class="pt-hint">Заблокированные поля рассчитываются автоматически по входящему процессу.</span>`
+        : `<span class="pt-hint">Задайте любую из {t, φ, d, h} — остальное посчитается от процесса ${i}→${i+1}. Либо задайте Q или q<sub>w</sub> на стрелке выше.</span>`);
   // v0.59.970: title-tooltips для всех полей. По репорту:
   // «добавь подсказки при наведении ... показывать при наведении мыши на
   // обозначение параметра или поле ввода».
@@ -1011,10 +1098,11 @@ function pointCard(p, i) {
       <button type="button" class="pt-del" title="Удалить точку" data-act="del" data-i="${i}">✕</button>
     </div>
     <label title="${escAttr(TT.name)}">Имя<input type="text" data-col="name" data-i="${i}" data-user="${du('name')}" value="${escAttr(p.name || '')}" title="${escAttr(TT.name)}"></label>
-    <label title="${escAttr(TT.t)}">${L.t}<input type="number" data-col="t" data-i="${i}" data-user="${du('t')}" data-ts="${ts('t')}" value="${p.t ?? ''}" step="0.1" title="${escAttr(TT.t)}"></label>
-    <label title="${escAttr(TT.rh)}">${L.rh}<input type="number" data-col="rh" data-i="${i}" data-user="${du('rh')}" data-ts="${ts('rh')}" value="${p.rh ?? ''}" step="1" min="0" max="100" title="${escAttr(TT.rh)}"></label>
-    <label title="${escAttr(TT.d)}">${L.d}<input type="number" data-col="x" data-i="${i}" data-user="${du('x')}" data-ts="${ts('x')}" value="${p.x ?? ''}" step="0.1" placeholder="авто" title="${escAttr(TT.d)}"></label>
-    <label title="${escAttr(TT.h)}">${L.h}<input type="number" data-col="h" data-i="${i}" data-user="${du('h')}" data-ts="${ts('h')}" value="${p.h ?? ''}" step="0.1" placeholder="авто" title="${escAttr(TT.h)}"></label>
+    ${lockHint}
+    <label title="${escAttr(_locked.t ? _lockReason : TT.t)}">${L.t}<input type="number" data-col="t" data-i="${i}" data-user="${du('t')}" data-ts="${ts('t')}" value="${p.t ?? ''}" step="0.1" title="${escAttr(_locked.t ? _lockReason : TT.t)}"${_attr('t')}></label>
+    <label title="${escAttr(_locked.rh ? _lockReason : TT.rh)}">${L.rh}<input type="number" data-col="rh" data-i="${i}" data-user="${du('rh')}" data-ts="${ts('rh')}" value="${p.rh ?? ''}" step="1" min="0" max="100" title="${escAttr(_locked.rh ? _lockReason : TT.rh)}"${_attr('rh')}></label>
+    <label title="${escAttr(_locked.x ? _lockReason : TT.d)}">${L.d}<input type="number" data-col="x" data-i="${i}" data-user="${du('x')}" data-ts="${ts('x')}" value="${p.x ?? ''}" step="0.1" placeholder="авто" title="${escAttr(_locked.x ? _lockReason : TT.d)}"${_attr('x')}></label>
+    <label title="${escAttr(_locked.h ? _lockReason : TT.h)}">${L.h}<input type="number" data-col="h" data-i="${i}" data-user="${du('h')}" data-ts="${ts('h')}" value="${p.h ?? ''}" step="0.1" placeholder="авто" title="${escAttr(_locked.h ? _lockReason : TT.h)}"${_attr('h')}></label>
     ${hint}
     <div class="pt-computed" data-role="pt-computed"></div>
   `;
