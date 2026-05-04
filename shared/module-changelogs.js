@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.199', date: '2026-05-04', items: [
+      '🔧 <b>Consumer-container наследует priorities от первого linked-member</b>. По open-issue из v0.60.197 «JB1 Ток 171 > Макс 111.4А — parallel-priority bug».',
+      '• <b>Раньше</b>: <code>container.priorities</code> = undefined → <code>activeInputs()</code> применял default 1 ко всем портам. Для PARALLEL [1,1] это работало (равный share), но для АВР-настроек inner consumer\'а [1,2] container всё равно делил 50/50, не уважая standby-вход.',
+      '• <b>Теперь</b>: при отсутствии <code>container.priorities</code> наследуем от первого linked-member через slots[]. Walkup от container согласован с настройками inner consumer.',
+      '• <b>Эффект</b>: для consumer с priorities=[1,2] (АВР) container правильно выберет primary вход; для [1,1] (parallel) — поделит 50/50 как раньше.',
+      'Файл: <code>js/engine/recalc.js</code> (activeInputs auto-priorities branch + consumer-container fallback).',
+    ] },
     { version: '0.60.198', date: '2026-05-04', items: [
       '🔤 <b>Единицы СИ — латиница везде</b> (kW / A / V / kVA / MVA / Hz / Ohm). По репорту Пользователя 2026-05-04 «я просил тебя везде использовать единицы СИ kW, даже когда я говорю про кВт». В <code>shared/card-fields-registry.js</code> заменены все 40 кириллических <code>unit</code>-строк: \'кВт\'→\'kW\', \'А\'→\'A\', \'В\'→\'V\', \'кВА\'→\'kVA\', \'МВА\'→\'MVA\', \'Гц\'→\'Hz\', \'Ом\'→\'Ohm\'. Карточки теперь показывают «Расчёт: 7 kW / 31.7 A» вместо «7 кВт / 31.7 А».',
       'Файл: <code>shared/card-fields-registry.js</code> (40 строк).',

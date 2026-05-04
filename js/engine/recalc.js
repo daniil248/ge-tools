@@ -1314,9 +1314,31 @@ function recalc() {
             }
           } else {
             // Без override — стандартная логика по приоритетам (первый запуск)
+            // v0.60.198 (по open-issue из v0.60.197 «JB1 Ток 171 > Макс
+            // 111.4А — parallel-priority bug»): для consumer-container
+            // priorities наследуются от первого linked-member. Раньше
+            // container.priorities=undefined → all default 1. Это работает
+            // для PARALLEL [1,1] (равный share), но если у inner consumer'а
+            // priorities=[1,2] (АВР) → walkUp от container всё равно делил
+            // 50/50, не уважая standby-вход. Унаследование priorities
+            // делает поведение container'а согласованным с настройками
+            // inner consumer.
+            let _effPriorities = n.priorities;
+            if ((!Array.isArray(_effPriorities) || _effPriorities.length === 0)
+                && n.type === 'consumer-container' && Array.isArray(n.slots)) {
+              for (const s of n.slots) {
+                if (s && s.kind === 'linked' && s.nodeId) {
+                  const a = state.nodes.get(s.nodeId);
+                  if (a && Array.isArray(a.priorities) && a.priorities.length > 0) {
+                    _effPriorities = a.priorities;
+                    break;
+                  }
+                }
+              }
+            }
             const groups = new Map();
             for (const c of ins) {
-              const prio = (n.priorities?.[c.to.port]) ?? 1;
+              const prio = (_effPriorities?.[c.to.port]) ?? 1;
               if (!groups.has(prio)) groups.set(prio, []);
               groups.get(prio).push(c);
             }
