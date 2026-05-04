@@ -1250,8 +1250,69 @@ export function renderInspectorNode(n) {
 let _containerMembersView = (() => {
   try { return localStorage.getItem('raschet.container-members.view.v1') === 'table' ? 'table' : 'cards'; } catch { return 'cards'; }
 })();
-let _containerMembersTableFilter = { search: '', subtype: '', phase: '' };
+let _containerMembersTableFilter = { search: '', subtype: '', phase: '', powered: '' };
 let _containerMembersSelected = new Set(); // bulk-edit selection (node ids)
+// v0.60.239 (по запросу Пользователя 2026-05-05 «для таблицы добавь фильтры
+// и возможность настройки отображаемых полей и пресеты, а то номинальная
+// мощность видна, а расчетная нет»): per-column visibility + presets.
+const _CM_TABLE_COLUMNS = [
+  { id: 'tag',        label: 'Tag',          default: true,  required: true },
+  { id: 'name',       label: 'Имя',          default: true },
+  { id: 'subtype',    label: 'Подтип',       default: true },
+  { id: 'pNom',       label: 'P_ном (кВт)',  default: true },
+  { id: 'iNom',       label: 'I_ном (А)',    default: false },
+  { id: 'pCalc',      label: 'P_расч (кВт)', default: true },
+  { id: 'iCalc',      label: 'I_расч (А)',   default: false },
+  { id: 'cos',        label: 'cos φ',        default: true },
+  { id: 'phase',      label: 'Фаза',         default: true },
+  { id: 'voltage',    label: 'U (В)',        default: true },
+  { id: 'ku',         label: 'К_и',          default: true },
+  { id: 'inputs',     label: 'Входы',        default: false },
+  { id: 'priorities', label: 'Приоритеты',   default: false },
+  { id: 'status',     label: 'Статус',       default: false },
+];
+const _CM_LS_COLS = 'raschet.container-members.cols.v1';
+const _CM_LS_PRESETS = 'raschet.container-members.presets.v1';
+const _CM_LS_PRESET_ID = 'raschet.container-members.preset-id.v1';
+let _containerMembersCols = (() => {
+  try {
+    const raw = localStorage.getItem(_CM_LS_COLS);
+    if (raw) return { ...Object.fromEntries(_CM_TABLE_COLUMNS.map(c => [c.id, c.default])), ...JSON.parse(raw) };
+  } catch {}
+  return Object.fromEntries(_CM_TABLE_COLUMNS.map(c => [c.id, c.default]));
+})();
+function _saveCmCols() {
+  try { localStorage.setItem(_CM_LS_COLS, JSON.stringify(_containerMembersCols)); } catch {}
+}
+function _loadCmPresets() {
+  try {
+    const raw = localStorage.getItem(_CM_LS_PRESETS);
+    if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) return p; }
+  } catch {}
+  // Default presets.
+  return [
+    { id: 'minimal', label: 'Минимум', cols: { tag: true, name: true, pNom: true, ku: true } },
+    { id: 'design',  label: 'Расчётный', cols: { tag: true, name: true, subtype: true, pNom: true, pCalc: true, iCalc: true, cos: true, phase: true, ku: true } },
+    { id: 'topology', label: 'Топология', cols: { tag: true, name: true, inputs: true, priorities: true, status: true, pCalc: true } },
+    { id: 'full',    label: 'Все', cols: Object.fromEntries(_CM_TABLE_COLUMNS.map(c => [c.id, true])) },
+  ];
+}
+function _saveCmPresets(presets) {
+  try { localStorage.setItem(_CM_LS_PRESETS, JSON.stringify(presets)); } catch {}
+}
+function _applyCmPreset(presetId) {
+  const presets = _loadCmPresets();
+  const p = presets.find(x => x.id === presetId);
+  if (!p) return;
+  // Reset to all-false, then set true per preset cols.
+  const next = Object.fromEntries(_CM_TABLE_COLUMNS.map(c => [c.id, false]));
+  // Required cols always on.
+  for (const c of _CM_TABLE_COLUMNS) if (c.required) next[c.id] = true;
+  for (const k of Object.keys(p.cols || {})) if (p.cols[k]) next[k] = true;
+  _containerMembersCols = next;
+  _saveCmCols();
+  try { localStorage.setItem(_CM_LS_PRESET_ID, presetId); } catch {}
+}
 
 export function openContainerMembersModal(container) {
   if (!container || container.type !== 'consumer-container') return;
@@ -1320,6 +1381,14 @@ export function openContainerMembersModal(container) {
           }
           if (flt.subtype && (a.consumerSubtype || 'custom') !== flt.subtype) return false;
           if (flt.phase && (a.phase || '3ph') !== flt.phase) return false;
+          // v0.60.239: фильтр по статусу.
+          if (flt.powered) {
+            const isPow = !!a._powered;
+            const isOver = !!a._overload;
+            if (flt.powered === 'powered' && !(isPow && !isOver)) return false;
+            if (flt.powered === 'overload' && !isOver) return false;
+            if (flt.powered === 'unpowered' && isPow) return false;
+          }
           return true;
         } else if (s.kind === 'placeholder') {
           if (flt.search) {
@@ -1328,6 +1397,7 @@ export function openContainerMembersModal(container) {
           }
           if (flt.subtype && (s.subtype || 'custom') !== flt.subtype) return false;
           if (flt.phase && (s.phase || '3ph') !== flt.phase) return false;
+          if (flt.powered) return false; // placeholder не имеет powered-state
           return true;
         }
         return false;
@@ -1344,11 +1414,37 @@ export function openContainerMembersModal(container) {
       h.push(`<input type="search" id="cm-table-search" placeholder="🔍 поиск по имени/тегу/типу" value="${escAttr(flt.search)}" style="padding:4px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:3px;width:200px">`);
       h.push(`<select id="cm-table-subtype" title="Подтип"><option value="">все типы</option>${[...subtypes].sort().map(s => `<option value="${escAttr(s)}" ${flt.subtype === s ? 'selected' : ''}>${escHtml(s)}</option>`).join('')}</select>`);
       h.push(`<select id="cm-table-phase" title="Фаза"><option value="">все фазы</option>${[...phases].sort().map(p => `<option value="${escAttr(p)}" ${flt.phase === p ? 'selected' : ''}>${escHtml(p)}</option>`).join('')}</select>`);
-      if (flt.search || flt.subtype || flt.phase) {
+      // v0.60.239: фильтр по статусу.
+      h.push(`<select id="cm-table-powered" title="Статус питания">
+        <option value="">все статусы</option>
+        <option value="powered"   ${flt.powered === 'powered' ? 'selected' : ''}>⚡ запитан</option>
+        <option value="overload"  ${flt.powered === 'overload' ? 'selected' : ''}>⚠ перегруз</option>
+        <option value="unpowered" ${flt.powered === 'unpowered' ? 'selected' : ''}>○ без питания</option>
+      </select>`);
+      // v0.60.239: пресеты + колонки.
+      const _curPresetId = (() => { try { return localStorage.getItem(_CM_LS_PRESET_ID) || ''; } catch { return ''; } })();
+      const _presetsList = _loadCmPresets();
+      h.push(`<select id="cm-table-preset" title="Пресет колонок">
+        <option value="">— пресет —</option>
+        ${_presetsList.map(p => `<option value="${escAttr(p.id)}" ${_curPresetId === p.id ? 'selected' : ''}>${escHtml(p.label)}</option>`).join('')}
+      </select>`);
+      h.push(`<button type="button" id="cm-table-cols" title="Настроить видимость колонок" style="padding:3px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer">⚙ Колонки</button>`);
+      if (flt.search || flt.subtype || flt.phase || flt.powered) {
         h.push(`<button type="button" id="cm-table-reset" style="padding:3px 8px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer">× сброс</button>`);
       }
       h.push(`<span class="muted" style="margin-left:auto">Показано: ${filteredM.length} из ${_sortedM.length}</span>`);
       h.push('</div>');
+      // v0.60.239: popover с чекбоксами видимости колонок (initially hidden).
+      h.push(`<div id="cm-cols-popover" style="display:none;padding:10px 14px;background:#f8fafc;border-bottom:1px solid #e0e7ee;font-size:12px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center">
+          ${_CM_TABLE_COLUMNS.map(c => `
+            <label style="display:flex;align-items:center;gap:4px;${c.required ? 'opacity:0.6' : 'cursor:pointer'}">
+              <input type="checkbox" data-cm-col="${escAttr(c.id)}" ${_containerMembersCols[c.id] ? 'checked' : ''} ${c.required ? 'disabled' : ''}>
+              <span>${escHtml(c.label)}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>`);
       // Bulk-edit toolbar (если что-то выделено)
       if (selCount > 0) {
         h.push(`<div style="padding:8px 12px;background:#eff6ff;border-bottom:1px solid #bfdbfe;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px">
@@ -1363,19 +1459,28 @@ export function openContainerMembersModal(container) {
         </div>`);
       }
       // Table
+      // v0.60.239: column visibility helper.
+      const _colVis = _containerMembersCols;
+      const _ifCol = (id, html) => _colVis[id] ? html : '';
       h.push('<div style="max-height:60vh;overflow-y:auto;padding:0">');
       h.push('<table class="cm-table" style="width:100%;border-collapse:collapse;font-size:12px">');
       h.push(`<thead style="background:#f1f5f9;position:sticky;top:0;z-index:1">
         <tr>
           <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1;width:30px"><input type="checkbox" id="cm-table-selectall" title="Выделить всё видимое"></th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Tag</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Имя</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Подтип</th>
-          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">P (кВт)</th>
-          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">cos φ</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Фаза</th>
-          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">U (В)</th>
-          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Ки</th>
+          ${_ifCol('tag',        '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Tag</th>')}
+          ${_ifCol('name',       '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Имя</th>')}
+          ${_ifCol('subtype',    '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Подтип</th>')}
+          ${_ifCol('pNom',       '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1" title="Установленная мощность (P_ном) одного прибора × количество.">P_ном (кВт)</th>')}
+          ${_ifCol('iNom',       '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1" title="Номинальный ток I_ном = P_ном / U / cos φ / k.">I_ном (А)</th>')}
+          ${_ifCol('pCalc',      '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1" title="Расчётная мощность P_расч = P_ном × К_и (ПУЭ 1.3.13 / IEC 60364).">P_расч (кВт)</th>')}
+          ${_ifCol('iCalc',      '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1" title="Расчётный ток I_расч = P_расч / U / cos φ / k.">I_расч (А)</th>')}
+          ${_ifCol('cos',        '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">cos φ</th>')}
+          ${_ifCol('phase',      '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">Фаза</th>')}
+          ${_ifCol('voltage',    '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1">U (В)</th>')}
+          ${_ifCol('ku',         '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1">К_и</th>')}
+          ${_ifCol('inputs',     '<th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1" title="Количество входных портов (P1, P2, …).">Входы</th>')}
+          ${_ifCol('priorities', '<th style="padding:6px 8px;text-align:left;border-bottom:1px solid #cbd5e1" title="Приоритеты использования портов: одинаковые = параллель, возрастающие = АВР (1=primary, 2=standby).">Приоритеты</th>')}
+          ${_ifCol('status',     '<th style="padding:6px 8px;text-align:center;border-bottom:1px solid #cbd5e1">Статус</th>')}
           <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #cbd5e1;width:90px"></th>
         </tr>
       </thead><tbody>`);
@@ -1384,21 +1489,64 @@ export function openContainerMembersModal(container) {
         if (s.kind === 'linked' && s.nodeId) {
           const a = state.nodes.get(s.nodeId);
           if (!a) {
-            h.push(`<tr><td colspan="10" style="padding:6px 8px;color:#991b1b;background:#fef2f2;border-bottom:1px solid #f1f5f9">Слот #${i+1}: битая ссылка <button type="button" data-cm-remove="${escAttr(String(i))}" style="margin-left:8px;padding:2px 8px;font-size:11px">×</button></td></tr>`);
+            // v0.60.239: dynamic colspan = checkbox + visible cols + actions.
+            const _visCount = 1 + _CM_TABLE_COLUMNS.filter(c => _colVis[c.id]).length + 1;
+            h.push(`<tr><td colspan="${_visCount}" style="padding:6px 8px;color:#991b1b;background:#fef2f2;border-bottom:1px solid #f1f5f9">Слот #${i+1}: битая ссылка <button type="button" data-cm-remove="${escAttr(String(i))}" style="margin-left:8px;padding:2px 8px;font-size:11px">×</button></td></tr>`);
             continue;
           }
-          const tag = effectiveTag(a) || a.tag || a.id;
+          // v0.60.239: extended fields.
+          let tagFull = effectiveTag(a) || a.tag || a.id;
+          if (!tagFull.includes('.') && container) {
+            const cZone = findZoneForMember(container);
+            if (cZone && cZone.zonePrefix) tagFull = `${cZone.zonePrefix}.${tagFull}`;
+          }
           const isSel = _containerMembersSelected.has(a.id);
+          const _kw = Number(a.demandKw) || 0;
+          const _cnt = Math.max(1, Number(a.count) || 1);
+          const _cos = Number(a.cosPhi) || 0.95;
+          const _ph3 = (a.phase || '3ph') === '3ph';
+          const _U = Number(a.voltage) || 400;
+          const _kUse = (a.kUse != null) ? Number(a.kUse) : 1;
+          const _Pnom = _kw * _cnt;
+          const _kFactor = _ph3 ? Math.sqrt(3) : 1;
+          const _Inom = (_Pnom > 0 && _U > 0 && _cos > 0) ? (_Pnom * 1000) / (_kFactor * _U * _cos) : 0;
+          const _Pcalc = _Pnom * _kUse;
+          const _Icalc = (_Pcalc > 0 && _U > 0 && _cos > 0) ? (_Pcalc * 1000) / (_kFactor * _U * _cos) : 0;
+          const _inputs = Math.max(1, Number(a.inputs) || 1);
+          const _priorities = Array.isArray(a.priorities) ? a.priorities : [];
+          let _portsTxt = '';
+          if (_inputs > 1 && _priorities.length) {
+            const allOnes = _priorities.every(p => Number(p) === 1);
+            const ascending = _priorities.every((p, idx) => Number(p) === idx + 1);
+            _portsTxt = allOnes ? 'параллель'
+                     : ascending ? `АВР (${_priorities.join(',')})`
+                     : _priorities.map((p, idx) => `P${idx+1}=${p}`).join(',');
+          } else {
+            _portsTxt = '—';
+          }
+          const _isPow = !!a._powered;
+          const _isOver = !!a._overload;
+          const _statusBadge = _isOver
+            ? '<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px" title="Перегрузка">⚠</span>'
+            : (_isPow
+                ? '<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px" title="Запитан">⚡</span>'
+                : '<span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px" title="Без питания">○</span>');
           h.push(`<tr data-mid="${escAttr(a.id)}" style="${isSel ? 'background:#eff6ff' : ''}">
             <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9"><input type="checkbox" class="cm-row-sel" data-mid="${escAttr(a.id)}" ${isSel ? 'checked' : ''}></td>
-            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-weight:600">${escHtml(tag)}</td>
-            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9">${escHtml(a.name || '')}</td>
-            <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;color:#64748b">${escHtml(a.consumerSubtype || 'custom')}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-kw" data-mid="${escAttr(a.id)}" value="${Number(a.demandKw) || 0}" min="0" step="0.5" style="width:70px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-cos" data-mid="${escAttr(a.id)}" value="${Number(a.cosPhi) || 0.95}" min="0.1" max="1" step="0.01" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9"><select class="cm-row-phase" data-mid="${escAttr(a.id)}" style="font-size:11px;padding:2px 4px;border:1px solid transparent;border-radius:3px"><option value="1ph" ${(a.phase||'3ph')==='1ph'?'selected':''}>1ph</option><option value="3ph" ${(a.phase||'3ph')==='3ph'?'selected':''}>3ph</option></select></td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-voltage" data-mid="${escAttr(a.id)}" value="${Number(a.voltage) || 400}" min="0" step="10" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9"><input type="number" class="cm-row-ku" data-mid="${escAttr(a.id)}" value="${(a.kUse != null) ? a.kUse : 1}" min="0" max="1" step="0.05" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>
+            ${_ifCol('tag',        `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-weight:600">${escHtml(tagFull)}</td>`)}
+            ${_ifCol('name',       `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9">${escHtml(a.name || '')}</td>`)}
+            ${_ifCol('subtype',    `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;color:#64748b">${escHtml(a.consumerSubtype || 'custom')}</td>`)}
+            ${_ifCol('pNom',       `<td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-kw" data-mid="${escAttr(a.id)}" value="${_kw}" min="0" step="0.5" style="width:70px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px">${_cnt > 1 ? `<span class="muted" style="font-size:10px"> ×${_cnt}</span>` : ''}</td>`)}
+            ${_ifCol('iNom',       `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;color:#475569">${fmt(_Inom, 1)}</td>`)}
+            ${_ifCol('pCalc',      `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;color:#1e40af;font-weight:500">${fmt(_Pcalc)}</td>`)}
+            ${_ifCol('iCalc',      `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right;color:#1e40af">${fmt(_Icalc, 1)}</td>`)}
+            ${_ifCol('cos',        `<td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-cos" data-mid="${escAttr(a.id)}" value="${_cos}" min="0.1" max="1" step="0.01" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>`)}
+            ${_ifCol('phase',      `<td style="padding:2px 8px;border-bottom:1px solid #f1f5f9"><select class="cm-row-phase" data-mid="${escAttr(a.id)}" style="font-size:11px;padding:2px 4px;border:1px solid transparent;border-radius:3px"><option value="1ph" ${(a.phase||'3ph')==='1ph'?'selected':''}>1ph</option><option value="3ph" ${(a.phase||'3ph')==='3ph'?'selected':''}>3ph</option></select></td>`)}
+            ${_ifCol('voltage',    `<td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right"><input type="number" class="cm-row-voltage" data-mid="${escAttr(a.id)}" value="${_U}" min="0" step="10" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>`)}
+            ${_ifCol('ku',         `<td style="padding:2px 8px;border-bottom:1px solid #f1f5f9"><input type="number" class="cm-row-ku" data-mid="${escAttr(a.id)}" value="${_kUse}" min="0" max="1" step="0.05" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid transparent;border-radius:3px"></td>`)}
+            ${_ifCol('inputs',     `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:right">${_inputs}</td>`)}
+            ${_ifCol('priorities', `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;color:#475569;font-size:11px">${escHtml(_portsTxt)}</td>`)}
+            ${_ifCol('status',     `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;text-align:center">${_statusBadge}</td>`)}
             <td style="padding:2px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap">
               <button type="button" data-cm-edit="${escAttr(a.id)}" title="Открыть полный инспектор" style="padding:2px 6px;font-size:11px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:3px;cursor:pointer">⚙</button>
               <button type="button" data-cm-extract="${escAttr(String(i))}" title="Извлечь" style="padding:2px 6px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:3px;cursor:pointer">↗</button>
@@ -1406,17 +1554,34 @@ export function openContainerMembersModal(container) {
             </td>
           </tr>`);
         } else if (s.kind === 'placeholder') {
-          h.push(`<tr style="background:#fef9c3">
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a"></td>
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a;color:#92400e;font-style:italic">placeholder #${i+1}</td>
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a">—</td>
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a;color:#92400e">${escHtml(s.subtype || 'custom')}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #fde68a;text-align:right"><input type="number" data-cm-kw="${escAttr(String(i))}" value="${Number(s.demandKw) || 0}" min="0" step="0.5" style="width:70px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid #fde68a;background:#fff;border-radius:3px"></td>
-            <td style="padding:2px 8px;border-bottom:1px solid #fde68a;text-align:right"><input type="number" data-cm-cos="${escAttr(String(i))}" value="${Number(s.cosPhi) || 0.95}" min="0.1" max="1" step="0.01" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid #fde68a;background:#fff;border-radius:3px"></td>
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a">${escHtml(s.phase || '3ph')}</td>
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a;text-align:right">${Number(s.voltage) || 400}</td>
-            <td style="padding:4px 8px;border-bottom:1px solid #fde68a">${(s.kUse != null) ? s.kUse : '—'}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #fde68a;text-align:right;white-space:nowrap">
+          // v0.60.239: расчётные значения для placeholder (1 единица).
+          const _phKw = Number(s.demandKw) || 0;
+          const _phCos = Number(s.cosPhi) || 0.95;
+          const _phU = Number(s.voltage) || 400;
+          const _phKu = (s.kUse != null) ? Number(s.kUse) : 1;
+          const _phPh3 = (s.phase || '3ph') === '3ph';
+          const _phK = _phPh3 ? Math.sqrt(3) : 1;
+          const _phInom = (_phKw > 0 && _phU > 0 && _phCos > 0) ? (_phKw * 1000) / (_phK * _phU * _phCos) : 0;
+          const _phPcalc = _phKw * _phKu;
+          const _phIcalc = (_phPcalc > 0 && _phU > 0 && _phCos > 0) ? (_phPcalc * 1000) / (_phK * _phU * _phCos) : 0;
+          const _bg = 'background:#fef9c3', _bd = 'border-bottom:1px solid #fde68a';
+          h.push(`<tr style="${_bg}">
+            <td style="padding:4px 8px;${_bd}"></td>
+            ${_ifCol('tag',        `<td style="padding:4px 8px;${_bd};color:#92400e;font-style:italic">placeholder #${i+1}</td>`)}
+            ${_ifCol('name',       `<td style="padding:4px 8px;${_bd}">—</td>`)}
+            ${_ifCol('subtype',    `<td style="padding:4px 8px;${_bd};color:#92400e">${escHtml(s.subtype || 'custom')}</td>`)}
+            ${_ifCol('pNom',       `<td style="padding:2px 8px;${_bd};text-align:right"><input type="number" data-cm-kw="${escAttr(String(i))}" value="${_phKw}" min="0" step="0.5" style="width:70px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid #fde68a;background:#fff;border-radius:3px"></td>`)}
+            ${_ifCol('iNom',       `<td style="padding:4px 8px;${_bd};text-align:right;color:#92400e">${fmt(_phInom, 1)}</td>`)}
+            ${_ifCol('pCalc',      `<td style="padding:4px 8px;${_bd};text-align:right;color:#92400e">${fmt(_phPcalc)}</td>`)}
+            ${_ifCol('iCalc',      `<td style="padding:4px 8px;${_bd};text-align:right;color:#92400e">${fmt(_phIcalc, 1)}</td>`)}
+            ${_ifCol('cos',        `<td style="padding:2px 8px;${_bd};text-align:right"><input type="number" data-cm-cos="${escAttr(String(i))}" value="${_phCos}" min="0.1" max="1" step="0.01" style="width:60px;text-align:right;padding:2px 4px;font-size:11px;border:1px solid #fde68a;background:#fff;border-radius:3px"></td>`)}
+            ${_ifCol('phase',      `<td style="padding:4px 8px;${_bd}">${escHtml(s.phase || '3ph')}</td>`)}
+            ${_ifCol('voltage',    `<td style="padding:4px 8px;${_bd};text-align:right">${_phU}</td>`)}
+            ${_ifCol('ku',         `<td style="padding:4px 8px;${_bd}">${_phKu}</td>`)}
+            ${_ifCol('inputs',     `<td style="padding:4px 8px;${_bd};text-align:right;color:#92400e">—</td>`)}
+            ${_ifCol('priorities', `<td style="padding:4px 8px;${_bd};color:#92400e">—</td>`)}
+            ${_ifCol('status',     `<td style="padding:4px 8px;${_bd};text-align:center;color:#92400e">📝</td>`)}
+            <td style="padding:2px 8px;${_bd};text-align:right;white-space:nowrap">
               <button type="button" data-cm-materialize="${escAttr(String(i))}" title="Материализовать" style="padding:2px 6px;font-size:11px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;border-radius:3px;cursor:pointer">⊕</button>
               <button type="button" data-cm-remove="${escAttr(String(i))}" title="Удалить slot" style="padding:2px 6px;font-size:11px;border:1px solid #ef4444;background:#fff;color:#b91c1c;border-radius:3px;cursor:pointer">×</button>
             </td>
@@ -1595,8 +1760,32 @@ function _wireContainerMembersModal(n, body, modal) {
   });
   body.querySelector('#cm-table-subtype')?.addEventListener('change', e => { _containerMembersTableFilter.subtype = e.target.value; openContainerMembersModal(n); });
   body.querySelector('#cm-table-phase')?.addEventListener('change', e => { _containerMembersTableFilter.phase = e.target.value; openContainerMembersModal(n); });
+  // v0.60.239: фильтр по статусу + пресеты + видимость колонок.
+  body.querySelector('#cm-table-powered')?.addEventListener('change', e => {
+    _containerMembersTableFilter.powered = e.target.value;
+    openContainerMembersModal(n);
+  });
+  body.querySelector('#cm-table-preset')?.addEventListener('change', e => {
+    const id = e.target.value;
+    if (id) _applyCmPreset(id);
+    openContainerMembersModal(n);
+  });
+  body.querySelector('#cm-table-cols')?.addEventListener('click', () => {
+    const pop = document.getElementById('cm-cols-popover');
+    if (pop) pop.style.display = pop.style.display === 'none' ? 'block' : 'none';
+  });
+  body.querySelectorAll('input[data-cm-col]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const colId = cb.dataset.cmCol;
+      _containerMembersCols[colId] = cb.checked;
+      _saveCmCols();
+      // Снимаем привязку к пресету (Пользователь сам кастомизировал).
+      try { localStorage.removeItem(_CM_LS_PRESET_ID); } catch {}
+      openContainerMembersModal(n);
+    });
+  });
   body.querySelector('#cm-table-reset')?.addEventListener('click', () => {
-    _containerMembersTableFilter = { search: '', subtype: '', phase: '' };
+    _containerMembersTableFilter = { search: '', subtype: '', phase: '', powered: '' };
     openContainerMembersModal(n);
   });
   // Row select checkboxes
