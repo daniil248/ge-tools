@@ -2585,13 +2585,21 @@ export function renderNodes() {
         // Icalc per-piece: пересчитываем из per-piece Pcalc.
         const Icalc = (Pcalc > 0 && Ucalc) ? computeCurrentA(Pcalc, Ucalc, cos, isThreePhase(n)) : 0;
         const _vdrop = Number(n._deltaUPct) || 0;
+        // v0.60.177 (по репорту Пользователя 2026-05-04 «расчетная мощность
+        // на карточке и в свойствах не совпадают»): demandKw/currentA теперь
+        // отображают РАСЧЁТНУЮ мощность/ток (P_ном × Ki × множитель), как
+        // в инспекторе. Раньше demandKw=Pnom давало карточку «Расчёт: 8.2 кВт»
+        // когда модал показывал «Расчётная: 3.5 кВт». nominalKw/capacityA —
+        // установленная мощность (P_ном) / номинальный ток (I_ном).
+        const Icalc_cont = (Pcalc > 0 && Ucalc) ? computeCurrentA(Pcalc, Ucalc, cos, isThreePhase(n)) : 0;
         valueMap = {
-          demandKw:   { v: fmtDigits(Pnom)  },
-          nominalKw:  { v: fmtDigits(Pnom)  },
+          demandKw:   { v: fmtDigits(Pcalc) },           // Расчётная P
+          currentA:   { v: fmtDigits(Icalc_cont) },      // Расчётный I
+          nominalKw:  { v: fmtDigits(Pnom)  },           // Установленная P
+          capacityA:  { v: fmtDigits(Inom)  },           // Номинальный I
           kvAOrVA:    { v: fmtDigits(Snom)  },
-          currentA:   { v: fmtDigits(Inom)  },
           maxKw:      { v: fmtDigits(Pcalc) },
-          maxA:       { v: fmtDigits(Icalc) },
+          maxA:       { v: fmtDigits(Icalc_cont) },
           freeKw:     { v: fmtDigits(n._freeKw) },
           freeA:      { v: fmtDigits(n._freeA)  },
           cosPhi:     { v: cos.toFixed(2) },
@@ -2615,12 +2623,16 @@ export function renderNodes() {
         const Pcalc = _isUniformGroup ? (PcalcTotal / cnt) : PcalcTotal;
         const Icalc = _isUniformGroup ? ((Number(n._loadA) || 0) / cnt) : (Number(n._loadA) || 0);
         const _vdrop = Number(n._deltaUPct) || 0;
-        // v0.59.807: unit и label берутся из registry (shortLabel/fieldUnit).
+        // v0.60.177 (по репорту Пользователя «расчетная мощность на карточке
+        // и в свойствах не совпадают»): demandKw/currentA = расчётная;
+        // nominalKw/capacityA = установленная (как в модале «Параметры
+        // потребителя»). Раньше demandKw=Pnom давало неверный label «Расчёт».
         valueMap = {
-          demandKw:   { v: fmtDigits(Pnom)  },
-          nominalKw:  { v: fmtDigits(Pnom)  },
+          demandKw:   { v: fmtDigits(Pcalc) },           // Расчётная P (= P_ном × Ki × множитель)
+          currentA:   { v: fmtDigits(Icalc) },           // Расчётный I
+          nominalKw:  { v: fmtDigits(Pnom)  },           // Установленная P
+          capacityA:  { v: fmtDigits(Inom)  },           // Номинальный I
           kvAOrVA:    { v: fmtDigits(Snom)  },
-          currentA:   { v: fmtDigits(Inom)  },
           maxKw:      { v: fmtDigits(Pcalc) },
           maxA:       { v: fmtDigits(Icalc) },
           freeKw:     { v: fmtDigits(n._freeKw) },
