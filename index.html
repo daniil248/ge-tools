@@ -758,14 +758,14 @@
           <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
             <input type="radio" name="set-panelMaxBasis" value="nameplate" style="margin-top:3px">
             <div>
-              <div style="font-weight:500;font-size:13px">Установленная мощность (P<sub>уст</sub>) <span class="muted" style="font-size:11px">(по умолчанию)</span></div>
+              <div style="font-weight:500;font-size:13px">Установленная мощность (P<sub>уст</sub>)</div>
               <div class="muted" style="font-size:12px">«Макс» = Σ P<sub>ном</sub> downstream без учёта К<sub>и</sub>. Консервативный сценарий: «все потребители работают одновременно на 100% nameplate». Завышает ток для агрегаторов. Подходит для маленьких систем с малой диверсификацией.</div>
             </div>
           </label>
           <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
             <input type="radio" name="set-panelMaxBasis" value="calculated" style="margin-top:3px">
             <div>
-              <div style="font-weight:500;font-size:13px">Расчётная мощность (P<sub>расч</sub>)</div>
+              <div style="font-weight:500;font-size:13px">Расчётная мощность (P<sub>расч</sub>) <span class="muted" style="font-size:11px">(по умолчанию)</span></div>
               <div class="muted" style="font-size:12px">«Макс» = Σ (P<sub>ном</sub> × К<sub>и</sub>) — учёт коэффициента использования. Соответствует <b>ПУЭ 1.3.13 / IEC 60364-3 §311.1</b> — стандартная практика подбора кабеля и автомата для агрегатов. Для ЦОД с типичным К<sub>и</sub>=0.7-0.9 даёт реалистичную нагрузку.</div>
             </div>
           </label>
