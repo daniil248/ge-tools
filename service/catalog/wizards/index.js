@@ -89,14 +89,185 @@ export const SEED_WIZARDS = [
   WIZARD_UPS_TO,
 ];
 
-// Получить все сценарии (seed + user). Phase 42.4: добавить user-сценарии
-// из LS catalog'а.
+// =============================================================================
+// Phase 42.4 (v0.60.118): User / Org-уровень сценариев.
+//
+// Три scope:
+//   📦 seed — встроенные read-only (этот файл).
+//   ✏ user — личные пользовательские (LS_KEY_USER).
+//   👥 org  — общие шаблоны организации (LS_KEY_ORG; Phase 41.2 pattern).
+//
+// Сценарии в LS — те же объекты что и SEED_WIZARDS, плюс scope/createdAt/etc.
+// Pure JSON, без import — поэтому редактировать можно через JSON editor.
+// =============================================================================
+
+const LS_KEY_USER = 'raschet.service.wizards.user.v1';
+const LS_KEY_ORG  = 'raschet.service.wizards.org.v1';
+
+function _loadJson(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function _saveJson(key, arr) {
+  try { localStorage.setItem(key, JSON.stringify(arr || [])); _notifyChange(); } catch {}
+}
+
+export function loadUserWizards() { return _loadJson(LS_KEY_USER); }
+export function loadOrgWizards()  { return _loadJson(LS_KEY_ORG); }
+
+/** Получить сценарий по id (seed / user / org). */
+export function getWizard(id) {
+  return SEED_WIZARDS.find(w => w.id === id)
+      || loadUserWizards().find(w => w.id === id)
+      || loadOrgWizards().find(w => w.id === id)
+      || null;
+}
+
+/** Получить все сценарии (с пометкой scope), опционально отфильтрованные по orderType. */
 export function listWizards(orderType = null) {
-  const all = SEED_WIZARDS.slice();
+  const seed = SEED_WIZARDS.map(w => ({ ...w, scope: 'seed' }));
+  const user = loadUserWizards().map(w => ({ ...w, scope: 'user' }));
+  const org  = loadOrgWizards().map(w => ({ ...w, scope: 'org'  }));
+  const all = [...seed, ...org, ...user];
   if (!orderType) return all;
   return all.filter(w => Array.isArray(w.appliesTo) && w.appliesTo.includes(orderType));
 }
 
-export function getWizard(id) {
-  return SEED_WIZARDS.find(w => w.id === id) || null;
+// ─── CRUD user
+
+/** Добавить новый user-сценарий. */
+export function addUserWizard(wizard) {
+  const arr = loadUserWizards();
+  const id = 'wz-usr-' + Math.random().toString(36).slice(2, 8);
+  const tpl = { ...wizard, id, createdAt: Date.now() };
+  arr.push(tpl);
+  _saveJson(LS_KEY_USER, arr);
+  return tpl;
+}
+
+/** Обновить user-сценарий. */
+export function updateUserWizard(id, patch) {
+  if (!id?.startsWith('wz-usr-')) return false;
+  const arr = loadUserWizards();
+  const idx = arr.findIndex(w => w.id === id);
+  if (idx < 0) return false;
+  arr[idx] = { ...arr[idx], ...patch, id, updatedAt: Date.now() };
+  _saveJson(LS_KEY_USER, arr);
+  return true;
+}
+
+/** Удалить user-сценарий. */
+export function deleteUserWizard(id) {
+  if (!id?.startsWith('wz-usr-')) return false;
+  const arr = loadUserWizards().filter(w => w.id !== id);
+  _saveJson(LS_KEY_USER, arr);
+  return true;
+}
+
+// ─── CRUD org
+
+export function updateOrgWizard(id, patch) {
+  if (!id?.startsWith('wz-org-')) return false;
+  const arr = loadOrgWizards();
+  const idx = arr.findIndex(w => w.id === id);
+  if (idx < 0) return false;
+  arr[idx] = { ...arr[idx], ...patch, id, updatedAt: Date.now() };
+  _saveJson(LS_KEY_ORG, arr);
+  return true;
+}
+
+export function deleteOrgWizard(id) {
+  if (!id?.startsWith('wz-org-')) return false;
+  const arr = loadOrgWizards().filter(w => w.id !== id);
+  _saveJson(LS_KEY_ORG, arr);
+  return true;
+}
+
+/** Promotion: user → org. */
+export function promoteWizardToOrg(id) {
+  if (!id?.startsWith('wz-usr-')) return false;
+  const userArr = loadUserWizards();
+  const idx = userArr.findIndex(w => w.id === id);
+  if (idx < 0) return false;
+  const wz = userArr[idx];
+  const orgArr = loadOrgWizards();
+  const newId = 'wz-org-' + Math.random().toString(36).slice(2, 8);
+  orgArr.push({ ...wz, id: newId, promotedAt: Date.now(), promotedFrom: wz.id });
+  userArr.splice(idx, 1);
+  _saveJson(LS_KEY_ORG, orgArr);
+  _saveJson(LS_KEY_USER, userArr);
+  return newId;
+}
+
+/** Demotion: org → user. */
+export function demoteWizardToUser(id) {
+  if (!id?.startsWith('wz-org-')) return false;
+  const orgArr = loadOrgWizards();
+  const idx = orgArr.findIndex(w => w.id === id);
+  if (idx < 0) return false;
+  const wz = orgArr[idx];
+  const userArr = loadUserWizards();
+  const newId = 'wz-usr-' + Math.random().toString(36).slice(2, 8);
+  const userTpl = { ...wz, id: newId, demotedAt: Date.now(), demotedFrom: wz.id };
+  delete userTpl.promotedAt;
+  delete userTpl.promotedFrom;
+  userArr.push(userTpl);
+  orgArr.splice(idx, 1);
+  _saveJson(LS_KEY_USER, userArr);
+  _saveJson(LS_KEY_ORG, orgArr);
+  return newId;
+}
+
+/** Скопировать seed/org → user (как «черновик» для редактирования). */
+export function cloneToUser(srcId) {
+  const src = getWizard(srcId);
+  if (!src) return null;
+  const copy = JSON.parse(JSON.stringify(src));
+  delete copy.scope;
+  delete copy.id;
+  copy.title = (copy.title || '') + ' (копия)';
+  return addUserWizard(copy);
+}
+
+// ─── Pub/sub
+const _listeners = new Set();
+export function onWizardsChange(cb) { _listeners.add(cb); return () => _listeners.delete(cb); }
+function _notifyChange() {
+  _listeners.forEach(cb => { try { cb(); } catch {} });
+  try { window.dispatchEvent(new CustomEvent('raschet:wizards-change')); } catch {}
+}
+
+// ─── Validation для JSON-editor
+//
+// Минимальная проверка структуры. Полная валидация по JSON-схеме — TODO.
+// Возвращает { ok: true } или { ok: false, errors: [...] }.
+export function validateWizard(wz) {
+  const errors = [];
+  if (!wz || typeof wz !== 'object') errors.push('Не объект');
+  else {
+    if (typeof wz.title !== 'string' || !wz.title.trim()) errors.push('title — строка обязательна');
+    if (!Array.isArray(wz.appliesTo) || !wz.appliesTo.length) errors.push('appliesTo — массив orderType (install|maintenance|one-off)');
+    if (!Array.isArray(wz.params)) errors.push('params — массив (может быть пустым)');
+    if (!Array.isArray(wz.suggestions)) errors.push('suggestions — массив (может быть пустым)');
+    if (Array.isArray(wz.params)) {
+      wz.params.forEach((p, i) => {
+        if (!p.id) errors.push(`params[${i}].id — обязательно`);
+        if (!p.label) errors.push(`params[${i}].label — обязательно`);
+        if (p.type && !['number','choice'].includes(p.type)) errors.push(`params[${i}].type — number|choice`);
+        if (p.type === 'choice' && (!Array.isArray(p.options) || !p.options.length)) errors.push(`params[${i}].options — для choice обязательно`);
+      });
+    }
+    if (Array.isArray(wz.suggestions)) {
+      wz.suggestions.forEach((g, gi) => {
+        if (!Array.isArray(g.rules)) errors.push(`suggestions[${gi}].rules — массив обязателен`);
+        else g.rules.forEach((r, ri) => {
+          if (!r.label) errors.push(`suggestions[${gi}].rules[${ri}].label — обязательно`);
+          if (r.qty == null) errors.push(`suggestions[${gi}].rules[${ri}].qty — обязательно (число или expr-строка)`);
+        });
+      });
+    }
+  }
+  return errors.length ? { ok: false, errors } : { ok: true };
 }

@@ -511,6 +511,13 @@ async function init() {
   const matBtn = $('sv-open-materials');
   if (matBtn) matBtn.addEventListener('click', () => openMaterialsCatalogModal());
 
+  // v0.60.118 (Phase 42.4): open wizard-catalog button
+  const wizBtn = $('sv-open-wizards');
+  if (wizBtn) wizBtn.addEventListener('click', async () => {
+    const { openWizardCatalogModal } = await import('./ui/wizard-catalog.js');
+    openWizardCatalogModal();
+  });
+
   // v0.60.44: open currency-rates dialog (тот же что в cooling)
   const ratesBtn = $('sv-rates-btn');
   if (ratesBtn) ratesBtn.addEventListener('click', () => openRatesDialog({

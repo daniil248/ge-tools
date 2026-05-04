@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.118', date: '2026-05-04', items: [
+      '🪄 <b>Phase 42.4: UI редактор сценариев wizard\'ов (CRUD + JSON editor + promote/demote)</b>. Завершение конфигурируемости мастера составления нарядов.',
+      '• <b>Новая кнопка «🪄 Сценарии мастера»</b> в сайдбаре service-модуля → каталог сценариев со scope-уровнями (📦 seed / 👥 org / ✏ user).',
+      '• <b>Действия per-row</b>: 📋 clone (копировать как личный) / ✏ edit (JSON editor) / ↑ promote (user → org) / ↓ demote (org → user) / 🗑 delete.',
+      '• <b>JSON editor</b>: textarea с полным DSL сценария + валидация перед save (validateWizard в index.js). Структура проверяется на: title (str), appliesTo[] (orderType), params[] (id/label/type/options для choice), suggestions[].rules[] (label/qty).',
+      '• <b>+ Новый сценарий</b>: создаёт blank-заготовку с одним параметром и одним правилом для текущего активного orderType — Пользователь дорабатывает в JSON editor.',
+      '• <b>Promotion-flow</b> (паттерн из Phase 41.2 work-templates): user ↑ → org → ↓ user. ID-префиксы <code>wz-usr-</code> / <code>wz-org-</code> для identity. Audit trail <code>promotedAt</code> / <code>promotedFrom</code>.',
+      '• <b>Изолированные LS</b>: <code>raschet.service.wizards.user.v1</code> / <code>raschet.service.wizards.org.v1</code>. Удаление user-каталога не трогает org.',
+      '• <b>UI подсветка строк</b>: org=синий (#eff6ff), user=жёлтый (#fefce8), seed=нейтральный.',
+      '• <b>Обновление при изменении</b>: pub/sub через <code>onWizardsChange</code> + window event <code>raschet:wizards-change</code> (готовность к Phase 40 Cloud Sync — сценарии в org-каталоге будут реал-таймом синхронизироваться между членами команды).',
+      '• ROADMAP Phase 42.4 отмечен ✅. Только импорт/экспорт JSON через файл — TODO (manually через JSON editor copy/paste работает уже сейчас).',
+      'Файлы: <code>service/catalog/wizards/index.js</code> (~150 строк: LS_KEY_USER/ORG + loadXyzWizards + addUser/updateUser/deleteUser/updateOrg/deleteOrg/promoteToOrg/demoteToUser/cloneToUser + validateWizard + pub/sub), <code>service/ui/wizard-catalog.js</code> (новый ~200 строк: openWizardCatalogModal + editWizardJson), <code>service/index.html</code> (+кнопка «🪄 Сценарии мастера»), <code>service/service.js</code> (+обработчик dynamic import).',
+    ] },
     { version: '0.60.117', date: '2026-05-04', items: [
       '🪄 <b>Phase 42.5: Cross-module pre-fill для wizard\'ов</b>. Мастер составления нарядов теперь подтягивает параметры из проектных данных автоматически — оператор видит сразу заполненные поля и может только подтвердить или скорректировать.',
       '• <b>Мастер «❄ ТО чиллера»</b> читает <code>cooling.selections.v1</code> активного проекта → подставляет:',
