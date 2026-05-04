@@ -4,6 +4,25 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.129', date: '2026-05-04', items: [
+      '📚 <b>/modules/ — обновление технического реестра</b> (по правилу memory <code>feedback_modules_index.md</code>). После недавнего бурного развития платформы (v0.60.105–128: каскады валюты/НДС, мастер нарядов, org-уровень для work-templates и price-records, NEC методика, auto-norm, rooms, rack clearances) — реестр обновлён.',
+      '• <b>Calc-библиотеки</b> расширены:',
+      '  • <code>service/catalog/wizards/</code> — мастер составления нарядов (Phase 42).',
+      '  • <code>service/ui/wizard-catalog.js</code> — Phase 42.4 CRUD сценариев.',
+      '  • <code>js/methods/nec.js</code> — методика NEC (NFPA 70).',
+      '  • Аннотация <code>service/calc/order-model</code> с vatEnabled/vatLabel.',
+      '  • <code>service/catalog/work-templates</code> — личные ✏ + общие команды 👥 (Phase 41.2).',
+      '• <b>Shared-инфраструктура</b> добавлены:',
+      '  • <code>shared/currency-defaults.js</code> — каскад валюты + НДС project→company→org→user→fallback.',
+      '  • <code>shared/auto-norm.js</code> — авто-выбор нормативного документа по country.',
+      '  • <code>shared/price-records.js</code> — общие шаблоны команды + audit promote/demote (Phase 41.2).',
+      '  • <code>shared/dialog.js</code> — rsToast/rsConfirm/rsPrompt (без browser dialogs).',
+      '  • Аннотация <code>shared/global-settings.js</code> с разделом «👥 Организация» (Phase 41).',
+      '  • Аннотация <code>shared/app-header.js</code> с project-context badge для standalone.',
+      '  • Аннотация <code>shared/company-profile.js</code> с defaultCurrency/defaultVat.',
+      '• Описания тегов с указанием версии добавления — для будущих audit\'ов «когда что появилось».',
+      'Файлы: <code>modules/index.html</code> (расширены секции «Calc-библиотеки» и «Shared-инфраструктура»; ничего user-visible не изменено в карточках, только технический реестр в нижней части страницы).',
+    ] },
     { version: '0.60.128', date: '2026-05-04', items: [
       '📐 <b>TW: rack clearances + accessFront/Rear (память, статив)</b>. Реализация memory rule <code>feedback_rack_clearances.md</code> зафиксированной 2026-05-04.',
       '• <b>newRackGroup получил поля</b>:',

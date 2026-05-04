@@ -384,11 +384,13 @@
         <li><code>dgu-config/calc/</code> — dgu-calc (ISO 8528-1 modes, ISO 3046-1 derate, fuel SFC)</li>
         <li><code>dgu-config/datasheets/</code> — каталог ДГУ (Caterpillar/Cummins/Volvo Penta/FG Wilson)</li>
         <li><code>cooling/ui/</code> — UI-компоненты cooling (chiller-form, capex-form, topology-view, comparison-view, energy-chart)</li>
-        <li><code>service/calc/</code> — order-model, order-builder, export-offer</li>
-        <li><code>service/catalog/</code> — work-templates (типовые работы)</li>
-        <li><code>service/ui/</code> — order-form, work-catalog</li>
+        <li><code>service/calc/</code> — order-model (с vatEnabled / vatLabel v0.60.112), order-builder, export-offer</li>
+        <li><code>service/catalog/</code> — work-templates (личные ✏ + общие команды 👥, Phase 41.2 v0.60.116)</li>
+        <li><code>service/catalog/wizards/</code> — Phase 42 v0.60.109+: мастер составления нарядов (ventilation-to / chiller-to / ups-to + DSL для пользовательских)</li>
+        <li><code>service/ui/</code> — order-form, work-catalog, order-wizard (4-этапная модалка), wizard-catalog (Phase 42.4 CRUD)</li>
         <li><code>js/calc/</code> — hvac-derate, прочие электрические калькуляторы</li>
         <li><code>js/engine/</code> — constants, inspector, ports, render</li>
+        <li><code>js/methods/</code> — iec / pue / nec (Phase auto-norm v0.60.123) / rtm + vdrop + economic</li>
         <li><code>shared/report/</code> — template, blocks, preview, editor, export-pdf, export-docx, picker</li>
       </ul>
 
@@ -398,8 +400,11 @@
         <li><code>shared/project-context.js</code> — навигация между модулями с контекстом проекта</li>
         <li><code>shared/module-nav.js</code> — embed-pattern, return-buttons, cross-links</li>
         <li><code>shared/element-library.js</code> — общая библиотека изделий</li>
-        <li><code>shared/global-settings.js</code> — модалка глобальных настроек (⚙)</li>
-        <li><code>shared/company-profile.js</code> — реквизиты организации (global + project override)</li>
+        <li><code>shared/global-settings.js</code> — модалка глобальных настроек (⚙) + раздел «👥 Организация» (Phase 41 v0.60.115)</li>
+        <li><code>shared/company-profile.js</code> — реквизиты организации (global + project override) + defaultCurrency / defaultVat (v0.60.112)</li>
+        <li><code>shared/currency-defaults.js</code> — каскадный резолвер валюты + НДС project→company→org→user→fallback (v0.60.105 / 121)</li>
+        <li><code>shared/auto-norm.js</code> — авто-выбор нормативного документа по country проекта (matrix domain×country: suppression / cable / scs / cooling / panel / mv / battery / dgu) v0.60.121</li>
+        <li><code>shared/price-records.js</code> — история цен оборудования (личные ✏ + общие команды 👥, Phase 41.2 v0.60.124)</li>
         <li><code>shared/currency-rates/</code> — курсы валют (НБ РК / ЦБ РФ / Frankfurter / open.er-api)</li>
         <li><code>shared/meteo-fetch.js</code> — auto-fetch meteo по координатам проекта (Open-Meteo)</li>
         <li><code>shared/service-bridge.js</code> — создание service-нарядов из других модулей</li>
@@ -407,9 +412,10 @@
         <li><code>shared/backup.js</code> — авто-бэкап в выбранную папку (File System Access API)</li>
         <li><code>shared/wheel-zoom.js</code> — Ctrl+wheel zoom (для всех canvas-модулей)</li>
         <li><code>shared/help-panel.js</code> — встроенная справка модуля (❓)</li>
-        <li><code>shared/app-header.js</code> — единая шапка модулей (🏠 Raschet)</li>
+        <li><code>shared/app-header.js</code> — единая шапка модулей (🏠 Raschet) с project-context badge для standalone (v0.60.103)</li>
         <li><code>shared/module-footer.js</code> — единый футер с changelog (📋 v.X.Y.Z)</li>
         <li><code>shared/module-changelogs.js</code> — централизованный changelog всех модулей</li>
+        <li><code>shared/dialog.js</code> — rsToast / rsConfirm / rsPrompt / rsPickOne (без browser dialogs, по правилу memory)</li>
         <li><code>shared/configurator-shell.css</code> — единый CSS-shell конфигураторов</li>
       </ul>
 
