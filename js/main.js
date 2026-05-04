@@ -7711,6 +7711,41 @@ async function init() {
         rsToast('Конфигурация стойки применена к узлу «' + (n.tag || n.name || n.id) + '».', 'ok');
       } catch (e) { console.warn('rack.apply error', e); }
     }
+    // v0.60.216 (по репорту Пользователя 2026-05-04 «как подбор вернуть
+    // обратно в конструктор схем???»): приёмник postMessage от dgu-config.
+    // Записывает выбранную модель ДГУ в узел generator/source.
+    if (msg.type === 'raschet.dgu.apply' && msg.nodeId && msg.selected) {
+      try {
+        const st = window.Raschet && window.Raschet._state;
+        if (!st) return;
+        const n = st.nodes.get(msg.nodeId);
+        if (!n) return;
+        const sel = msg.selected;
+        const sp  = msg.spec || {};
+        if (sel.vendor)   n.manufacturer = sel.vendor;
+        if (sel.model)    n.model = sel.model;
+        if (sel.engineModel) n.engineModel = sel.engineModel;
+        // capacityKw — номинал ДГУ (по выбранному режиму = ESP/PRP/COP).
+        // Берём nameplateKw модели, чтобы лимит реально соответствовал железу.
+        if (Number.isFinite(Number(sel.nameplateKw))) {
+          n.capacityKw = Math.round(Number(sel.nameplateKw));
+        }
+        // SFC для топливных расчётов в инспекторе/отчётах.
+        if (Number.isFinite(Number(sel.sfcLkWh))) n.fuelSfcLkWh = Number(sel.sfcLkWh);
+        // Mode/redundancy — переносим как metadata; UI инспектора может
+        // использовать в подсказках.
+        if (sp.mode)        n.dguMode = sp.mode;
+        if (sp.redundancy)  n.redundancy = sp.redundancy;
+        if (Number.isFinite(Number(sp.derateMultiplier))) n.dguClimateDerate = Number(sp.derateMultiplier);
+        if (Number.isFinite(Number(sp.safetyMarginPct))) n.dguSafetyMarginPct = Number(sp.safetyMarginPct);
+        // Полный snapshot — для отчётов и round-trip
+        n.appliedConfig = n.appliedConfig || {};
+        n.appliedConfig.dgu = JSON.parse(JSON.stringify({ selected: sel, spec: sp, ts: msg.ts || Date.now() }));
+        if (window.Raschet.rerender) window.Raschet.rerender();
+        const lbl = `${sel.vendor || ''} ${sel.model || ''}`.trim() || 'ДГУ';
+        rsToast(`ДГУ «${lbl}» (${n.capacityKw} кВт) применена к узлу «${n.tag || n.name || n.id}».`, 'ok');
+      } catch (e) { console.warn('dgu.apply error', e); }
+    }
     // v0.59.193: унифицированная обработка *-config:apply из mountEmbeddedPicker.
     // У физического узла остаётся свой id/tag; шаблон сохраняется отдельно в
     // поле n.appliedConfig.<kind> и n.appliedConfigId — как ссылка.
@@ -7745,20 +7780,50 @@ async function init() {
   // rack-config открыта в другом окне без window.opener (например, через
   // ярлык). При каждой записи в bridge-ключ проверяем флаг applied.
   window.addEventListener('storage', (ev) => {
-    if (!ev.key || !ev.key.startsWith('raschet.rack.bridge.')) return;
-    try {
-      const obj = JSON.parse(ev.newValue || '{}');
-      if (!obj || !obj.applied || !obj.template) return;
-      const nodeId = ev.key.slice('raschet.rack.bridge.'.length);
-      const st = window.Raschet && window.Raschet._state;
-      if (!st) return;
-      const n = st.nodes.get(nodeId);
-      if (!n) return;
-      n.rackTemplate = JSON.parse(JSON.stringify(obj.template));
-      if (obj.template.manufacturer) n.manufacturer = obj.template.manufacturer;
-      if (obj.template.demandKw != null) n.demandKw = Number(obj.template.demandKw) || 0;
-      if (window.Raschet.rerender) window.Raschet.rerender();
-    } catch {}
+    if (!ev.key) return;
+    if (ev.key.startsWith('raschet.rack.bridge.')) {
+      try {
+        const obj = JSON.parse(ev.newValue || '{}');
+        if (!obj || !obj.applied || !obj.template) return;
+        const nodeId = ev.key.slice('raschet.rack.bridge.'.length);
+        const st = window.Raschet && window.Raschet._state;
+        if (!st) return;
+        const n = st.nodes.get(nodeId);
+        if (!n) return;
+        n.rackTemplate = JSON.parse(JSON.stringify(obj.template));
+        if (obj.template.manufacturer) n.manufacturer = obj.template.manufacturer;
+        if (obj.template.demandKw != null) n.demandKw = Number(obj.template.demandKw) || 0;
+        if (window.Raschet.rerender) window.Raschet.rerender();
+      } catch {}
+    }
+    // v0.60.216: bridge для dgu-config (на случай отсутствия opener).
+    if (ev.key.startsWith('raschet.dgu.bridge.')) {
+      try {
+        const obj = JSON.parse(ev.newValue || '{}');
+        if (!obj || !obj.applied || !obj.selected) return;
+        const nodeId = ev.key.slice('raschet.dgu.bridge.'.length);
+        const st = window.Raschet && window.Raschet._state;
+        if (!st) return;
+        const n = st.nodes.get(nodeId);
+        if (!n) return;
+        const sel = obj.selected;
+        const sp  = obj.spec || {};
+        if (sel.vendor)   n.manufacturer = sel.vendor;
+        if (sel.model)    n.model = sel.model;
+        if (sel.engineModel) n.engineModel = sel.engineModel;
+        if (Number.isFinite(Number(sel.nameplateKw))) n.capacityKw = Math.round(Number(sel.nameplateKw));
+        if (Number.isFinite(Number(sel.sfcLkWh))) n.fuelSfcLkWh = Number(sel.sfcLkWh);
+        if (sp.mode)       n.dguMode = sp.mode;
+        if (sp.redundancy) n.redundancy = sp.redundancy;
+        if (Number.isFinite(Number(sp.derateMultiplier))) n.dguClimateDerate = Number(sp.derateMultiplier);
+        if (Number.isFinite(Number(sp.safetyMarginPct))) n.dguSafetyMarginPct = Number(sp.safetyMarginPct);
+        n.appliedConfig = n.appliedConfig || {};
+        n.appliedConfig.dgu = JSON.parse(JSON.stringify({ selected: sel, spec: sp, ts: obj.ts || Date.now() }));
+        if (window.Raschet.rerender) window.Raschet.rerender();
+        const lbl = `${sel.vendor || ''} ${sel.model || ''}`.trim() || 'ДГУ';
+        rsToast(`ДГУ «${lbl}» (${n.capacityKw} кВт) применена к узлу «${n.tag || n.name || n.id}» (через storage-bridge).`, 'ok');
+      } catch {}
+    }
   });
 
   // Справка по главному модулю — floating-«?» в правом-нижнем углу

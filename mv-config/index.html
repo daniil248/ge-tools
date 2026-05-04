@@ -21,7 +21,9 @@
   <div id="rs-header-mount"></div>
   <script type="module">
     import { mountHeader } from '../shared/app-header.js';
-    import { mountFooter } from '../shared/app-footer.js';
+    // v0.60.216 (по репорту Пользователя 2026-05-04 «да фикс примени для всех
+    // модулей»): app-footer (.rs-footer) удалён — используем только
+    // module-footer (.rs-mfoot) ниже, чтобы не было двойного футера.
     import { mountHelp } from '../shared/help-panel.js';
     mountHeader({ title: 'Конфигуратор РУ СН', home: '../hub.html' });
     mountHelp({
@@ -101,7 +103,6 @@
     if (window.Auth && typeof window.Auth.init === 'function') {
       window.Auth.init().catch(e => console.warn('[mv-config] auth init failed', e));
     }
-    window.addEventListener('DOMContentLoaded', () => mountFooter());
   </script>
 
   <main class="mvc-layout">

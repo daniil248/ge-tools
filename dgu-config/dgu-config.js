@@ -10,7 +10,7 @@
 //   ?autonomy=N      — часы автономии
 //   ?vendor=...      — фильтр вендора
 
-import { calcDgu, DGU_MODES } from './calc/dgu-calc.js';
+import { calcDgu, DGU_MODES, getDguModePowerKw } from './calc/dgu-calc.js';
 import { listDgus, listDguVendors, suggestDgu } from './datasheets/index.js';
 import { ensureDefaultProject, projectKey, listProjects, getProject, setActiveProjectId } from '../shared/project-storage.js';
 
@@ -36,13 +36,26 @@ let _state = {
   loadKw: 500,
   mode: 'PRP',
   redundancy: 'N',
-  margin: 15,
+  // v0.60.216 fix (по репорту Пользователя 2026-05-04 «маргин вроде не влияет
+  // ни на что»): поле в state было `margin`, а calcDguRequired ждёт
+  // `safetyMarginPct` — рассинхрон, margin молча игнорировался и брался
+  // дефолт 15%. Переименовал в safetyMarginPct.
+  safetyMarginPct: 15,
   altitudeM: 0,
   ambientTC: 25,
   humidityPct: 60,
   autonomyHours: 24,
   vendor: '',
 };
+
+// v0.60.216 (по репорту Пользователя 2026-05-04 «как подбор вернуть обратно
+// в конструктор схем???»): id узла схемы из URL ?nodeId=. Если задан —
+// показываем кнопку «↩ Применить к узлу схемы», которая отправляет
+// postMessage('raschet.dgu.apply',…) родительскому окну и пишет
+// LS-bridge ключ для off-tab сценариев.
+let _nodeId = null;
+const BRIDGE_KEY_PREFIX = 'raschet.dgu.bridge.';
+let _lastBest = null;
 
 // v0.60.81: project context resolution + per-project state persistence.
 function resolvePid() {
@@ -95,6 +108,21 @@ function saveSelectedDgu(dguEntry) {
   } catch (e) { console.warn('[dgu-config] saveSelected failed:', e); }
 }
 
+// v0.60.216: атрибуция источника каждого значения. Заполняется в
+// loadFromProject и используется баннером _renderContextBanner.
+// '?' — не определено, 'project' — project.location, 'meteo' — meteo dataset,
+// 'tw' — tech-workspace concept, 'url' — URL params, 'manual' — ввод
+// пользователя в самом dgu-config, 'default' — значение по умолчанию.
+let _stateMeta = {
+  loadKw: 'default',
+  altitudeM: 'default',
+  ambientTC: 'default',
+  humidityPct: 'default',
+  // дополнительные подробности об источниках
+  projectInfo: null,   // { id, name, location: { city, country, lat, lon, altitudeM } }
+  meteoInfo: null,     // { name, source } — какой dataset и откуда (ASHRAE/t99/tmax)
+};
+
 // v0.60.91 (Пользователь 2026-05-03 «мощность должна передаваться из проекта,
 // так же все параметры проекта, включая место расположения, климат»):
 // auto-fill параметров из выбранного проекта.
@@ -129,18 +157,33 @@ async function loadFromProject() {
         const totalKw = itKw + (itKw * 0.05) + coolKw;
         if (totalKw > 0 && (_force || _state.loadKw === 500)) {
           _state.loadKw = Math.round(totalKw);
+          _stateMeta.loadKw = 'tw';
           appliedHints.push(`нагрузка ${_state.loadKw} кВт (из TW концепции)`);
         }
       }
     }
   } catch (e) { console.warn('[dgu-config] TW load failed:', e); }
 
-  // 2. Location (altitude) from project.location
+  // 2. Location (altitude + meta) from project.location
   try {
     const proj = getProject(_pid);
     const loc = proj?.location || {};
+    if (proj) {
+      _stateMeta.projectInfo = {
+        id: proj.id,
+        name: proj.name || proj.code || '(без имени)',
+        location: {
+          city: loc.city || '',
+          country: loc.country || '',
+          lat: loc.lat ?? null,
+          lon: loc.lon ?? null,
+          altitudeM: Number.isFinite(Number(loc.altitudeM)) ? Number(loc.altitudeM) : null,
+        },
+      };
+    }
     if (loc.altitudeM != null && (_force || _state.altitudeM === 0)) {
       _state.altitudeM = Number(loc.altitudeM);
+      _stateMeta.altitudeM = 'project';
       appliedHints.push(`высота ${_state.altitudeM} м (из локации проекта)`);
     }
   } catch (e) { console.warn('[dgu-config] location read failed:', e); }
@@ -158,37 +201,63 @@ async function loadFromProject() {
     }
     if (Array.isArray(datasets) && datasets.length) {
       const active = datasets.find(d => d.activeForProject) || datasets[0];
-      const tDesign = active.ashrae?.cooling04?.tDb
-                   || active.stats?.t99
-                   || active.stats?.tmax;
+      // v0.60.216: запоминаем источник чтобы показать пользователю в баннере.
+      let tSource = null, rhSource = null;
+      let tDesign = null;
+      if (active.ashrae?.cooling04?.tDb != null) { tDesign = active.ashrae.cooling04.tDb; tSource = 'ASHRAE 0.4% (cooling04.tDb)'; }
+      else if (active.stats?.t99 != null)        { tDesign = active.stats.t99; tSource = 't99 (stats)'; }
+      else if (active.stats?.tmax != null)       { tDesign = active.stats.tmax; tSource = 'tmax (stats)'; }
+      let rhDesign = null;
+      if (active.ashrae?.cooling04?.rh != null) { rhDesign = active.ashrae.cooling04.rh; rhSource = 'ASHRAE 0.4% (cooling04.rh)'; }
+      else if (active.stats?.rh99 != null)       { rhDesign = active.stats.rh99; rhSource = 'rh99 (stats)'; }
+      else if (active.stats?.rhMax != null)      { rhDesign = active.stats.rhMax; rhSource = 'rhMax (stats)'; }
+
+      _stateMeta.meteoInfo = {
+        name: active.name || active.label || active.station || '(meteo dataset)',
+        tSource: tSource,
+        rhSource: rhSource,
+        tDesign: tDesign,
+        rhDesign: rhDesign,
+      };
+
       if (tDesign != null && (_force || _state.ambientTC === 25)) {
         _state.ambientTC = Math.round(tDesign);
-        appliedHints.push(`T расч. ${_state.ambientTC}°C (ASHRAE 0.4% / t99 из meteo)`);
+        _stateMeta.ambientTC = 'meteo';
+        appliedHints.push(`T расч. ${_state.ambientTC}°C (${tSource})`);
       }
-      // v0.60.212: также RH из meteo (если есть в stats).
-      const rhDesign = active.ashrae?.cooling04?.rh
-                    || active.stats?.rh99
-                    || active.stats?.rhMax;
       if (rhDesign != null && (_force || _state.humidityPct === 60)) {
         _state.humidityPct = Math.round(rhDesign);
-        appliedHints.push(`RH расч. ${_state.humidityPct}% (из meteo)`);
+        _stateMeta.humidityPct = 'meteo';
+        appliedHints.push(`RH расч. ${_state.humidityPct}% (${rhSource})`);
       }
     }
   } catch (e) { console.warn('[dgu-config] meteo read failed:', e); }
 
   if (appliedHints.length) {
-    console.info(`[dgu-config v0.60.212] auto-fill из проекта (${_force ? 'force' : 'soft'}):`, appliedHints.join(' · '));
+    console.info(`[dgu-config v0.60.216] auto-fill из проекта (${_force ? 'force' : 'soft'}):`, appliedHints.join(' · '));
   }
 }
 
 function readUrlParams() {
   const qp = new URLSearchParams(location.search);
-  if (qp.get('capacityKw')) _state.loadKw = Number(qp.get('capacityKw')) || _state.loadKw;
+  if (qp.get('capacityKw')) {
+    const v = Number(qp.get('capacityKw'));
+    if (Number.isFinite(v)) { _state.loadKw = v; _stateMeta.loadKw = 'url'; }
+  }
   if (qp.get('mode')) _state.mode = qp.get('mode');
   if (qp.get('redundancy')) _state.redundancy = qp.get('redundancy');
-  if (qp.get('altitude')) _state.altitudeM = Number(qp.get('altitude')) || _state.altitudeM;
-  if (qp.get('tamb')) _state.ambientTC = Number(qp.get('tamb')) || _state.ambientTC;
-  if (qp.get('rh')) _state.humidityPct = Number(qp.get('rh')) || _state.humidityPct;
+  if (qp.get('altitude')) {
+    const v = Number(qp.get('altitude'));
+    if (Number.isFinite(v)) { _state.altitudeM = v; _stateMeta.altitudeM = 'url'; }
+  }
+  if (qp.get('tamb')) {
+    const v = Number(qp.get('tamb'));
+    if (Number.isFinite(v)) { _state.ambientTC = v; _stateMeta.ambientTC = 'url'; }
+  }
+  if (qp.get('rh')) {
+    const v = Number(qp.get('rh'));
+    if (Number.isFinite(v)) { _state.humidityPct = v; _stateMeta.humidityPct = 'url'; }
+  }
   if (qp.get('autonomy')) _state.autonomyHours = Number(qp.get('autonomy')) || _state.autonomyHours;
   if (qp.get('vendor')) _state.vendor = qp.get('vendor');
 }
@@ -197,7 +266,12 @@ function syncStateFromInputs() {
   _state.loadKw = Number($('dg-loadKw').value) || _state.loadKw;
   _state.mode = $('dg-mode').value || _state.mode;
   _state.redundancy = $('dg-redundancy').value || _state.redundancy;
-  _state.margin = Number($('dg-margin').value) || _state.margin;
+  // v0.60.216: margin → safetyMarginPct (см. комментарий выше).
+  // 0 — валидное значение, поэтому НЕ используем `||` (он съест 0).
+  {
+    const v = Number($('dg-margin').value);
+    _state.safetyMarginPct = Number.isFinite(v) ? v : _state.safetyMarginPct;
+  }
   _state.altitudeM = Number($('dg-altitude').value) || _state.altitudeM;
   _state.ambientTC = Number($('dg-tamb').value) || _state.ambientTC;
   _state.humidityPct = Number($('dg-rh').value) || _state.humidityPct;
@@ -209,7 +283,7 @@ function applyStateToInputs() {
   $('dg-loadKw').value = _state.loadKw;
   $('dg-mode').value = _state.mode;
   $('dg-redundancy').value = _state.redundancy;
-  $('dg-margin').value = _state.margin;
+  $('dg-margin').value = _state.safetyMarginPct;
   $('dg-altitude').value = _state.altitudeM;
   $('dg-tamb').value = _state.ambientTC;
   $('dg-rh').value = _state.humidityPct;
@@ -263,23 +337,40 @@ function renderCalcResult(res) {
   `;
 }
 
+// v0.60.216: helper — мощность для текущего режима (datasheet или derived).
+function _modeKw(d) {
+  return getDguModePowerKw(d, _state.mode);
+}
+function _isDerived(d) {
+  return _modeKw(d).source !== 'datasheet';
+}
+
 function renderSuggestResult(spec) {
   const filter = { mode: _state.mode };
   if (_state.vendor) filter.vendor = _state.vendor;
 
-  // Подбор: показываем top-5 ближайших по possKw
-  const fieldByMode = { ESP: 'espKw', PRP: 'prpKw', COP: 'copKw' };
-  const field = fieldByMode[_state.mode];
-  const allDgus = listDgus(_state.vendor ? { vendor: _state.vendor } : {});
-  const sorted = allDgus.slice().sort((a, b) => a[field] - b[field]);
+  const allDgus = listDgus(_state.vendor ? { vendor: _state.vendor } : {})
+    .filter(d => Number.isFinite(_modeKw(d).kw));
+  const sorted = allDgus.slice().sort((a, b) => _modeKw(a).kw - _modeKw(b).kw);
 
   // Best = ближайшая ≥ requiredKw
-  const best = sorted.find(d => d[field] >= spec.nameplateKw);
-  const matches = sorted.filter(d => d[field] >= spec.nameplateKw && d[field] <= spec.nameplateKw * 1.5);
+  const best = sorted.find(d => _modeKw(d).kw >= spec.nameplateKw);
+  const matches = sorted.filter(d => {
+    const k = _modeKw(d).kw;
+    return k >= spec.nameplateKw && k <= spec.nameplateKw * 1.5;
+  });
 
   if (!matches.length) {
     return `<div class="dg-warn">⚠ Нет моделей в каталоге, покрывающих требуемые ${fmt(spec.nameplateKw)} кВт по режиму ${escHtml(_state.mode)}${_state.vendor ? ` (вендор: ${escHtml(_state.vendor)})` : ''}. Попробуйте другой режим или снимите фильтр вендора.</div>`;
   }
+
+  // v0.60.216: расчёт количества derived-значений в видимых строках.
+  const derivedCount = matches.slice(0, 8).filter(d => _isDerived(d)).length;
+  const derivedNote = derivedCount > 0
+    ? `<div class="muted" style="font-size:11px;margin-top:6px;font-style:italic">
+         <b>*</b> — мощность не задана в datasheet, выведена по типовым коэффициентам ISO 8528 (наведите на ячейку — формула в tooltip).
+       </div>`
+    : '';
 
   return `
     <p style="font-size:12px;margin-bottom:6px">
@@ -303,10 +394,12 @@ function renderSuggestResult(spec) {
         ${matches.slice(0, 8).map(d => {
           const isBest = d === best;
           const p = d.physical || {};
+          const mp = _modeKw(d);
+          const isDer = mp.source !== 'datasheet';
           return `<tr class="${isBest ? 'dg-suggest-best' : ''}" title="${escAttr(d.notes || '')}">
             <td>${escHtml(d.vendor)}</td>
             <td><b>${escHtml(d.model)}</b></td>
-            <td class="num"><b>${fmt(d[field])}</b></td>
+            <td class="num" title="${escAttr(mp.source)}"><b>${fmt(mp.kw)}</b>${isDer ? '<sup style="color:#dc2626" title="' + escAttr(mp.source) + '">*</sup>' : ''}</td>
             <td class="num">${fmt(d.espKw)} / ${fmt(d.prpKw)} / ${fmt(d.copKw)}</td>
             <td>${escHtml(d.engineModel)} (${d.cylinders} цил., ${fmt(d.displacement, 1)} L)</td>
             <td class="num">${p.lengthMm || '—'} × ${p.widthMm || '—'} × ${p.heightMm || '—'}</td>
@@ -315,7 +408,12 @@ function renderSuggestResult(spec) {
         }).join('')}
       </tbody>
     </table>
-    ${best ? `<div class="dg-success">✓ Рекомендация: <b>${escHtml(best.vendor)} ${escHtml(best.model)}</b> — ${fmt(best[field])} кВт по ${escHtml(_state.mode)}, ${best.cylinders}-цилиндровый ${escHtml(best.engineModel)}, SFC ${fmt(best.sfcLkWh, 3)} л/кВт·ч.</div>` : ''}
+    ${derivedNote}
+    ${best ? (() => {
+      const mp = _modeKw(best);
+      const srcNote = mp.source === 'datasheet' ? '' : ` <i title="${escAttr(mp.source)}">(*выведено)</i>`;
+      return `<div class="dg-success">✓ Рекомендация: <b>${escHtml(best.vendor)} ${escHtml(best.model)}</b> — ${fmt(mp.kw)} кВт по ${escHtml(_state.mode)}${srcNote}, ${best.cylinders}-цилиндровый ${escHtml(best.engineModel)}, SFC ${fmt(best.sfcLkWh, 3)} л/кВт·ч.</div>`;
+    })() : ''}
   `;
 }
 
@@ -349,22 +447,183 @@ function renderFuelResult(res, best) {
   `;
 }
 
+// v0.60.216: баннер с контекстом проекта (локация) и источниками climate
+// (meteo dataset). Делает явным «откуда взялись altitude/T/RH». Показывается
+// всегда (даже без nodeId), чтобы Пользователь видел, что dgu-config
+// реально читает project + meteo.
+function _renderContextBanner() {
+  let bar = document.getElementById('dg-ctx-banner');
+  const card = document.querySelector('.dg-content');
+  if (!card) return;
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'dg-ctx-banner';
+    bar.className = 'rs-cfg-card';
+    bar.style.cssText = 'border:1px solid #cbd5e1;background:#f8fafc;font-size:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:center';
+    const hdr = card.querySelector('.dg-content-header');
+    if (hdr && hdr.nextSibling) card.insertBefore(bar, hdr.nextSibling);
+    else card.prepend(bar);
+  }
+  const proj = _stateMeta.projectInfo;
+  const meteo = _stateMeta.meteoInfo;
+  const _srcLabel = (s) => {
+    if (s === 'project') return '📁 проект';
+    if (s === 'meteo')   return '🌡 метео';
+    if (s === 'tw')      return '🏗 TW концепция';
+    if (s === 'url')     return '🔗 URL (из схемы)';
+    if (s === 'manual')  return '✍ ввод';
+    if (s === 'default') return '— default';
+    return '?';
+  };
+  let projHtml = '';
+  if (proj) {
+    const loc = proj.location || {};
+    const locParts = [];
+    if (loc.city) locParts.push(escHtml(loc.city));
+    if (loc.country) locParts.push(escHtml(loc.country));
+    if (loc.lat != null && loc.lon != null) {
+      locParts.push(`${Number(loc.lat).toFixed(3)}°, ${Number(loc.lon).toFixed(3)}°`);
+    }
+    if (loc.altitudeM != null) locParts.push(`высота ${escHtml(loc.altitudeM)} м`);
+    projHtml = `<div title="Проект задаёт локацию (city/country/lat/lon/altitude). Эти данные пропагируются во все calc-модули, в т.ч. dgu-config.">
+      <b>📁 Проект:</b> ${escHtml(proj.name)}<br>
+      <span class="muted">📍 ${locParts.length ? locParts.join(' · ') : '<i>локация не задана</i>'}</span>
+    </div>`;
+  } else {
+    projHtml = `<div class="muted"><i>📁 Проект не разрешён</i></div>`;
+  }
+  let meteoHtml = '';
+  if (meteo) {
+    const tParts = [];
+    if (meteo.tDesign != null) tParts.push(`T design ${fmt(meteo.tDesign)}°C`);
+    if (meteo.rhDesign != null) tParts.push(`RH design ${fmt(meteo.rhDesign)}%`);
+    meteoHtml = `<div title="Активный meteo-dataset проекта. T/RH design используются для climate derate (ISO 3046-1). Источник полей: ${escAttr((meteo.tSource || '—') + ' / ' + (meteo.rhSource || '—'))}.">
+      <b>🌡 Метео:</b> ${escHtml(meteo.name)}<br>
+      <span class="muted">${tParts.length ? tParts.join(' · ') : '<i>climate-поля не найдены</i>'}</span>
+    </div>`;
+  } else {
+    meteoHtml = `<div class="muted"
+      title="Активный meteo-dataset не найден. Загрузите данные в модуле Meteo и активируйте dataset для проекта.">
+      <i>🌡 Метео-dataset не активен</i>
+    </div>`;
+  }
+  const srcHtml = `<div title="Откуда взяты значения в полях расчёта.">
+    <b>📊 Источники:</b><br>
+    <span class="muted">
+      нагрузка ${escHtml(_srcLabel(_stateMeta.loadKw))} ·
+      высота ${escHtml(_srcLabel(_stateMeta.altitudeM))} ·
+      T ${escHtml(_srcLabel(_stateMeta.ambientTC))} ·
+      RH ${escHtml(_srcLabel(_stateMeta.humidityPct))}
+    </span>
+  </div>`;
+  bar.innerHTML = projHtml + meteoHtml + srcHtml;
+}
+
 function recalcAndRender() {
   syncStateFromInputs();
   const res = calcDgu(_state);
   $('dg-calc-result').innerHTML = renderCalcResult(res);
   $('dg-suggest-result').innerHTML = renderSuggestResult(res.spec);
 
-  // Best для fuel
-  const fieldByMode = { ESP: 'espKw', PRP: 'prpKw', COP: 'copKw' };
-  const allDgus = listDgus(_state.vendor ? { vendor: _state.vendor } : {});
-  const sorted = allDgus.slice().sort((a, b) => a[fieldByMode[_state.mode]] - b[fieldByMode[_state.mode]]);
-  const best = sorted.find(d => d[fieldByMode[_state.mode]] >= res.spec.nameplateKw);
+  // Best для fuel — v0.60.216: используем getDguModePowerKw с fallback.
+  const allDgus = listDgus(_state.vendor ? { vendor: _state.vendor } : {})
+    .filter(d => Number.isFinite(_modeKw(d).kw));
+  const sorted = allDgus.slice().sort((a, b) => _modeKw(a).kw - _modeKw(b).kw);
+  const best = sorted.find(d => _modeKw(d).kw >= res.spec.nameplateKw);
   $('dg-fuel-result').innerHTML = renderFuelResult(res, best);
 
   // v0.60.81: persist state per-project + auto-save best as selected
   saveProjectState();
   if (best) saveSelectedDgu(best);
+  // v0.60.216: запоминаем best для кнопки «↩ Применить к узлу схемы».
+  _lastBest = best || null;
+  _renderContextBanner();
+  _renderApplyBar(res.spec);
+}
+
+// v0.60.216: bar с кнопкой возврата в Конструктор схем (если открыто из
+// инспектора с ?nodeId=). За пределами schema-mode не рисуется.
+function _renderApplyBar(spec) {
+  let bar = document.getElementById('dg-apply-bar');
+  if (!_nodeId) { if (bar) bar.remove(); return; }
+  const card = document.querySelector('.dg-content');
+  if (!card) return;
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'dg-apply-bar';
+    bar.className = 'rs-cfg-card';
+    bar.style.cssText = 'border:2px solid #16a34a;background:#f0fdf4;display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between';
+    // вставляем сверху content'а (после header)
+    const hdr = card.querySelector('.dg-content-header');
+    if (hdr && hdr.nextSibling) card.insertBefore(bar, hdr.nextSibling);
+    else card.prepend(bar);
+  }
+  const best = _lastBest;
+  const lbl = best
+    ? `<b>${escHtml(best.vendor)} ${escHtml(best.model)}</b> — ESP ${fmt(best.espKw)} кВт`
+    : `<span class="muted">Подбор не найден</span>`;
+  bar.innerHTML = `
+    <div style="font-size:13px">
+      🔗 Возврат в Конструктор схем · узел <code>${escHtml(_nodeId)}</code><br>
+      ${lbl}
+    </div>
+    <button type="button" id="dg-apply-btn" class="rs-cfg-btn-primary"
+      ${best ? '' : 'disabled'}
+      title="Записать выбранную модель ДГУ в узел Конструктора схем (manufacturer, model, capacityKw, fuelSfcLkWh).">
+      ↩ Применить к узлу схемы
+    </button>
+  `;
+  const btn = document.getElementById('dg-apply-btn');
+  if (btn) btn.addEventListener('click', () => sendApplyToHost(spec));
+}
+
+function sendApplyToHost(spec) {
+  if (!_nodeId) return;
+  const best = _lastBest;
+  if (!best) return;
+  const payload = {
+    nodeId: _nodeId,
+    selected: {
+      vendor: best.vendor,
+      model: best.model,
+      nameplateKw: best.nameplateKw,
+      espKw: best.espKw, prpKw: best.prpKw, copKw: best.copKw,
+      engineModel: best.engineModel,
+      sfcLkWh: best.sfcLkWh,
+      physical: best.physical || null,
+    },
+    spec: {
+      mode: _state.mode,
+      redundancy: _state.redundancy,
+      requiredKw: spec.nameplateKw,
+      qty: spec.qty,
+      totalNameplateKw: spec.totalNameplateKw,
+      derateMultiplier: spec.derate?.multiplier,
+      safetyMarginPct: _state.safetyMarginPct,
+    },
+    ts: Date.now(),
+  };
+  // 1) LS-bridge — для случая, если schema-страница уже закрыта или открыта
+  // в другой вкладке: при следующем фокусе она прочитает этот ключ.
+  try {
+    localStorage.setItem(BRIDGE_KEY_PREFIX + _nodeId, JSON.stringify({ applied: true, ...payload }));
+  } catch (e) { console.warn('[dgu-config] LS bridge failed:', e); }
+  // 2) postMessage — мгновенно если schema-tab ещё открыт.
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({ type: 'raschet.dgu.apply', ...payload }, '*');
+    }
+  } catch {}
+  // toast (если в shell есть rsToast — используем, иначе alert-альтернатива)
+  if (window.rsToast) {
+    window.rsToast(`Модель «${best.vendor} ${best.model}» применена к узлу ${_nodeId}. Можно закрыть вкладку.`, 'ok');
+  } else {
+    const t = document.createElement('div');
+    t.style.cssText = 'position:fixed;top:60px;right:16px;background:#16a34a;color:#fff;padding:10px 14px;border-radius:8px;z-index:9999;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+    t.textContent = `✓ Модель «${best.vendor} ${best.model}» применена к узлу ${_nodeId}. Можно закрыть вкладку.`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
 }
 
 // v0.60.134 (по репорту Пользователя 2026-05-04 «как то объедини выбор и
@@ -387,6 +646,8 @@ async function init() {
   // (мощность из TW concept, T из meteo, высота из location).
   await loadFromProject();
   readUrlParams();
+  // v0.60.216: запоминаем nodeId для apply-bar.
+  try { _nodeId = new URLSearchParams(location.search).get('nodeId') || null; } catch { _nodeId = null; }
   renderProjectContext();
   // Заполняем vendor select
   const vendors = listDguVendors();
@@ -400,9 +661,20 @@ async function init() {
   applyStateToInputs();
 
   // Listeners — auto-recalc on any input change
+  // v0.60.216: помечаем источник как 'manual' для полей с отслеживанием.
+  const _manualMap = {
+    'dg-loadKw': 'loadKw',
+    'dg-altitude': 'altitudeM',
+    'dg-tamb': 'ambientTC',
+    'dg-rh': 'humidityPct',
+  };
   ['dg-loadKw', 'dg-mode', 'dg-redundancy', 'dg-margin', 'dg-altitude', 'dg-tamb', 'dg-rh', 'dg-autonomy', 'dg-vendor'].forEach(id => {
     const el = $(id);
-    if (el) el.addEventListener('change', recalcAndRender);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      if (_manualMap[id]) _stateMeta[_manualMap[id]] = 'manual';
+      recalcAndRender();
+    });
   });
   $('dg-recalc')?.addEventListener('click', recalcAndRender);
 

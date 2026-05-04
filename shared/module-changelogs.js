@@ -4,6 +4,26 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.216', date: '2026-05-04', items: [
+      '🦶 <b>Двойной футер фикс — все модули</b>. По репорту Пользователя 2026-05-04 «да фикс примени для всех модулей». Найдены и исправлены: <code>panel-config</code>, <code>mv-config</code>, <code>logistics</code>, <code>elements</code>. В каждом удалены <code>import { mountFooter } from "../shared/app-footer.js"</code> и <code>window.addEventListener("DOMContentLoaded", () => mountFooter())</code>. Остался только <code>module-footer</code>.',
+      '⚙ <b>ДГУ: margin теперь работает</b>. По репорту Пользователя «и маргин вроде не влияет ни на что». Баг: в state поле было <code>margin</code>, а калькулятор <code>calcDguRequired</code> ждёт <code>safetyMarginPct</code> — рассинхрон, margin молча игнорировался, бралось дефолтное 15%. Переименовано в <code>safetyMarginPct</code>, теперь margin=0 (валидный 0) тоже учитывается (раньше съедался <code>||</code>).',
+      '🔗 <b>ДГУ → Конструктор схем: возврат подбора</b>. По репорту Пользователя «как подбор вернуть обратно в конструктор схем???». В <code>dgu-config</code> добавлен apply-bar (зелёная карточка вверху, видна только при <code>?nodeId=…</code>) с кнопкой «↩ Применить к узлу схемы».',
+      '• Click → <code>postMessage(\'raschet.dgu.apply\', {nodeId, selected, spec})</code> + LS-bridge <code>raschet.dgu.bridge.&lt;nodeId&gt;</code> (на случай отсутствия opener).',
+      '• <code>js/main.js</code> теперь ловит <code>raschet.dgu.apply</code> + storage-event <code>raschet.dgu.bridge.*</code> и применяет к узлу: <code>manufacturer</code>, <code>model</code>, <code>capacityKw=nameplateKw</code>, <code>fuelSfcLkWh</code>, <code>dguMode</code>, <code>redundancy</code>, <code>dguClimateDerate</code>, <code>dguSafetyMarginPct</code>, <code>appliedConfig.dgu</code>.',
+      '📊 <b>ДГУ: явный source-attribution локации/метео</b>. По репорту Пользователя «передачи места установки так и нет из данных проекта и модуля метео». Добавлен баннер «контекст проекта/метео» в шапку — показывает: 📁 Проект, 📍 локацию (city/country/lat/lon/altitudeM), 🌡 активный meteo-dataset (T design, RH design, источник: ASHRAE 0.4% / t99 / tmax). Под ним — 📊 Источники для каждого поля: <code>tw/project/meteo/url/manual/default</code>.',
+      '• <code>_stateMeta</code> tracks источник для loadKw/altitudeM/ambientTC/humidityPct. Manual-edit в input помечает поле как <code>manual</code>, чтобы Пользователь видел что значение перебито вручную.',
+      '🧮 <b>ДГУ: ISO 8528 fallback для отсутствующих режимов</b>. По запросу Пользователя «если в каталоге ДГУ нет мощности для режима, вычисляй их посредством применения коэффициентов, например если нет параметра COP, то применением дискаунта 30% от мощности в режиме PRP». Новая функция <code>getDguModePowerKw(dgu, mode)</code> в <code>dgu-config/calc/dgu-calc.js</code>:',
+      '• <b>ESP=PRP÷0.90</b> или COP÷0.63 / LTP÷0.95',
+      '• <b>PRP=ESP×0.90</b> (ISO 8528-1) или COP÷0.70',
+      '• <b>LTP=ESP×0.95</b> или PRP÷0.95',
+      '• <b>COP=PRP×0.70</b> (−30% по ISO 8528-1, как просил Пользователь) или ESP×0.63',
+      '• <b>DCS=ESP</b> (ISO 8528-13)',
+      '• <b>DCP=PRP×1.05</b> (чистая нагрузка ЦОД)',
+      '• <b>DCC=COP×1.05</b> или PRP×0.735',
+      '• <b>MCSP=ESP×0.95</b> (Tier IV)',
+      '• Derived-значения помечаются красным <sup>*</sup> в таблице подбора, в tooltip — формула и стандарт. Внизу таблицы примечание про ISO.',
+      'Файлы: <code>panel-config/index.html</code>, <code>mv-config/index.html</code>, <code>logistics/index.html</code>, <code>elements/index.html</code>, <code>dgu-config/dgu-config.js</code>, <code>dgu-config/calc/dgu-calc.js</code>, <code>js/main.js</code>, <code>js/engine/constants.js</code>.',
+    ] },
     { version: '0.60.215', date: '2026-05-04', items: [
       '🦶 <b>Каталог: убран двойной футер</b>. По репорту Пользователя 2026-05-04 «мой каталог имеет двойной футер, приведи к общему». В catalog/index.html было два разных footer-mount: <code>app-footer.js</code> (<code>.rs-footer</code>: «v0.60.210 © 2026 Raschet Platform») + <code>module-footer.js</code> (<code>.rs-mfoot</code>: «Raschet v0.60.210 · Журнал изменений Каталог»). Они не дедуплицировались (разные классы).',
       '• <b>Решение</b>: оставлен только <code>module-footer</code> — он богаче (версия + ссылка на журнал изменений модуля).',

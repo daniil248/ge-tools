@@ -29,7 +29,9 @@
 
   <script type="module">
     import { mountHeader } from '../shared/app-header.js';
-    import { mountFooter } from '../shared/app-footer.js';
+    // v0.60.216 (по репорту Пользователя 2026-05-04 «да фикс примени для всех
+    // модулей»): app-footer (.rs-footer) удалён — используем только
+    // module-footer (.rs-mfoot) ниже, чтобы не было двойного футера.
     import { mountHelp } from '../shared/help-panel.js';
     mountHeader({ title: 'Библиотека → переезд', home: '../hub.html', moduleId: 'elements', moduleTitle: 'Элементы' });
     mountHelp({
@@ -79,7 +81,6 @@
         <div class="warn">Редактор здесь заморожен. Все правки делайте через <code>catalog/</code> — данные общие.</div>
       `,
     });
-    window.addEventListener('DOMContentLoaded', () => mountFooter());
   </script>
   <script type="module">
     import { mountFooter as mountModuleFooter } from '../shared/module-footer.js';

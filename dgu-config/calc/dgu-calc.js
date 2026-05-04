@@ -217,6 +217,92 @@ export function calcFuelConsumption(input) {
 }
 
 /**
+ * Маппинг режима на поле в datasheet каталога.
+ */
+export const DGU_MODE_FIELDS = {
+  ESP: 'espKw',
+  PRP: 'prpKw',
+  LTP: 'ltpKw',
+  COP: 'copKw',
+  DCS: 'dcsKw',
+  DCP: 'dcpKw',
+  DCC: 'dccKw',
+  MCSP: 'mcspKw',
+};
+
+/**
+ * v0.60.216 (по запросу Пользователя 2026-05-04 «если в каталоге ДГУ нет
+ * мощности для режима, вычисляй их посредством применения коэффициентов,
+ * например если нет параметра COP, то применением дискаунта 30% от
+ * мощности в режиме PRP»).
+ *
+ * Получить мощность ДГУ для конкретного режима. Если в datasheet нет
+ * прямого значения — выводим через типовые коэффициенты ISO 8528-1
+ * (для общих режимов) и ISO 8528-13 (для режимов ЦОД).
+ *
+ * Принятые ratio (в индустрии и в большинстве datasheet):
+ *   PRP  ≈ 0.90 × ESP        (PRP = 90% standby — стандарт ISO 8528-1)
+ *   LTP  ≈ 0.95 × ESP        (между PRP и ESP, лимит 500 ч/год)
+ *   COP  ≈ 0.70 × PRP = 0.63 × ESP (−30% от PRP, для 24/7 без перерывов)
+ *   DCS  = ESP               (для ЦОД — те же условия что Standby)
+ *   DCP  ≈ 1.05 × PRP        (чистая нагрузка ЦОД позволяет +5%)
+ *   DCC  ≈ 1.05 × COP        (24/7 ЦОД с допуском 10% переменной)
+ *   MCSP ≈ 0.95 × ESP        (резерв Tier IV, чуть консервативнее)
+ *
+ * @param {object} dgu — datasheet entry (espKw / prpKw / copKw …)
+ * @param {string} mode — 'ESP'|'PRP'|'LTP'|'COP'|'DCS'|'DCP'|'DCC'|'MCSP'
+ * @returns {{ kw: number, source: string }} — kw=NaN если вывод невозможен.
+ */
+export function getDguModePowerKw(dgu, mode) {
+  if (!dgu) return { kw: NaN, source: 'no datasheet' };
+  const field = DGU_MODE_FIELDS[mode];
+  if (field && Number.isFinite(Number(dgu[field]))) {
+    return { kw: Number(dgu[field]), source: 'datasheet' };
+  }
+  const esp = Number(dgu.espKw);
+  const prp = Number(dgu.prpKw);
+  const cop = Number(dgu.copKw);
+  const ltp = Number(dgu.ltpKw);
+  switch (mode) {
+    case 'ESP':
+      if (Number.isFinite(prp)) return { kw: prp / 0.90, source: 'derived: ESP=PRP÷0.90 (ISO 8528-1)' };
+      if (Number.isFinite(ltp)) return { kw: ltp / 0.95, source: 'derived: ESP=LTP÷0.95' };
+      if (Number.isFinite(cop)) return { kw: cop / 0.63, source: 'derived: ESP=COP÷0.63' };
+      break;
+    case 'PRP':
+      if (Number.isFinite(esp)) return { kw: esp * 0.90, source: 'derived: PRP=ESP×0.90 (ISO 8528-1)' };
+      if (Number.isFinite(cop)) return { kw: cop / 0.70, source: 'derived: PRP=COP÷0.70 (−30% по ISO)' };
+      if (Number.isFinite(ltp)) return { kw: ltp * 0.95, source: 'derived: PRP≈LTP×0.95' };
+      break;
+    case 'LTP':
+      if (Number.isFinite(esp)) return { kw: esp * 0.95, source: 'derived: LTP=ESP×0.95 (ISO 8528-1)' };
+      if (Number.isFinite(prp)) return { kw: prp / 0.95, source: 'derived: LTP=PRP÷0.95' };
+      break;
+    case 'COP':
+      if (Number.isFinite(prp)) return { kw: prp * 0.70, source: 'derived: COP=PRP×0.70 (−30% по ISO 8528-1)' };
+      if (Number.isFinite(esp)) return { kw: esp * 0.63, source: 'derived: COP≈ESP×0.63' };
+      break;
+    case 'DCS':
+      if (Number.isFinite(esp)) return { kw: esp, source: 'derived: DCS=ESP (ISO 8528-13)' };
+      break;
+    case 'DCP':
+      if (Number.isFinite(prp)) return { kw: prp * 1.05, source: 'derived: DCP=PRP×1.05 (ISO 8528-13)' };
+      if (Number.isFinite(esp)) return { kw: esp * 0.945, source: 'derived: DCP≈ESP×0.945' };
+      break;
+    case 'DCC':
+      if (Number.isFinite(cop)) return { kw: cop * 1.05, source: 'derived: DCC=COP×1.05 (ISO 8528-13)' };
+      if (Number.isFinite(prp)) return { kw: prp * 0.735, source: 'derived: DCC≈PRP×0.735' };
+      if (Number.isFinite(esp)) return { kw: esp * 0.661, source: 'derived: DCC≈ESP×0.661' };
+      break;
+    case 'MCSP':
+      if (Number.isFinite(esp)) return { kw: esp * 0.95, source: 'derived: MCSP=ESP×0.95 (Tier IV)' };
+      if (Number.isFinite(prp)) return { kw: prp * 1.056, source: 'derived: MCSP≈PRP×1.056' };
+      break;
+  }
+  return { kw: NaN, source: 'unknown (нет источника)' };
+}
+
+/**
  * Полный расчёт: спецификация ДГУ + топливо.
  *
  * @param {object} input — все параметры из UI
