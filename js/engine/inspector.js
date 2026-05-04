@@ -2789,6 +2789,10 @@ export function renderGeneralPanel(n) {
     // v0.60.217: если к узлу-генератору применена ДГУ — показываем сводку
     // (round-trip из dgu-config через postMessage('raschet.dgu.apply')).
     // v0.60.222: tooltips на каждом поле (правило feedback_tooltips).
+    // v0.60.224 (по репорту Пользователя 2026-05-04 «при выходе запрашиваемой
+    // мощности за пределы подобранного ДГУ, нужно оповещать пользователя»):
+    // если n._maxLoadKw > capacityKw — блок становится красным с alert-иконкой
+    // и показывает % перегруза.
     if (cfg === _CONFIGURATORS.generator && n.appliedConfig?.dgu) {
       const cfgDgu = n.appliedConfig.dgu;
       const sel = cfgDgu.selected || {};
@@ -2796,6 +2800,12 @@ export function renderGeneralPanel(n) {
       const ageMin = cfgDgu.ts ? Math.round((Date.now() - cfgDgu.ts) / 60000) : null;
       const ageStr = ageMin == null ? '' : (ageMin < 1 ? 'только что' : ageMin < 60 ? `${ageMin} мин назад` : `${Math.round(ageMin / 60)} ч назад`);
       const _t = (txt, tooltip) => `<span title="${escAttr(tooltip)}">${txt}</span>`;
+      // v0.60.224: проверка перегруза.
+      const _reqKw = Math.max(Number(n._maxLoadKw) || 0, Number(n._maxDownstreamUncapped) || 0);
+      const _capKw = Number(n.capacityKw) || Number(sel.nameplateKw) || 0;
+      const _exceeded = _capKw > 0 && _reqKw > _capKw;
+      const _exceedPct = _exceeded ? ((_reqKw - _capKw) / _capKw * 100) : 0;
+      const _close = !_exceeded && _capKw > 0 && _reqKw >= 0.85 * _capKw;
       const modelLine = (sel.vendor || sel.model)
         ? _t(`${sel.vendor ? escHtml(sel.vendor) + ' ' : ''}<b>${escHtml(sel.model || '')}</b>`,
              `Производитель и модель ДГУ из каталога. Записано через apply из dgu-config (postMessage 'raschet.dgu.apply').`)
@@ -2832,13 +2842,32 @@ export function renderGeneralPanel(n) {
         ? '<br>' + _t('Climate derate: ' + (Number(sp.derateMultiplier) * 100).toFixed(1) + '% от nameplate',
             'Climate derate по ISO 3046-1: высота, T наружного воздуха, влажность снижают доступную мощность от nameplate. Учитывается при подборе размера ДГУ.')
         : '';
-      h.push(`<div style="margin-top:8px;padding:8px 10px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:3px;font-size:11px;color:#14532d"
+      // v0.60.224: цвет блока зависит от состояния перегруза.
+      const _bgColor   = _exceeded ? '#fef2f2' : (_close ? '#fff7ed' : '#f0fdf4');
+      const _borderCol = _exceeded ? '#b91c1c' : (_close ? '#c2410c' : '#16a34a');
+      const _txtColor  = _exceeded ? '#7f1d1d' : (_close ? '#7c2d12' : '#14532d');
+      const _statusIcon = _exceeded ? '⛔' : (_close ? '⚠' : '✓');
+      const _statusText = _exceeded ? 'ДГУ ПЕРЕГРУЖЕНА' : (_close ? 'ДГУ близка к пределу' : 'ДГУ сконфигурирована');
+      const _capacityWarning = _exceeded
+        ? `<div style="margin-top:6px;padding:6px 8px;background:#fee2e2;border-radius:3px;font-size:11.5px;font-weight:600"
+             title="Запрашиваемая мощность узла превышает паспортный номинал применённой модели. Откройте конфигуратор и выберите более крупную модель — либо распределите нагрузку.">
+             ⛔ Запрашиваемая мощность <b>${_reqKw.toFixed(1)} кВт</b> превышает номинал ДГУ <b>${_capKw.toFixed(0)} кВт</b> на <b>+${_exceedPct.toFixed(1)}%</b>.<br>
+             Откройте <a href="../dgu-config/?nodeId=${escAttr(n.id)}" target="_blank" style="color:#7f1d1d;text-decoration:underline">конфигуратор ДГУ</a> и выберите более мощную модель.
+           </div>`
+        : (_close
+          ? `<div style="margin-top:6px;padding:6px 8px;background:#ffedd5;border-radius:3px;font-size:11.5px"
+               title="Запрашиваемая мощность близка к пределу применённой модели (≥85%). Рекомендуется запас минимум 15-20% для долгосрочной эксплуатации.">
+               ⚠ Запрашиваемая <b>${_reqKw.toFixed(1)} кВт</b> близка к номиналу <b>${_capKw.toFixed(0)} кВт</b> (${(_reqKw/_capKw*100).toFixed(0)}%). Рекомендуется запас ≥15-20%.
+             </div>`
+          : '');
+      h.push(`<div style="margin-top:8px;padding:8px 10px;background:${_bgColor};border-left:3px solid ${_borderCol};border-radius:3px;font-size:11px;color:${_txtColor}"
         title="Узел-генератор имеет привязанную модель ДГУ из каталога (n.appliedConfig.dgu). Войдёт в BOM проекта.">
-        <b title="Сигнал что ДГУ-конфигуратор успешно вернул выбор в схему.">✓ ДГУ сконфигурирована</b>${ageStr ? ` <span class="muted" title="Время с момента apply из dgu-config.">(${escHtml(ageStr)})</span>` : ''}<br>
+        <b title="Сигнал что ДГУ-конфигуратор успешно вернул выбор в схему.">${_statusIcon} ${escHtml(_statusText)}</b>${ageStr ? ` <span class="muted" title="Время с момента apply из dgu-config.">(${escHtml(ageStr)})</span>` : ''}<br>
         ${modelLine}
         ${nameplateBlock}${modeBlock}${qtyBlock}
         ${engineBlock}${sfcBlock}
         ${derateBlock}
+        ${_capacityWarning}
         <br><span class="muted" title="Запись произошла через postMessage('raschet.dgu.apply') или storage-bridge от dgu-config. Спецификация автоматически обновится при следующем экспорте BOM/КП.">Записано через apply из dgu-config. Войдёт в BOM проекта автоматически.</span>
       </div>`);
     }
