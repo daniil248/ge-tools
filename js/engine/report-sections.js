@@ -339,8 +339,11 @@ function sectionUps() {
       fmt(batt), autStr, status,
     ]);
 
-    // Детальная карточка по ИБП
-    const line1 = `${fullTag(u)} ${u.name || ''}  ·  КПД ${eff}%  ·  заряд ${u.batteryChargePct || 0}%`;
+    // Детальная карточка по ИБП.
+    // v0.60.197 (по репорту Пользователя 2026-05-04 «в отчету по ИБП не
+    // следует выводить текущий заряд»): «заряд X%» убран из отчёта —
+    // это переменная величина симуляции, не статическая характеристика.
+    const line1 = `${fullTag(u)} ${u.name || ''}  ·  КПД ${eff}%`;
     details.push({ heading: `ИБП ${fullTag(u) || u.name}`, body: [line1] });
     if (u._maxOverload) {
       const uncapped = Number(u._maxDownstreamUncapped) || 0;

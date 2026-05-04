@@ -2039,14 +2039,24 @@ export function renderNodes() {
         ? _homo.common.demandKw * (_homo.common.kUse || 1)
         : (_homo && _homo.count > 0 ? _calcKwTotal / _homo.count : 0);
       const _mismatchSuffix = _isMixed ? ' ⚠' : '';
+      // v0.60.197 (по репорту Пользователя 2026-05-04 «округление в группе
+      // для мощности сделай 0,0»): footer-метка использует фиксированную
+      // 1-decimal точность для consistency. fmtPower может терять «.0»
+      // у целых чисел (8 vs 8.0), → разнобой «4 × 8 kW = 34.3 kW».
+      // Теперь оба числа форматируются одинаково: «4 × 8.6 kW = 34.4 kW».
+      const _fmtKwFixed = (kw) => {
+        const v = Number(kw) || 0;
+        if (Math.abs(v) < 0.5) return Math.round(v * 1000) + ' W';
+        return v.toFixed(1) + ' kW';
+      };
       let gLabel = '';
       if (_showKw && _showCount) {
         if (_isContainer) {
           if (_homo && _homo.homogeneous && _homo.count > 1 && _calcKwPerUnit > 0) {
-            // «8 × 7 kW = 56 kW» — Pрасч на единицу × count = Σ Pрасч.
-            gLabel = `${_homo.count} × ${fmtPower(_calcKwPerUnit)} = ${fmtPower(_calcKwTotal)}`;
+            // «8 × 7.0 kW = 56.0 kW» — Pрасч на единицу × count = Σ Pрасч.
+            gLabel = `${_homo.count} × ${_fmtKwFixed(_calcKwPerUnit)} = ${_fmtKwFixed(_calcKwTotal)}`;
           } else {
-            gLabel = `Σ ${fmtPower(_calcKwTotal || totalKw)} (${cntEff} шт.)`;
+            gLabel = `Σ ${_fmtKwFixed(_calcKwTotal || totalKw)} (${cntEff} шт.)`;
             gLabel += _mismatchSuffix;
           }
         } else {
@@ -2054,12 +2064,12 @@ export function renderNodes() {
           const _pCalcPerUnit = (Number(n.demandKw) || 0) * (Number(n.kUse) || 1);
           const _pCalcTotal = (Number(n._loadKw) || (_pCalcPerUnit * (n.count || 1)));
           gLabel = (n.groupMode === 'individual' && Array.isArray(n.items))
-            ? `Σ ${fmtPower(_pCalcTotal)} (${cntEff} шт.)`
-            : `${n.count || 1} × ${fmtPower(_pCalcPerUnit)} = ${fmtPower(_pCalcTotal)}`;
+            ? `Σ ${_fmtKwFixed(_pCalcTotal)} (${cntEff} шт.)`
+            : `${n.count || 1} × ${_fmtKwFixed(_pCalcPerUnit)} = ${_fmtKwFixed(_pCalcTotal)}`;
         }
       } else if (_showKw) {
         const _showVal = _isContainer ? (_calcKwTotal || totalKw) : (Number(n._loadKw) || totalKw);
-        gLabel = `Σ ${fmtPower(_showVal)}`;
+        gLabel = `Σ ${_fmtKwFixed(_showVal)}`;
         gLabel += _mismatchSuffix;
       } else if (_showCount) {
         gLabel = `${cntEff} шт.${_mismatchSuffix}`;
