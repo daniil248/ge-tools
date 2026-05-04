@@ -4,6 +4,25 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.131', date: '2026-05-04', items: [
+      '🎫 <b>Phase 44 START: Subscription per-module (коммерческая модель)</b>. По запросу Пользователя 2026-05-04: «хочется поддерживать мульти модули чтобы подавать подписку на модули» + «зависящие модули расчёта должны попадать в доступ автоматически, но без графического отображения».',
+      '• <b>shared/subscriptions.js</b> (новый, ~250 строк) — API:',
+      '  • <code>PLANS</code> — 5 планов: 🆓 Free / 🚀 Starter (9 900 ₽) / ⭐ Pro (29 900 ₽) / 🏢 Enterprise (79 900 ₽) / 🎯 Custom (договорная).',
+      '  • <code>getSubscription()</code> / <code>saveSubscription(sub)</code> — LS-операции с auto-rollback на free после <code>expiresAt</code>.',
+      '  • <code>hasModuleAccess(moduleId)</code> / <code>requireModuleAccess(moduleId, name)</code> — guard для UI-модулей.',
+      '  • <code>activateTrial(planId, days=14)</code> — 14-дневный триал.',
+      '  • <code>showLockedModal()</code> — upsell-модалка с кнопками «🎁 Триал 14 дн.» / «💳 Купить» / «Отмена».',
+      '  • <code>planBadge()</code> — лейбл текущего плана для UI («⭐ Pro · триал 13 дн.»).',
+      '• <b>modules.json v1.1.0</b> — добавлены поля у всех 13 модулей:',
+      '  • <code>kind: \'ui\' | \'calc-lib\'</code> — определяет что показывать в реестре и для чего проверять подписку.',
+      '  • <code>subscriptionPlan: \'free\' | \'starter\' | \'pro\' | \'enterprise\'</code> — минимальный план для доступа.',
+      '  • Распределение: free (cable, battery, help), starter (схематика, ИБП, щит, трансформатор), pro (cooling, TW, mv-config, reports, catalog, logistics).',
+      '• <b>Принцип «calc-deps авто-включаются»</b>: subscription-check ТОЛЬКО для kind=\'ui\'. Calc-libs (cooling/calc/, dgu-config/calc/, shared/calc-modules/, shared/auto-norm.js, js/methods/) свободно импортируются. Пример: Пользователь подписан на dgu-config (UI), внутри dgu-config используется shared/auto-norm и cooling/calc/psychro-formulas — оба работают без подписки на cooling.',
+      '• <b>Soft-enforcement</b> (не security): LS легко правится, цель — бизнес-стимул для добросовестных Пользователей. Server-side validation через Firebase Cloud Function — Phase 44.4 TODO.',
+      '• <b>ROADMAP Phase 44 добавлена</b> с 6 этапами: 44.1 базовая инфра ✅, 44.2 UI soft-enforcement, 44.3 Plan management UI, 44.4 платёжная интеграция, 44.5 trial-flow расширение, 44.6 custom-планы.',
+      '• <b>Memory rule <code>feedback_subscription_per_module.md</code></b> — полная архитектура + чек-лист добавления нового UI-модуля.',
+      'Файлы: <code>shared/subscriptions.js</code> (новый), <code>modules.json</code> (v1.1.0 +kind +subscriptionPlan), <code>ROADMAP.md</code> (+Phase 44).',
+    ] },
     { version: '0.60.130', date: '2026-05-04', items: [
       '📥📤 <b>Phase 42.4 final: импорт/экспорт сценариев wizard\'ов через JSON-файл</b>. Завершение Phase 42 (мастер составления нарядов).',
       '• <b>📥 Импорт JSON</b> — кнопка в шапке каталога сценариев. File-input принимает <code>.json</code>. Поддерживает 2 формата: одиночный wizard-объект ИЛИ массив (export-all bundle). Каждый сценарий проходит <code>validateWizard</code> перед save. Валидные → в личные (<code>addUserWizard</code>). Невалидные пропускаются с warning «⚠ Пропущено N: {ошибки}».',

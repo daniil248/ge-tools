@@ -3923,6 +3923,84 @@ v0.60.105 (`shared/currency-defaults.js::resolveDefaultCurrency`).
 
 ---
 
+## Фаза 44 — Subscription per-module (коммерческая модель) 🆕
+
+> Добавлено 2026-05-04 по запросу Пользователя: «хочется поддерживать
+> мульти модули чтобы подавать подписку на модули» + «зависящие модули
+> расчёта должны попадать в доступ автоматически, но без графического
+> отображения».
+
+**Цель:** перевести платформу на модель «модульная подписка» — клиент
+выбирает план (Free / Starter / Pro / Enterprise) или индивидуальный
+набор модулей, остальные показываются «🔒 заблокирован».
+
+См. полное обоснование и архитектуру в memory `feedback_subscription_per_module.md`.
+
+### 44.1 — Базовая инфраструктура [v0.60.131 START]
+
+- [x] **shared/subscriptions.js** — API:
+  - <code>getSubscription()</code>, <code>saveSubscription(sub)</code>.
+  - <code>hasModuleAccess(moduleId)</code>, <code>requireModuleAccess(moduleId)</code>.
+  - <code>activateTrial(planId, days=14)</code>.
+  - <code>showLockedModal(moduleId)</code> — upsell UI.
+  - <code>PLANS</code> constant — Free / Starter / Pro / Enterprise / Custom + цены.
+- [x] **modules.json v1.1.0** — поля <code>kind: 'ui'|'calc-lib'</code> и
+  <code>subscriptionPlan</code> (free/starter/pro/enterprise) у всех 13
+  модулей.
+- [x] Принцип «calc-deps авто-включаются»: подписка проверяется ТОЛЬКО для
+  kind='ui'; calc-libs (cooling/calc/, dgu-config/calc/, shared/calc-modules/)
+  свободно импортируются.
+
+### 44.2 — Soft-enforcement в UI
+
+- [ ] <code>/modules/index.html</code>: для locked модулей — иконка 🔒,
+  затемнение карточки, click → showLockedModal с upsell.
+- [ ] <code>hub.html</code>: те же визуальные локи.
+- [ ] Каждый <code>&lt;module&gt;/index.html</code> в начале вызывает
+  <code>requireModuleAccess(moduleId)</code> — defence-in-depth для
+  прямых URL.
+- [ ] В шапке (app-header.js) badge с текущим планом
+  («⭐ Pro · триал 13 дн.») — кликабельно к плану-выбору.
+
+### 44.3 — Plan management UI
+
+- [ ] В <code>⚙ Глобальные настройки</code> — новый раздел «🎫 Подписка»:
+  - Текущий план + срок действия / триал-таймер.
+  - Кнопка «🎁 Активировать триал Pro 14 дней» (одноразово).
+  - Кнопка «💳 Купить план» — открытие платёжной страницы.
+  - Список доступных модулей по плану с галочками.
+  - Для custom — checkbox per-module + total price calc.
+
+### 44.4 — Платёжная интеграция
+
+- [ ] Stripe / ЮKassa / Cloudpayments / Tinkoff Acquiring — выбрать.
+- [ ] Webhook на Firebase Cloud Function для активации подписки.
+- [ ] Server-side validation подписки (защита от LS-tampering) —
+  Firebase auth.users[uid].plan через Firestore.
+- [ ] License key (для self-hosted edition).
+
+### 44.5 — Trial-flow
+
+- [x] **v0.60.131**: 14-дневный триал любого плана через activateTrial.
+- [ ] Email-напоминания о скором окончании триала (через FCM).
+- [ ] Auto-rollback на free после expiresAt (уже есть в getSubscription).
+- [ ] Метрики: какие модули триал-юзеры использовали → upsell-targeting.
+
+### 44.6 — Per-module SKU (custom plans)
+
+- [ ] UI: «индивидуальный набор» — пользователь выбирает 3-5 модулей,
+  получает индивидуальную цену.
+- [ ] Discount-механизм: bundle 3+ модулей со скидкой 20%.
+- [ ] B2B-предложения для корпоративных клиентов (per-seat × per-module).
+
+**Acceptance:**
+- Юзер с free-планом видит cooling/tech-workspace/suppression-config с 🔒.
+- Click → upsell-модалка с предложением триала.
+- После активации триала Pro — все модули доступны 14 дней.
+- После истечения — auto-rollback на free, calc-libs продолжают работать.
+
+---
+
 ## Фаза 43 — Modular development workflow (per-module ownership) 🆕
 
 > Добавлено 2026-05-04 по запросу Пользователя: «как мне перейти на

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "1.0.0",
-  "description": "Манифест модулей платформы Raschet. Используется hub.html для рендера карточек и (в будущем) системой permissions для фильтрации по ролям.",
+  "version": "1.1.0",
+  "description": "Манифест модулей платформы Raschet. Используется hub.html для рендера карточек, /modules/ для реестра, и shared/subscriptions.js для проверки доступа per-module. v1.1.0 (Phase 44 v0.60.131): добавлены поля kind ('ui'|'calc-lib') и subscriptionPlan для per-module подписок.",
   "modules": [
     {
       "id": "constructor",
@@ -10,9 +10,19 @@
       "path": "index.html",
       "icon": "blue",
       "badge": "active",
-      "requires": ["shared/auth", "shared/global-settings", "shared/calc-modules"],
-      "dbCollections": ["projects"],
-      "permissions": ["constructor.use"],
+      "requires": [
+        "shared/auth",
+        "shared/global-settings",
+        "shared/calc-modules"
+      ],
+      "dbCollections": [
+        "projects"
+      ],
+      "permissions": [
+        "constructor.use"
+      ],
+      "kind": "ui",
+      "subscriptionPlan": "starter",
       "enabled": true
     },
     {
@@ -22,10 +32,19 @@
       "path": "cable/",
       "icon": "orange",
       "badge": "new",
-      "requires": ["shared/auth", "shared/global-settings", "shared/calc-modules", "shared/report"],
+      "requires": [
+        "shared/auth",
+        "shared/global-settings",
+        "shared/calc-modules",
+        "shared/report"
+      ],
       "dbCollections": [],
-      "permissions": ["cable.use"],
-      "enabled": true
+      "permissions": [
+        "cable.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "free"
     },
     {
       "id": "schematic",
@@ -34,10 +53,17 @@
       "path": "schematic/",
       "icon": "purple",
       "badge": "new",
-      "requires": ["shared/auth", "shared/app-header"],
+      "requires": [
+        "shared/auth",
+        "shared/app-header"
+      ],
       "dbCollections": [],
-      "permissions": ["schematic.use"],
-      "enabled": true
+      "permissions": [
+        "schematic.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "starter"
     },
     {
       "id": "battery",
@@ -46,10 +72,17 @@
       "path": "battery/",
       "icon": "green",
       "badge": "new",
-      "requires": ["shared/auth", "shared/battery-picker"],
+      "requires": [
+        "shared/auth",
+        "shared/battery-picker"
+      ],
       "dbCollections": [],
-      "permissions": ["battery.use"],
-      "enabled": true
+      "permissions": [
+        "battery.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "free"
     },
     {
       "id": "ups-config",
@@ -58,10 +91,18 @@
       "path": "ups-config/",
       "icon": "purple",
       "badge": "wip",
-      "requires": ["shared/auth", "shared/ups-catalog", "shared/ups-picker"],
+      "requires": [
+        "shared/auth",
+        "shared/ups-catalog",
+        "shared/ups-picker"
+      ],
       "dbCollections": [],
-      "permissions": ["ups-config.use"],
-      "enabled": true
+      "permissions": [
+        "ups-config.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "starter"
     },
     {
       "id": "panel-config",
@@ -70,10 +111,17 @@
       "path": "panel-config/",
       "icon": "orange",
       "badge": "new",
-      "requires": ["shared/auth", "shared/panel-catalog"],
+      "requires": [
+        "shared/auth",
+        "shared/panel-catalog"
+      ],
       "dbCollections": [],
-      "permissions": ["panel-config.use"],
-      "enabled": true
+      "permissions": [
+        "panel-config.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "starter"
     },
     {
       "id": "mv-config",
@@ -82,10 +130,17 @@
       "path": "mv-config/",
       "icon": "orange",
       "badge": "new",
-      "requires": ["shared/element-library", "shared/catalog-bridge"],
+      "requires": [
+        "shared/element-library",
+        "shared/catalog-bridge"
+      ],
       "dbCollections": [],
-      "permissions": ["mv-config.use"],
-      "enabled": true
+      "permissions": [
+        "mv-config.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "pro"
     },
     {
       "id": "transformer-config",
@@ -94,10 +149,17 @@
       "path": "transformer-config/",
       "icon": "blue",
       "badge": "wip",
-      "requires": ["shared/auth", "shared/transformer-catalog"],
+      "requires": [
+        "shared/auth",
+        "shared/transformer-catalog"
+      ],
       "dbCollections": [],
-      "permissions": ["transformer-config.use"],
-      "enabled": true
+      "permissions": [
+        "transformer-config.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "starter"
     },
     {
       "id": "reports",
@@ -106,10 +168,18 @@
       "path": "reports/",
       "icon": "green",
       "badge": "new",
-      "requires": ["shared/auth", "shared/report", "shared/report-catalog"],
+      "requires": [
+        "shared/auth",
+        "shared/report",
+        "shared/report-catalog"
+      ],
       "dbCollections": [],
-      "permissions": ["reports.use"],
-      "enabled": true
+      "permissions": [
+        "reports.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "pro"
     },
     {
       "id": "catalog",
@@ -118,10 +188,24 @@
       "path": "catalog/",
       "icon": "blue",
       "badge": "new",
-      "requires": ["shared/element-library", "shared/element-schemas", "shared/catalog-bridge", "shared/price-records", "shared/counterparty-catalog"],
-      "dbCollections": ["prices", "counterparties"],
-      "permissions": ["catalog.use", "catalog.manage-prices"],
-      "enabled": true
+      "requires": [
+        "shared/element-library",
+        "shared/element-schemas",
+        "shared/catalog-bridge",
+        "shared/price-records",
+        "shared/counterparty-catalog"
+      ],
+      "dbCollections": [
+        "prices",
+        "counterparties"
+      ],
+      "permissions": [
+        "catalog.use",
+        "catalog.manage-prices"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "pro"
     },
     {
       "id": "help",
@@ -132,8 +216,12 @@
       "badge": "new",
       "requires": [],
       "dbCollections": [],
-      "permissions": ["help.use"],
-      "enabled": true
+      "permissions": [
+        "help.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "free"
     },
     {
       "id": "tech-workspace",
@@ -142,10 +230,17 @@
       "path": "tech-workspace/",
       "icon": "purple",
       "badge": "wip",
-      "requires": ["shared/auth", "shared/project-storage"],
+      "requires": [
+        "shared/auth",
+        "shared/project-storage"
+      ],
       "dbCollections": [],
-      "permissions": ["tech-workspace.use"],
-      "enabled": true
+      "permissions": [
+        "tech-workspace.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "pro"
     },
     {
       "id": "logistics",
@@ -154,10 +249,21 @@
       "path": "logistics/",
       "icon": "green",
       "badge": "new",
-      "requires": ["shared/logistics-schemas", "shared/counterparty-catalog"],
-      "dbCollections": ["shipments", "warehouses", "carrier-rates"],
-      "permissions": ["logistics.use"],
-      "enabled": true
+      "requires": [
+        "shared/logistics-schemas",
+        "shared/counterparty-catalog"
+      ],
+      "dbCollections": [
+        "shipments",
+        "warehouses",
+        "carrier-rates"
+      ],
+      "permissions": [
+        "logistics.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "pro"
     }
   ]
 }
