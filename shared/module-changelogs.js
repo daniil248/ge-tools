@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.120', date: '2026-05-04', items: [
+      '📋 <b>Suppression-config: автовыбор нормативного документа по стране проекта + auto-fill site из реквизитов</b>. По репорту Пользователя 2026-05-04: «у нас уже есть место расположения в настройках проекта. Нормативный документ по умолчанию так же можно определять и выбирать автоматически (с возможностью изменения пользователем)».',
+      '• <b>readActiveProject()</b> теперь читает настоящий project из <code>raschet.projects.v1</code> по active-id (вместо legacy плоского ключа). Возвращает <code>{ name, address, customer, contract, info, country, city, stage }</code> — нормализованный view с location.country.',
+      '• <b>detectNormByCountry(country)</b> helper — маппинг страна → методика:',
+      '  • 🇰🇿 Казахстан (qazaq/kazakh/KZ) → <code>sp-rk-2022</code> (СП РК 2.02-102-2022).',
+      '  • 🇷🇺 Россия (russia/RU) → <code>sp-485-annex-d</code> (СП 485.1311500.2020 Прил. Д).',
+      '  • 🇺🇸 США / 🇨🇦 Канада → <code>nfpa-2001</code>.',
+      '  • 🇪🇺 EU (germ/france/italy/spain/poland/swed/etc.) → <code>iso-14520</code>.',
+      '  • Прочее → null (используется default <code>sp-485-annex-d</code>).',
+      '• <b>defaultInstallation()</b> при создании новой установки — auto-pick по country проекта + предзаполнение site (name/address/customer/contract/info) из requisites.',
+      '• <b>Dialog «Установка: создание»</b> при открытии для НОВОЙ установки — auto-set норматива и toast «📋 Нормативный документ авто-выбран по стране проекта (X). Можно изменить вручную.» Existing установки сохраняют свой norm.',
+      '• <b>Memory rule <code>feedback_auto_norm_by_location.md</code></b> создан с картой country→норматив для всех будущих модулей (cable / scs / cooling / panel / mv-config — TODO применить тот же паттерн).',
+      'Файлы: <code>suppression-config/suppression-config.js</code> (~50 строк: расширение readActiveProject, новый detectNormByCountry, auto-pick в defaultInstallation и в dialog open).',
+    ] },
     { version: '0.60.119', date: '2026-05-04', items: [
       '🏠 <b>TW Rooms editor: убран select типа помещения, добавлены климат-требования + расчётная площадь</b>. По репорту Пользователя 2026-05-04: «давай просто перечень помещений, с характеристиками климата и прочими требованиями. Выбирать тип для помещения не корректно. Имена задаются технологом. Иметь возможность плановую площадь и расчетную площадь из характеристик оборудования и клиренсов».',
       '• <b>Убран жёсткий select «Тип помещения»</b> (было: IT-зал / Электрощитовая / Механическое / Офис / Прочее). Теперь имя — свободная форма: «Главный зал» / «UPS-room» / «Машзал ГПУ» / «Зал A на этаже 3». Поле <code>kind</code> в данных оставлено для backward-compat (не выводится в UI). Иконка в rail унифицирована к 🏠 для всех новых помещений; для legacy с kind — сохраняется старая.',

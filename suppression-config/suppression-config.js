@@ -68,7 +68,39 @@ function pickBestModuleCode(inst) {
   return (best || vars[vars.length - 1]).code;
 }
 
+// v0.60.120: расширено — читаем полный проект из project-storage.
+// Раньше брали только legacy `raschet.activeProject.v1` (плоская
+// структура {name, address, customer, ...}); теперь — настоящий проект
+// с location.country, requisites.{customer, address, code, gip}.
+//
+// Возвращает «плоский view» совместимый с предыдущим форматом + добавляет
+// `country` для auto-pick нормативного документа.
 function readActiveProject() {
+  // 1) Сначала пробуем настоящий project-storage.
+  try {
+    const aid = JSON.parse(localStorage.getItem('raschet.activeProject.v1') || 'null');
+    const id = aid && typeof aid === 'object' ? aid.id : aid;
+    if (id) {
+      const arr = JSON.parse(localStorage.getItem('raschet.projects.v1') || '[]');
+      const p = (arr || []).find(x => x && x.id === id);
+      if (p) {
+        const r = p.requisites || {};
+        const loc = p.location || {};
+        return {
+          id: p.id,
+          name: p.name || '',
+          address: r.address || (loc.city ? (loc.city + (loc.country ? ', ' + loc.country : '')) : ''),
+          customer: r.customer || '',
+          contract: r.code || '',
+          info: r.description || p.description || '',
+          country: (loc.country || '').trim(),
+          city: (loc.city || '').trim(),
+          stage: r.stage || '',
+        };
+      }
+    }
+  } catch {}
+  // 2) Fallback — legacy плоский ключ (для совместимости со standalone).
   try {
     const raw = localStorage.getItem('raschet.activeProject.v1');
     if (!raw) return null;
@@ -77,16 +109,46 @@ function readActiveProject() {
   } catch { return null; }
 }
 
+// v0.60.120: авто-выбор нормативного документа по стране проекта.
+// По репорту Пользователя 2026-05-04: «у нас уже есть место расположения
+// в настройках проекта. Нормативный документ по умолчанию так же можно
+// определять и выбирать автоматически (с возможностью изменения
+// пользователем)».
+//
+// Возвращает id методики или null если не распознано.
+function detectNormByCountry(country) {
+  if (!country) return null;
+  const c = String(country).toLowerCase();
+  // Казахстан → СП РК
+  if (/казах|qazaq|kazakh/.test(c) || /^kz$/.test(c)) return 'sp-rk-2022';
+  // Россия → СП 485 Прил. Д
+  if (/росси|russia|^ru$/.test(c)) return 'sp-485-annex-d';
+  // США / Канада / Англоязычные → NFPA 2001
+  if (/usa|united states|canada|^us$|^ca$|америк/.test(c)) return 'nfpa-2001';
+  // EU и прочее международное → ISO 14520
+  if (/germ|france|italy|spain|poland|finland|swed|norway|netherl|euro|герман|франц|итал|испан|польш|финлянд|швец|норвег/.test(c)) return 'iso-14520';
+  return null;  // неизвестная страна — оставляем default
+}
+
 /* ------------------- Defaults ------------------- */
 function defaultInstallation() {
   const agent = 'HFC-227ea';
   const series = 'halocarbon-42bar';
   const variants = listVariants(series);
+  // v0.60.120: auto-select нормативного документа по стране проекта.
+  const proj = readActiveProject();
+  const autoNorm = detectNormByCountry(proj?.country) || 'sp-485-annex-d';
   return {
     id: newId('inst-'), name: 'Установка 1', elevation: 0,
-    norm: 'sp-485-annex-d', agent, series, moduleCode: variants[0]?.code || '',
+    norm: autoNorm, agent, series, moduleCode: variants[0]?.code || '',
     installType: 'modular',
-    site: { name:'', address:'', contract:'', customer:'', info:'' },
+    site: {
+      name: proj?.name || '',
+      address: proj?.address || '',
+      contract: proj?.contract || '',
+      customer: proj?.customer || '',
+      info: proj?.info || '',
+    },
     directions: [], assemblies: [], pu: [],
     createdAt: Date.now(), calcNo: '0001-G',
   };
@@ -192,10 +254,24 @@ function openInstDialog(existingId) {
   };
   // Подстановка из активного проекта Raschet (если модуль открыт после
   // загрузки проекта в главном Конструкторе или любом другом модуле).
+  // v0.60.120: расширено — country/requisites через project-storage,
+  // auto-pick нормативного документа.
   const proj = readActiveProject();
   $('f-name').value = existing?.name ?? proj?.name ?? '';
   $('f-elev').value = existing?.elevation ?? 0;
-  $('f-norm').value = existing?.norm ?? 'sp-485-annex-d';
+  // Авто-выбор нормативного документа по стране проекта (только для новых
+  // установок — existing.norm имеет приоритет).
+  const _autoNorm = detectNormByCountry(proj?.country);
+  $('f-norm').value = existing?.norm ?? (_autoNorm || 'sp-485-annex-d');
+  // v0.60.120: hint об источнике auto-pick (для прозрачности — Пользователь
+  // должен видеть откуда взялся этот документ и что его можно изменить).
+  if (!existing && _autoNorm) {
+    setTimeout(() => {
+      try {
+        rsToast(`📋 Нормативный документ авто-выбран по стране проекта (${proj.country}). Можно изменить вручную.`, 'info');
+      } catch {}
+    }, 100);
+  }
   // При смене методики показываем её специфические термины / рекомендуемые
   // значения (каждый норматив оперирует своим набором входных величин).
   const showNormHints = () => {
