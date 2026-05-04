@@ -3524,7 +3524,18 @@ function recalc() {
       if (n.type !== 'panel') continue;
       panelDownstream.set(n.id, _walkConsumers(n.id));
     }
-    // Группируем sibling-ов по пересечению.
+    // Группируем sibling-ов по ПРЕИМУЩЕСТВЕННОМУ пересечению.
+    // v0.60.235 (по репорту Пользователя 2026-05-05 «ты зачем 3 панель
+    // испортил, на ней лампочки и немного нагревателей, мне не нужно к
+    // всем панелям подключенным к общей панели применять одинаковые
+    // параметры, идем только от нагрузки»):
+    // КРИТЕРИЙ: |A ∩ B| / min(|A|, |B|) ≥ 0.5. То есть для двух панелей
+    // ≥50% потребителей меньшей из них должны быть в обеих. Это отделяет:
+    //   • IT1+IT2 (100% общий пул) — siblings ✓
+    //   • AC vs IT (1 общий резервный потребитель из 7-30) — НЕ siblings ✓
+    // Раньше любое пересечение делало группу — это было слишком агрессивно
+    // (резервные cross-feeds для АГПТ/Слаботочки ошибочно склеивали все).
+    const SIBLING_OVERLAP_THRESHOLD = 0.5;
     const panelIds = [...panelDownstream.keys()];
     const assigned = new Set();
     const groups = [];
@@ -3538,10 +3549,15 @@ function recalc() {
         if (a === b || assigned.has(b)) continue;
         const bSet = panelDownstream.get(b);
         if (!bSet || !bSet.size) continue;
-        // Любое пересечение → siblings (parallel-feeders общей нагрузки).
-        let overlap = false;
-        for (const x of aSet) if (bSet.has(x)) { overlap = true; break; }
-        if (overlap) { group.push(b); assigned.add(b); }
+        // Считаем пересечение и сравниваем с min(|A|,|B|).
+        let overlapCount = 0;
+        for (const x of aSet) if (bSet.has(x)) overlapCount++;
+        const minSize = Math.min(aSet.size, bSet.size);
+        const ratio = minSize > 0 ? overlapCount / minSize : 0;
+        if (ratio >= SIBLING_OVERLAP_THRESHOLD) {
+          group.push(b);
+          assigned.add(b);
+        }
       }
       if (group.length > 1) groups.push(group);
     }
