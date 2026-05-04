@@ -1843,14 +1843,25 @@ export function openConsumerParamsModal(n) {
   const cosInput = document.getElementById('cp-cosPhi');
   const phaseSel = document.getElementById('cp-phase');
   const voltSel = document.getElementById('cp-voltage');
+  // v0.60.186 (по репорту Пользователя 2026-05-04 «как то разные данные не
+  // могут быть. в модалке 8,2 кВт = 21,35 А и расчетная 7 кВт = 18,24 А
+  // а в свойствах в сайдбаре 7 кВт = 31,7 А»):
+  // Для 1-фазной нагрузки нужно напряжение фаза-ноль (vLN=230), а не
+  // линейное (vLL=400). Раньше брали всегда vLL → ток занижался в √3.
+  // Sidebar (recalc.js → nodeCalcVoltage) уже использует правильно vLN
+  // для 1ph — поэтому был расхождение с модальным расчётом.
   const _getU = () => {
+    const ph = phaseSel ? phaseSel.value : (n.phase || '3ph');
     const idx = voltSel ? Number(voltSel.value) : -1;
     if (Number.isFinite(idx) && idx >= 0) {
       const lv = (GLOBAL.voltageLevels || [])[idx];
-      if (lv && Number(lv.vLL)) return Number(lv.vLL);
+      if (lv) {
+        // Для 1ph — фазное напряжение vLN (или vLL если оно "однофазное"
+        // как 110V, 48V DC, где vLL == vLN).
+        if (ph === '1ph') return Number(lv.vLN || lv.vLL) || 230;
+        return Number(lv.vLL) || 400;
+      }
     }
-    // fallback из узла: phase ph выбран → стандартное напряжение
-    const ph = phaseSel ? phaseSel.value : (n.phase || '3ph');
     if (ph === 'dc') return 48;
     if (ph === '1ph') return 230;
     return 400;
