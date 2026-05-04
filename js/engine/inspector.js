@@ -1490,7 +1490,24 @@ export function openContainerMembersModal(container) {
     h.push('</div>');
     } // end inner else (cards view)
   } // end outer else (slots.length > 0)
-  h.push('<div style="padding:12px;border-top:1px solid #e0e7ee;display:flex;gap:8px;justify-content:flex-end">');
+  // v0.60.180 (по репорту Пользователя 2026-05-04 «как теперь удалить
+  // экземпляры и группу с одним элементом вернуть в простой потребитель?»):
+  // в footer модалки добавлены явные actions:
+  //   • «↩ Расформировать группу» — показывается когда осталось 1
+  //     linked-instance + 0 placeholders. Откатывает контейнер обратно
+  //     к одиночному consumer'у (через тот же flow, что normalizeContainers).
+  //   • «🗑 Удалить группу» — удаляет контейнер целиком + все linked-consumer'ы
+  //     (с подтверждением).
+  // Раньше Пользователь видел только «➕ Добавить placeholder» и не знал,
+  // что × на карточке возвращает consumer в реестр, а нормализация —
+  // автоматическая на recalc.
+  h.push('<div style="padding:12px;border-top:1px solid #e0e7ee;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">');
+  h.push('<div style="display:flex;gap:8px;flex-wrap:wrap">');
+  if (linkedCount === 1 && phCount === 0) {
+    h.push('<button type="button" id="cm-collapse-group" title="Группа содержит только 1 потребителя — вернуть его как обычного consumer\'a (контейнер удаляется, consumer возвращается на canvas)" style="padding:6px 14px;font-size:12px;border:1px solid #16a34a;background:#dcfce7;color:#166534;border-radius:4px;cursor:pointer;font-weight:600">↩ Расформировать группу (1 элемент)</button>');
+  }
+  h.push('<button type="button" id="cm-delete-container" title="Удалить контейнер целиком вместе со всеми linked-потребителями (необратимо)" style="padding:6px 14px;font-size:12px;border:1px solid #dc2626;background:#fee2e2;color:#991b1b;border-radius:4px;cursor:pointer">🗑 Удалить группу полностью</button>');
+  h.push('</div>');
   h.push('<button type="button" id="cm-add-placeholder" style="padding:6px 14px;font-size:12px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:4px;cursor:pointer">➕ Добавить placeholder-слот</button>');
   h.push('</div>');
   body.innerHTML = h.join('');
@@ -1803,6 +1820,68 @@ function _wireContainerMembersModal(n, body, modal) {
       }
       n.slots.push({ kind: 'placeholder', demandKw, cosPhi, phase, voltage, voltageLevelIdx: vIdx, subtype });
       refresh();
+    });
+  }
+  // v0.60.180 (по репорту Пользователя 2026-05-04): «↩ Расформировать
+  // группу» — когда linked=1, ph=0. Возвращает consumer на canvas с
+  // pageIds + positions контейнера; перенаправляет state.conns/sysConns
+  // container.id → consumer.id; контейнер удаляется.
+  const collapseBtn = document.getElementById('cm-collapse-group');
+  if (collapseBtn) {
+    collapseBtn.addEventListener('click', () => {
+      const slots = Array.isArray(n.slots) ? n.slots : [];
+      const linked = slots.filter(s => s && s.kind === 'linked' && s.nodeId);
+      if (linked.length !== 1) return;
+      const memberId = linked[0].nodeId;
+      const a = state.nodes.get(memberId);
+      if (!a) return;
+      snapshot('container-collapse:' + n.id);
+      // Возвращаем consumer на canvas: pageIds + positionsByPage от контейнера.
+      a.pageIds = Array.isArray(n.pageIds) ? n.pageIds.slice() : [];
+      if (n.positionsByPage) {
+        try { a.positionsByPage = JSON.parse(JSON.stringify(n.positionsByPage)); } catch {}
+      }
+      a.x = n.x; a.y = n.y;
+      delete a.containerId;
+      // Перенаправить connections container → consumer.
+      for (const c of state.conns.values()) {
+        if (c.from && c.from.nodeId === n.id) c.from.nodeId = a.id;
+        if (c.to && c.to.nodeId === n.id) c.to.nodeId = a.id;
+      }
+      if (state.sysConns) {
+        for (const sc of state.sysConns.values()) {
+          if (sc.fromNodeId === n.id) sc.fromNodeId = a.id;
+          if (sc.toNodeId === n.id) sc.toNodeId = a.id;
+        }
+      }
+      // Удалить контейнер (без удаления consumer'а — мы передали ему ссылки).
+      try { _deleteNode(n.id, { hard: true, silent: true, force: true }); } catch {}
+      modal.classList.add('hidden');
+      _render(); notifyChange();
+    });
+  }
+  // v0.60.180: «🗑 Удалить группу полностью» — контейнер + все linked-members.
+  const deleteContainerBtn = document.getElementById('cm-delete-container');
+  if (deleteContainerBtn) {
+    deleteContainerBtn.addEventListener('click', async () => {
+      const slots = Array.isArray(n.slots) ? n.slots : [];
+      const linked = slots.filter(s => s && s.kind === 'linked' && s.nodeId);
+      const lcount = linked.length;
+      const ok = await rsConfirm(
+        'Удалить группу полностью?',
+        `Удалятся: контейнер «${n.tag || n.name || n.id}» и ${lcount} linked-потребител${lcount === 1 ? 'ь' : (lcount < 5 ? 'я' : 'ей')}. Действие необратимо.`,
+        { okLabel: 'Удалить', cancelLabel: 'Отмена' }
+      );
+      if (!ok) return;
+      snapshot('container-deleteall:' + n.id);
+      // Удаляем сначала linked-consumer'ы (без force — они могут иметь
+      // pageIds=[] так что hard-delete пройдёт), затем сам контейнер.
+      for (const s of linked) {
+        try { _deleteNode(s.nodeId, { hard: true, silent: true, force: true }); } catch {}
+      }
+      try { _deleteNode(n.id, { hard: true, silent: true, force: true }); } catch {}
+      modal.classList.add('hidden');
+      _render(); notifyChange();
     });
   }
   // close handlers
