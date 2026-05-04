@@ -4,6 +4,11 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.192', date: '2026-05-04', items: [
+      '🎨 <b>Integrated UPS — все секции одного цвета</b>. По репорту Пользователя 2026-05-04 «теперь поясни почему панели в интегрированном ИБП разного цвета?». Внутри shell\'а Z1.UPS1 (INTEGRATED) UPS-карточка была purple/pink (.node.ups), а PDM-IT/AC/Bypass — blue (.node.panel). Визуально неконсистентно — это всё секции одного шкафа MR33.',
+      '• <b>Фикс</b>: для UPS с <code>kind=\'ups-integrated\'</code> добавлен class <code>ups-integrated</code> + CSS rule переопределяет fill/stroke под panel-style (fill:#eceff1, stroke:#607d8b). Standalone UPS остаётся purple.',
+      'Файлы: <code>js/engine/render.js</code> (+class), <code>app.css</code> (+правило <code>.node.ups.ups-integrated</code>).',
+    ] },
     { version: '0.60.191', date: '2026-05-04', items: [
       '⚪ <b>Обесточенный узел — просто серая карточка, без status-надписи</b>. По репорту Пользователя 2026-05-04 «если питания нет (нет ни одной цепочки до источника электричества, а то может потребитель подключен, но в данный момент не включен, например вентилятор дымоудаления, работает только если пожар), просто серая карточка».',
       '• <b>Убраны</b> status-надписи: «Без питания» (panel/ups), «нет питания» (consumer). Раньше различали truly-orphan vs standby — теперь оба варианта = просто серая карточка (off-class).',

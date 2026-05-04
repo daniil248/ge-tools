@@ -1974,6 +1974,12 @@ export function renderNodes() {
       })(),
       (n.type === 'ups' && n._onBattery) ? 'onbattery' : '',
       (n.type === 'ups' && n._onStaticBypass) ? 'onbypass' : '',
+      // v0.60.192 (по репорту Пользователя 2026-05-04 «теперь поясни почему
+      // панели в интегрированном ИБП разного цвета?»): integrated UPS
+      // (kind='ups-integrated') — это секция шкафа MR33 наряду с PDM-IT/AC/
+      // Bypass. Все секции должны выглядеть единообразно (как панели).
+      // Класс 'ups-integrated' триггерит CSS rule: panel-like заливка/обводка.
+      (n.type === 'ups' && n.kind === 'ups-integrated') ? 'ups-integrated' : '',
       (n.type === 'panel' && n.switchMode === 'manual') ? 'manual' : '',
       (n.type === 'panel' && n._marginWarn === 'undersize') ? 'undersize' : '',
       (n.type === 'panel' && n._marginWarn === 'oversize') ? 'oversize' : '',
