@@ -1500,13 +1500,37 @@ async function init() {
   migrateLegacyObjectObjectKeys();
 
   _activeCols = loadJson(KEY_COLS, _activeCols);
+  // v0.60.98 (Пользователь 2026-05-03 «тариф на электроэнергию синхронизировать
+  // или объединить для всего проекта»): сначала читаем project.economics
+  // (если есть), потом per-cooling override (если был).
+  let projectEco = null;
+  if (!_standalone && _pid?.id) {
+    try {
+      const proj = getProject(_pid.id);
+      projectEco = proj?.economics || null;
+    } catch {}
+  }
+  if (projectEco) {
+    if (typeof projectEco.displayCurrency === 'string') _currency = projectEco.displayCurrency;
+    if (Number.isFinite(Number(projectEco.tariffPerKwh))) _tariffRubKwh = Number(projectEco.tariffPerKwh);
+    if (typeof projectEco.tariffCurrency === 'string') _tariffCurrency = projectEco.tariffCurrency;
+    if (typeof projectEco.ratesDate === 'string') _ratesDate = projectEco.ratesDate;
+    console.info('[cooling v0.60.98] use project economics:', projectEco);
+    // Show hint badge in sidebar header
+    setTimeout(() => {
+      const hint = document.getElementById('cl-eco-hint');
+      if (hint) hint.style.display = 'inline';
+    }, 0);
+  }
+  // Per-cooling override (если был ранее установлен)
   const t = Number(loadJson(KEY_TARIFF, null));
-  if (Number.isFinite(t) && t >= 0) _tariffRubKwh = t;
+  if (Number.isFinite(t) && t >= 0 && !projectEco) _tariffRubKwh = t;
   const savedCur = loadJson(KEY_CURRENCY, null);
-  if (typeof savedCur === 'string' && savedCur) _currency = savedCur;
+  if (typeof savedCur === 'string' && savedCur && !projectEco) _currency = savedCur;
   // v0.60.18: тариф может быть в любой валюте; default = валюта проекта.
   const savedTarCur = loadJson(KEY_TARIFF_CUR, null);
-  _tariffCurrency = (typeof savedTarCur === 'string' && savedTarCur) ? savedTarCur : _currency;
+  if (typeof savedTarCur === 'string' && savedTarCur && !projectEco) _tariffCurrency = savedTarCur;
+  if (!_tariffCurrency) _tariffCurrency = _currency;
 
   // v0.59.995: загрузка подборов + миграция legacy bucket _options
   _selections = loadJson(KEY_SELECTIONS, []) || [];

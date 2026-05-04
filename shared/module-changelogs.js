@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.98', date: '2026-05-03', items: [
+      '💰 <b>Project-level экономика (тариф + валюта + дата курса)</b>. По запросу Пользователя 2026-05-03: «курс наверное вынести с датой курса. А тариф на электроэнергию синхронизировать или объединить для всего проекта».',
+      '• В /projects/&lt;id&gt;/ новая секция «💰 Экономика проекта»: валюта проекта, тариф на электр-во (с собственной валютой), дата курса.',
+      '• Поле <code>project.economics</code> = {displayCurrency, tariffPerKwh, tariffCurrency, ratesDate, updatedAt}.',
+      '• Auto-save при любом изменении select/input. Toast «💰 Экономика проекта обновлена».',
+      '• <b>cooling-модуль</b> приоритетно читает из <code>project.economics</code> на init: displayCurrency / tariffPerKwh / tariffCurrency / ratesDate. Per-cooling override в LS работает как fallback.',
+      '• Sidebar cooling header «💰 Тариф и валюта» получает badge «📁 из проекта» когда значения подтянулись из project.economics.',
+      '• Унификация: cooling/service/tech-workspace/dgu-config будут постепенно переведены на чтение project.economics (TODO: остальные модули в следующих версиях).',
+      'Файлы: <code>projects/project.html</code> (секция economics), <code>projects/project.js</code> (renderProjectEconomics + PROJECT_CURRENCIES), <code>cooling/cooling.js</code> (init читает project.economics), <code>cooling/index.html</code> (badge «📁 из проекта»).',
+    ] },
     { version: '0.60.97', date: '2026-05-03', items: [
       '📅 <b>Phase 38.1 START: список задач проекта</b>. В /projects/&lt;id&gt;/ добавлена секция «📅 План-график» с минимальной CRUD для задач.',
       '• Поля задачи: title / discipline / status / endDate / progressPct + ts.',

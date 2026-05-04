@@ -580,6 +580,80 @@ function _deriveLcmFromStatus(status) {
   return map[status || 'draft'] || 'concept';
 }
 
+// v0.60.98 (Пользователь 2026-05-03 «курс наверное вынести с датой курса.
+// А тариф на электроэнергию синхронизировать или объединить для всего
+// проекта»): экономика на уровне проекта — единый источник для всех модулей.
+// Раньше cooling/service имели свои tariff/currency/ratesDate — теперь
+// читают из project.economics при работе с проектом.
+const PROJECT_CURRENCIES = [
+  { code: '₽',   iso: 'RUB', label: 'RUB · российский рубль' },
+  { code: '$',   iso: 'USD', label: 'USD · доллар США' },
+  { code: '€',   iso: 'EUR', label: 'EUR · евро' },
+  { code: '₸',   iso: 'KZT', label: 'KZT · тенге' },
+  { code: '¥',   iso: 'CNY', label: 'CNY · юань' },
+  { code: '£',   iso: 'GBP', label: 'GBP · фунт' },
+  { code: 'Br',  iso: 'BYN', label: 'BYN · бел. рубль' },
+  { code: '₺',   iso: 'TRY', label: 'TRY · лира' },
+  { code: '₴',   iso: 'UAH', label: 'UAH · гривна' },
+  { code: 'CHF', iso: 'CHF', label: 'CHF · франк' },
+];
+function renderProjectEconomics(p, host) {
+  const e = p.economics || {};
+  const today = new Date().toISOString().slice(0, 10);
+  const tariff = e.tariffPerKwh != null ? e.tariffPerKwh : 7.5;
+  const tariffCurrency = e.tariffCurrency || '₽';
+  const displayCurrency = e.displayCurrency || '₽';
+  const ratesDate = e.ratesDate || today;
+  const curOpts = PROJECT_CURRENCIES.map(c =>
+    `<option value="${esc(c.code)}" title="${esc(c.label)}">${esc(c.code)} — ${esc(c.label)}</option>`).join('');
+  host.innerHTML = `
+    <p class="muted" style="font-size:11.5px;margin:0 0 10px">Эти параметры применяются ко всем calc-модулям проекта (cooling, service, tech-workspace, dgu-config). Изменение здесь — единая точка обновления.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px">
+      <label title="Валюта проекта — в ней отображаются и считаются все CAPEX/OPEX/TCO. Если оборудование закуплено в другой валюте — будет конвертация по курсу на «Дата курса».">
+        <span style="font-size:11.5px;color:#475569;display:block;margin-bottom:3px">Валюта проекта:</span>
+        <select id="pr-eco-disp-cur" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px">
+          ${PROJECT_CURRENCIES.map(c => `<option value="${esc(c.code)}"${c.code === displayCurrency ? ' selected' : ''} title="${esc(c.label)}">${esc(c.code)} — ${esc(c.label)}</option>`).join('')}
+        </select>
+      </label>
+      <label title="Тариф на электроэнергию (за кВт·ч) — используется в OPEX-расчёте cooling и других модулей. Можно ввести в любой валюте — для расчётов будет авто-пересчитан в валюту проекта по курсу.">
+        <span style="font-size:11.5px;color:#475569;display:block;margin-bottom:3px">Тариф на эл-во (/кВт·ч):</span>
+        <span style="display:flex;gap:4px">
+          <input type="number" id="pr-eco-tariff" min="0" step="0.001" value="${tariff}" style="flex:1;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px">
+          <select id="pr-eco-tariff-cur" style="padding:5px 6px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px;min-width:60px">
+            ${PROJECT_CURRENCIES.map(c => `<option value="${esc(c.code)}"${c.code === tariffCurrency ? ' selected' : ''}>${esc(c.code)}</option>`).join('')}
+          </select>
+        </span>
+      </label>
+      <label title="Дата на которую брать курсы валют. Применяется ко ВСЕМ конвертациям в проекте. Default = сегодня.">
+        <span style="font-size:11.5px;color:#475569;display:block;margin-bottom:3px">📅 Дата курса:</span>
+        <input type="date" id="pr-eco-rates-date" value="${esc(ratesDate)}" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px">
+      </label>
+    </div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">💡 При первом сохранении значения станут default для всех модулей проекта. Существующие cooling/service могут сохранять свои override-значения локально.</p>
+  `;
+
+  // Auto-save on change
+  const dispCur = host.querySelector('#pr-eco-disp-cur');
+  const tariffInp = host.querySelector('#pr-eco-tariff');
+  const tariffCur = host.querySelector('#pr-eco-tariff-cur');
+  const ratesInp = host.querySelector('#pr-eco-rates-date');
+  function saveEconomics() {
+    const next = {
+      displayCurrency: dispCur.value,
+      tariffPerKwh: Number(tariffInp.value) || 0,
+      tariffCurrency: tariffCur.value,
+      ratesDate: ratesInp.value || today,
+      updatedAt: Date.now(),
+    };
+    updateProject(p.id, { economics: next });
+    prToast('💰 Экономика проекта обновлена', 'info');
+  }
+  if (dispCur) dispCur.addEventListener('change', saveEconomics);
+  if (tariffInp) tariffInp.addEventListener('change', saveEconomics);
+  if (tariffCur) tariffCur.addEventListener('change', saveEconomics);
+  if (ratesInp) ratesInp.addEventListener('change', saveEconomics);
+}
+
 // v0.60.97 (Phase 38.1 START): План-график задач проекта.
 // Минимальная версия: список задач с CRUD. Gantt + critical path — TODO 38.3.
 const PLAN_DISCIPLINES = [
@@ -1022,6 +1096,7 @@ function render() {
   const propsHost = document.getElementById('pr-detail-properties');
   const modulesHost = document.getElementById('pr-detail-modules');
   const actionsHost = document.getElementById('pr-detail-actions');
+  const economicsHost = document.getElementById('pr-detail-economics'); // v0.60.98
   const planHost = document.getElementById('pr-detail-plan'); // v0.60.97 Phase 38
   const metaHost = document.getElementById('pr-detail-meta');
 
@@ -1748,6 +1823,8 @@ function render() {
     });
   }
 
+  // v0.60.98: рендер экономики проекта (тариф/валюта/дата курса)
+  if (economicsHost) renderProjectEconomics(p, economicsHost);
   // v0.60.97 (Phase 38.1 START): рендер плана задач
   if (planHost) renderProjectPlan(p, planHost);
 
