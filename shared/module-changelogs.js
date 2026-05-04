@@ -4,6 +4,32 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.162', date: '2026-05-04', items: [
+      '🎨 <b>Карточки узлов: cross-unit pairs (kW + A на одной строке)</b>. По репорту Пользователя 2026-05-04 «переделай встроенные карточки под отображение в несколько позиций в ряд, помнишь было Макс ххх кВт / ххх A, Номинал ххх кВт/ ххх А».',
+      '• <b>render.js — PAIRS массив расширен</b>: добавлены 4 cross-unit пары ДО legacy same-unit пар (приоритет по first-match):',
+      '  • <code>maxKw + maxA</code> → «Макс: 75.6 кВт / 110 А»',
+      '  • <code>nominalKw + capacityA</code> → «Номинал: 60 кВт / 100 А»',
+      '  • <code>demandKw + currentA</code> → «Расчёт: 50 кВт / 90 А»',
+      '  • <code>freeKw + freeA</code> → «Свободно: 15 кВт / 20 А»',
+      '• <b>Эффект</b>: вместо 4 разрозненных строк (Макс kW, Свободно kW, Своб. ток A, currentA) — 2 компактные строки с metric+unit. Карточка стала компактнее.',
+      '• <b>Legacy same-unit pairs</b> (demandKw+maxKw, nominalKw+maxKw, currentA+maxA) остаются как fallback — срабатывают если cross-unit пара не активна (например, если max kW отображается, но max A отключён в пресете).',
+      '• <b>Свободно=0 для terminal-panel</b>: формула Ifree = max(0, Imax−Iused) корректна — если upstream breaker полностью нагружен, резерв = 0. Это не баг, а отображение реального состояния защиты.',
+      '🔌 <b>v0.60.161 follow-up</b>: junction-box passthrough + effective nominal на карточке (см. v0.60.161).',
+      'Файлы: <code>js/engine/render.js</code> (+4 cross-unit PAIRS).',
+    ] },
+    { version: '0.60.161', date: '2026-05-04', items: [
+      '🔌 <b>Клеммная коробка: passthrough защиты + effective nominal на карточке</b>. По двум репортам Пользователя 2026-05-04: «кабель из клеммную коробки (если в ней нет защитного аппарата) должен защищаться автоматом расположенным на линии питания клеммой коробки» + «у клеммной коробки все так же нужен номинал».',
+      '• <b>recalc.js — junction-box passthrough</b> (для type=\'junction-box\' с channels[]):',
+      '  • Если у канала <code>hasProtection: true</code> — используем <code>breakerA</code>/<code>fuseA</code> канала.',
+      '  • Иначе — наследуем upstream breaker через bridges[] (union-find группировка inputs).',
+      '  • Помечается <code>_breakerInternal: true</code>, <code>_breakerExcludeFromBom: true</code>, <code>_breakerInternalSource: junction-box-passthrough</code>.',
+      '  • Существующая логика для panel.switchMode=\'terminal\' остаётся без изменений (терминал-passthrough v0.59.328).',
+      '• <b>render.js — effective nominal для terminal-panel</b>:',
+      '  • Когда <code>n.switchMode==\'terminal\'</code> и <code>n.capacityA==0</code>, на карточке показывается <code>maxUpstreamBreakerIn</code> вместо сырого 0A.',
+      '  • Пользователь видит реальный номинал защиты (например, 250A автомат upstream), а не «Номинал: 0 A».',
+      '  • Применяется через valueMap.capacityA в _presetShowLoadInfo блоке.',
+      'Файлы: <code>js/engine/recalc.js</code> (+junction-box passthrough блок ~50 строк), <code>js/engine/render.js</code> (effective capacityA для terminal-panel в valueMap).',
+    ] },
     { version: '0.60.160', date: '2026-05-04', items: [
       '⚡ <b>Трансформатор: hotfix v0.60.159 — упрощена логика «без автомата»</b>. v0.60.159 пыталась читать <code>panel.mainBreakerIn</code> которого не существует как поля (panel использует <code>channelProtection[]</code> per-input). В результате downBrk всегда был null и проверка не работала корректно.',
       '• <b>Упрощено</b>: кабель transformer→panel/ups не имеет _breakerIn (= null) и не помечается как «In > Iz» ошибка. Защита через main breaker downstream-ЩС подбирается уже в downstream-узле (там его собственная логика).',

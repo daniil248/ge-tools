@@ -2486,6 +2486,68 @@ function recalc() {
      // отходящим автоматом. Раньше для ДГУ → JB/панель breakerIn оставался
      // null («Не определён» в инспекторе) — а ДГУ-выход ОБЯЗАН иметь свой
      // автомат защиты по правилам IEC 60204-1 / ГОСТ Р 50571.
+    // v0.60.161 (по репорту Пользователя 2026-05-04 «кабель из клеммную
+    // коробки (если в ней нет защитного аппарата) должен защищаться
+    // автоматом расположенным на линии питания клеммой коробки»):
+    // junction-box (клеммная коробка) обрабатывается как passthrough —
+    // если в самой JB нет защитного аппарата на канале, кабель от JB
+    // наследует upstream breaker (который кормит JB).
+    if (fromN.type === 'junction-box') {
+      // Найти канал, к которому подключён выходной порт.
+      // junction-box: inputs=outputs=N, bridges[] = [[iA, iB], ...].
+      // Cable идёт из output port. Соответствующий input = тот же индекс
+      // (input N → output N) если нет bridge'й, либо через bridge.
+      const outPort = c.from.port | 0;
+      const channels = Array.isArray(fromN.channels) ? fromN.channels : [];
+      const ch = channels[outPort] || null;
+      // Если у канала есть защита — используем её номинал.
+      let chBrk = null;
+      if (ch && ch.hasProtection) {
+        chBrk = ch.protKind === 'fuse' ? Number(ch.fuseA) || null : Number(ch.breakerA) || null;
+      }
+      if (chBrk) {
+        // Защита прямо в JB.
+        c._breakerIn = chBrk;
+        c._breakerPerLine = null;
+        c._breakerCount = 1;
+        c._breakerExcludeFromBom = false;
+        const IzJb = c._cableIz || 0;
+        const parJb = Math.max(1, c._cableParallel || 1);
+        c._breakerAgainstCable = !!(IzJb > 0 && chBrk > IzJb * parJb);
+        c._breakerUndersize = !!(c._maxA && chBrk < c._maxA);
+        c._breakerCurveEff = ch.protKind === 'fuse' ? 'fuse' : 'MCCB';
+        continue;
+      }
+      // Защиты нет — наследуем upstream breaker (через bridge'и).
+      // Bridges: [[iA, iB], ...] — input iA соединён с input iB до защиты.
+      // Используем union-find для группировки.
+      const N = Math.max(channels.length, fromN.inputs || 0, fromN.outputs || 0);
+      const bridges = Array.isArray(fromN.bridges) ? fromN.bridges : [];
+      const parent = new Array(N).fill(0).map((_, i) => i);
+      const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+      const uni = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; };
+      for (const b of bridges) if (Array.isArray(b) && b.length === 2) uni(b[0] | 0, b[1] | 0);
+      // Output N соответствует input N (в той же группе по bridges).
+      const gOut = find(outPort);
+      let upBrk = null;
+      for (const cc of state.conns.values()) {
+        if (cc.to.nodeId !== fromN.id) continue;
+        if (find((cc.to.port | 0)) !== gOut) continue;
+        if (cc._breakerIn && (!upBrk || cc._breakerIn > upBrk)) upBrk = cc._breakerIn;
+      }
+      c._breakerInternal = true;
+      c._breakerInternalSource = 'junction-box-passthrough';
+      c._breakerExcludeFromBom = true;
+      c._breakerIn = upBrk || null;
+      c._breakerPerLine = null;
+      c._breakerCount = 0;
+      const IzJb2 = c._cableIz || 0;
+      const parJb2 = Math.max(1, c._cableParallel || 1);
+      c._breakerAgainstCable = !!(upBrk && IzJb2 > 0 && upBrk > IzJb2 * parJb2);
+      c._breakerUndersize = !!(upBrk && c._maxA && upBrk < c._maxA);
+      c._breakerCurveEff = 'MCCB';
+      continue;
+    }
     if (fromN.type !== 'panel' && fromN.type !== 'ups' && fromN.type !== 'source' && fromN.type !== 'generator') {
       c._breakerIn = null;
       c._breakerPerLine = null;

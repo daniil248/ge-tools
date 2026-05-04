@@ -2560,8 +2560,23 @@ export function renderNodes() {
         const InomSum = (PnomSum > 0 && Ucalc) ? computeCurrentA(PnomSum, Ucalc, cos, isThreePhase(n)) : 0;
         const margin = (n._marginPct == null) ? null : Number(n._marginPct);
         const sectCount = Array.isArray(n.sectionIds) ? n.sectionIds.length : 0;
+        // v0.60.161 (по репорту Пользователя 2026-05-04 «у клеммной коробки
+        // все так же нужен номинал»): для terminal-mode панели (клеммной
+        // коробки) effective nominal = max upstream-breaker по всем входящим
+        // линиям (через terminal-passthrough). Так Пользователь видит реальную
+        // защиту, а не сырое n.capacityA=0 по дефолту.
+        let effectiveCapA = Number(n.capacityA);
+        if (n.switchMode === 'terminal' && (!effectiveCapA || effectiveCapA === 0)) {
+          let upMax = 0;
+          for (const cc of state.conns.values()) {
+            if (cc.to?.nodeId === n.id && Number(cc._breakerIn) > upMax) {
+              upMax = Number(cc._breakerIn);
+            }
+          }
+          if (upMax > 0) effectiveCapA = upMax;
+        }
         valueMap = {
-          capacityA:   { v: Number.isFinite(Number(n.capacityA)) ? String(n.capacityA) : null },
+          capacityA:   { v: Number.isFinite(effectiveCapA) && effectiveCapA > 0 ? String(effectiveCapA) : null },
           currentA:    { v: fmtDigits(n._loadA) },
           maxKw:       { v: fmtDigits(n._maxLoadKw) },
           maxA:        { v: fmtDigits(n._maxLoadA)  },
@@ -2662,15 +2677,20 @@ export function renderNodes() {
       // Получить эффективную зону: для fixed-zone полей игнорируем assignment.
       const _effZone = (fid) => _FIXED_ZONE_FIELDS[fid] || _zoneAssign[fid] || _defaultZone(fid);
 
-      // v0.59.868: авто-combining связанных пар «номинал/расчёт» в одну
-      // строку через «/». Пользователь: «помнишь у нас в карточке выводилось
-      // Номинальная мощность, расчетная мощность, с токами через /».
-      // До v0.59.803 это было default; в v0.59.803 split на per-field row.
-      // Сейчас возвращаем combined: если ОБА поля пары включены в пресете —
-      // рендерим одной строкой «Мощность: P_ном / P_расч кВт».
-      // Если только одно — обычная отдельная строка (per-field).
-      // Поле <pair.primary> определяет позицию в zone и custom-label.
+      // v0.59.868 / v0.60.162: авто-combining пар в одну строку через «/».
+      // По репорту Пользователя 2026-05-04 «переделай встроенные карточки
+      // под отображение в несколько позиций в ряд, помнишь было Макс ххх
+      // кВт / ххх A, Номинал ххх кВт/ ххх А»: cross-unit пары (kW+A одного
+      // metric type) добавлены ПЕРЕД same-unit парами — они выигрывают
+      // приоритет, давая формат «Макс: 75.6 кВт / 110 А» вместо разрозненных
+      // строк или same-unit pairs.
       const PAIRS = [
+        // Cross-unit pairs (kW + A одного metric — приоритетные)
+        { primary: 'maxKw',     secondary: 'maxA',      label: 'Макс',     unit: '' },
+        { primary: 'nominalKw', secondary: 'capacityA', label: 'Номинал',  unit: '' },
+        { primary: 'demandKw',  secondary: 'currentA',  label: 'Расчёт',   unit: '' },
+        { primary: 'freeKw',    secondary: 'freeA',     label: 'Свободно', unit: '' },
+        // Same-unit pairs (legacy fallback — если cross-unit pair не активна)
         { primary: 'demandKw',  secondary: 'maxKw', label: 'Мощность', unit: 'кВт' },
         { primary: 'nominalKw', secondary: 'maxKw', label: 'Мощность', unit: 'кВт' },
         { primary: 'currentA',  secondary: 'maxA',  label: 'Ток',      unit: 'А'   },
