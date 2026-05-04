@@ -17,6 +17,10 @@ import { mountFooter } from '../shared/module-footer.js';
 import { APP_VERSION } from '../js/engine/constants.js';
 import { MODULE_CHANGELOG } from './changelog.js';
 import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
+// v0.60.121: универсальный helper auto-pick нормативного документа.
+// Заменяет локальный detectNormByCountry — теперь используется shared
+// matrix country×domain → norm-id (см. memory feedback_auto_norm_by_location).
+import { resolveAutoNorm, countryLabel, detectCountryCode } from '../shared/auto-norm.js';
 import { wireExportImport } from '../shared/config-io.js';
 
 const $ = id => document.getElementById(id);
@@ -109,25 +113,11 @@ function readActiveProject() {
   } catch { return null; }
 }
 
-// v0.60.120: авто-выбор нормативного документа по стране проекта.
-// По репорту Пользователя 2026-05-04: «у нас уже есть место расположения
-// в настройках проекта. Нормативный документ по умолчанию так же можно
-// определять и выбирать автоматически (с возможностью изменения
-// пользователем)».
-//
-// Возвращает id методики или null если не распознано.
+// v0.60.120 → v0.60.121: detectNormByCountry заменён на shared
+// resolveAutoNorm('suppression', country) из shared/auto-norm.js.
+// Локальная обёртка для совместимости со старым кодом этого модуля.
 function detectNormByCountry(country) {
-  if (!country) return null;
-  const c = String(country).toLowerCase();
-  // Казахстан → СП РК
-  if (/казах|qazaq|kazakh/.test(c) || /^kz$/.test(c)) return 'sp-rk-2022';
-  // Россия → СП 485 Прил. Д
-  if (/росси|russia|^ru$/.test(c)) return 'sp-485-annex-d';
-  // США / Канада / Англоязычные → NFPA 2001
-  if (/usa|united states|canada|^us$|^ca$|америк/.test(c)) return 'nfpa-2001';
-  // EU и прочее международное → ISO 14520
-  if (/germ|france|italy|spain|poland|finland|swed|norway|netherl|euro|герман|франц|итал|испан|польш|финлянд|швец|норвег/.test(c)) return 'iso-14520';
-  return null;  // неизвестная страна — оставляем default
+  return resolveAutoNorm('suppression', country);
 }
 
 /* ------------------- Defaults ------------------- */
@@ -268,7 +258,9 @@ function openInstDialog(existingId) {
   if (!existing && _autoNorm) {
     setTimeout(() => {
       try {
-        rsToast(`📋 Нормативный документ авто-выбран по стране проекта (${proj.country}). Можно изменить вручную.`, 'info');
+        const cc = detectCountryCode(proj.country);
+        const flag = countryLabel(cc) || proj.country;
+        rsToast(`📋 Нормативный документ авто-выбран по стране проекта (${flag}). Можно изменить вручную.`, 'info');
       } catch {}
     }, 100);
   }

@@ -4,6 +4,23 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.121', date: '2026-05-04', items: [
+      '🌍 <b>Shared <code>auto-norm.js</code>: универсальный helper для авто-выбора нормативного документа по country проекта</b>. Шаг 1 порядка — фундамент для применения к другим модулям. По roadmap-задаче «Auto-norm в других модулях по тому же паттерну».',
+      '• <b>NORM_MATRIX</b> — карта <code>domain × country → norm-id</code> по 7 доменам (suppression / cable / scs / cooling / panel / mv / battery / dgu) и 6 кодам стран (KZ / RU / BY / US / CA / EU). Расширяемая.',
+      '  • <b>suppression</b>: KZ→СП РК / RU→СП 485 / US→NFPA 2001 / EU→ISO 14520.',
+      '  • <b>cable</b>: KZ→IEC 60364 / RU→ПУЭ-7 / US→NEC / EU→IEC 60364.',
+      '  • <b>scs</b>: KZ→ISO 24764 / RU→ГОСТ Р 53246 / US→TIA-942 / EU→ISO 24764.',
+      '  • <b>cooling</b>: KZ→СП 60 / US→ASHRAE TC 9.9 / EU→EN 12831.',
+      '  • <b>panel</b>: KZ→IEC 61439 / RU→ПУЭ-7 / US→UL 891.',
+      '  • <b>mv</b>: KZ→IEC 62271 / US→IEEE C37 / EU→IEC 62271.',
+      '  • <b>battery</b>: RU→ГОСТ IEC 62485 / US→IEEE 1187.',
+      '  • <b>dgu</b>: ISO 8528 (universal) / US→EPA Tier 4.',
+      '• <b>API</b>: <code>resolveAutoNorm(domain, country)</code>, <code>resolveAutoNormForActiveProject(domain)</code>, <code>detectCountryCode(country)</code>, <code>getProjectCountry(pid)</code>, <code>countryLabel(code)</code> с эмодзи флага.',
+      '• <b>Country detection</b>: regex по русским и английским вариантам названий + ISO-2 коды (KZ/RU/BY/US/CA/EU). Графика тонкая — расширять по мере появления новых проектов.',
+      '• <b>Suppression-config рефакторинг</b>: локальный <code>detectNormByCountry</code> (v0.60.120) теперь обёртка над <code>resolveAutoNorm(\'suppression\', country)</code>. Toast при auto-pick показывает флаг + название страны через <code>countryLabel</code>.',
+      '• <b>Memory rule</b> <code>feedback_auto_norm_by_location.md</code> расширен: указаны конкретные шаги внедрения паттерна в cable / scs / cooling / panel / mv (TODO следующих коммитов).',
+      'Файлы: <code>shared/auto-norm.js</code> (новый ~140 строк, NORM_MATRIX + 5 export-функций), <code>suppression-config/suppression-config.js</code> (упрощение detectNormByCountry до wrapper над shared).',
+    ] },
     { version: '0.60.120', date: '2026-05-04', items: [
       '📋 <b>Suppression-config: автовыбор нормативного документа по стране проекта + auto-fill site из реквизитов</b>. По репорту Пользователя 2026-05-04: «у нас уже есть место расположения в настройках проекта. Нормативный документ по умолчанию так же можно определять и выбирать автоматически (с возможностью изменения пользователем)».',
       '• <b>readActiveProject()</b> теперь читает настоящий project из <code>raschet.projects.v1</code> по active-id (вместо legacy плоского ключа). Возвращает <code>{ name, address, customer, contract, info, country, city, stage }</code> — нормализованный view с location.country.',
