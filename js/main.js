@@ -3130,6 +3130,95 @@ function _ctNodeTag(n) {
   } catch {}
   return n.tag || n.name || '?';
 }
+
+// v0.60.227 (по репорту Пользователя 2026-05-04 «для линий к группе
+// потребителей нужно учитывать каждый отдельный потребитель, они
+// обозначены отдельно» / «допустим к SR01-SR08» / «8 отдельных кабелей
+// в кабельном журнале»): раскрываем conn-ы к группам потребителей в
+// N виртуальных строк журнала — по одной на каждого индивидуального
+// потребителя группы. Каждая строка имеет:
+//   • _virtualParentId — id физической conn (бэкенд бросаемых apply)
+//   • _virtualGroupIdx — индекс слота (для read-only debug)
+//   • _virtualLabel    — обозначение линии «W-{from}-{slotTag}»
+//   • _virtualToNode   — отрисовываемое «Куда»
+//   • _virtualLoadKw / _virtualLoadA — индивидуальная нагрузка слота
+//     (cable-spec — общий, физически 1 кабель к группе/контейнеру).
+// Bulk-edit и inline-правки работают на parent-conn (data-id одинаковый
+// для всех виртуальных строк одной группы — правка отразится на всех).
+function _expandConnsForJournal(conns, S) {
+  if (!Array.isArray(conns)) return [];
+  const out = [];
+  for (const c of conns) {
+    if (c._virtualParentId) { out.push(c); continue; } // уже виртуальный
+    const toN = c.to ? S.nodes.get(c.to.nodeId) : null;
+    if (!toN) { out.push(c); continue; }
+    // Case A: consumer-container с N слотами
+    if (toN.type === 'consumer-container' && Array.isArray(toN.slots) && toN.slots.length > 0) {
+      const slots = toN.slots.filter(Boolean);
+      if (slots.length <= 1) { out.push(c); continue; }
+      let idx = 0;
+      for (const s of slots) {
+        idx++;
+        let slotTag, slotName, slotKw, slotCos;
+        if (s.kind === 'linked' && s.nodeId) {
+          const a = S.nodes.get(s.nodeId);
+          if (!a) continue;
+          slotTag = _ctNodeTag(a);
+          slotName = a.name || a.tag || slotTag;
+          slotKw = (Number(a.demandKw) || 0) * Math.max(1, Number(a.count) || 1);
+          slotCos = Number(a.cosPhi) || 0;
+        } else if (s.kind === 'placeholder') {
+          slotTag = `${_ctNodeTag(toN)}-${idx}`;
+          slotName = s.name || slotTag;
+          slotKw = Number(s.demandKw) || 0;
+          slotCos = Number(s.cosPhi) || 0;
+        } else continue;
+        const linePrefix = c._isHV ? 'WH' : (c._isDC ? 'WD' : 'W');
+        const fromN = S.nodes.get(c.from?.nodeId);
+        const v = Object.assign(Object.create(c), {
+          _virtualParentId: c.id,
+          _virtualGroupIdx: idx - 1,
+          _virtualLabel: `${linePrefix}-${_ctNodeTag(fromN)}-${slotTag}`,
+          _virtualToTag: slotTag,
+          _virtualToName: slotName,
+          _virtualLoadKw: slotKw,
+          _virtualLoadA: (slotKw > 0 && c._cosPhi)
+            ? (slotKw * 1000) / ((c._threePhase ? Math.sqrt(3) : 1) * (c._voltage || 400) * (slotCos || c._cosPhi || 0.92))
+            : null,
+        });
+        out.push(v);
+      }
+      continue;
+    }
+    // Case B: consumer с count > 1 (uniform group)
+    if (toN.type === 'consumer' && (Number(toN.count) || 1) > 1) {
+      const cnt = Math.max(1, Number(toN.count) || 1);
+      const baseTag = _ctNodeTag(toN);
+      const baseKw = Number(toN.demandKw) || 0;
+      const linePrefix = c._isHV ? 'WH' : (c._isDC ? 'WD' : 'W');
+      const fromN = S.nodes.get(c.from?.nodeId);
+      for (let i = 1; i <= cnt; i++) {
+        const slotTag = cnt > 1 ? `${baseTag}-${String(i).padStart(2, '0')}` : baseTag;
+        const v = Object.assign(Object.create(c), {
+          _virtualParentId: c.id,
+          _virtualGroupIdx: i - 1,
+          _virtualLabel: `${linePrefix}-${_ctNodeTag(fromN)}-${slotTag}`,
+          _virtualToTag: slotTag,
+          _virtualToName: toN.name || baseTag,
+          _virtualLoadKw: baseKw,
+          _virtualLoadA: (baseKw > 0 && c._cosPhi)
+            ? (baseKw * 1000) / ((c._threePhase ? Math.sqrt(3) : 1) * (c._voltage || 400) * (c._cosPhi || 0.92))
+            : null,
+        });
+        out.push(v);
+      }
+      continue;
+    }
+    // Default: одиночный consumer / panel / ups — без раскрытия.
+    out.push(c);
+  }
+  return out;
+}
 // Фаза 1.20.1: per-column фильтры (марка, длина min/max, способ, обозначение,
 // from/to) + групповое редактирование выделенных строк.
 let _cableTableFilters = {
@@ -3451,7 +3540,12 @@ function renderCableTable() {
   // Phase 1.20.5: показываем ВСЕ кабели с известным сечением (не только
   // active-в-текущем-режиме). Иначе bulk-edit не может достать линии,
   // «спящие» в других режимах работы, но попадающие в BOM отчёта.
-  const conns = [...S.conns.values()].filter(c => (c._cableSize || c._busbarNom));
+  const physConns = [...S.conns.values()].filter(c => (c._cableSize || c._busbarNom));
+  // v0.60.227: раскрываем conn-ы к группам потребителей в N виртуальных
+  // строк (см. _expandConnsForJournal). Bulk-edit и inline-правки идут на
+  // физический parent-conn — все виртуальные строки одной группы
+  // обновляются одновременно (один физический кабель).
+  const conns = _expandConnsForJournal(physConns, S);
 
   // Фильтры (поиск + класс + per-column)
   const F = _cableTableFilters;
@@ -3477,18 +3571,21 @@ function renderCableTable() {
     }
     const fromN = S.nodes.get(c.from.nodeId);
     const toN = S.nodes.get(c.to.nodeId);
+    // v0.60.227: для виртуальных строк ищем по slot-tag.
+    const _vTo = c._virtualToTag || _ctNodeTag(toN);
+    const _vLabel = c._virtualLabel || c.lineLabel;
     if (q) {
-      const hay = [c.lineLabel, _ctNodeTag(fromN), _ctNodeTag(toN), fromN?.name, toN?.name, c.cableMark]
+      const hay = [_vLabel, _ctNodeTag(fromN), _vTo, fromN?.name, c._virtualToName || toN?.name, c.cableMark]
         .filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (exceptKey !== 'label' && fLabel
-        && !String(c.lineLabel || '').toLowerCase().includes(fLabel)
-        && !`${_ctNodeTag(fromN)}-${_ctNodeTag(toN)}`.toLowerCase().includes(fLabel)) {
+        && !String(_vLabel || '').toLowerCase().includes(fLabel)
+        && !`${_ctNodeTag(fromN)}-${_vTo}`.toLowerCase().includes(fLabel)) {
       return false;
     }
     if (exceptKey !== 'fromTo' && fFromTo) {
-      const ft = `${_ctNodeTag(fromN)} ${_ctNodeTag(toN)}`.toLowerCase();
+      const ft = `${_ctNodeTag(fromN)} ${_vTo}`.toLowerCase();
       if (!ft.includes(fFromTo)) return false;
     }
     if (exceptKey !== 'mark' && fMark) {
@@ -3548,9 +3645,9 @@ function renderCableTable() {
     const toN = S.nodes.get(c.to?.nodeId);
     switch (sortCol) {
       case 'label':
-        return (c.lineLabel || `${_ctNodeTag(fromN)}-${_ctNodeTag(toN)}`).toLowerCase();
+        return (c._virtualLabel || c.lineLabel || `${_ctNodeTag(fromN)}-${c._virtualToTag || _ctNodeTag(toN)}`).toLowerCase();
       case 'fromTo':
-        return `${_ctNodeTag(fromN)} → ${_ctNodeTag(toN)}`.toLowerCase();
+        return `${_ctNodeTag(fromN)} → ${c._virtualToTag || _ctNodeTag(toN)}`.toLowerCase();
       case 'mark': {
         const rec = c.cableMark ? allMarks.find(m => m.id === c.cableMark) : null;
         return (rec?.brand || c.cableMark || '').toLowerCase();
@@ -3775,9 +3872,10 @@ function renderCableTable() {
     const toN = S.nodes.get(c.to.nodeId);
     // Phase 1.20.15: полное обозначение (с parent chain) вместо локального tag
     const fromLabel = _ctNodeTag(fromN);
-    const toLabel = _ctNodeTag(toN);
+    // v0.60.227: для виртуальных строк (раскрытие группы) — берём slot-tag.
+    const toLabel = c._virtualToTag || _ctNodeTag(toN);
     const linePrefix = c._isHV ? 'WH' : (c._isDC ? 'WD' : 'W');
-    const lineLabel = c.lineLabel || `${linePrefix}-${fromLabel}-${toLabel}`;
+    const lineLabel = c._virtualLabel || c.lineLabel || `${linePrefix}-${fromLabel}-${toLabel}`;
 
     // Фильтр допустимых марок по классу линии
     const allowedCats = c._isHV ? ['hv'] : (c._isDC ? ['dc', 'power'] : ['power']);

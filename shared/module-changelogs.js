@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.227', date: '2026-05-04', items: [
+      '📋 <b>Кабельный журнал: раскрытие группы потребителей в N строк</b>. По репорту Пользователя 2026-05-04 «для линий к группе потребителей нужно учитывать каждый отдельный потребитель, они обозначены отдельно» / «допустим к SR01-SR08» / «8 отдельных кабелей в кабельном журнале».',
+      '• <code>_expandConnsForJournal(conns, S)</code> в <code>js/main.js</code> раскрывает conn-ы к группам:',
+      '   — <b>consumer-container</b> с N слотами → N виртуальных строк (по одной на slot, linked или placeholder),',
+      '   — <b>consumer</b> с count > 1 (uniform group) → N строк (SR-01...SR-08).',
+      '• Каждая виртуальная строка имеет: <code>_virtualLabel</code> (W-{from}-{slotTag}), <code>_virtualToTag</code>, <code>_virtualLoadKw</code>, <code>_virtualLoadA</code>. Спецификация кабеля (mark/method/material/size) — общая (1 физический кабель). Bulk-edit и inline-правки идут на parent-conn — все строки группы обновляются одновременно.',
+      '• Filters/sort/search обновлены: учитывают _virtualLabel и _virtualToTag, чтобы фильтры/поиск работали по slot-tag.',
+      'Файл: <code>js/main.js</code> (renderCableTable + новый _expandConnsForJournal).',
+    ] },
     { version: '0.60.226', date: '2026-05-04', items: [
       '👁 <b>dgu-config: видимая кнопка «↩ Применить к узлу схемы»</b>. По репорту Пользователя 2026-05-04 «опять кнопки возврата в модуль нет» / «кнопка прячется». Класс <code>rs-cfg-btn-primary</code> имел светлую заливку и сливался с зелёным фоном баннера — текст был почти не виден до hover. Заменили на явный inline-style (синяя заливка #1d4ed8 + белый текст + box-shadow + white-space:nowrap). Mode-label в баннере теперь показывает выбранный режим (не всегда «ESP»).',
       '🔄 <b>Modal «Параметры источника» auto-refresh после apply</b>. По репорту Пользователя 2026-05-04 «еще не сбросилось». Когда модалка открыта (а не закрыта пользователем) и приходит <code>raschet.dgu.apply</code> для того же узла — модалка автоматически перерисовывается с новыми kW/kVA/cosPhi/genRatings. Идентификация: <code>modal-impedance.dataset.nodeId</code> = id узла, выставляется при открытии. Раньше пользователь видел stale-данные и думал что apply не сработал.',
