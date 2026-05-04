@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.210', date: '2026-05-04', items: [
+      '🔌 <b>DGU configurator: исправлены имена URL-параметров</b>. По репорту Пользователя 2026-05-04 «давай вернемся к передачи актуальной нагрузки в конфигуратор ДГУ». В v0.60.207 я сделал передачу URL-params, но имена не совпадали с тем что DGU readUrlParams реально читает.',
+      '• <b>Раньше</b>: <code>?loadKw=160</code> — DGU configurator его игнорировал, использовал default 500 кВт.',
+      '• <b>Теперь</b>: <code>?capacityKw=160</code> (правильное имя per dgu-config v0.60.70).',
+      '• Также исправлено: <code>?humidity</code> → <code>?rh</code> (правильное имя в DGU).',
+      '• Дополнительно: передаётся <code>?project=&lt;pid&gt;</code> чтобы DGU мог сам подтянуть climate из <code>project.location</code> через свой <code>loadFromProject</code> hydration.',
+      '• <b>Эффект</b>: при нажатии «Конфигуратор ДГУ» из инспектора генератора схемы — реальная мощность <code>n._maxLoadKw</code> (например 160 кВт) сразу подставляется в DGU, climate из проекта применяется к ISO 3046-1 derate.',
+      'Файл: <code>js/engine/inspector.js</code> (qp.set fix).',
+    ] },
     { version: '0.60.209', date: '2026-05-04', items: [
       '👻 <b>Ghost CR01/MR01 после удаления — фикс через soft-delete blacklist</b>. По репорту Пользователя 2026-05-04 «постоянно появляться удаляемые мной CR01, MR01» (часть #2). После v0.60.208 (auto-merge legacy SCS) осталась проблема: <code>scheme-rack-bridge</code> регенерировал виртуальные стойки из scheme-node\'ов после удаления materialized экземпляра.',
       '• <b>Per-project blacklist</b>: <code>raschet.project.&lt;pid&gt;.scs-config.virtual-rack-blacklist.v1</code> = массив ключей вида <code>«&lt;schemeNodeId&gt;#&lt;schemeIndex&gt;»</code>.',

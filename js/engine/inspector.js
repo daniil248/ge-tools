@@ -2703,28 +2703,28 @@ export function renderGeneralPanel(n) {
       if (n.mvSwitchgearId) qp.set('lockedId', n.mvSwitchgearId);
       href = cfg.href + '?' + qp.toString();
     } else if (cfg === _CONFIGURATORS.generator) {
-      // v0.60.207 (по репорту Пользователя 2026-05-04 «почему в конфигуратор
-      // ДГУ не передалась реальная максимальная мощность необходимая для
-      // схемы?? а так же условия объекта»):
-      // передаём nodeId + max-kW (необходимая мощность по downstream-нагрузке)
-      // + климат из project.location (altitude/T/humidity).
+      // v0.60.210 (исправление v0.60.207 + по репорту Пользователя 2026-05-04
+      // «давай вернемся к передачи актуальной нагрузки в конфигуратор ДГУ»):
+      // имена URL-params исправлены под то, что dgu-config.js readUrlParams
+      // реально читает: «capacityKw» (не «loadKw»), «rh» (не «humidity»).
+      // Дополнительно передаём «project» — чтобы dgu-config-сам подтянул
+      // location/climate из активного проекта если URL-params не задали.
       const qp = new URLSearchParams();
       qp.set('nodeId', n.id);
       if (n.name) qp.set('name', n.name);
+      // Project — чтобы dgu-config мог сам читать project.location при
+      // отсутствии явных climate-params (его _hydrateFromContext делает
+      // location-fallback).
+      try {
+        const pid = _activeProjectId();
+        if (pid) qp.set('project', pid);
+      } catch {}
       // Реальная максимальная мощность, которую должен покрыть ДГУ —
       // _maxLoadKw (downstream worst-case). Fallback: capacityKw (paper-rating).
       const reqKw = Number(n._maxLoadKw) || Number(n.capacityKw) || 0;
-      if (reqKw > 0) qp.set('loadKw', String(Math.ceil(reqKw)));
+      if (reqKw > 0) qp.set('capacityKw', String(Math.ceil(reqKw)));
       // Климат: из активного проекта project.location.{altitudeM, ambientTC,
-      // humidityPct} (или дефолты: 0м / 25°C / 60%RH ISO 3046-1 baseline).
-      try {
-        const pid = _activeProjectId();
-        if (pid) {
-          const _proj = pid && (typeof window !== 'undefined' ? window : globalThis)
-            ?.Raschet?._projectStorageGet?.(pid);
-          // fallback: прямое чтение через listProjects
-        }
-      } catch {}
+      // humidityPct}.
       try {
         const _ls = (typeof localStorage !== 'undefined') ? localStorage : null;
         if (_ls) {
@@ -2736,7 +2736,7 @@ export function renderGeneralPanel(n) {
           if (loc) {
             if (Number.isFinite(Number(loc.altitudeM))) qp.set('altitude', String(Number(loc.altitudeM)));
             if (Number.isFinite(Number(loc.ambientTC))) qp.set('tamb', String(Number(loc.ambientTC)));
-            if (Number.isFinite(Number(loc.humidityPct))) qp.set('humidity', String(Number(loc.humidityPct)));
+            if (Number.isFinite(Number(loc.humidityPct))) qp.set('rh', String(Number(loc.humidityPct)));
           }
         }
       } catch {}
