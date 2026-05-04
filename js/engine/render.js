@@ -2286,12 +2286,11 @@ export function renderNodes() {
           if (jumps) parts.push(`перем ${jumps}`);
           return parts.join(' · ');
         })()
-      // v0.60.175 (по репорту Пользователя 2026-05-04 «2 раза максимум
-      // показывать не стоит точно»): убрали «· Макс: …» из panel-subtitle —
-      // body уже рендерит Макс отдельной строкой через cross-unit pair
-      // (maxKw + maxA → «Макс: 60.4 кВт / 91.6 А»). Дубль убран — subtitle
-      // показывает только In (номинал автомата).
-      : `In ${fmt(n.capacityA || 0)} A`;
+      // v0.60.203 (по репорту Пользователя 2026-05-04 «номинал тоже для
+      // чего дважды выводить In 100 A и Номинал: 100 A»): subtitle для
+      // panel убран — Номинал уже в body. Раньше «In 100 A» дублировал
+      // «Номинал: 100 A» в первой строке.
+      : '';
     const subTxt = {
       source:    srcSubLabel,
       generator: 'Генератор' + (n.backupMode ? ' (резерв)' : ''),
@@ -2754,7 +2753,11 @@ export function renderNodes() {
           : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cos) : 0);
         valueMap = {
           sourceSubtype: { v: n.sourceSubtype || null },
-          voltage:    { v: Ucalc ? fmt(Ucalc) : null },
+          // v0.60.203 (по репорту Пользователя «и для трансформатора до 4
+          // строк, лишнее убрать в свойства»): voltage/sscMva/ukPct скрыты —
+          // живут в инспекторе «Параметры источника». На карточке: 4 строки
+          // (Номинал/Ток/Макс/Свободно+Запас).
+          voltage:    { v: null },
           snomKva:    { v: fmtDigits(SnomNameplate) },
           capacityKw: { v: fmtDigits(n.capacityKw) },
           currentA:   { v: fmtDigits(n._loadA) },
@@ -2762,16 +2765,16 @@ export function renderNodes() {
           maxA:       { v: fmtDigits(n._maxLoadA)  },
           freeKw:     { v: fmtDigits(n._freeKw) },
           freeA:      { v: fmtDigits(n._freeA)  },
-          sscMva:     { v: Number.isFinite(Number(n.sscMva)) ? Number(n.sscMva).toFixed(0) : null },
-          ukPct:      { v: Number.isFinite(Number(n.ukPct)) ? Number(n.ukPct).toFixed(1) : null },
+          sscMva:     { v: null },
+          ukPct:      { v: null },
         };
         labelMap = null;
       } else if (n.type === 'generator') {
         const SnomNameplate = (Number(n.snomKva) > 0)
           ? Number(n.snomKva)
           : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cos) : 0);
-        const triggerCount = (Array.isArray(n.triggerNodeIds) ? n.triggerNodeIds.length : 0)
-          + (Array.isArray(n.triggerGroups) ? n.triggerGroups.length : 0);
+        // v0.60.203: backupMode и triggerInfo скрыты на карточке (живут
+        // в инспекторе генератора). 4 строки: Номинал/Ток/Макс/Свободно+Запас.
         valueMap = {
           capacityKw: { v: fmtDigits(n.capacityKw) },
           snomKva:    { v: fmtDigits(SnomNameplate) },
@@ -2780,8 +2783,8 @@ export function renderNodes() {
           maxA:       { v: fmtDigits(n._maxLoadA)  },
           freeKw:     { v: fmtDigits(n._freeKw) },
           freeA:      { v: fmtDigits(n._freeA)  },
-          backupMode: { v: n.backupMode ? 'резерв' : 'основной' },
-          triggerInfo: { v: triggerCount > 0 ? String(triggerCount) : null },
+          backupMode: { v: null },
+          triggerInfo: { v: null },
         };
         labelMap = null;
       } else if (n.type === 'ups') {
@@ -2793,15 +2796,18 @@ export function renderNodes() {
           ? Number(n.capacityKva)
           : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cosForCap) : 0);
         valueMap = {
+          // v0.60.203: 4 строки на UPS-карточке. autonomyMin и redundancy
+          // переехали в инспектор. На карточке: Номинал (Sном/Pном) /
+          // Ток / Макс / Свободно+Запас.
           kva:        { v: fmtDigits(SnomNameplate) },
           kw:         { v: fmtDigits(n.capacityKw) },
-          autonomyMin: { v: Number.isFinite(Number(n.autonomyMin)) ? String(n.autonomyMin) : null },
+          autonomyMin: { v: null },
           currentA:   { v: fmtDigits(n._loadA || capA) },
           maxKw:      { v: fmtDigits(n._maxLoadKw) },
           maxA:       { v: fmtDigits(n._maxLoadA)  },
           freeKw:     { v: fmtDigits(n._freeKw) },
           freeA:      { v: fmtDigits(n._freeA)  },
-          redundancy: { v: n.redundancy || null },
+          redundancy: { v: null },
         };
         labelMap = null;
       }
@@ -2975,6 +2981,52 @@ export function renderNodes() {
         };
         rowsByPos.body = _bodyArr
           .map((s, i) => ({ s, i, r: _rank(s) }))
+          .sort((a, b) => (a.r - b.r) || (a.i - b.i))
+          .map(o => o.s);
+      }
+      // v0.60.203 (по репорту Пользователя 2026-05-04 «давай для щитов
+      // примем шаблон как для потребителей, 4 строки, нижнюю Запас укажем
+      // в строке Свободно. Для ИБП и ДГУ тоже до 4 строк»):
+      // Для panel/ups/source/generator:
+      //   • Запас → в строку Свободно: «Свободно: 91.7 kW / 139.1 A · Запас 9.2%»
+      //   • Для UPS/generator: Sном (kVA) + Pном (kW) объединяются в строку
+      //     «Номинал: 120 kVA / 120 kW».
+      //   • Фиксированный порядок: Номинал → Ток → Макс → Свободно+Запас.
+      if (n.type === 'panel' || n.type === 'ups' || n.type === 'source' || n.type === 'generator') {
+        const _findRowIdxP = (arr, prefix) => arr.findIndex(s => typeof s === 'string' && s.startsWith(prefix));
+        const _bodyArr = rowsByPos.body;
+        // Свободно + Запас → одна строка.
+        const freeIdx = _findRowIdxP(_bodyArr, 'Свободно:');
+        const margIdx = _findRowIdxP(_bodyArr, 'Запас:');
+        if (freeIdx >= 0 && margIdx >= 0) {
+          const merged = `${_bodyArr[freeIdx]} · ${_bodyArr[margIdx]}`;
+          const idxs = [freeIdx, margIdx].sort((a, b) => b - a);
+          for (const i of idxs) _bodyArr.splice(i, 1);
+          _bodyArr.splice(Math.min(freeIdx, margIdx), 0, merged);
+        }
+        // Sном (kVA) + Pном (kW) → одна строка «Номинал».
+        // shortLabel: kva→Sном, kw→Pном (см. card-fields-registry).
+        const sIdx = _findRowIdxP(_bodyArr, 'Sном:');
+        const pIdx = _findRowIdxP(_bodyArr, 'Pном:');
+        if (sIdx >= 0 && pIdx >= 0) {
+          // Извлекаем чистые значения «120 kVA», «120 kW»
+          const sVal = _bodyArr[sIdx].replace(/^Sном:\s*/, '');
+          const pVal = _bodyArr[pIdx].replace(/^Pном:\s*/, '');
+          const merged = `Номинал: ${sVal} / ${pVal}`;
+          const idxs = [sIdx, pIdx].sort((a, b) => b - a);
+          for (const i of idxs) _bodyArr.splice(i, 1);
+          _bodyArr.splice(Math.min(sIdx, pIdx), 0, merged);
+        }
+        // Порядок: Номинал → Ток → Макс → Свободно (с Запасом).
+        const _orderP = ['Номинал:', 'Ток:', 'Макс:', 'Свободно:'];
+        const _rankP = (s) => {
+          for (let i = 0; i < _orderP.length; i++) {
+            if (typeof s === 'string' && s.startsWith(_orderP[i])) return i;
+          }
+          return _orderP.length;
+        };
+        rowsByPos.body = _bodyArr
+          .map((s, i) => ({ s, i, r: _rankP(s) }))
           .sort((a, b) => (a.r - b.r) || (a.i - b.i))
           .map(o => o.s);
       }
