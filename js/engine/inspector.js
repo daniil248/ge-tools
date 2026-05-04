@@ -2778,7 +2778,7 @@ export function wireSystemsBlock(n, root) {
     if (all.find(s => s.id === id)) { flash('Система с таким ID уже существует', 'error'); return; }
     const icon = ((await rsPrompt('Иконка (emoji, 1 символ):', '🔧')) || '🔧').slice(0, 2);
     const color = ((await rsPrompt('Цвет (#RRGGBB):', '#6366f1')) || '#6366f1').trim();
-    const kindsRaw = await rsPrompt('Виды страниц через запятую (schematic, low-voltage, data, mechanical). Пусто = везде:', 'low-voltage');
+    const kindsRaw = await rsPrompt('Виды страниц через запятую (schematic, layout). Пусто = везде:', 'schematic');
     const pageKinds = String(kindsRaw || '').split(',').map(s => s.trim()).filter(Boolean);
     snapshot('custom-system-add:' + id);
     if (!Array.isArray(state.project.customSystems)) state.project.customSystems = [];

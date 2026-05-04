@@ -14,21 +14,33 @@
 // layout/mechanical/... вводятся постепенно в Фазах 2.2-2.5 и пока
 // рендерятся как schematic с бейджем «бета-вид».
 
-// Виды страниц (Phase 2.1). PAGE_KINDS_META — иконка + label + описание
-// для UI. Порядок задаёт порядок в меню выбора типа.
+// Виды страниц (Phase 2.1). PAGE_KINDS_META — иконка + label + описание для UI.
+// v0.60.154 (по репорту Пользователя 2026-05-04 «давай в кондукторе схем,
+// оставим только электрику (может быть только планировку для трассировки
+// кабелей, если не будет отдельный модуль), другие типы страниц удалим»):
+// сокращено с 7 до 2 видов. Удалены: mechanical / low-voltage / data /
+// scs (есть отдельный модуль scs-design) / 3d.
+// При загрузке legacy-проектов страницы с удалёнными kinds мигрируются на
+// 'schematic' через getPageKind (preserve-on-miss).
 export const PAGE_KINDS_META = {
-  'schematic':   { label: 'Принципиальная',    icon: '⚡', desc: 'Электрическая схема (текущий редактор)' },
-  'layout':      { label: 'Схема расположения', icon: '📐', desc: 'Физическая расстановка оборудования (мм) — Фаза 2.3' },
-  'mechanical':  { label: 'Механика',          icon: '⚙',  desc: 'Трубопроводы, вентиляция, каркасы — Фаза 2.5' },
-  'low-voltage': { label: 'Слаботочка',        icon: '📡', desc: 'Связь, СКС, пожарная сигнализация' },
-  'data':        { label: 'Данные',            icon: '🗂', desc: 'Информационные соединения (logical только)' },
-  'scs':         { label: 'СКС',               icon: '🔗', desc: 'Структурированная кабельная: меж-шкафные связи + план зала' },
-  '3d':          { label: '3D',                icon: '🧊', desc: 'Трёхмерное представление — Фаза 4' },
+  'schematic':   { label: 'Принципиальная',    icon: '⚡', desc: 'Электрическая схема (основной редактор)' },
+  'layout':      { label: 'План расположения',  icon: '📐', desc: 'Физическая расстановка оборудования (мм) для трассировки кабелей' },
 };
 export const PAGE_KINDS = Object.keys(PAGE_KINDS_META);
+// Legacy-kinds для backward-compat: страницы старых проектов мигрируем.
+const _LEGACY_PAGE_KIND_MIGRATE = {
+  'mechanical':  'schematic',  // удалён → fallback на электрику
+  'low-voltage': 'schematic',
+  'data':        'schematic',
+  'scs':         'layout',     // СКС-планы лучше всего соответствуют layout
+  '3d':          'schematic',
+};
 export function getPageKind(p) {
   if (!p) return 'schematic';
-  return PAGE_KINDS.includes(p.kind) ? p.kind : 'schematic';
+  if (PAGE_KINDS.includes(p.kind)) return p.kind;
+  // v0.60.154: миграция legacy-kinds.
+  const migrated = _LEGACY_PAGE_KIND_MIGRATE[p.kind];
+  return migrated || 'schematic';
 }
 export const state = {
   nodes: new Map(),

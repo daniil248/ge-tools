@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.154', date: '2026-05-04', items: [
+      '⚡ <b>Конструктор схем: оставлены только электрические виды страниц</b>. По репорту Пользователя 2026-05-04 «давай в кондукторе схем, оставим только электрику (может быть только планировку для трассировки кабелей, если не будет отдельный модуль), другие типы страниц удалим».',
+      '• <b>PAGE_KINDS_META</b> сокращена с 7 до 2 видов:',
+      '  • <b>schematic</b> — ⚡ Принципиальная (электрическая схема, основной редактор).',
+      '  • <b>layout</b> — 📐 План расположения (физическая расстановка для трассировки кабелей).',
+      '• <b>Удалены</b>: mechanical (трубопроводы) / low-voltage (слаботочка) / data / scs (есть отдельный scs-design) / 3d.',
+      '• <b>Backward-compat</b>: existing проекты со страницами удалённых kinds мигрируются автоматически в getPageKind:',
+      '  • <code>mechanical</code>/<code>low-voltage</code>/<code>data</code>/<code>3d</code> → <code>schematic</code>',
+      '  • <code>scs</code> → <code>layout</code> (план — ближайший аналог)',
+      '• <b>UI «+ страница»</b> теперь предлагает только schematic / layout.',
+      '• <b>Inspector custom-system prompt</b> обновлён — упоминает только новые kinds (schematic, layout).',
+      '• <b>SYSTEMS_CATALOG</b> в constants.js сохранён без изменений — entries с pageKinds: [\'low-voltage\'] / [\'mechanical\'] остаются в коде как dormant (не показываются в UI после удаления соответствующих page-kinds, но не удалены чтобы не сломать legacy-проекты с custom-systems).',
+      'Файлы: <code>js/engine/state.js</code> (PAGE_KINDS_META сокращена + _LEGACY_PAGE_KIND_MIGRATE мapping в getPageKind), <code>js/engine/inspector.js</code> (custom-system prompt updated).',
+    ] },
     { version: '0.60.153', date: '2026-05-04', items: [
       '🎨 <b>schematic + sketch: drawio-style полный визуальный фикс палитр + tabbed property panel</b>. По двум репортам Пользователя 2026-05-04: «забрать отображение из drawio» + «тоже для схемы принципиальной».',
       '• <b>schematic palette fix (по второму репорту)</b>:',
