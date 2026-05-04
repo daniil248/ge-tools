@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.110', date: '2026-05-04', items: [
+      '🐛 <b>Fix: значения полей в карточке проекта сбрасывались при background re-render</b>. По репорту Пользователя 2026-05-04: «значение некоторых полей постоянно сбрасывается». Sacred-params правило (см. memory <code>feedback_user_params.md</code>).',
+      '• <b>Корень бага</b>: <code>render()</code> в <code>projects/project.js</code> вызывается на <code>Auth.onAuthChange</code> (строка 1907) — Firebase periodically refresh\'ит токен в фоне и эмитит auth-change. Это перерисовывает innerHTML detail-секций. Если в этот момент юзер набирает текст в input «Заказчик» / «Обозначение / шифр» / «Объект / адрес» — несохранённое значение теряется (change-event ещё не сработал, т.к. срабатывает только на blur).',
+      '• <b>Fix</b>: добавлен focus-preservation в <code>render()</code>:',
+      '  • <code>_captureActiveInput()</code> в начале — снимает snapshot активного input (data-* selector + value + caret position) внутри <code>#pr-detail-*</code> зон.',
+      '  • <code>_restoreActiveInput(snap)</code> в конце — находит тот же input в новом DOM, восстанавливает value (если в новом DOM значение != набранному пользователем — оставляем набранное), фокус и caret.',
+      '• Затронутые поля: реквизиты (code/customer/address/stage/gip/objectType/description), экономика (валюта/тариф/дата курса), план (CRUD задач), реквизиты компании-исполнителя (project-override).',
+      '• Альтернативное решение «не вызывать render() на auth-change» отвергнуто — ломает обновление storage-mode UI после login. Snapshot-restore — точечный fix без побочных эффектов.',
+      'Файлы: <code>projects/project.js</code> (~50 строк: _captureActiveInput / _restoreActiveInput helpers + 2 строки в начале и конце render()).',
+    ] },
     { version: '0.60.109', date: '2026-05-04', items: [
       '🪄 <b>Phase 42.1-42.3 START: Мастер составления нарядов</b>. По запросу Пользователя 2026-05-04: «в нарядах добавь мастер составления нарядов, который по категориям работ будет сам предлагать выбрать соответствующие пункты, например если речь идет про систему вентиляции, то мастер запрашивает производительность системы, затем соответственно предлагает соответствующие расходные материалы для конкретной установки, учитывая производительность, по ходы работы мастера спрашивая пользователя, нужно ли добавить тот или иной пункт. Сами комбинации для того или иного оборудования или работы должны иметь возможность конфигурироваться».',
       '• <b>Архитектура data-driven</b> (правило <code>feedback_use_catalogs.md</code>): сценарии — декларативные JSON в <code>service/catalog/wizards/</code>. Никакого хардкода в UI.',

@@ -1093,7 +1093,68 @@ function getPid() {
 }
 
 /* ---------- Rendering ---------- */
+
+// v0.60.110: guard против сброса несохранённого ввода при background re-render
+// (Auth.onAuthChange срабатывает при silent-refresh токена Firebase даже когда
+// проект не менялся). По репорту Пользователя 2026-05-04: «значение некоторых
+// полей постоянно сбрасывается».
+//
+// Стратегия:
+//   1. Перед replace-innerHTML захватываем активный input (если есть фокус
+//      внутри detail-page) — его data-req/data-cf/data-eco-* + value + caret.
+//   2. После render() ищем тот же input и восстанавливаем value + focus + caret.
+//
+// Также: если у активного input есть несохранённый ввод (value ≠ stored),
+// сначала эмитим change-событие, чтобы handler сохранил данные.
+function _captureActiveInput() {
+  const a = document.activeElement;
+  if (!a || a === document.body) return null;
+  if (!(a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement)) return null;
+  // Берём только поля под data-detail-* зоной (не toolbar / picker).
+  const root = a.closest('#pr-detail-properties, #pr-detail-economics, #pr-detail-plan, #pr-detail-meta, #pr-detail-modules, #pr-detail-actions');
+  if (!root) return null;
+  const ds = a.dataset || {};
+  // Уникальный селектор по data-* атрибуту
+  let selector = null;
+  for (const k of Object.keys(ds)) {
+    selector = `[data-${k.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}="${ds[k]}"]`;
+    break;
+  }
+  if (!selector) selector = a.id ? `#${a.id}` : null;
+  if (!selector) return null;
+  return {
+    selector,
+    rootId: root.id,
+    value: a.value,
+    selStart: a.selectionStart,
+    selEnd: a.selectionEnd,
+  };
+}
+
+function _restoreActiveInput(snap) {
+  if (!snap) return;
+  // Находим input по selector внутри его root
+  const root = document.getElementById(snap.rootId);
+  if (!root) return;
+  const target = root.querySelector(snap.selector);
+  if (!target) return;
+  // Восстанавливаем только если input существует и имеет тот же тип
+  if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return;
+  // Если в новом DOM-значении значение отличается от того что юзер набрал —
+  // он, очевидно, не успел сохранить. Восстанавливаем НАБРАННОЕ.
+  if (target.value !== snap.value) {
+    target.value = snap.value;
+  }
+  try { target.focus(); } catch {}
+  try {
+    if (snap.selStart != null) target.setSelectionRange(snap.selStart, snap.selEnd ?? snap.selStart);
+  } catch {}
+}
+
 function render() {
+  // v0.60.110: запоминаем focused input чтобы не потерять несохранённый ввод
+  // при background re-render (auth-change, etc.).
+  const _activeInputSnap = _captureActiveInput();
   const pid = getPid();
   const p = pid ? getProject(pid) : null;
 
@@ -1845,6 +1906,10 @@ function render() {
         </tbody>
       </table>`;
   }
+
+  // v0.60.110: восстановить focused input после re-render. Делаем синхронно
+  // (на этом же тике) чтобы не моргнуть пустым значением.
+  _restoreActiveInput(_activeInputSnap);
 }
 
 function badgeChip(icon, n, label, bg, fg) {
