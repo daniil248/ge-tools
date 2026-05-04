@@ -152,3 +152,69 @@ export function currencyLabel(code) {
   const c = findCurrencyByCode(code);
   return c ? `${c.code} — ${c.label}` : (code || '');
 }
+
+// =============================================================================
+// VAT / TAXES — каскадный резолвер (v0.60.112)
+//
+// По запросу Пользователя 2026-05-04: «Любые налоги должны указываться в
+// настройках проекта и настройках компании. В РК с начала 2026 года НДС
+// 16%. но для КП за рубеж мы должны давать стоимость без НДС».
+//
+// Каскад приоритетов:
+//   1. Project-level — project.economics.vat
+//   2. Company-level — company-profile.defaultVat
+//   3. Org-level     — org-profile.defaultVat [Phase 41]
+//   4. Hardcoded     — KZ 2026 default (16%, enabled, KZ)
+// =============================================================================
+
+/** Системный fallback. KZ-2026 default — наиболее актуальная юрисдикция. */
+export const HARDCODED_VAT_FALLBACK = {
+  pct: 16, enabled: true, jurisdiction: 'KZ', label: 'НДС',
+};
+
+export function getProjectVat(pid) {
+  if (!pid) return null;
+  try {
+    const p = getProject(pid);
+    if (p && p.economics && p.economics.vat) return p.economics.vat;
+  } catch {}
+  return null;
+}
+
+export function getCompanyVat(pid) {
+  try {
+    const cp = loadEffectiveCompanyProfile(pid);
+    if (cp && cp.defaultVat) return cp.defaultVat;
+  } catch {}
+  return null;
+}
+
+export function getOrgVat() {
+  const p = getOrgProfile();
+  return p && p.defaultVat ? p.defaultVat : null;
+}
+
+/**
+ * Каскадный резолвер VAT. Возвращает первый непустой объект из:
+ *   project → company → org → hardcoded (KZ 2026 16%).
+ *
+ * @param {string|null} pid
+ * @returns {{ pct, enabled, jurisdiction, label }}
+ */
+export function resolveDefaultVat(pid = null) {
+  return getProjectVat(pid)
+      || getCompanyVat(pid)
+      || getOrgVat()
+      || HARDCODED_VAT_FALLBACK;
+}
+
+export function resolveDefaultVatWithSource(pid = null) {
+  let v;
+  v = getProjectVat(pid);
+  if (v) return { value: v, source: 'project',  sourceLabel: '📁 из проекта' };
+  v = getCompanyVat(pid);
+  if (v) return { value: v, source: 'company',  sourceLabel: '🏢 из компании' };
+  v = getOrgVat();
+  if (v) return { value: v, source: 'org',      sourceLabel: '👥 из организации' };
+  return       { value: HARDCODED_VAT_FALLBACK, source: 'fallback', sourceLabel: '⚙ дефолт системы (KZ 2026)' };
+}

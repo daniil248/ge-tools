@@ -274,6 +274,21 @@ function buildOrderDefaultsFromProject() {
   if (r.address) {
     out.notes = `Объект: ${r.address}${r.code ? ` (шифр ${r.code})` : ''}${r.stage ? ` · стадия ${r.stage}` : ''}`;
   }
+  // v0.60.112: НДС из каскада project.economics → company.defaultVat → ⚙ KZ-2026.
+  // По запросу Пользователя: «Любые налоги должны указываться в настройках
+  // проекта и настройках компании».
+  try {
+    // dynamic import без top-level — service.js может грузиться рано
+    // (лучше lazy через async, но buildOrderDefaultsFromProject sync).
+    // Используем require-style через прямое чтение каскада здесь.
+    const e = _pid.economics || {};
+    const projectVat = e.vat || null;
+    if (projectVat) {
+      out.vatPct = Number(projectVat.pct) || 0;
+      out.vatEnabled = projectVat.enabled !== false;
+      out.vatLabel = projectVat.label || 'НДС';
+    }
+  } catch {}
   return out;
 }
 

@@ -156,11 +156,22 @@ export function totals(ctx, options = {}) {
   const { B, order, totals, displayCurrency } = ctx;
   const showCost = options.showCostInTotals === true;
   const fmt = (v) => fmtKpMoney(v, displayCurrency);
-  const rows = [
-    ['Стоимость работ и материалов (без НДС):', fmt(totals.sumClientNative)],
-    [`НДС (${order.vatPct}%):`, fmt(totals.sumVat)],
-    ['ИТОГО к оплате:', fmt(totals.sumClientWithVat)],
-  ];
+  // v0.60.112: vatEnabled — для экспортных КП («без НДС»).
+  // Если выключен (project.economics.vat.enabled=false ИЛИ override
+  // в наряде) — НЕ выводим строку «НДС», итог = чистая клиент-цена.
+  const vatEnabled = (order.vatEnabled !== false) && (Number(order.vatPct) || 0) > 0;
+  const vatLabel = order.vatLabel || 'НДС';
+  const rows = vatEnabled
+    ? [
+        [`Стоимость работ и материалов (без ${vatLabel}):`, fmt(totals.sumClientNative)],
+        [`${vatLabel} (${order.vatPct}%):`, fmt(totals.sumVat)],
+        ['ИТОГО к оплате:', fmt(totals.sumClientWithVat)],
+      ]
+    : [
+        // Экспортный КП: одна строка, без НДС-роу. Подпись «(без НДС)»
+        // явно указывает клиенту что это чистая стоимость.
+        [`ИТОГО к оплате (без ${vatLabel}):`, fmt(totals.sumClientNative)],
+      ];
   if (showCost) {
     rows.push(['(служебно) Себестоимость + накладные:', fmt(totals.sumCostWithOverhead)]);
     rows.push(['(служебно) Маржа:', `${fmt(totals.marginAbs)} (${totals.marginPct.toFixed(1)} %)`]);

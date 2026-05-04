@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.112', date: '2026-05-04', items: [
+      '📊 <b>НДС / налоги: каскад project → company → fallback</b>. По репорту Пользователя 2026-05-04: «НДС должен быть настраиваемым и привязанным к проекту или месту поставки, нужно его учитывать в КП или нет. В РК с начала 2026 года НДС 16%. но для КП за рубеж мы должны давать стоимость без НДС» + «Любые налоги должны указываться в настройках проекта и настройках компании».',
+      '• <b>Project-level</b> (свойства проекта → 💰 Экономика → 📊 НДС): пресеты юрисдикций <b>🇰🇿 KZ-2026 (16%) / 🇰🇿 KZ-до-2026 (12%) / 🇷🇺 RU (20%) / 🇧🇾 BY (20%) / 🌍 Экспорт (без НДС) / ⚙ Custom</b>. При выборе пресета — pct и enabled заполняются автоматически.',
+      '• <b>Company-level</b>: <code>company-profile.defaultVat</code> в <code>DEFAULT_COMPANY</code> (для глобального дефолта компании-исполнителя — UI в global-settings TODO).',
+      '• <b>Каскад резолвер</b>: <code>shared/currency-defaults.js::resolveDefaultVat(pid)</code> + <code>resolveDefaultVatWithSource</code>. project → company → org [Phase 41] → ⚙ KZ-2026 fallback.',
+      '• <b>Service order-model</b>: добавлены <code>vatEnabled</code> (false для экспорта), <code>vatLabel</code> (default «НДС»). DEFAULT_ORDER.vatPct поднят с 12 на 16 (KZ 2026). Calc respects vatEnabled — для экспорта sumVat=0, sumClientWithVat=sumClient.',
+      '• <b>КП export</b>: при <code>vatEnabled=false</code> вместо строки «НДС: X» выводится «ИТОГО к оплате (без НДС): X» — одна чистая строка для экспортных клиентов.',
+      '• <b>service/service.js::buildOrderDefaultsFromProject</b>: автоматически подтягивает vat из project.economics при создании наряда из cooling-подбора.',
+      '• Backward-compat: старые наряды без vatEnabled — `enabled !== false` → true, продолжают работать как раньше с НДС в КП.',
+      '• Memory rule <code>feedback_taxes_cascade.md</code> создан с чек-листом для будущих налогов.',
+      'Файлы: <code>projects/project.js</code> (renderProjectEconomics + VAT_PRESETS + UI секция), <code>shared/company-profile.js</code> (defaultVat в DEFAULT_COMPANY), <code>shared/currency-defaults.js</code> (resolveDefaultVat + ...WithSource), <code>service/calc/order-model.js</code> (vatEnabled/vatLabel), <code>service/service.js</code> (buildOrderDefaultsFromProject + economics.vat), <code>service/report/slots/kp-blocks.js::totals</code> (conditional row).',
+    ] },
     { version: '0.60.111', date: '2026-05-04', items: [
       '🔒 <b>Service order-form: fix потери фокуса при вводе многосимвольных строк</b>. По репорту Пользователя 2026-05-04 (повторное упоминание ≥4 раз — 🔥 HIGH): «все поля не должны терять фокус при вводе много символьных строк, уже несколько раз это указывал».',
       '• <b>Корень бага</b>: <code>wrap.addEventListener(\'input\', ...)</code> срабатывал на КАЖДЫЙ keystroke в полях СЕБЕС/ЕД, КЛИЕНТ/ЕД, qty, label, top-level Учётный №/Название/Контакт/Накладные/НДС → <code>onChange()</code> → <code>service.js::renderActive()</code> → <code>wrap.innerHTML = \'\'</code> + <code>renderOrderForm()</code> → input уничтожается → фокус теряется.',

@@ -602,6 +602,24 @@ const PROJECT_CURRENCIES = [
   { code: '₴',   iso: 'UAH', label: 'UAH · гривна' },
   { code: 'CHF', iso: 'CHF', label: 'CHF · франк' },
 ];
+// v0.60.112: пресеты НДС по месту поставки. По репорту Пользователя
+// 2026-05-04: «НДС должен быть настраиваемым и привязанным к проекту или
+// месту поставки, нужно его учитывать в КП или нет. В РК с начала 2026
+// года НДС 16%. но для КП за рубеж мы должны давать стоимость без НДС».
+const VAT_PRESETS = [
+  { id: 'kz-2026',    label: '🇰🇿 Казахстан 2026+ (16%)',   pct: 16, enabled: true,  jurisdiction: 'KZ' },
+  { id: 'kz-pre2026', label: '🇰🇿 Казахстан до 2026 (12%)', pct: 12, enabled: true,  jurisdiction: 'KZ' },
+  { id: 'ru',         label: '🇷🇺 Россия (20%)',            pct: 20, enabled: true,  jurisdiction: 'RU' },
+  { id: 'by',         label: '🇧🇾 Беларусь (20%)',          pct: 20, enabled: true,  jurisdiction: 'BY' },
+  { id: 'export',     label: '🌍 Экспорт (без НДС)',         pct: 0,  enabled: false, jurisdiction: 'export' },
+  { id: 'custom',     label: '⚙ Пользовательский',           pct: 0,  enabled: true,  jurisdiction: 'custom' },
+];
+function _detectVatPreset(vat) {
+  if (!vat || !vat.enabled) return 'export';
+  const found = VAT_PRESETS.find(p => p.enabled && p.pct === Number(vat.pct) && p.id !== 'custom');
+  return found ? found.id : 'custom';
+}
+
 function renderProjectEconomics(p, host) {
   const e = p.economics || {};
   const today = new Date().toISOString().slice(0, 10);
@@ -609,8 +627,12 @@ function renderProjectEconomics(p, host) {
   const tariffCurrency = e.tariffCurrency || '₽';
   const displayCurrency = e.displayCurrency || '₽';
   const ratesDate = e.ratesDate || today;
-  const curOpts = PROJECT_CURRENCIES.map(c =>
-    `<option value="${esc(c.code)}" title="${esc(c.label)}">${esc(c.code)} — ${esc(c.label)}</option>`).join('');
+  // v0.60.112: НДС — настраиваемый, default = KZ 2026 (16%, enabled).
+  // Если у проекта vat не задан — берём KZ-2026 как разумный дефолт для
+  // существующих проектов (старые с vatPct=12 у нарядов будут продолжать
+  // работать через order-level override).
+  const vat = e.vat || { pct: 16, enabled: true, label: 'НДС' };
+  const vatPreset = _detectVatPreset(vat);
   host.innerHTML = `
     <p class="muted" style="font-size:11.5px;margin:0 0 10px">Эти параметры применяются ко всем calc-модулям проекта (cooling, service, tech-workspace, dgu-config). Изменение здесь — единая точка обновления.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px">
@@ -634,6 +656,27 @@ function renderProjectEconomics(p, host) {
         <input type="date" id="pr-eco-rates-date" value="${esc(ratesDate)}" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px">
       </label>
     </div>
+    <hr style="border:none;border-top:1px dashed #cbd5e1;margin:14px 0">
+    <h4 style="margin:0 0 8px;font-size:12.5px;color:#075985;text-transform:uppercase;letter-spacing:0.4px" title="НДС / VAT — налог на добавленную стоимость. Привязан к месту поставки (юрисдикции). Для экспортных КП обычно ставится «Экспорт (без НДС)».">📊 НДС / налогообложение</h4>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px">
+      <label title="Пресет места поставки — автоматически проставляет ставку НДС и флаг включения в КП. Меняется в РК с 2026: 12% → 16%. Для экспортных КП — «Экспорт (без НДС)».">
+        <span style="font-size:11.5px;color:#475569;display:block;margin-bottom:3px">Юрисдикция / пресет:</span>
+        <select id="pr-eco-vat-preset" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px">
+          ${VAT_PRESETS.map(vp => `<option value="${esc(vp.id)}"${vp.id === vatPreset ? ' selected' : ''} title="Ставка ${vp.pct}%, включён: ${vp.enabled ? 'да' : 'нет'}">${esc(vp.label)}</option>`).join('')}
+        </select>
+      </label>
+      <label title="Ставка НДС в %. При выборе пресета — заполняется автоматически. «Пользовательский» позволяет ввести любую ставку.">
+        <span style="font-size:11.5px;color:#475569;display:block;margin-bottom:3px">Ставка НДС, %:</span>
+        <input type="number" id="pr-eco-vat-pct" min="0" max="50" step="0.5" value="${Number(vat.pct) || 0}" ${vatPreset !== 'custom' ? 'readonly style="background:#f8fafc;color:#64748b;cursor:not-allowed;width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px"' : 'style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px"'}>
+      </label>
+      <label title="Если включено — НДС выводится в шапке КП (отдельной строкой) и добавляется к итогу. Если выключено — клиент видит «Стоимость без НДС» и итог = чистая клиент-цена. Для экспортных КП — выключить.">
+        <span style="font-size:11.5px;color:#475569;display:block;margin-bottom:3px">Учитывать в КП:</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;background:#fff;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="pr-eco-vat-enabled"${vat.enabled ? ' checked' : ''}>
+          <span>${vat.enabled ? '✓ Включён в итог' : '✗ Без НДС (экспорт)'}</span>
+        </label>
+      </label>
+    </div>
     <p class="muted" style="font-size:11px;margin:8px 0 0">💡 При первом сохранении значения станут default для всех модулей проекта. Существующие cooling/service могут сохранять свои override-значения локально.</p>
   `;
 
@@ -642,12 +685,21 @@ function renderProjectEconomics(p, host) {
   const tariffInp = host.querySelector('#pr-eco-tariff');
   const tariffCur = host.querySelector('#pr-eco-tariff-cur');
   const ratesInp = host.querySelector('#pr-eco-rates-date');
+  const vatPresetSel = host.querySelector('#pr-eco-vat-preset');
+  const vatPctInp = host.querySelector('#pr-eco-vat-pct');
+  const vatEnabledChk = host.querySelector('#pr-eco-vat-enabled');
   function saveEconomics() {
+    const presetId = vatPresetSel?.value || 'custom';
+    const preset = VAT_PRESETS.find(vp => vp.id === presetId);
+    const vatNext = (preset && preset.id !== 'custom')
+      ? { pct: preset.pct, enabled: preset.enabled, jurisdiction: preset.jurisdiction, label: 'НДС' }
+      : { pct: Number(vatPctInp?.value) || 0, enabled: !!vatEnabledChk?.checked, jurisdiction: 'custom', label: 'НДС' };
     const next = {
       displayCurrency: dispCur.value,
       tariffPerKwh: Number(tariffInp.value) || 0,
       tariffCurrency: tariffCur.value,
       ratesDate: ratesInp.value || today,
+      vat: vatNext,
       updatedAt: Date.now(),
     };
     updateProject(p.id, { economics: next });
@@ -657,6 +709,26 @@ function renderProjectEconomics(p, host) {
   if (tariffInp) tariffInp.addEventListener('change', saveEconomics);
   if (tariffCur) tariffCur.addEventListener('change', saveEconomics);
   if (ratesInp) ratesInp.addEventListener('change', saveEconomics);
+  // VAT controls: при смене пресета — re-render чтобы переключить readonly state.
+  if (vatPresetSel) vatPresetSel.addEventListener('change', () => {
+    const presetId = vatPresetSel.value;
+    const preset = VAT_PRESETS.find(vp => vp.id === presetId);
+    if (preset && preset.id !== 'custom') {
+      // Сразу применяем пресет — pct/enabled из presetа.
+      const next = {
+        displayCurrency: dispCur.value,
+        tariffPerKwh: Number(tariffInp.value) || 0,
+        tariffCurrency: tariffCur.value,
+        ratesDate: ratesInp.value || today,
+        vat: { pct: preset.pct, enabled: preset.enabled, jurisdiction: preset.jurisdiction, label: 'НДС' },
+        updatedAt: Date.now(),
+      };
+      updateProject(p.id, { economics: next });
+    }
+    renderProjectEconomics(p, host);  // re-render с новым preset / readonly
+  });
+  if (vatPctInp) vatPctInp.addEventListener('change', saveEconomics);
+  if (vatEnabledChk) vatEnabledChk.addEventListener('change', saveEconomics);
 }
 
 // v0.60.97 (Phase 38.1 START): План-график задач проекта.

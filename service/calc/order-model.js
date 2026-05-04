@@ -69,7 +69,15 @@ export const DEFAULT_ORDER = {
   customer: { name: '', contact: '' },
   positions: [],
   overheadPct: 15,
-  vatPct: 12,
+  vatPct: 16,           // v0.60.112: KZ-2026 default. Override per-order или
+                        //            из project.economics.vat (см. service.js
+                        //            buildOrderDefaultsFromProject).
+  vatEnabled: true,     // v0.60.112: false = «без НДС» (для экспортных КП).
+                        //            В КП row «НДС» скрывается, итог = чистая
+                        //            клиент-цена. Управляется в свойствах
+                        //            проекта (📊 НДС / налогообложение) или
+                        //            override per-order.
+  vatLabel: 'НДС',      // v0.60.112: лейбл налога — НДС / VAT / другое.
   notes: '',
 };
 
@@ -193,7 +201,13 @@ export function computeOrderTotals(order, displayCurrency = '₽', convertFn = n
     else byCategory.other += q * c;
   }
   const overheadPct = Number(o.overheadPct) || 0;
-  const vatPct = Number(o.vatPct) || 0;
+  // v0.60.112: vatEnabled — false для экспортных КП («без НДС»).
+  // Если выключен — sumVat = 0, sumClientWithVat = sumClient (чистая клиент-
+  // цена, как просит Пользователь: «для КП за рубеж мы должны давать
+  // стоимость без НДС»). Default true (backward-compat для старых нарядов
+  // без поля vatEnabled).
+  const vatEnabled = (o.vatEnabled !== false);
+  const vatPct = vatEnabled ? (Number(o.vatPct) || 0) : 0;
   const sumOverhead = sumCost * overheadPct / 100;
   const sumCostWithOverhead = sumCost + sumOverhead;
   const sumVat = sumClient * vatPct / 100;

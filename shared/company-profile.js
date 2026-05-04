@@ -34,6 +34,18 @@ export const DEFAULT_COMPANY = {
   // каскаде resolveDefaultCurrency (project→company→org→user→fallback).
   // Пусто = унаследовать с уровня выше (org или user). Символ ('₽','$',...).
   defaultCurrency: '',
+  // v0.60.112: налоги (НДС / VAT и др.) по умолчанию для компании. По
+  // запросу Пользователя 2026-05-04: «Любые налоги должны указываться
+  // в настройках проекта и настройках компании». Используется в каскаде
+  // resolveDefaultVat (project.economics.vat → company.defaultVat → fallback).
+  // null = унаследовать с уровня выше / системный дефолт.
+  //
+  // Структура: { pct: 16, enabled: true, jurisdiction: 'KZ', label: 'НДС' }
+  //   pct          — ставка %
+  //   enabled      — включать в КП (false = «без НДС», для экспорта)
+  //   jurisdiction — 'KZ' / 'RU' / 'BY' / 'export' / 'custom'
+  //   label        — отображаемое имя налога (НДС / VAT / ...)
+  defaultVat: null,
 };
 
 /**
