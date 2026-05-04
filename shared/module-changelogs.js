@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.205', date: '2026-05-04', items: [
+      '⚙ <b>Параметры расчёта в глобальных настройках</b>: «реальное напряжение на зажимах» vs «условное номинальное». По репорту Пользователя 2026-05-04 «поясни почему разные значения на двух идентичных щитах … добавь в настройки параметры расчета: использовать реальное напряжение или условное номинальное».',
+      '• <b>DEFAULTS.calcVoltageMode</b>: \'real\' (default) | \'nominal\'.',
+      '• <b>UI</b>: новая секция «🧮 Параметры расчёта» в openSettingsModal с двумя радиокнопками + объяснением каждого режима.',
+      '• <b>Текущий factual analysis</b>: <code>nodeCalcVoltage(n)</code> уже возвращает Uном из voltageLevel (не реальное с ΔU). Расхождение Макс между JB1 (75.6 kW) и JB2 (78.7 kW) НЕ из-за voltage — это <b>parallel-priority bug</b>: <code>maxDownstreamLoad</code> walks downstream через АВР и в активном/резервном плече видит разные состояния. Это deep recalc fix, который требует отдельной сессии.',
+      '• Setting calcVoltageMode сейчас <b>не применяется</b> в pipeline — placeholder. В следующих версиях расширим: будет влиять на cable VD calc + терминальное напряжение узлов.',
+      'Файл: <code>shared/global-settings.js</code> (DEFAULTS + _renderCalcSection + section в modal).',
+    ] },
     { version: '0.60.204', date: '2026-05-04', items: [
       '📥 <b>Зеркало drawio electrical stencils в репозитории</b>. По репорту Пользователя 2026-05-04 «https://github.com/jgraph/drawio/tree/dev/src/main/webapp/stencils/electrical можешь элементы схемы забрать отсюда. в таком же виде положи в наш репозиторий».',
       '• <b>Скачаны 24 файла</b> в <code>schematic/drawio-stencils/</code> (~570 KB сжатого XML, сотни условных обозначений): abstract, capacitors, diodes, electro-mechanical, iec417, iec_logic_gates, inductors, instruments, logic_gates, miscellaneous, mosfets1/2, op_amps, opto_electronics, plc_ladder, power_semiconductors, radio, resistors, rot_mech, signal_sources, thermionic_devices, transistors, transmission, waveforms.',

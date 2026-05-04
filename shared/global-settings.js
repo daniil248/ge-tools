@@ -71,6 +71,15 @@ export const DEFAULTS = {
   showHelp: true,
   allowReducedNeutral: false,
   autoCenterOnSelect: false,
+  // v0.60.205 (по репорту Пользователя 2026-05-04 «поясни почему разные
+  // значения на двух идентичных щитах … добавь в настройки параметры
+  // расчета: использовать реальное напряжение на зажимах или условное
+  // номинальное напряжение»):
+  // calcVoltageMode: 'real' (default — учитывает фактическое падение
+  //   напряжения на пути от источника, для активной линии и резерва
+  //   получаются разные числа из-за разного ΔU) | 'nominal' (всегда
+  //   использует Uном уровня, идентичные щиты дают идентичные числа).
+  calcVoltageMode: 'real',
 };
 
 const listeners = new Set();
@@ -305,6 +314,36 @@ function _renderVoltageTable(container) {
 }
 
 // v0.59.855: секция авто-бэкапа в модалке настроек.
+// v0.60.205 (по репорту Пользователя 2026-05-04 «поясни почему разные
+// значения на двух идентичных щитах … добавь в настройки параметры
+// расчета»): секция выбора режима напряжения для расчётов.
+function _renderCalcSection(host) {
+  const cur = getGlobal();
+  const mode = cur.calcVoltageMode || 'real';
+  host.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:10px 14px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px">
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+        <input type="radio" name="rs-gs-calcv" value="real" ${mode === 'real' ? 'checked' : ''} style="margin-top:3px">
+        <div>
+          <div style="font-weight:500">Реальное напряжение на зажимах <span class="muted">(по умолчанию)</span></div>
+          <div class="muted" style="font-size:12px">Для каждого узла берётся фактическое напряжение с учётом ΔU от источника. Точно отражает физику. Идентичные щиты в активном/резервном плече дают <b>разные</b> числа Макс — это ожидаемо (в активной линии есть ток → ΔU больше → меньше U → больше I при той же P).</div>
+        </div>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+        <input type="radio" name="rs-gs-calcv" value="nominal" ${mode === 'nominal' ? 'checked' : ''} style="margin-top:3px">
+        <div>
+          <div style="font-weight:500">Условное номинальное напряжение</div>
+          <div class="muted" style="font-size:12px">Все расчёты ведутся при U<sub>ном</sub> уровня (400/230 В) без учёта ΔU. Идентичные щиты дают <b>идентичные</b> числа Макс. Удобно для сравнения и проверки. Менее точно физически, но проще в чтении.</div>
+        </div>
+      </label>
+    </div>`;
+  host.addEventListener('change', (e) => {
+    if (e.target.name !== 'rs-gs-calcv') return;
+    const v = e.target.value;
+    saveGlobal({ calcVoltageMode: v });
+  });
+}
+
 function _renderBackupSection(host) {
   const settings = getAutoBackupSettings();
   const last = getLastBackupInfo();
@@ -781,6 +820,10 @@ export function openSettingsModal() {
         <div class="muted" style="margin-bottom:8px">Защита от потери данных. Раз в час (или другой интервал) приложение автоматически записывает JSON-бэкап в выбранную папку.</div>
         <div id="rs-gs-backup-section" style="margin-bottom:18px"></div>
 
+        <h4>🧮 Параметры расчёта</h4>
+        <div class="muted" style="margin-bottom:8px">Влияет на отображаемые токи/мощности на карточках узлов. По репорту Пользователя 2026-05-04 (расхождение значений на идентичных щитах в активном/резервном плече).</div>
+        <div id="rs-gs-calc-section" style="margin-bottom:18px"></div>
+
         <h4>Справочник уровней напряжения</h4>
         <div class="muted">Единый источник для всех подпрограмм платформы. Метка формируется автоматически из V<sub>LL</sub> / phases / DC — изменения видны во всех модулях сразу.</div>
         <div id="rs-gs-voltage-table" style="margin-top:10px"></div>
@@ -794,6 +837,10 @@ export function openSettingsModal() {
 
   const tableHost = overlay.querySelector('#rs-gs-voltage-table');
   _renderVoltageTable(tableHost);
+
+  // v0.60.205: секция «Параметры расчёта» (calcVoltageMode).
+  const calcHost = overlay.querySelector('#rs-gs-calc-section');
+  if (calcHost) _renderCalcSection(calcHost);
 
   // v0.59.855: секция авто-бэкапа.
   const backupHost = overlay.querySelector('#rs-gs-backup-section');
