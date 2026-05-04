@@ -33,6 +33,10 @@ import { ensureDefaultProject, projectKey, listSubProjects, createSubProject, li
 import { buildModuleHref } from '../shared/project-context.js';
 import { idbGet, idbAvailable } from '../shared/idb-store.js';
 import { pricesForElement } from '../shared/price-records.js';
+// v0.60.136 (Phase 44.3 follow-up): RBAC guards на approve-actions.
+// По правилу feedback_role_based_access.md — canApproveVariants только
+// для manager / gip. Для engineer / viewer кнопка disabled.
+import { hasPermission, currentRole, ROLES } from '../shared/subscriptions.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -566,11 +570,24 @@ function renderVariantsList() {
         <button type="button" class="tw-bind-btn" data-act="create-sketch" data-vid="${v.id}" style="font-size:11px;padding:3px 6px">➕ Sketch-проект для схем</button>
       </div>`;
     }
+    // v0.60.136: guard на «✓ Утвердить» — только canApproveVariants.
+    // Снять утверждение тоже регулируется этим же permission.
+    const canApprove = hasPermission('canApproveVariants');
+    let approveBtn = '';
+    if (!v.approvedAt) {
+      if (canApprove) {
+        approveBtn = `<button type="button" data-act="approve" data-vid="${v.id}" title="✓ Утвердить вариант. После утверждения можно генерить итоговый BOM и КП.">✓</button>`;
+      } else {
+        const role = currentRole();
+        const roleLabel = role ? (ROLES[role]?.label || role) : 'не задана';
+        approveBtn = `<button type="button" disabled style="opacity:0.4;cursor:not-allowed" title="Утверждение разрешено только 👑 Менеджеру или 🛠 ГИП. Текущая роль: «${escAttr(roleLabel)}».">✓🔒</button>`;
+      }
+    }
     return `<div class="tw-variant-row${active}" data-vid="${v.id}">
       <span class="tw-variant-name" title="${escAttr(v.name)}">${escHtml(v.name)}</span>
       ${primary}${readonly}${approved}
       <span class="tw-variant-actions">
-        ${!v.approvedAt ? `<button type="button" data-act="approve" data-vid="${v.id}" title="✓ Утвердить вариант. После утверждения можно генерить итоговый BOM и КП.">✓</button>` : ''}
+        ${approveBtn}
         <button type="button" data-act="primary" data-vid="${v.id}" title="Сделать основным">⭐</button>
         <button type="button" data-act="duplicate" data-vid="${v.id}" title="Дублировать">📋</button>
         <button type="button" data-act="delete" data-vid="${v.id}" title="Удалить">🗑</button>
@@ -4081,6 +4098,12 @@ function openSketchForVariant(vid) {
 async function approveVariant(vid) {
   const v = _variants.find(x => x.id === vid);
   if (!v) return;
+  // v0.60.136: defence-in-depth — даже если кнопка как-то стала кликабельной
+  // (DevTools / direct call), permission проверяется ещё раз.
+  if (!hasPermission('canApproveVariants')) {
+    twToast('⚠ Утверждение запрещено для текущей роли. Обратитесь к менеджеру проектов или ГИП.', 'warn');
+    return;
+  }
   if (v.approvedAt) {
     const ok = await twConfirm('Вариант уже утверждён. Снять статус «утверждено»?', 'Снять утверждение');
     if (!ok) return;

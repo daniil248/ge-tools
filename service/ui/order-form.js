@@ -19,6 +19,10 @@ import {
 import { openOfferPreview } from '../calc/export-offer.js';
 import { fmtMoney } from '../../cooling/calc/fc-summary.js';
 import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
+// v0.60.136 (Phase 44.3 follow-up): RBAC guard на economics fields.
+// canEditEconomics — только manager/gip. Для engineer/viewer поля
+// клиент-цены и себестоимости становятся read-only.
+import { hasPermission, currentRole, ROLES } from '../../shared/subscriptions.js';
 
 /**
  * @param {object} order            — текущий наряд
@@ -35,6 +39,13 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
 
   const totals = computeOrderTotals(o, displayCurrency, convertFn);
   const fmt = (v) => fmtMoney(v, displayCurrency);
+
+  // v0.60.136: economics permission для top-level полей (overheadPct/vatPct).
+  const _topCanEcon = hasPermission('canEditEconomics');
+  const _topRole = currentRole();
+  const _topRoleLabel = _topRole ? (ROLES[_topRole]?.label || _topRole) : 'не задана';
+  const _topEconLockTitle = `🔒 Поле экономики — только для 👑 Менеджера или 🛠 ГИП. Текущая роль: «${_topRoleLabel}». Просмотр доступен, редактирование запрещено.`;
+  const _topEconAttrs = _topCanEcon ? '' : ` disabled style="opacity:0.7;cursor:not-allowed;background:#f1f5f9"`;
 
   const typeOpts = ORDER_TYPES.map(t =>
     `<option value="${t.id}"${t.id === o.type ? ' selected' : ''} title="${escAttr(t.desc)}">${escHtml(t.label)}</option>`
@@ -68,13 +79,13 @@ export function renderOrderForm(order, onChange, displayCurrency = '₽', conver
           <span>Контакт</span>
           <input type="text" data-of="customer.contact" value="${escAttr(o.customer?.contact || '')}" placeholder="+7 ... / email@...">
         </label>
-        <label class="sv-field" title="Накладные расходы — % от себестоимости. Учитываются при расчёте маржи. Типично 10–20%.">
-          <span>Накладные, %</span>
-          <input type="number" min="0" max="200" step="1" data-of="overheadPct" value="${o.overheadPct}">
+        <label class="sv-field" title="${_topCanEcon ? 'Накладные расходы — % от себестоимости. Учитываются при расчёте маржи. Типично 10–20%.' : escAttr(_topEconLockTitle)}">
+          <span>Накладные, %${_topCanEcon ? '' : ' 🔒'}</span>
+          <input type="number" min="0" max="200" step="1" data-of="overheadPct" value="${o.overheadPct}"${_topEconAttrs}>
         </label>
-        <label class="sv-field" title="НДС, % от клиент-цены. Применяется к итогу для клиента. РФ — 20%, KZ — 12%.">
-          <span>НДС, %</span>
-          <input type="number" min="0" max="50" step="0.5" data-of="vatPct" value="${o.vatPct}">
+        <label class="sv-field" title="${_topCanEcon ? 'НДС, % от клиент-цены. Применяется к итогу для клиента. РФ — 20%, KZ — 12%.' : escAttr(_topEconLockTitle)}">
+          <span>НДС, %${_topCanEcon ? '' : ' 🔒'}</span>
+          <input type="number" min="0" max="50" step="0.5" data-of="vatPct" value="${o.vatPct}"${_topEconAttrs}>
         </label>
       </div>
     </div>
@@ -303,15 +314,22 @@ function renderPositionsTable(positions, displayCurrency) {
       ? `Источник: ${srcIcon} ${srcLabel}. При повторном импорте из этого источника позиция будет ОБНОВЛЕНА (не дублирована).`
       : 'Пользовательская позиция (без источника). Не затрагивается при импорте из модулей.';
     const srcMarker = `<span class="sv-pos-src" title="${escAttr(srcTitle)}" style="display:inline-block;width:18px;text-align:center;cursor:help;font-size:13px;flex-shrink:0">${srcIcon || '✏'}</span>`;
+    // v0.60.136: economics fields (себестоимость + клиент-цена + валюты) —
+    // read-only для ролей без canEditEconomics. Tooltip объясняет почему.
+    const _canEcon = hasPermission('canEditEconomics');
+    const _role = currentRole();
+    const _roleLabel = _role ? (ROLES[_role]?.label || _role) : 'не задана';
+    const _econLockTitle = `🔒 Поле экономики — только для 👑 Менеджера или 🛠 ГИП. Текущая роль: «${_roleLabel}». Просмотр доступен, редактирование запрещено.`;
+    const _econDis = _canEcon ? '' : ` disabled style="opacity:0.7;cursor:not-allowed;background:#f1f5f9" title="${escAttr(_econLockTitle)}"`;
     return `<tr data-pos="${i}">
       <td><span style="display:flex;align-items:center;gap:4px">${srcMarker}<input type="text" class="sv-pos-label" data-attr="label" value="${escAttr(p.label || '')}" placeholder="Описание работы / материала" title="Описание позиции" style="flex:1;min-width:0"></span></td>
       <td><select class="sv-pos-cat" data-attr="category" title="Категория позиции">${catOpts(p.category)}</select></td>
       <td><input type="number" min="0" step="0.5" class="sv-pos-qty" data-attr="qty" value="${Number(p.qty) || 1}" title="Количество"></td>
       <td><select class="sv-pos-unit" data-attr="unit" title="Единица измерения">${unitOpts(p.unit)}</select></td>
-      <td><input type="number" min="0" step="100" class="sv-pos-val" data-col="costPrice" data-attr="value" value="${Number(p.costPrice?.value) || 0}" title="Себестоимость одной единицы"></td>
-      <td><select class="sv-pos-cur" data-col="costPrice" data-attr="currency" title="Валюта себестоимости">${curOpts(p.costPrice?.currency || displayCurrency)}</select></td>
-      <td><input type="number" min="0" step="100" class="sv-pos-val" data-col="clientPrice" data-attr="value" value="${Number(p.clientPrice?.value) || 0}" title="Цена для клиента за единицу"></td>
-      <td><select class="sv-pos-cur" data-col="clientPrice" data-attr="currency" title="Валюта клиент-цены">${curOpts(p.clientPrice?.currency || displayCurrency)}</select></td>
+      <td><input type="number" min="0" step="100" class="sv-pos-val" data-col="costPrice" data-attr="value" value="${Number(p.costPrice?.value) || 0}" ${_canEcon ? 'title="Себестоимость одной единицы"' : _econDis}></td>
+      <td><select class="sv-pos-cur" data-col="costPrice" data-attr="currency" ${_canEcon ? 'title="Валюта себестоимости"' : _econDis}>${curOpts(p.costPrice?.currency || displayCurrency)}</select></td>
+      <td><input type="number" min="0" step="100" class="sv-pos-val" data-col="clientPrice" data-attr="value" value="${Number(p.clientPrice?.value) || 0}" ${_canEcon ? 'title="Цена для клиента за единицу"' : _econDis}></td>
+      <td><select class="sv-pos-cur" data-col="clientPrice" data-attr="currency" ${_canEcon ? 'title="Валюта клиент-цены"' : _econDis}>${curOpts(p.clientPrice?.currency || displayCurrency)}</select></td>
       <td><button type="button" class="sv-pos-del" title="Удалить позицию">×</button></td>
     </tr>`;
   }).join('');

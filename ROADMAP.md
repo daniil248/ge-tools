@@ -3978,10 +3978,10 @@ v0.60.105 (`shared/currency-defaults.js::resolveDefaultCurrency`).
   - <code>currentRole()</code> / <code>setRole(roleId)</code> / <code>hasPermission(perm)</code>.
   - В global-settings — секция «🏢 Внутрикорпоративный доступ + роль» (тумблер internal + селектор роли).
   - В <code>/projects/</code> — guard на «＋ Новый проект» / «Удалить» через <code>hasPermission</code>; role-banner над списком.
-- [ ] Расширить guard'ы permissions:
-  - service/tw — <code>canApproveVariants</code> на «✓ Утвердить».
-  - service order-form — <code>canEditEconomics</code> для полей экономики.
-  - catalog/work-templates/wizards — <code>canPromoteOrgItems</code> для кнопок «↑ В организацию».
+- [x] **v0.60.136** — расширение guard'ов permissions:
+  - tech-workspace — <code>canApproveVariants</code> на «✓ Утвердить вариант» (disabled+tooltip + defence-in-depth).
+  - service/ui/order-form — <code>canEditEconomics</code> для top-level (overheadPct / vatPct) + per-row (costPrice / clientPrice + валюты).
+  - catalog/catalog.js (price-records) + service/ui/work-catalog + service/ui/wizard-catalog — <code>canPromoteOrgItems</code> для ↑/↓ promote/demote кнопок.
 - [ ] В шапке (app-header.js) badge с текущим планом — Phase 44.2 TODO.
 
 ### 44.4 — Платёжная интеграция

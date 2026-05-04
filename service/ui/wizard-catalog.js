@@ -20,6 +20,8 @@ import {
 } from '../catalog/wizards/index.js';
 import { ORDER_TYPES } from '../calc/order-model.js';
 import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
+// v0.60.136 (Phase 44.3 follow-up): RBAC guard на promote/demote.
+import { hasPermission, currentRole, ROLES } from '../../shared/subscriptions.js';
 
 export async function openWizardCatalogModal() {
   let activeType = 'maintenance';
@@ -39,10 +41,18 @@ export async function openWizardCatalogModal() {
         ? '<button type="button" disabled style="opacity:0.3;cursor:not-allowed" title="Встроенный сценарий — нельзя редактировать. Скопируйте через 📋 для редактирования.">✏</button>'
         : `<button type="button" class="wzc-edit" data-id="${escAttr(w.id)}" data-scope="${escAttr(scope)}" title="Редактировать (JSON editor)">✏</button>`;
       const cloneBtn = `<button type="button" class="wzc-clone" data-id="${escAttr(w.id)}" title="Скопировать как личный сценарий (можно потом редактировать)">📋</button>`;
+      // v0.60.136: guard canPromoteOrgItems.
+      const _canPromote = hasPermission('canPromoteOrgItems');
+      const _role = currentRole();
+      const _roleLabel = _role ? (ROLES[_role]?.label || _role) : 'не задана';
       const promoteBtn = scope === 'user'
-        ? `<button type="button" class="wzc-promote" data-id="${escAttr(w.id)}" title="Опубликовать в общий каталог организации">↑</button>`
+        ? (_canPromote
+            ? `<button type="button" class="wzc-promote" data-id="${escAttr(w.id)}" title="Опубликовать в общий каталог организации">↑</button>`
+            : `<button type="button" disabled style="opacity:0.4;cursor:not-allowed" title="Публикация запрещена для роли «${escAttr(_roleLabel)}». Только 👑 Менеджер или 🛠 ГИП.">↑🔒</button>`)
         : scope === 'org'
-          ? `<button type="button" class="wzc-demote" data-id="${escAttr(w.id)}" title="Вернуть в личные">↓</button>`
+          ? (_canPromote
+              ? `<button type="button" class="wzc-demote" data-id="${escAttr(w.id)}" title="Вернуть в личные">↓</button>`
+              : `<button type="button" disabled style="opacity:0.4;cursor:not-allowed" title="Снятие из общего каталога запрещено для роли «${escAttr(_roleLabel)}».">↓🔒</button>`)
           : '';
       const delBtn = scope === 'seed'
         ? '<button type="button" disabled style="opacity:0.3;cursor:not-allowed" title="Встроенный — нельзя удалить">🗑</button>'
@@ -268,6 +278,11 @@ export async function openWizardCatalogModal() {
         return;
       }
       if (ev.target.closest('.wzc-promote') && scope === 'user') {
+        // v0.60.136: defence-in-depth.
+        if (!hasPermission('canPromoteOrgItems')) {
+          toast('⚠ Публикация в каталог организации запрещена для текущей роли', 'warn');
+          return;
+        }
         const ok = await modalOpen('<h3>👥 В организацию?</h3>',
           `<p>Опубликовать сценарий в общий каталог организации?<br>
            <span class="muted" style="font-size:11.5px">Будет виден всем членам команды (Phase 40 Cloud Sync синхронизирует между устройствами в будущем; пока локально).</span></p>`,
@@ -280,6 +295,10 @@ export async function openWizardCatalogModal() {
         return;
       }
       if (ev.target.closest('.wzc-demote') && scope === 'org') {
+        if (!hasPermission('canPromoteOrgItems')) {
+          toast('⚠ Снятие из каталога организации запрещено для текущей роли', 'warn');
+          return;
+        }
         const ok = await modalOpen('<h3>↓ В личные?</h3>',
           `<p>Снять сценарий из общего каталога? Другие члены команды его перестанут видеть.</p>`,
           async () => ({ ok: true })

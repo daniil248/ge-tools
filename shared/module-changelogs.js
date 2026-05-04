@@ -4,6 +4,25 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.136', date: '2026-05-04', items: [
+      '👥 <b>Phase 44.3 follow-up: расширение RBAC guard\'ов на TW + catalog + service economics</b>. Продолжение v0.60.135 — TODO-список из ROADMAP закрыт.',
+      '• <b>tech-workspace</b> — guard на «✓ Утвердить вариант»:',
+      '  • <code>canApproveVariants</code> required.',
+      '  • Disabled-button с tooltip «Только 👑 Менеджер или 🛠 ГИП» если нет permission.',
+      '  • Defence-in-depth в approveVariant() — проверка ещё раз даже при прямом вызове.',
+      '• <b>catalog/catalog.js</b> (price-records) — guard на ↑/↓ promote/demote:',
+      '  • <code>canPromoteOrgItems</code> required.',
+      '  • При отсутствии permission — кнопки disabled с замком (↑🔒 / ↓🔒).',
+      '  • Defence-in-depth в click-handler\'ах promote/demote.',
+      '• <b>service/ui/work-catalog.js</b> + <b>service/ui/wizard-catalog.js</b> — те же guard\'ы canPromoteOrgItems на ↑/↓ кнопках в строках work-templates и wizards.',
+      '• <b>service/ui/order-form.js</b> — guard на economics fields:',
+      '  • <code>canEditEconomics</code> required для редактирования.',
+      '  • Top-level: «Накладные, %» / «НДС, %» — disabled+🔒 для ролей без permission.',
+      '  • Per-row: «Себес/ед» / «Клиент/ед» (значения и валюты) — disabled для engineer/viewer.',
+      '  • Просмотр доступен всем — view-режим для engineer не ломается.',
+      '• Принцип во всех guard\'ах: <b>не скрывать кнопки/поля</b>, делать disabled+tooltip — Пользователь должен понимать что действие существует, но недоступно для его роли (правило <code>feedback_role_based_access.md</code>).',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code> (+import hasPermission/ROLES; guard на ✓; defence-in-depth в approveVariant), <code>catalog/catalog.js</code> (+import; guard на promote/demote), <code>service/ui/work-catalog.js</code> (+import; guard на ↑/↓), <code>service/ui/wizard-catalog.js</code> (+import; guard на ↑/↓), <code>service/ui/order-form.js</code> (+import; economics fields read-only).',
+    ] },
     { version: '0.60.135', date: '2026-05-04', items: [
       '👥 <b>Phase 44.3 follow-up: ролевая модель в /projects/ + UI настройки роли + memory rules</b>. По требованию Пользователя 2026-05-04 «В модуле Проекты только менеджер проектов или ГИП могут создавать проекты».',
       '• <b>projects/projects.js</b> guard\'ы permissions:',

@@ -17,6 +17,9 @@ import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
 // v0.60.105: каскадный резолвер валюты (project → company → org → user → fallback).
 import { CURRENCIES, resolveDefaultCurrency, resolveDefaultCurrencyWithSource } from '../../shared/currency-defaults.js';
 import { getActiveProjectId } from '../../shared/project-storage.js';
+// v0.60.136 (Phase 44.3 follow-up): RBAC guard на promote/demote
+// (canPromoteOrgItems). По правилу feedback_role_based_access.md.
+import { hasPermission, currentRole, ROLES } from '../../shared/subscriptions.js';
 
 /**
  * Открыть модалку каталога. Возвращает Promise<void> — каталог обновляется
@@ -43,10 +46,18 @@ export async function openWorkCatalogModal() {
         : `<button type="button" class="wc-edit" data-id="${escAttr(t.id)}" data-scope="${escAttr(scope)}" title="Редактировать ${scope === 'org' ? 'общий шаблон организации' : 'личный шаблон'}">✏</button>`;
       const cloneBtn = `<button type="button" class="wc-clone" data-id="${escAttr(t.id)}" title="Скопировать как личный шаблон (можно потом редактировать)">📋</button>`;
       // v0.60.116: promote/demote — toggle между user и org.
+      // v0.60.136: guard canPromoteOrgItems (только manager/gip).
+      const _canPromote = hasPermission('canPromoteOrgItems');
+      const _role = currentRole();
+      const _roleLabel = _role ? (ROLES[_role]?.label || _role) : 'не задана';
       const promoteBtn = scope === 'user'
-        ? `<button type="button" class="wc-promote" data-id="${escAttr(t.id)}" title="Опубликовать в общий каталог организации (видим всем членам команды)">↑</button>`
+        ? (_canPromote
+            ? `<button type="button" class="wc-promote" data-id="${escAttr(t.id)}" title="Опубликовать в общий каталог организации (видим всем членам команды)">↑</button>`
+            : `<button type="button" disabled style="opacity:0.4;cursor:not-allowed" title="Публикация в каталог организации запрещена для роли «${escAttr(_roleLabel)}». Только 👑 Менеджер или 🛠 ГИП.">↑🔒</button>`)
         : scope === 'org'
-          ? `<button type="button" class="wc-demote" data-id="${escAttr(t.id)}" title="Вернуть в личные шаблоны (только вы будете видеть)">↓</button>`
+          ? (_canPromote
+              ? `<button type="button" class="wc-demote" data-id="${escAttr(t.id)}" title="Вернуть в личные шаблоны (только вы будете видеть)">↓</button>`
+              : `<button type="button" disabled style="opacity:0.4;cursor:not-allowed" title="Снятие из общего каталога запрещено для роли «${escAttr(_roleLabel)}».">↓🔒</button>`)
           : '';
       const delBtn = scope === 'seed'
         ? '<button type="button" disabled style="opacity:0.3;cursor:not-allowed" title="Встроенный шаблон — нельзя удалить">🗑</button>'
@@ -194,7 +205,12 @@ export async function openWorkCatalogModal() {
         return;
       }
       // v0.60.116 (Phase 41.2): promote / demote
+      // v0.60.136: defence-in-depth permission check.
       if (ev.target.closest('.wc-promote') && scope === 'user') {
+        if (!hasPermission('canPromoteOrgItems')) {
+          toast('⚠ Публикация в каталог организации запрещена для текущей роли', 'warn');
+          return;
+        }
         const ok = await modalOpen('<h3>👥 В организацию?</h3>',
           `<p>Опубликовать «${escHtml(t.label)}» в общий каталог организации?<br>
            <span class="muted" style="font-size:11.5px">Будет виден всем членам команды (Phase 40 Cloud Sync синхронизирует между устройствами в будущем; пока локально на этом устройстве).</span></p>`,
@@ -207,6 +223,10 @@ export async function openWorkCatalogModal() {
         return;
       }
       if (ev.target.closest('.wc-demote') && scope === 'org') {
+        if (!hasPermission('canPromoteOrgItems')) {
+          toast('⚠ Снятие из каталога организации запрещено для текущей роли', 'warn');
+          return;
+        }
         const ok = await modalOpen('<h3>↓ В личные?</h3>',
           `<p>Снять «${escHtml(t.label)}» из общего каталога и вернуть в личные?<br>
            <span class="muted" style="font-size:11.5px">Другие члены команды перестанут его видеть. У вас останется в личных шаблонах.</span></p>`,

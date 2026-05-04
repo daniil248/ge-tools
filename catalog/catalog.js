@@ -34,6 +34,9 @@ import {
 } from '../shared/counterparty-catalog.js';
 import { initCatalogBridge } from '../shared/catalog-bridge.js';
 import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
+// v0.60.136 (Phase 44.3 follow-up): RBAC guard на promote/demote
+// (canPromoteOrgItems). По правилу feedback_role_based_access.md.
+import { hasPermission, currentRole, ROLES } from '../shared/subscriptions.js';
 
 initCatalogBridge();
 
@@ -1421,10 +1424,20 @@ function renderPricesTab() {
     const scopeIcon = scope === 'org' ? '👥' : '✏';
     const scopeTitle = scope === 'org' ? 'Общий шаблон организации (виден всем членам команды)' : 'Личный шаблон (виден только вам)';
     const rowBg = scope === 'org' ? 'background:#eff6ff' : 'background:#fefce8';
-    // promote/demote кнопки
-    const promoteBtn = scope === 'user'
-      ? '<button data-act="promote" title="Опубликовать в общий каталог организации (виден всем членам команды)">↑</button>'
-      : '<button data-act="demote" title="Снять из общего каталога (вернуть в личные)">↓</button>';
+    // promote/demote кнопки. v0.60.136: guard на canPromoteOrgItems.
+    const canPromote = hasPermission('canPromoteOrgItems');
+    let promoteBtn;
+    if (canPromote) {
+      promoteBtn = scope === 'user'
+        ? '<button data-act="promote" title="Опубликовать в общий каталог организации (виден всем членам команды)">↑</button>'
+        : '<button data-act="demote" title="Снять из общего каталога (вернуть в личные)">↓</button>';
+    } else {
+      const role = currentRole();
+      const roleLabel = role ? (ROLES[role]?.label || role) : 'не задана';
+      promoteBtn = scope === 'user'
+        ? `<button disabled style="opacity:0.4;cursor:not-allowed" title="Публикация в каталог организации запрещена для роли «${esc(roleLabel)}». Только 👑 Менеджер или 🛠 ГИП.">↑🔒</button>`
+        : `<button disabled style="opacity:0.4;cursor:not-allowed" title="Снятие из общего каталога запрещено для роли «${esc(roleLabel)}». Только 👑 Менеджер или 🛠 ГИП.">↓🔒</button>`;
+    }
     html.push(`
       <tr data-id="${esc(p.id)}" data-scope="${esc(scope)}" style="${rowBg}">
         <td title="${esc(scopeTitle)}" style="text-align:center">${scopeIcon}</td>
@@ -1472,12 +1485,22 @@ function renderPricesTab() {
           }
         }
         else if (btn.dataset.act === 'promote') {
+          // v0.60.136: defence-in-depth — кнопка может быть disabled но
+          // если её включат через DevTools — permission проверяется здесь.
+          if (!hasPermission('canPromoteOrgItems')) {
+            flash('⚠ Публикация в общий каталог запрещена для текущей роли', 'warn');
+            return;
+          }
           if (await rsConfirm('Опубликовать цену в общий каталог организации?', 'Будет видна всем членам команды (Phase 40 Cloud Sync позже синхронизирует между устройствами).', { okLabel: '↑ Опубликовать', cancelLabel: 'Отмена' })) {
             const ok = promotePriceToOrg(id);
             if (ok) flash('👥 Цена в общем каталоге', 'success');
           }
         }
         else if (btn.dataset.act === 'demote') {
+          if (!hasPermission('canPromoteOrgItems')) {
+            flash('⚠ Снятие из общего каталога запрещено для текущей роли', 'warn');
+            return;
+          }
           if (await rsConfirm('Снять цену из общего каталога?', 'Другие члены команды перестанут её видеть. У вас останется в личных записях.', { okLabel: '↓ Снять', cancelLabel: 'Отмена' })) {
             const ok = demotePriceToUser(id);
             if (ok) flash('↓ Цена в личных записях', 'info');
