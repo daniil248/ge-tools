@@ -3860,15 +3860,23 @@ function recalc() {
     const Iworst  = Math.max(_loadA, _maxA);
     const Iused   = Iworst / Math.max(1, _par);
     const Ifree   = Math.max(0, Imax - Iused);
+    // v0.60.211 (визуальное улучшение): индикатор перегруза.
+    // Если Iused > Imax — пишем _overloadA = разница, чтобы карточка
+    // могла показать «Свободно: 0 А · Перегруз X А» (вместо немой 0).
+    const Iover = Math.max(0, Iused - Imax);
     const U = nodeCalcVoltage(n);
     let Pfree = null;
+    let Pover = null;
     if (U && U > 0) {
       const cos = Math.max(0.1, Math.min(1, Number(n._cosPhi) || Number(n.cosPhi) || GLOBAL.defaultCosPhi || 0.92));
       const phaseK = isThreePhase(n) ? Math.sqrt(3) : 1;
       Pfree = (Ifree * U * cos * phaseK) / 1000;
+      Pover = (Iover * U * cos * phaseK) / 1000;
     }
     n._freeKw = Pfree;
     n._freeA = Ifree;
+    n._overloadA = Iover;
+    n._overloadKw = Pover;
     n._freeLimit = limit;
     // Backward-compat alias (оставляем доступным до полного перевода
     // вызывающего кода; новые места используют _free*).

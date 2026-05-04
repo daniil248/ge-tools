@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.211', date: '2026-05-04', items: [
+      '⚠ <b>Индикатор перегруза в строке «Свободно»</b>. Раньше при перегрузе панели/ИБП/источника карточка молча показывала «Свободно: 0 kW / 0 A» — Пользователь не видел масштаба превышения. Теперь: «Свободно: 0 kW / 0 A · Запас 9.2% · Перегруз 4.2 kW / 11.0 A».',
+      '• <b>recalc.js</b>: добавлены поля <code>n._overloadA</code> и <code>n._overloadKw</code> = max(0, Iused − Imax) на основе того же подсчёта что и Свободно.',
+      '• <b>render.js</b>: post-merge body для panel/ups/source/generator — если <code>_overloadA > 0</code>, в строку «Свободно» добавляется «· Перегруз X kW / Y A».',
+      'Файлы: <code>js/engine/recalc.js</code> (+_overloadA/Kw fields), <code>js/engine/render.js</code> (overload chip в Свободно-строку).',
+    ] },
     { version: '0.60.210', date: '2026-05-04', items: [
       '🔌 <b>DGU configurator: исправлены имена URL-параметров</b>. По репорту Пользователя 2026-05-04 «давай вернемся к передачи актуальной нагрузки в конфигуратор ДГУ». В v0.60.207 я сделал передачу URL-params, но имена не совпадали с тем что DGU readUrlParams реально читает.',
       '• <b>Раньше</b>: <code>?loadKw=160</code> — DGU configurator его игнорировал, использовал default 500 кВт.',

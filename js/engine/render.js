@@ -2995,14 +2995,32 @@ export function renderNodes() {
       if (n.type === 'panel' || n.type === 'ups' || n.type === 'source' || n.type === 'generator') {
         const _findRowIdxP = (arr, prefix) => arr.findIndex(s => typeof s === 'string' && s.startsWith(prefix));
         const _bodyArr = rowsByPos.body;
+        // v0.60.211: если есть перегруз (n._overloadA > 0), добавляем
+        // «· Перегруз X А» к строке Свободно. Так Пользователь видит
+        // не молчаливый 0, а конкретное превышение.
+        const overA = Number(n._overloadA) || 0;
+        const overKw = Number(n._overloadKw) || 0;
         // Свободно + Запас → одна строка.
         const freeIdx = _findRowIdxP(_bodyArr, 'Свободно:');
         const margIdx = _findRowIdxP(_bodyArr, 'Запас:');
         if (freeIdx >= 0 && margIdx >= 0) {
-          const merged = `${_bodyArr[freeIdx]} · ${_bodyArr[margIdx]}`;
+          let merged = `${_bodyArr[freeIdx]} · ${_bodyArr[margIdx]}`;
+          if (overA > 0) {
+            // «Перегруз X.X kW / Y.Y A» (kW если есть Pover, иначе только A)
+            const overTxt = overKw > 0
+              ? `Перегруз ${overKw.toFixed(1)} kW / ${overA.toFixed(1)} A`
+              : `Перегруз ${overA.toFixed(1)} A`;
+            merged += ` · ${overTxt}`;
+          }
           const idxs = [freeIdx, margIdx].sort((a, b) => b - a);
           for (const i of idxs) _bodyArr.splice(i, 1);
           _bodyArr.splice(Math.min(freeIdx, margIdx), 0, merged);
+        } else if (freeIdx >= 0 && overA > 0) {
+          // Только Свободно (без Запас) — добавляем перегруз.
+          const overTxt = overKw > 0
+            ? `Перегруз ${overKw.toFixed(1)} kW / ${overA.toFixed(1)} A`
+            : `Перегруз ${overA.toFixed(1)} A`;
+          _bodyArr[freeIdx] = `${_bodyArr[freeIdx]} · ${overTxt}`;
         }
         // Sном (kVA) + Pном (kW) → одна строка «Номинал».
         // shortLabel: kva→Sном, kw→Pном (см. card-fields-registry).
