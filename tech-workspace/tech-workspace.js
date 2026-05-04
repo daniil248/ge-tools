@@ -150,11 +150,12 @@ function newCoolingUnit(name) {
 //                    raised_floor, additional } — прочие требования.
 //   kind (legacy) — оставлен для backward-compat но не используется в UI.
 
-// v0.60.143 (по репорту Пользователя 2026-05-04 «требования должны
-// ограничиваться выбранным классом, не больше, не меньше»): когда
-// выбран ASHRAE-класс — поля T мин/макс, RH мин/макс автоматически
-// заполняются по «allowable» диапазону этого класса И блокируются для
-// редактирования. Свободный ввод разрешён только при class='custom'.
+// v0.60.143/145 (по репортам Пользователя 2026-05-04 «требования должны
+// ограничиваться выбранным классом» + «не нужно блокировать ввод, только
+// ограничить выход за пределы класса»): ASHRAE-класс задаёт диапазон
+// «allowable envelope» — поля T мин/макс, RH мин/макс остаются редакти-
+// руемыми, но input.min/max и change-handler clamp'ят значения к этому
+// диапазону. Class='custom' снимает все ограничения.
 //
 // Источник: ASHRAE TC 9.9 «Thermal Guidelines for Data Processing
 // Environments» (4th edition, 2021). Здесь используем allowable envelope
@@ -398,12 +399,23 @@ function migrateVariant(v) {
       // v0.60.143: default — ASHRAE A1 allowable envelope.
       rm.climate = { tMinC: 15, tMaxC: 32, rhMinPct: 8, rhMaxPct: 80, ashraeClass: 'A1' };
     }
-    // v0.60.143: migration — если class задан и не 'custom', значения T/RH
-    // должны совпадать с диапазоном класса. Если расходятся (старые legacy
-    // значения 18/27/20/80 для A1) — синкаем. По правилу «требования
-    // должны ограничиваться выбранным классом, не больше, не меньше».
+    // v0.60.145: migration — clamp existing values в диапазон класса
+    // (НЕ сброс на bounds). По уточнению Пользователя «не нужно блокировать
+    // ввод, а только ограничить выход за пределы класса». Сохраняем то что
+    // ввёл Пользователь, если оно внутри диапазона; что вне — clamp'аем.
     if (rm.climate.ashraeClass && rm.climate.ashraeClass !== 'custom') {
-      applyAshraeClassToClimate(rm.climate, rm.climate.ashraeClass);
+      const _def = ASHRAE_CLASSES[rm.climate.ashraeClass];
+      if (_def) {
+        const _cl = (f, lo, hi) => {
+          const v = Number(rm.climate[f]);
+          if (!Number.isFinite(v)) { rm.climate[f] = lo; return; }
+          rm.climate[f] = Math.max(lo, Math.min(hi, v));
+        };
+        _cl('tMinC',    _def.tMinC,    _def.tMaxC);
+        _cl('tMaxC',    _def.tMinC,    _def.tMaxC);
+        _cl('rhMinPct', _def.rhMinPct, _def.rhMaxPct);
+        _cl('rhMaxPct', _def.rhMinPct, _def.rhMaxPct);
+      }
     }
     if (!rm.requirements || typeof rm.requirements !== 'object') {
       rm.requirements = { fireSuppression: '', accessLevel: '', antistatic: false, raisedFloor: false, additional: '' };
@@ -1796,19 +1808,25 @@ function renderDetails(c, ro) {
     if (!rm) return '<div class="tw-details-empty muted">Помещение удалено. Выберите другое слева.</div>';
     const climate = rm.climate || { tMinC: 18, tMaxC: 27, rhMinPct: 20, rhMaxPct: 80, ashraeClass: 'A1' };
     const reqs = rm.requirements || { fireSuppression: '', accessLevel: '', antistatic: false, raisedFloor: false, additional: '' };
-    // v0.60.143: ASHRAE class теперь констрейнит диапазоны. Custom для override.
+    // v0.60.143: ASHRAE class констрейнит диапазон значений T/RH.
+    // v0.60.145 (по уточнению Пользователя 2026-05-04 «мне не нужно
+    // блокировать ввод, а только ограничить выход за пределы класса»):
+    // поля остаются РЕДАКТИРУЕМЫМИ, но input.min/max берутся из класса
+    // и значения clamp'аются на change-handler. Toast предупреждает если
+    // юзер ввёл вне диапазона. Class='custom' снимает любые ограничения.
     const ashraeOpts = Object.entries(ASHRAE_CLASSES).map(([id, def]) =>
       `<option value="${id}"${climate.ashraeClass === id ? ' selected' : ''} title="${escAttr(def.label)}">${id}</option>`
     ).join('');
-    // Если выбран конкретный класс (не custom) — поля T/RH lock'ятся: их
-    // значения = диапазон класса. Override через выбор «custom» в dropdown.
     const _ashraeDef = ASHRAE_CLASSES[climate.ashraeClass] || ASHRAE_CLASSES.A1;
-    const _ashraeLocked = climate.ashraeClass !== 'custom';
-    const _lockTip = _ashraeLocked
-      ? `🔒 Значение определено классом ${escAttr(climate.ashraeClass)}: ${escAttr(_ashraeDef.label)}. Для свободного ввода — выберите «custom» в dropdown.`
-      : '';
-    const _lockAttr = (ro || _ashraeLocked) ? ' disabled' : '';
-    const _lockStyle = _ashraeLocked ? 'background:#f0f9ff;color:#075985;cursor:not-allowed' : '';
+    const _isCustom = climate.ashraeClass === 'custom';
+    // min/max для inputs. Для custom — широкие пределы; для класса — границы класса.
+    const _tMin = _isCustom ? -20 : (_ashraeDef.tMinC ?? -20);
+    const _tMax = _isCustom ?  50 : (_ashraeDef.tMaxC ??  50);
+    const _rhMin = _isCustom ? 0   : (_ashraeDef.rhMinPct ?? 0);
+    const _rhMax = _isCustom ? 100 : (_ashraeDef.rhMaxPct ?? 100);
+    const _classTip = _isCustom
+      ? 'Свободный ввод (без ограничений по ASHRAE-классу).'
+      : `Допустимый диапазон по классу ${escAttr(climate.ashraeClass)}: T ${_ashraeDef.tMinC}…${_ashraeDef.tMaxC} °C, RH ${_ashraeDef.rhMinPct}…${_ashraeDef.rhMaxPct}%. Значения вне диапазона будут clamp'нуты при сохранении.`;
     const fireOpts = [
       { v: '', l: '— не задано —' },
       { v: 'gas', l: '🔥 Газовое (FM-200/FK-5-1-12/Inergen)' },
@@ -1859,23 +1877,23 @@ function renderDetails(c, ro) {
 
           <h5 style="margin:14px 0 6px;font-size:12.5px;color:#075985">🌡 Климатические требования</h5>
           <p class="muted" style="font-size:11px;margin:0 0 8px">
-            💡 ASHRAE TC 9.9 «Thermal Guidelines for Data Processing Environments» (4-th ed., 2021) — стандартные классы оборудования по допустимому диапазону T/RH. <b>Выбор класса фиксирует диапазон</b> — поля T мин/макс, RH мин/макс заполняются по «allowable envelope» класса и блокируются. Для свободного ввода выберите «custom».
+            💡 ASHRAE TC 9.9 «Thermal Guidelines for Data Processing Environments» (4-th ed., 2021) — стандартные классы оборудования по допустимому диапазону T/RH. <b>Выбор класса ограничивает диапазон</b> — значения T мин/макс, RH мин/макс могут редактироваться, но не выходят за пределы «allowable envelope» класса. Для свободного ввода — «custom».
           </p>
           <div class="tw-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
-            <label title="ASHRAE TC 9.9 класс. Выбор класса автоматически устанавливает T/RH min/max и блокирует поля от ручного редактирования (по правилу «требования = диапазон класса, не больше, не меньше»). Для свободного ввода — «custom».">ASHRAE класс:
+            <label title="ASHRAE TC 9.9 класс. Выбор класса задаёт допустимый диапазон T/RH min/max — значения вне диапазона clamp'аются при сохранении. Для свободного ввода — «custom».">ASHRAE класс:
               <select data-field="climate.ashraeClass" ${ro ? 'disabled' : ''}>${ashraeOpts}</select>
             </label>
-            <label title="${_ashraeLocked ? _lockTip : 'Минимальная температура воздуха в зале, °C'}">T мин, °C:
-              <input type="number" data-field="climate.tMinC" min="-20" max="50" step="0.5" value="${Number(climate.tMinC) || 0}"${_lockAttr} style="${_lockStyle}">
+            <label title="Минимальная температура воздуха в зале, °C. ${escAttr(_classTip)}">T мин, °C:
+              <input type="number" data-field="climate.tMinC" min="${_tMin}" max="${_tMax}" step="0.5" value="${Number(climate.tMinC) || 0}" ${ro ? 'disabled' : ''}>
             </label>
-            <label title="${_ashraeLocked ? _lockTip : 'Максимальная температура воздуха в зале, °C'}">T макс, °C:
-              <input type="number" data-field="climate.tMaxC" min="-20" max="50" step="0.5" value="${Number(climate.tMaxC) || 0}"${_lockAttr} style="${_lockStyle}">
+            <label title="Максимальная температура воздуха в зале, °C. ${escAttr(_classTip)}">T макс, °C:
+              <input type="number" data-field="climate.tMaxC" min="${_tMin}" max="${_tMax}" step="0.5" value="${Number(climate.tMaxC) || 0}" ${ro ? 'disabled' : ''}>
             </label>
-            <label title="${_ashraeLocked ? _lockTip : 'Минимальная относительная влажность, %'}">RH мин, %:
-              <input type="number" data-field="climate.rhMinPct" min="0" max="100" step="1" value="${Number(climate.rhMinPct) || 0}"${_lockAttr} style="${_lockStyle}">
+            <label title="Минимальная относительная влажность, %. ${escAttr(_classTip)}">RH мин, %:
+              <input type="number" data-field="climate.rhMinPct" min="${_rhMin}" max="${_rhMax}" step="1" value="${Number(climate.rhMinPct) || 0}" ${ro ? 'disabled' : ''}>
             </label>
-            <label title="${_ashraeLocked ? _lockTip : 'Максимальная относительная влажность, %'}">RH макс, %:
-              <input type="number" data-field="climate.rhMaxPct" min="0" max="100" step="1" value="${Number(climate.rhMaxPct) || 0}"${_lockAttr} style="${_lockStyle}">
+            <label title="Максимальная относительная влажность, %. ${escAttr(_classTip)}">RH макс, %:
+              <input type="number" data-field="climate.rhMaxPct" min="${_rhMin}" max="${_rhMax}" step="1" value="${Number(climate.rhMaxPct) || 0}" ${ro ? 'disabled' : ''}>
             </label>
           </div>
 
@@ -2563,16 +2581,53 @@ function bindListEvents() {
       const arr = cur.concept[arrName];
       const obj = arr.find(x => x.id === id);
       if (!obj) return;
+      // v0.60.145 (по уточнению Пользователя 2026-05-04 «не нужно блокировать
+      // ввод, а только ограничить выход за пределы класса»): для T/RH полей
+      // в room.climate — clamp значение к диапазону класса перед сохранением.
+      // Если class='custom' — clamp не применяется (свободный ввод).
+      let _saveValue = (kind === 'ups' && field === 'loadFactor') ? value / 100 : value;
+      if (kind === 'room' && /^climate\.(tMinC|tMaxC|rhMinPct|rhMaxPct)$/.test(field)) {
+        const _curClass = obj.climate?.ashraeClass || 'A1';
+        const _def = ASHRAE_CLASSES[_curClass];
+        if (_def && _curClass !== 'custom') {
+          const _isT = field.startsWith('climate.t');
+          const _lo = _isT ? _def.tMinC : _def.rhMinPct;
+          const _hi = _isT ? _def.tMaxC : _def.rhMaxPct;
+          const _orig = Number(value);
+          if (Number.isFinite(_orig) && Number.isFinite(_lo) && Number.isFinite(_hi)) {
+            const _clamped = Math.max(_lo, Math.min(_hi, _orig));
+            if (_clamped !== _orig) {
+              _saveValue = _clamped;
+              try {
+                twToast(`Значение ${_orig} вне диапазона класса ${_curClass} (${_lo}…${_hi}) — установлено ${_clamped}.`, 'warn');
+              } catch {}
+              // Reflect clamp visually на input.
+              try { target.value = String(_clamped); } catch {}
+            }
+          }
+        }
+      }
       // Поддержка nested путей вроде "pdu.kind"
-      _setNested(obj, field, kind === 'ups' && field === 'loadFactor' ? value / 100 : value);
-      // v0.60.143: смена ASHRAE-класса в room → автоматически применить
-      // диапазон класса к T/RH min/max. По репорту Пользователя 2026-05-04:
-      // «требования должны ограничиваться выбранным классом, не больше,
-      // не меньше». При выборе 'custom' — оставляем существующие значения,
-      // Пользователь редактирует их свободно.
+      _setNested(obj, field, _saveValue);
+      // v0.60.143: смена ASHRAE-класса в room → авто-применить диапазон
+      // класса к T/RH min/max ТОЛЬКО если existing values вне нового
+      // диапазона. По уточнению v0.60.145 — Пользователь хочет сохранять
+      // свои значения внутри диапазона, не пересбрасывать на envelope.
       if (kind === 'room' && field === 'climate.ashraeClass') {
         if (!obj.climate) obj.climate = {};
-        applyAshraeClassToClimate(obj.climate, value);
+        const _newDef = ASHRAE_CLASSES[value];
+        if (_newDef && value !== 'custom') {
+          // Clamp existing values в новый диапазон (не сброс на bounds!).
+          const _clampField = (f, lo, hi) => {
+            const v = Number(obj.climate[f]);
+            if (!Number.isFinite(v)) { obj.climate[f] = lo; return; }
+            obj.climate[f] = Math.max(lo, Math.min(hi, v));
+          };
+          _clampField('tMinC',     _newDef.tMinC,     _newDef.tMaxC);
+          _clampField('tMaxC',     _newDef.tMinC,     _newDef.tMaxC);
+          _clampField('rhMinPct',  _newDef.rhMinPct,  _newDef.rhMaxPct);
+          _clampField('rhMaxPct',  _newDef.rhMinPct,  _newDef.rhMaxPct);
+        }
       }
       // v0.60.113: при смене scope климата (room ↔ shared) мигрируем
       // roomId ↔ roomIds[]. Иначе UI показывает picker без значения.

@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.145', date: '2026-05-04', items: [
+      '🌡 <b>ASHRAE class: clamp вместо lock</b>. По уточнению Пользователя 2026-05-04 «мне не нужно блокировать ввод, а только ограничить выход за пределы класса».',
+      '• Поля T мин/макс, RH мин/макс <b>остаются редактируемыми</b> (убран disabled).',
+      '• <code>input.min</code> / <code>input.max</code> атрибуты берутся из ASHRAE_CLASSES — браузер показывает spinner-границы.',
+      '• На <code>change</code>-handler — clamp значения к [class.min, class.max]. Если Пользователь ввёл вне диапазона — toast «Значение X вне диапазона класса A4 (5…45) — установлено 45», input.value reflect к clamp\'нутому.',
+      '• <b>При смене ASHRAE-класса</b> — clamp existing values в новый диапазон (НЕ сброс на bounds). Сохраняем то что было, если внутри нового диапазона.',
+      '• <b>Migration</b> в normalize-rooms также через clamp — не пересбрасывает значения на envelope, только обрезает выход за границы.',
+      '• Class=\'custom\' снимает все ограничения: input.min=-20/0, max=50/100, без clamp.',
+      '🎨 <b>service: эргономика sv-order-row</b>. Применён паттерн TW v0.60.143: flex-layout с min-width:0, line-clamp:2 для длинных имён нарядов, chip flex-shrink:0.',
+      '📝 <b>Memory rule</b> <code>feedback_sidebar_item_ergonomics.md</code> — паттерн для всех будущих item-row\'ов в sidebar\'ах. Чек-лист добавления нового модуля.',
+      'Файлы: <code>tech-workspace/tech-workspace.js</code> (clamp в change-handler + render с class-bounded min/max + migration через clamp), <code>service/service.css</code> (sv-order-row flex rewrite), <code>memory/feedback_sidebar_item_ergonomics.md</code> (новый), <code>memory/MEMORY.md</code> (+ссылка на правило).',
+    ] },
     { version: '0.60.143', date: '2026-05-04', items: [
       '🎨 <b>TW: эргономика sidebar (rail) — flex layout, без overflow</b>. По репорту Пользователя 2026-05-04 «строки залазят внутрь рамки. Перепиши эргономику модуля».',
       '• Раньше: <code>display:grid</code> с двумя колонками + ellipsis на name → длинные шифры (25006-GEP-GEN-ELC-901_TBC Bank) обрезались до бессмыслицы, chip упирался в name.',
