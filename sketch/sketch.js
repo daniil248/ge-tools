@@ -178,14 +178,20 @@ function renderPalette() {
       try {
         svgFrag = (typeof renderFn === 'function') ? renderFn(w, h) : (renderFn || '');
       } catch { svgFrag = `<rect width="${w}" height="${h}"/>`; }
-      // viewBox для масштабирования в tile (60×60 примерно).
+      // v0.60.152 (по репорту Пользователя 2026-05-04 «мог бы ты просто
+      // забрать отображение из drawio а то у тебя как то не очень вид»):
+      // wrap-<g> получает inline style fill:#fff + stroke:#1f2937 +
+      // stroke-width:1.4 (drawio-like тонкая линия). Custom-fill внутри
+      // фигур (например, fill="#fef3c7" у firewall) переопределяет
+      // автоматически. Раньше тайлы рендерились чёрной заливкой т.к.
+      // CSS-style на .sk-shape не применялся к .sk-tile-content.
       return `<div class="sk-shape-tile"
                    draggable="true"
                    data-lib-id="${escAttr(lib.id)}"
                    data-shape-id="${escAttr(s.id)}"
                    title="${escAttr(s.label)} — перетащите на холст">
-        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet" pointer-events="none">
-          <g class="sk-tile-content" style="--fill:#fff;--stroke:#1f2937">${svgFrag}</g>
+        <svg viewBox="-2 -2 ${w+4} ${h+4}" preserveAspectRatio="xMidYMid meet" pointer-events="none">
+          <g style="fill:#ffffff;stroke:#1f2937;stroke-width:1.4;stroke-linejoin:round" vector-effect="non-scaling-stroke">${svgFrag}</g>
         </svg>
         <span class="sk-shape-tile-label">${escHtml(s.label)}</span>
       </div>`;
@@ -276,10 +282,13 @@ function renderShape(sh) {
   const labelEl = labelText
     ? `<text x="${w/2}" y="${h/2 + fontSize/3}" text-anchor="middle" font-size="${fontSize}" pointer-events="none">${escHtml(labelText)}</text>`
     : '';
+  // v0.60.152: drawio-like — тонкий stroke 1.4, fill/stroke применяются
+  // через inline style на wrap-<g>; custom-fill внутри svgFrag
+  // (firewall, note, server-status-bars) переопределяет автоматически.
   return `<g class="sk-shape ${isSel ? 'selected' : ''}" data-shape-id="${escAttr(sh.id)}"
               transform="translate(${sh.x},${sh.y})"
               style="--fill:${fill};--stroke:${stroke}">
-    <g style="fill:${fill};stroke:${stroke}">${svgFrag}</g>
+    <g style="fill:${fill};stroke:${stroke};stroke-width:1.4;stroke-linejoin:round" vector-effect="non-scaling-stroke">${svgFrag}</g>
     ${labelEl}
     ${anchors}
     ${handles}

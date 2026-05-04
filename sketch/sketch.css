@@ -195,14 +195,22 @@
 .sk-svg.tool-text { cursor: text; }
 .sk-svg.panning { cursor: grabbing; }
 
-/* Узлы (фигуры) */
+/* Узлы (фигуры). v0.60.152 (по репорту Пользователя 2026-05-04 «забрать
+   отображение из drawio»): drawio-style — тонкие stroke 1.4, белая
+   заливка по дефолту, чёткие углы. Inline style на wrap-<g> — главный
+   источник правды; CSS-fallback на случай если inline не применился. */
 .sk-shape {
   cursor: move;
 }
-.sk-shape rect, .sk-shape ellipse, .sk-shape polygon, .sk-shape path {
+/* CSS-fallback — применяется если inline style на wrap-<g> отсутствует */
+.sk-shape > g:not([style]) rect,
+.sk-shape > g:not([style]) ellipse,
+.sk-shape > g:not([style]) polygon,
+.sk-shape > g:not([style]) path,
+.sk-shape > g:not([style]) circle:not(.sk-anchor) {
   fill: #fff;
   stroke: #1f2937;
-  stroke-width: 1.6;
+  stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
 }
 .sk-shape text {
@@ -210,12 +218,26 @@
   font: 12px system-ui, sans-serif;
   pointer-events: none;
 }
-.sk-shape.selected rect,
-.sk-shape.selected ellipse,
-.sk-shape.selected polygon,
-.sk-shape.selected path {
+.sk-shape.selected > g[style]:first-of-type {
+  /* Подсветка выделения — через outline-stroke-color на :first-of-type
+     (это wrap-<g> с фигурой, не label/anchors/handles). */
+  filter: drop-shadow(0 0 0 #1e40af);
+}
+.sk-shape.selected > g:not([style]) rect,
+.sk-shape.selected > g:not([style]) ellipse,
+.sk-shape.selected > g:not([style]) polygon,
+.sk-shape.selected > g:not([style]) path,
+.sk-shape.selected > g:not([style]) circle:not(.sk-anchor) {
   stroke: #1e40af;
-  stroke-width: 2.5;
+  stroke-width: 2.2;
+}
+/* Drawio-like палитра tile — белый фон, без сильного box-shadow */
+.sk-shape-tile svg g rect,
+.sk-shape-tile svg g ellipse,
+.sk-shape-tile svg g polygon,
+.sk-shape-tile svg g path,
+.sk-shape-tile svg g circle {
+  vector-effect: non-scaling-stroke;
 }
 /* Якоря для соединений (4 точки) — видны при hover на фигуру */
 .sk-anchor {

@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.152', date: '2026-05-04', items: [
+      '🎨 <b>sketch: drawio-style тонкие линии + правильное отображение тайлов</b>. По репорту Пользователя 2026-05-04 «мог бы ты просто забрать отображение из drawio а то у тебя как то не очень вид».',
+      '• <b>Проблема</b>: тайлы палитры рендерились ЧЁРНОЙ заливкой (не белой). Причина: wrap-<g> в SVG-тайле имел <code>--fill</code> CSS-переменную, но элементы внутри (rect/ellipse/path) не ссылались на неё — нужен был inline <code>fill</code>+<code>stroke</code>.',
+      '• <b>Fix</b>: wrap-<g> в тайлах и на холсте теперь имеет inline <code>style="fill:#fff;stroke:#1f2937;stroke-width:1.4;stroke-linejoin:round"</code> (drawio-like). Custom-fill внутри фигур (firewall #fef3c7, note #fef9c3, server status-bars #94a3b8) переопределяет автоматически.',
+      '• <b>Stroke-width</b> уменьшена с 1.6 до 1.4 — drawio-like clean look.',
+      '• <b>vector-effect="non-scaling-stroke"</b> — линии остаются тонкими при zoom.',
+      '• <b>viewBox</b> в тайлах расширен до <code>-2 -2 w+4 h+4</code> — добавляет padding, чтобы stroke не обрезался по краям.',
+      '• <b>CSS</b>: добавлены fallback-rules через <code>:not([style])</code> чтобы legacy-фигуры (без inline-style) тоже получали правильный fill/stroke.',
+      'Файлы: <code>sketch/sketch.js</code> (renderShape + renderPalette inline-style fix), <code>sketch/sketch.css</code> (drawio-style тонкие линии + fallback rules + selected state через :first-of-type).',
+    ] },
     { version: '0.60.151', date: '2026-05-04', items: [
       '🎨 <b>Новый модуль: «Скетч / Whiteboard» (drawio-like)</b>. По репорту Пользователя 2026-05-04 «Добавь модуль полностью копирующий функционал drawio, включая библиотеки фигур, для составления предварительных набросков по проекту» + «готовые библиотеки должны копироваться и создаваться пользовательские библиотеки с импортом и экспортом».',
       '• <b>sketch/index.html</b> — 3-панельный layout: левая палитра (библиотеки), центр (SVG-холст), правая панель свойств.',
