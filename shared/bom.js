@@ -370,12 +370,41 @@ export function collectBomFromProject(state, opts = null) {
   if (!state || !state.nodes) return { flat: [], aggregated: [], totals: null };
   const flat = [];
   const nodes = (state.nodes instanceof Map) ? [...state.nodes.values()] : Object.values(state.nodes);
+  // v0.60.195 (по репорту Пользователя 2026-05-04 «панели которые входят
+  // в состав многосекционных панелей или интегрированных ИБП не должны
+  // отображаться отдельно. Они указываются в составе оборудования»):
+  // строим Set всех integrated child id'ов (PDM-AC/IT/Bypass) — они НЕ
+  // попадают в BOM как отдельные строки, родительский ИБП их учитывает
+  // в bomForNode (composition или synthetic-ref).
+  const _integratedChildIds = new Set();
+  for (const node of nodes) {
+    if (node && node.type === 'ups' && Array.isArray(node.integratedChildIds)) {
+      for (const cid of node.integratedChildIds) _integratedChildIds.add(cid);
+    }
+  }
   for (const node of nodes) {
     // Узлы не-оборудование — пропускаем (зоны, каналы — это не BOM)
     if (node.type === 'zone') continue;
     // Фаза 1.19.9: городская сеть — абстрактный ввод от поставщика
     // энергии, в спецификацию оборудования не попадает.
     if (node.type === 'source' && (node.sourceSubtype === 'utility' || node.sourceSubtype === 'grid')) continue;
+    // v0.60.195 (по репорту Пользователя 2026-05-04 «контейнеры группы
+    // потребителей не должны попадать в отчет, только сами потребители.
+    // у нас 8+2=10 стоек, они указаны, а группа не должна быть указана
+    // в BOM»): consumer-container — это организационная обёртка (модель/
+    // тег), физически закупаются ИНДИВИДУАЛЬНЫЕ потребители, которые
+    // уже учтены через свои собственные bomForNode вызовы.
+    if (node.type === 'consumer-container') continue;
+    // v0.60.195: секция многосекционного щита (panel.parentSectionedId
+    // указывает на parent-щит) НЕ выводится в BOM отдельно — она часть
+    // composition родительского многосекционного щита.
+    if (node.type === 'panel' && node.parentSectionedId &&
+        state.nodes && (state.nodes instanceof Map ? state.nodes.get(node.parentSectionedId) : state.nodes[node.parentSectionedId])) {
+      continue;
+    }
+    // v0.60.195: panel-член integrated UPS (PDM-AC/IT/Bypass) — учтён в
+    // composition parent-ИБП. Не выводим отдельной строкой.
+    if (node.type === 'panel' && _integratedChildIds.has(node.id)) continue;
     const items = bomForNode(node);
     flat.push(...items);
   }

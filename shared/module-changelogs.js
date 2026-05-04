@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.195', date: '2026-05-04', items: [
+      '📋 <b>BOM: исключены контейнеры/секции, фиксированный порядок групп, батареи после ИБП</b>. Несколько репортов Пользователя 2026-05-04.',
+      '• «контейнеры группы потребителей не должны попадать в отчет, только сами потребители»: <code>consumer-container</code> исключён из BOM. Физически закупаются индивидуальные потребители (8+2 стойки уже учтены).',
+      '• «панели входящие в многосекционные или интегрированные ИБП не должны отображаться отдельно»: исключены panel-узлы с <code>parentSectionedId</code> (секции multi-section панели) и panel-узлы из <code>integratedChildIds</code> любого UPS (PDM-AC/IT/Bypass MR33). Они учтены в composition родительского оборудования.',
+      '• «Батареи должны быть указаны сразу за ИБП к которым они подключены»: фиксированный порядок групп в BOM-выводе: source → transformer → ups → battery → generator → panel → mv → breaker → enclosure → climate → consumer → cable → other. Батареи теперь сразу после ИБП.',
+      'Файлы: <code>shared/bom.js</code> (фильтры в collectBomFromProject), <code>js/engine/report-sections.js</code> (KIND_ORDER в sectionBom).',
+    ] },
     { version: '0.60.194', date: '2026-05-04', items: [
       '✅ <b>Члены группы больше не считаются «не подключёнными»</b> в отчёте «Проверки и предупреждения». По репорту Пользователя 2026-05-04 «в отчете моя группа потребителей считается неподключенной, исправляй». 8 потребителей SR01-SR08 внутри группы помечались как «не подключён», хотя группа физически запитана.',
       '• <b>Корень bug</b>: проверка <code>state.conns.values().some(c =&gt; c.to.nodeId === n.id)</code> искала connection напрямую к consumer\'у. Но дочерние члены container\'а — это linked-slots внутри n.slots, connections идут к container.id, не к consumer.id.',

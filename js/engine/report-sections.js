@@ -1602,7 +1602,33 @@ function sectionBom() {
     ? ['Группа', 'Наименование', 'Кол-во', 'Цена за ед.', 'Итого']
     : ['Группа', 'Наименование', 'Кол-во'];
   const rows = [];
-  for (const [kind, items] of Object.entries(groups)) {
+  // v0.60.195 (по репорту Пользователя 2026-05-04 «Батареи должны быть
+  // указаны сразу за ИБП к которым они подключены»):
+  // фиксированный порядок групп: источники → трансформаторы → ИБП →
+  // батареи → генераторы → НКУ/MV → автоматы → корпуса/климат →
+  // потребители → кабели/трассы → прочее.
+  const KIND_ORDER = [
+    'source', 'transformer',
+    'ups', 'battery',
+    'generator',
+    'panel', 'mv-switchgear', 'mv-cell',
+    'breaker',
+    'enclosure', 'climate',
+    'consumer-type', 'consumer',
+    'cable-type', 'cable-sku', 'channel',
+    'custom', 'other',
+  ];
+  const _seenKinds = new Set();
+  const _orderedKinds = [];
+  for (const k of KIND_ORDER) {
+    if (groups[k]) { _orderedKinds.push(k); _seenKinds.add(k); }
+  }
+  // Незнакомые kinds — в конец
+  for (const k of Object.keys(groups)) {
+    if (!_seenKinds.has(k)) _orderedKinds.push(k);
+  }
+  for (const kind of _orderedKinds) {
+    const items = groups[kind];
     // Заголовок группы
     if (showPriceCols) rows.push([KIND_LABELS[kind] || kind, '', '', '', '']);
     else rows.push([KIND_LABELS[kind] || kind, '', '']);
