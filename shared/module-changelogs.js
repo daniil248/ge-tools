@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.204', date: '2026-05-04', items: [
+      '📥 <b>Зеркало drawio electrical stencils в репозитории</b>. По репорту Пользователя 2026-05-04 «https://github.com/jgraph/drawio/tree/dev/src/main/webapp/stencils/electrical можешь элементы схемы забрать отсюда. в таком же виде положи в наш репозиторий».',
+      '• <b>Скачаны 24 файла</b> в <code>schematic/drawio-stencils/</code> (~570 KB сжатого XML, сотни условных обозначений): abstract, capacitors, diodes, electro-mechanical, iec417, iec_logic_gates, inductors, instruments, logic_gates, miscellaneous, mosfets1/2, op_amps, opto_electronics, plc_ladder, power_semiconductors, radio, resistors, rot_mech, signal_sources, thermionic_devices, transistors, transmission, waveforms.',
+      '• <b>Формат</b>: исходный drawio mxStencil XML без модификаций. Apache 2.0 license сохраняется (как у jgraph/drawio).',
+      '• <b>README</b> с описанием категорий, лицензии, скрипта обновления и плана интеграции в schematic palette.',
+      '• <b>TODO</b> (Phase 3 след. сессии): парсер mxStencil → SVG draw functions + UI вкладка «drawio» в палитре символов schematic-модуля.',
+      'Файлы: <code>schematic/drawio-stencils/*.xml</code> (24) + README.md.',
+    ] },
     { version: '0.60.203', date: '2026-05-04', items: [
       '🎴 <b>Карточки щитов: 4 строки, Запас в Свободно, без дубля Номинала</b>. По репорту Пользователя 2026-05-04 «давай для щитов примем шаблон как для потребителей, 4 строки, нижнюю Запас укажем в строке Свободно. Номинал тоже для чего дважды выводить In 100 A и Номинал: 100 A».',
       '• <b>Subtitle убран</b>: «In 100 A» в подзаголовке panel дублировал «Номинал: 100 A» в body. Subtitle теперь пустой для panel.',
