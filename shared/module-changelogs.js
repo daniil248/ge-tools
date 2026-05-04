@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.117', date: '2026-05-04', items: [
+      '🪄 <b>Phase 42.5: Cross-module pre-fill для wizard\'ов</b>. Мастер составления нарядов теперь подтягивает параметры из проектных данных автоматически — оператор видит сразу заполненные поля и может только подтвердить или скорректировать.',
+      '• <b>Мастер «❄ ТО чиллера»</b> читает <code>cooling.selections.v1</code> активного проекта → подставляет:',
+      '  • <code>capKw</code> = ratedCapKw первого чиллерного equipment в active-опции (или первой опции).',
+      '  • <code>refrigerant</code> из spec\'а (R410A / R32 / R134a / R407C / R290 / R513A / R1234ze).',
+      '• <b>Мастер «🔋 ТО ИБП»</b> читает <code>ups-config.selected.v1</code> → подставляет:',
+      '  • <code>kva</code> = capacityKw / cos φ (округлено).',
+      '  • Source-инфо: «ups-config «Supplier Model»».',
+      '• <b>UI</b>: подтянутые поля подсвечены синим бейджем «📁 авто» рядом с label + светло-голубой фон input. Сверху над всеми полями — info-баннер: «📁 Параметры (отмечены 📁 авто) подтянуты из «cooling-подбор XXX → опция YYY». Можно скорректировать вручную перед «Далее».»',
+      '• <b>Backward-compat</b>: если данных в проекте нет — wizard работает как раньше с дефолтами из сценария. Standalone-режим (без active project) — тоже поддерживается через standalone-key для cooling.',
+      '• Phase 42 ROADMAP: 42.5 отмечен ✅. TODO в будущем: ТО ДГУ ← tech-workspace concept feed.dgu, batteryCount/stringCount/batteryTech ← extended ups-config bridge.',
+      'Файлы: <code>service/ui/order-wizard.js</code> (~50 строк: <code>_collectPrefillFromProject(wizard)</code> helper + integration в collectParams + UI badges).',
+    ] },
     { version: '0.60.116', date: '2026-05-04', items: [
       '👥 <b>Phase 41.2: Promotion шаблонов работ в org-catalog</b>. По roadmap: общие шаблоны работ команды (видны всем членам организации). Закрывает первый shared-catalog из Phase 41.2.',
       '• <b>Три scope</b>: 📦 seed (встроенные read-only) / ✏ user (личные, видны только вам) / 👥 org (общие команды).',

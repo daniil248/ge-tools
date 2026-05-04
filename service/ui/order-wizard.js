@@ -103,28 +103,91 @@ function pickScenario(wizards, orderType) {
 }
 
 // ─── Этап 2: Параметры
+//
+// v0.60.117 (Phase 42.5): cross-module pre-fill. Если в проекте уже есть
+// данные cooling-подбора / ups-config / ДГУ — wizard подтягивает значения
+// в параметры по умолчанию. По roadmap Phase 42.5: «Если активен проект
+// с cooling-подбором — мастер ТО чиллера предлагает мощность из подбора».
+//
+// Источники по wizard.id:
+//   wz-seed-chiller-to     ← cooling.selections (capKw, refrigerant)
+//   wz-seed-ups-to         ← ups-config.selected (kva, batteryCount, batteryTech)
+//   wz-seed-ventilation-to ← пока нет источника (вентиляция не моделируется)
+//                            в системе — TODO когда появится).
+function _collectPrefillFromProject(wizard) {
+  const pid = (() => { try { return getActiveProjectId(); } catch { return null; } })();
+  const out = {};
+  try {
+    if (wizard.id === 'wz-seed-chiller-to') {
+      // cooling.selections.v1 — массив подборов; ищем первый чиллерный
+      // option в активном (или первом) подборе.
+      const key = pid ? `raschet.project.${pid}.cooling.selections.v1` : 'raschet.cooling.standalone.cooling.selections.v1';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      if (Array.isArray(arr) && arr.length) {
+        const sel = arr.find(s => s.activeOptionId) || arr[0];
+        const opt = sel?.options?.find(o => o.id === sel?.activeOptionId) || sel?.options?.[0];
+        const eq = (opt?.equipment || []).find(e => /chiller/i.test(e.spec?.systemType || e.role || '')) || opt?.equipment?.[0];
+        if (eq?.spec?.ratedCapKw > 0) out.capKw = Math.round(eq.spec.ratedCapKw);
+        if (eq?.spec?.refrigerant) out.refrigerant = eq.spec.refrigerant;
+        out._source = `cooling-подбор «${sel.name || 'без имени'}» → опция «${opt?.name || ''}»`;
+      }
+    } else if (wizard.id === 'wz-seed-ups-to') {
+      // ups-config.selected.v1 — single object с capacityKw (не kVA напрямую).
+      // Wizard.kva = kVA → конвертируем kW / cos φ.
+      const key = pid ? `raschet.project.${pid}.ups-config.selected.v1` : null;
+      if (key) {
+        const sel = JSON.parse(localStorage.getItem(key) || 'null');
+        if (sel) {
+          if (sel.capacityKw > 0) {
+            const cos = Number(sel.cosPhi) || 0.9;
+            out.kva = Math.round(sel.capacityKw / cos);
+          }
+          // batteryCount/stringCount не сохраняются в текущем bridge —
+          // оставляем для будущего расширения. autonomyMin не нужен в ТО.
+          out._source = `ups-config «${sel.supplier || ''} ${sel.model || ''}»`.trim();
+        }
+      }
+    }
+  } catch (e) { console.warn('[wizard] prefill failed:', e); }
+  return out;
+}
+
 function collectParams(wizard) {
   return new Promise(resolve => {
+    // v0.60.117: pre-fill из проекта.
+    const prefill = _collectPrefillFromProject(wizard);
+    const prefilledKeys = new Set(Object.keys(prefill).filter(k => !k.startsWith('_')));
+
     const overlay = document.createElement('div');
     overlay.className = 'mt-modal-overlay';
     const rows = wizard.params.map(p => {
+      // v0.60.117: подтягиваем prefill-значение если оно есть.
+      const prefillVal = prefill[p.id];
+      const effectiveDefault = (prefillVal !== undefined && prefillVal !== null && prefillVal !== '') ? prefillVal : (p.default ?? '');
+      const isPrefilled = prefilledKeys.has(p.id) && prefillVal !== undefined;
       let input;
       if (p.type === 'choice') {
-        const opts = p.options.map(o => `<option value="${escAttr(o.v)}"${o.v === (p.default || '') ? ' selected' : ''}>${escHtml(o.l)}</option>`).join('');
-        input = `<select data-pid="${escAttr(p.id)}" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px">${opts}</select>`;
+        const opts = p.options.map(o => `<option value="${escAttr(o.v)}"${o.v === effectiveDefault ? ' selected' : ''}>${escHtml(o.l)}</option>`).join('');
+        input = `<select data-pid="${escAttr(p.id)}" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px${isPrefilled ? ';background:#dbeafe' : ''}">${opts}</select>`;
       } else {
-        const v = p.default ?? '';
-        input = `<input type="number" data-pid="${escAttr(p.id)}" value="${v}" min="${p.min ?? ''}" max="${p.max ?? ''}" step="${p.step || 1}"${p.required ? ' required' : ''} style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px">`;
+        input = `<input type="number" data-pid="${escAttr(p.id)}" value="${effectiveDefault}" min="${p.min ?? ''}" max="${p.max ?? ''}" step="${p.step || 1}"${p.required ? ' required' : ''} style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px${isPrefilled ? ';background:#dbeafe' : ''}">`;
       }
+      const prefillBadge = isPrefilled
+        ? `<span style="display:inline-block;font-size:10.5px;background:#1d4ed8;color:#fff;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:600" title="Подтянуто из проекта (${escAttr(prefill._source || '')})">📁 авто</span>`
+        : '';
       return `<label style="display:block;margin:6px 0" title="${escAttr(p.tip || '')}">
-        <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">${escHtml(p.label)}${p.required ? ' <span style="color:#dc2626">*</span>' : ''}</span>
+        <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">${escHtml(p.label)}${p.required ? ' <span style="color:#dc2626">*</span>' : ''}${prefillBadge}</span>
         ${input}
       </label>`;
     }).join('');
+    const sourceHint = prefill._source
+      ? `<p class="muted" style="font-size:11px;margin:4px 0 10px;padding:6px 10px;background:#dbeafe;border-left:3px solid #1d4ed8;border-radius:3px">📁 Параметры (отмечены 📁 авто) подтянуты из <b>${escHtml(prefill._source)}</b>. Можно скорректировать вручную перед «Далее».</p>`
+      : '';
     overlay.innerHTML = `<div class="mt-modal" role="dialog" style="max-width:520px">
       <div class="mt-modal-head"><h3>${wizard.icon} ${escHtml(wizard.title)} — параметры</h3></div>
       <div class="mt-modal-body">
         <p class="muted" style="font-size:12px;margin:0 0 10px">${escHtml(wizard.description)}</p>
+        ${sourceHint}
         ${rows}
       </div>
       <div class="mt-modal-actions">
