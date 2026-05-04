@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.214', date: '2026-05-04', items: [
+      '📁 <b>Каталоги: подпапка-per-type, файл-per-vendor</b>. По репорту Пользователя 2026-05-04 «давай не будем сваливать в одну папку, а для каждого типа оборудования или элемента сделаем отдельную подпапку, а в внутри уже по производителям будут файлы».',
+      '• <code>shared/catalogs/dgu/</code> — caterpillar.js, cummins.js, volvo-penta.js, fg-wilson.js, mtu.js, aksa.js, <b>aj-power.js</b> + index.js (агрегатор, экспортирует <code>DGU_DATASHEETS</code>, <code>listDgus</code>, <code>listDguVendors</code>, <code>suggestDgu</code>).',
+      '• <code>shared/catalogs/ups/</code> — dkc.js, eaton.js, kehua-mr33.js, kehua-s3-aio.js, legrand.js, schneider.js (rename из <code>ups-*.js</code>).',
+      '• <code>shared/catalogs/battery/</code> — kehua-s3.js (rename из <code>battery-kehua-s3.js</code>).',
+      '🏭 <b>AJ Power добавлен в каталог ДГУ</b>: 7 моделей включая запрошенную <b>DA3-AJ165-P1</b>. Серия DA<phase>-AJ<kVA>-P<package> (P1=open, P2=canopy, P3=container). Двигатели Volvo Penta / Perkins.',
+      '• <b>Все imports обновлены</b>: <code>battery/battery-calc.js</code>, <code>shared/battery-seed.js</code>, <code>shared/ups-seed.js</code>, <code>ups-config/ups-config.js</code>, <code>dgu-config/datasheets/index.js</code>.',
+      '• <b>TODO след. итерация</b>: аналогично разбить <code>breakers.js</code>, <code>pdus.js</code>, <code>rack-accessories.js</code>, <code>racks.js</code>, <code>drups.js</code> в подпапки-by-vendor (если есть несколько производителей).',
+      'Файлы: 7 новых dgu/, 6 mv ups/, 1 mv battery/, удалён <code>shared/catalogs/dgu.js</code>.',
+    ] },
     { version: '0.60.213', date: '2026-05-04', items: [
       '🏭 <b>AKSA в каталог ДГУ</b> + altitude уже передаётся из location. По репорту Пользователя 2026-05-04 «добавь в каталог ДГУ AKSA. или конфигуратор знает место проекта и сам забирает высоту установки и наихудшие параметры влияющие на дирейтинг из модуля метео».',
       '• <b>AKSA добавлены 7 моделей</b> (33–1250 kVA): APD33C/Cummins, APD110A/Doosan, APD220A/Doosan, APD330C/Cummins, APD500P/Perkins, APD825BD/Baudouin, APD1250M/MTU. Параметры по datasheet AKSA.',

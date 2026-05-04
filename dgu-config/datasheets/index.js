@@ -14,4 +14,4 @@ export {
   listDgus,
   listDguVendors,
   suggestDgu,
-} from '../../shared/catalogs/dgu.js';
+} from '../../shared/catalogs/dgu/index.js';

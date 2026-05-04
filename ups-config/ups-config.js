@@ -9,8 +9,8 @@
 import { listUpses, addUps, removeUps, clearCatalog, makeUpsId } from '../shared/ups-catalog.js';
 import { parseUpsXlsx, downloadCatalogTemplate } from '../shared/catalog-xlsx-parser.js';
 import { mountUpsPicker, extractUpsSeries } from '../shared/ups-picker.js';
-import { KEHUA_MR33_UPSES } from '../shared/catalogs/ups-kehua-mr33.js';
-import { KEHUA_S3_AIO_UPSES } from '../shared/catalogs/ups-kehua-s3-aio.js';
+import { KEHUA_MR33_UPSES } from '../shared/catalogs/ups/kehua-mr33.js';
+import { KEHUA_S3_AIO_UPSES } from '../shared/catalogs/ups/kehua-s3-aio.js';
 // v0.59.446: единый источник правды seed-данных ИБП (все 6 каталогов).
 import '../shared/ups-seed.js';
 // v0.59.385: типы ИБП — плагин-архитектура. Чтобы добавить новый тип

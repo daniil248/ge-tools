@@ -15,7 +15,7 @@ import * as B      from '../shared/report/blocks.js';
 // Последнее состояние расчёта АКБ для экспорта отчёта
 let lastBatteryCalc = null;
 import { mountBatteryPicker, extractBatterySeries } from '../shared/battery-picker.js';
-import { KEHUA_S3_BATTERIES } from '../shared/catalogs/battery-kehua-s3.js';
+import { KEHUA_S3_BATTERIES } from '../shared/catalogs/battery/kehua-s3.js';
 import { listUpses, getUps } from '../shared/ups-catalog.js';
 import { isUpsVdcVerified } from '../shared/ups-verified.js';
 // v0.59.446: единый источник правды seed-данных ИБП (Kehua MR33/S3 AIO,

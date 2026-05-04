@@ -18,12 +18,12 @@
 // ======================================================================
 
 import { listUpses, addUps } from './ups-catalog.js';
-import { KEHUA_MR33_UPSES } from './catalogs/ups-kehua-mr33.js';
-import { KEHUA_S3_AIO_UPSES } from './catalogs/ups-kehua-s3-aio.js';
-import { SCHNEIDER_UPSES } from './catalogs/ups-schneider.js';
-import { EATON_UPSES } from './catalogs/ups-eaton.js';
-import { LEGRAND_UPSES } from './catalogs/ups-legrand.js';
-import { DKC_UPSES } from './catalogs/ups-dkc.js';
+import { KEHUA_MR33_UPSES } from './catalogs/ups/kehua-mr33.js';
+import { KEHUA_S3_AIO_UPSES } from './catalogs/ups/kehua-s3-aio.js';
+import { SCHNEIDER_UPSES } from './catalogs/ups/schneider.js';
+import { EATON_UPSES } from './catalogs/ups/eaton.js';
+import { LEGRAND_UPSES } from './catalogs/ups/legrand.js';
+import { DKC_UPSES } from './catalogs/ups/dkc.js';
 
 const KEY = 'raschet.upsCatalog.kehua.seedVersion';
 const CURRENT_VERSION = '20'; // v0.59.498: DKC Small Tower 1/3 + SMALL+ 6/10 + Modulys GP 25/100 — verified V_DC через pdftotext PDFs (OEM источники: DAKER DK, Socomec)
