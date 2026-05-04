@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.142', date: '2026-05-04', items: [
+      '📋 <b>«Действующие нормативы по стране» — info-widget в свойствах проекта</b>. Visible reference какие стандарты будут применены в расчётных модулях по location.country.',
+      '• <b>projects/project.js</b> — под секцией «Местоположение объекта» новый блок с badge\'ами:',
+      '  • Бейдж per-domain: 🔥 АГПТ / 🔌 Кабель / 🌐 СКС / ❄ Климат / ⚡ НКУ / ⚡ РУ СН / 🔋 АКБ / ⚡ ДГУ.',
+      '  • На каждом — название норматива по country (СП РК 2022 / СП 485 / NFPA / ISO / IEC / ПУЭ / TIA-942 / ASHRAE TC 9.9 / EN 12831 / UL 891 / IEEE C37 / EPA Tier 4 etc).',
+      '  • Tooltip объясняет: «Какие нормативные документы будут применены... Override на уровне модуля разрешён.»',
+      '• <b>NORM_LABELS</b> — словарь human-readable названий для norm-id из <code>auto-norm.js::NORM_MATRIX</code>.',
+      '• <b>Авто-обновление</b>: при смене country проекта badges перерисовываются (renderProjectProperties).',
+      '• <b>Цель</b>: чек-лист для аудита («какие стандарты применены в этом проекте») + объяснение Пользователю «почему именно этот документ выбран» в каждом модуле.',
+      'Файлы: <code>projects/project.js</code> (+import NORM_MATRIX/detectCountryCode/countryLabel из auto-norm.js; +NORM_DOMAIN_LABELS+NORM_LABELS словари; +_renderNormBadgesForCountry helper ~30 строк; вставка в renderProjectProperties под location-display).',
+    ] },
     { version: '0.60.141', date: '2026-05-04', items: [
       '📋 <b>cable: auto-pick методики расчёта по country проекта</b>. Расширение правила <code>feedback_auto_norm_by_location.md</code> на cable-модуль (раньше только suppression-config).',
       '• <b>cable/cable-calc.js</b> при init() читает country активного проекта через <code>resolveAutoNormForActiveProject(\'cable\')</code> из <code>shared/auto-norm.js</code>.',

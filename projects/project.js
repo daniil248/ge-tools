@@ -16,6 +16,9 @@ import {
   DEFAULT_COMPANY, loadRawProfile, saveProjectCompanyProfile, loadEffectiveCompanyProfile,
   onCompanyProfileChange,
 } from '../shared/company-profile.js';
+// v0.60.142: «📋 Действующие нормативы» badges под местоположением проекта.
+// Visible reference какие стандарты будут применены в каждом расчётном модуле.
+import { NORM_MATRIX, detectCountryCode, countryLabel } from '../shared/auto-norm.js';
 
 /* ---------- inline modal / toast ---------- */
 function prToast(msg, kind = 'info') {
@@ -110,6 +113,71 @@ function fmtDate(ts) {
    и используют location/locations + activeLocationId. Смотри memory
    feedback_project_location.md и ROADMAP Phase 22.13.
 */
+
+// v0.60.142: visible reference того, какие нормативы будут применены в
+// расчётных модулях согласно country проекта. Helper-метки для каждого
+// domain в NORM_MATRIX. Применяется как чек-лист для аудита и для
+// объяснения Пользователю «почему именно эти стандарты».
+const NORM_DOMAIN_LABELS = {
+  suppression: '🔥 АГПТ',
+  cable:       '🔌 Кабель',
+  scs:         '🌐 СКС',
+  cooling:     '❄ Климат',
+  panel:       '⚡ НКУ',
+  mv:          '⚡ РУ СН',
+  battery:     '🔋 АКБ',
+  dgu:         '⚡ ДГУ',
+};
+// Человекочитаемые названия для norm-id из auto-norm.js NORM_MATRIX.
+const NORM_LABELS = {
+  'sp-rk-2022':     'СП РК 2.02-102-2022',
+  'sp-485-annex-d': 'СП 485 Прил. Д',
+  'nfpa-2001':      'NFPA 2001',
+  'iso-14520':      'ISO 14520',
+  'iec-60364':      'IEC 60364',
+  'pue-7':          'ПУЭ-7 / СП 76',
+  'nec':            'NEC (NFPA 70)',
+  'iso-24764':      'ISO/IEC 24764',
+  'gost-r-53246':   'ГОСТ Р 53246',
+  'tia-942':        'TIA-942-C',
+  'sp-60':          'СП 60.13330',
+  'ashrae-tc99':    'ASHRAE TC 9.9',
+  'en-12831':       'EN 12831',
+  'iec-61439':      'IEC 61439',
+  'ul-891':         'UL 891 / UL 67',
+  'iec-62271':      'IEC 62271',
+  'ieee-c37':       'IEEE C37.20',
+  'iec-62485':      'IEC 62485',
+  'gost-iec-62485': 'ГОСТ IEC 62485',
+  'ieee-1187':      'IEEE 1187',
+  'iso-8528':       'ISO 8528-1',
+  'epa-tier4':      'EPA Tier 4 / NFPA 110',
+};
+function _renderNormBadgesForCountry(country) {
+  if (!country) return '';
+  const code = detectCountryCode(country);
+  if (!code) return '';
+  const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, m => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[m]));
+  // Собираем nrom для каждого domain — только те, где есть запись для country.
+  const items = [];
+  for (const [domain, label] of Object.entries(NORM_DOMAIN_LABELS)) {
+    const map = NORM_MATRIX[domain];
+    if (!map) continue;
+    const normId = map[code];
+    if (!normId) continue;
+    const normLabel = NORM_LABELS[normId] || normId;
+    items.push(`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:10px;font-size:11px;white-space:nowrap" title="${esc(domain)} — авто-выбор по стране проекта">${esc(label)}: <b>${esc(normLabel)}</b></span>`);
+  }
+  if (!items.length) return '';
+  return `
+    <div style="margin-top:10px;padding:8px 10px;background:#f0f9ff;border:1px dashed #bae6fd;border-radius:4px">
+      <div style="font-size:11.5px;color:#075985;font-weight:600;margin-bottom:6px" title="Какие нормативные документы будут применены в расчётных модулях согласно стране проекта (${esc(countryLabel(code))}). Override на уровне модуля разрешён.">📋 Действующие нормативы по стране проекта (${esc(countryLabel(code))})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${items.join('')}</div>
+      <p class="muted" style="font-size:10.5px;margin:6px 0 0;color:#475569">Override в каждом модуле через локальный dropdown «Методика». Изменение страны → изменение всех нормативов.</p>
+    </div>
+  `;
+}
+
 function renderProjectProperties(p, host) {
   // v0.60.10: реквизиты проекта + локация. По требованию: «так же добавить
   // прочие данные проекта, полный адрес, эти данные должны быть там, в
@@ -173,6 +241,7 @@ function renderProjectProperties(p, host) {
       <p class="muted" style="font-size:11px;margin:8px 0 0">
         💡 Эта локация автоматически передаётся во все calc-модули проекта (Метеоданные, Подбор холодильных систем, ID-диаграмма). Менять координаты в модулях нельзя — только здесь.
       </p>
+      ${_renderNormBadgesForCountry(loc.country)}
     `;
   } else {
     const locs = Array.isArray(p.locations) ? p.locations : [];
