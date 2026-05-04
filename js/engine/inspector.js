@@ -2477,12 +2477,17 @@ const _CONFIGURATORS = {
   ups:         { href: 'ups-config/',         label: 'Конфигуратор ИБП' },
   rack:        { href: 'rack-config/',        label: 'Конфигуратор стойки' },
   scs:         { href: 'scs-config/',         label: 'Конфигуратор СКС/телеком (в разработке)' },
+  // v0.60.202 (по репорту Пользователя 2026-05-04 «у нас вроде уже появился
+  // конфигуратор ДГУ, почему бы не привязать его к схеме»): добавлен
+  // конфигуратор ДГУ для type='generator'.
+  generator:   { href: 'dgu-config/',         label: 'Конфигуратор ДГУ' },
 };
 function _configuratorForNode(n) {
   if (!n) return null;
   if (n.type === 'source' || n.type === 'generator') {
     const sub = n.sourceSubtype || (n.type === 'generator' ? 'generator' : 'transformer');
     if (sub === 'transformer') return _CONFIGURATORS.transformer;
+    if (sub === 'generator' || n.type === 'generator') return _CONFIGURATORS.generator;
     return null;
   }
   if (n.type === 'panel') return n.isMv ? _CONFIGURATORS.panelMv : _CONFIGURATORS.panel;
