@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.220', date: '2026-05-04', items: [
+      '🦶 <b>Метео: убрана дублирующая кнопка «Применить и вернуться»</b>. По репорту Пользователя 2026-05-04 «зачем две кнопки, оставь одну, которая работает». В embed-режиме рендерились две одинаковые apply-кнопки:',
+      '• Шапка актива (через <code>renderModuleActions</code>): «✓ Применить и вернуться в «Свойства проекта…»» — generic-кнопка из shared/module-nav.',
+      '• Жёлтый баннер (<code>renderEmbedBanner</code> v0.60.31): «🔗 Embed-режим: вы выбираете датасет для модуля… Активный: ASHRAE Темиртау (2016–2026) (Темиртау, 50.058, 72.953). [✓ Применить и вернуться] [✗ Отмена]» — meteo-специфичный, информативнее.',
+      '• <b>Решение</b>: оставлен жёлтый баннер (он показывает контекст: активный dataset + координаты), generic-кнопка из шапки убрана. В project-mode <code>renderModuleActions</code> по-прежнему используется для cross-link «❄ Подбор холодильных систем →».',
+      'Файл: <code>meteo/meteo.js</code> (renderActive — guard <code>if (_navMode === \'embed\')</code> вокруг renderModuleActions).',
+    ] },
     { version: '0.60.219', date: '2026-05-04', items: [
       '🧮 <b>calcVoltageMode подключён в pipeline</b>. По TODO из v0.60.205-206 («Setting calcVoltageMode пока не применяется в pipeline — placeholder. В следующих версиях расширим»).',
       '• <code>nodeCalcVoltageEff(n)</code> в <code>electrical.js</code> — возвращает Unom × (1 − _deltaUPct/100) при <b>real</b>-режиме, либо Unom при <b>nominal</b>. Защита: ΔU clamp до 50%, fallback на Unom если _deltaUPct отсутствует.',

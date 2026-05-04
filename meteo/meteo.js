@@ -266,33 +266,43 @@ function renderEmbedBanner() {
 
 // ─── Render: активный датасет
 function renderActive() {
-  // v0.59.995: cross-links / return-buttons
+  // v0.59.995: cross-links / return-buttons.
+  // v0.60.220 (по репорту Пользователя 2026-05-04 «зачем две кнопки, оставь
+  // одну, которая работает»): в embed-mode полагаемся ТОЛЬКО на жирный
+  // жёлтый баннер renderEmbedBanner ниже — он информативнее (показывает
+  // активный dataset, локацию, координаты). Дублирующая кнопка из
+  // renderModuleActions в шапке актива убрана. В project-mode по-прежнему
+  // используется renderModuleActions для cross-links.
   const actionsEl = $('mt-content-actions');
   if (actionsEl) {
-    renderModuleActions(actionsEl, {
-      navContext: { mode: _navMode, return: _navReturn },
-      crossLinks: [
-        // В project-mode показываем cross-link на cooling. По требованию:
-        // «А вот ссылка Подбор холодильных систем может быть доступна
-        // только если у пользователя есть доступ к этому модулю» —
-        // permissions пока не реализованы, делаем всегда видимым TODO.
-        { href: '../cooling/', label: '❄ Подбор холодильных систем →',
-          title: 'Перейти в модуль «Подбор холодильных систем» — расчёт чиллеров/DX/free-cooling по этим климатическим данным.' },
-      ],
-      getPayload: () => {
-        const d = _datasets.find(x => x.id === _activeId);
-        return {
-          datasetId: d?.id || null,
-          datasetName: d?.name || null,
-          locationName: d?.locationName || null,
-          lat: d?.lat || null,
-          lon: d?.lon || null,
-          dateFrom: d?.dateFrom || null,
-          dateTo: d?.dateTo || null,
-          recordsCount: (d?.hourly || []).length,
-        };
-      },
-    });
+    if (_navMode === 'embed') {
+      actionsEl.innerHTML = '';
+    } else {
+      renderModuleActions(actionsEl, {
+        navContext: { mode: _navMode, return: _navReturn },
+        crossLinks: [
+          // В project-mode показываем cross-link на cooling. По требованию:
+          // «А вот ссылка Подбор холодильных систем может быть доступна
+          // только если у пользователя есть доступ к этому модулю» —
+          // permissions пока не реализованы, делаем всегда видимым TODO.
+          { href: '../cooling/', label: '❄ Подбор холодильных систем →',
+            title: 'Перейти в модуль «Подбор холодильных систем» — расчёт чиллеров/DX/free-cooling по этим климатическим данным.' },
+        ],
+        getPayload: () => {
+          const d = _datasets.find(x => x.id === _activeId);
+          return {
+            datasetId: d?.id || null,
+            datasetName: d?.name || null,
+            locationName: d?.locationName || null,
+            lat: d?.lat || null,
+            lon: d?.lon || null,
+            dateFrom: d?.dateFrom || null,
+            dateTo: d?.dateTo || null,
+            recordsCount: (d?.hourly || []).length,
+          };
+        },
+      });
+    }
   }
   // v0.60.31: жирный embed-баннер сверху + кнопка «✓ Выбрать ЭТОТ датасет
   // и вернуться» — пользователь должен сразу понимать что он в embed-режиме
