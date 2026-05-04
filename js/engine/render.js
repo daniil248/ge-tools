@@ -2227,7 +2227,12 @@ export function renderNodes() {
           if (jumps) parts.push(`перем ${jumps}`);
           return parts.join(' · ');
         })()
-      : `In ${fmt(n.capacityA || 0)} A · Макс: ${fmt(n._maxLoadA || 0)} A / ${fmt(n._maxLoadKw || 0)} kW`;
+      // v0.60.175 (по репорту Пользователя 2026-05-04 «2 раза максимум
+      // показывать не стоит точно»): убрали «· Макс: …» из panel-subtitle —
+      // body уже рендерит Макс отдельной строкой через cross-unit pair
+      // (maxKw + maxA → «Макс: 60.4 кВт / 91.6 А»). Дубль убран — subtitle
+      // показывает только In (номинал автомата).
+      : `In ${fmt(n.capacityA || 0)} A`;
     const subTxt = {
       source:    srcSubLabel,
       generator: 'Генератор' + (n.backupMode ? ' (резерв)' : ''),
@@ -2835,16 +2840,48 @@ export function renderNodes() {
         else rowsByPos.body.push(txt);
       }
 
-      const lineH = 12;
+      // v0.60.175 (по репорту Пользователя 2026-05-04 «для потребителей сделай
+      // так же нормальную настройку карточек, чтобы не перекрывать все
+      // пространство»): когда body-строк слишком много для NODE_H — сжимаем
+      // line-height + font-size + переносим хвост в topRight, чтобы карточка
+      // не перекрывала title/subtitle. Раньше при 8+ полях рамка доходила
+      // до самого верха и налезала на «Стойка»/«cos φ» строки.
       const baseY = NODE_H - 12;
-      const statusOffset = statusLine ? lineH : 0;
-      // Body: стопка снизу
-      const bodyRows = rowsByPos.body;
+      const statusOffset = statusLine ? 12 : 0;
+      const _bodyRowsAll = rowsByPos.body;
       const footerRows = rowsByPos.footer;
-      const footerH = footerRows.length ? lineH : 0;
+      const footerH = footerRows.length ? 12 : 0;
+      // Свободное пространство для body — от низа карточки (с учётом
+      // status и footer) до низа header (subtitle на y≈58, оставляем
+      // запас 8px → bodyTopMin = 66).
+      const bodyTopMin = 66;
+      const bodyAvail = baseY - statusOffset - footerH - bodyTopMin;
+      // Сначала пробуем lineH=12. Если не помещается — пробуем 11, 10, 9, 8.
+      // Если и при lineH=8 хвост не помещается — выкидываем хвост в topRight.
+      let lineH = 12;
+      let bodyRows = _bodyRowsAll;
+      let overflow = [];
+      const _candidateLh = [12, 11, 10, 9, 8];
+      for (const lh of _candidateLh) {
+        if (_bodyRowsAll.length * lh <= bodyAvail) { lineH = lh; bodyRows = _bodyRowsAll; overflow = []; break; }
+        lineH = lh;
+        const fits = Math.max(1, Math.floor(bodyAvail / lh));
+        if (fits >= _bodyRowsAll.length) { bodyRows = _bodyRowsAll; overflow = []; break; }
+        bodyRows = _bodyRowsAll.slice(0, fits);
+        overflow = _bodyRowsAll.slice(fits);
+      }
+      const _bodyFontSize = lineH <= 9 ? '9' : (lineH <= 10 ? '10' : (lineH <= 11 ? '10.5' : '11'));
       for (let i = 0; i < bodyRows.length; i++) {
         const y = baseY - statusOffset - footerH - (bodyRows.length - 1 - i) * lineH;
-        g.appendChild(text(12, y, bodyRows[i], loadCls + ' node-load-row'));
+        const _t = text(12, y, bodyRows[i], loadCls + ' node-load-row');
+        if (lineH < 12) _t.setAttribute('font-size', _bodyFontSize);
+        g.appendChild(_t);
+      }
+      // Хвост body — в topRight (right-aligned, маленьким шрифтом). Прибавляем
+      // к существующим topRight-строкам после построения общего trY ниже.
+      if (overflow.length) {
+        // Перенос: добавим к rowsByPos.topRight в самый конец.
+        rowsByPos.topRight.push(...overflow);
       }
       if (statusLine) {
         g.appendChild(text(12, baseY - footerH, statusLine, loadCls + ' node-load-status'));

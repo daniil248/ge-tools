@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.175', date: '2026-05-04', items: [
+      '🎴 <b>Карточки потребителей не перекрывают title/subtitle</b>. По репорту Пользователя 2026-05-04 «для потребителей сделай так же нормальную настройку карточек, чтобы не перекрывать все пространство». При 8+ полях body-строки наслаивались на «Стойка»/«cos φ» и т.д.',
+      '• <b>Auto-fit body</b>: пробуем lineH=12, если не влезает — 11, 10, 9, 8 (с подстройкой font-size). Хвост, который не влезает даже при lineH=8, переносится в topRight (right-align).',
+      '• <b>bodyTopMin=66</b>: минимальный отступ сверху, чтобы body не наезжал на subtitle (y≈58).',
+      '🚫 <b>Убрали дубль «Макс» в panel subtitle</b>. По репорту Пользователя «2 раза максимум показывать не стоит точно». Раньше subtitle = «In 100 A · Макс: 91.6 A / 60.4 kW» — Макс дублировался в body через cross-unit pair (maxKw+maxA → «Макс: 60.4 кВт / 91.6 А»). Теперь subtitle = «In 100 A» (только номинал автомата); Макс — единожды в body.',
+      'Файл: <code>js/engine/render.js</code> (panelSub без Макс + auto-fit body lineH).',
+      '⚠ Известные открытые проблемы (нужна следующая сессия):',
+      '• Распределение нагрузки на 2 входа группы: при parallel-priorities [1,1] на nested-consumer\'е, вход 1 получает 142.2А, вход 2 — 5.3А (должно быть 50/50).',
+      '• <code>consumer.inputs</code> в nested-consumer\'е сбрасывается на 1 при некоторых операциях с группой.',
+      '• Drawio-vendor (sparse git clone) — webapp пока не подтянулся; embed.diagrams.net fallback работает.',
+    ] },
     { version: '0.60.174', date: '2026-05-04', items: [
       '🐛 <b>Sketch\'и теперь часть export/import/copy/clear проекта</b>. Регрессия после v0.60.166: sketch\'и хранятся в раздельном LS-namespace <code>raschet.sketch.&lt;pid&gt;.*</code> (не в общем <code>raschet.project.&lt;pid&gt;.*</code>) и не подпадали под общий префикс. При export+import sketch\'и терялись, при copy — не копировались, при удалении проекта оставались в LS висеть.',
       '• <b>shared/project-storage.js — collectSketches(pid)</b>: новая функция, сканирует <code>raschet.sketch.&lt;pid&gt;.*</code> и собирает все sketch\'и + refs.',
