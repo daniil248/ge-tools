@@ -69,6 +69,26 @@
       "internalOnly": false
     },
     {
+      "id": "sketch",
+      "name": "Скетч / Whiteboard",
+      "description": "Drawio-like редактор предварительных набросков по проекту: библиотеки фигур (базовые, BPMN, сеть, электрика, HVAC, стрелки) с возможностью клонирования, создания пользовательских библиотек, импорта/экспорта JSON. Multi-page, undo/redo, экспорт SVG/PNG/JSON",
+      "path": "sketch/",
+      "icon": "purple",
+      "badge": "new",
+      "requires": [
+        "shared/auth",
+        "shared/app-header"
+      ],
+      "dbCollections": [],
+      "permissions": [
+        "sketch.use"
+      ],
+      "enabled": true,
+      "kind": "ui",
+      "subscriptionPlan": "starter",
+      "internalOnly": false
+    },
+    {
       "id": "battery",
       "name": "Расчёт АКБ",
       "description": "Подбор ёмкости и конфигурации АКБ для ИБП. Загрузка таблиц разряда производителей (Kehua, Panasonic, SVC, Sonnenschein) в XLSX и точный расчёт по ним",

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Raschet · Скетч / Whiteboard</title>
+  <link rel="stylesheet" href="../shared/styles/base.css">
+  <link rel="stylesheet" href="../shared/app-header.css">
+  <link rel="stylesheet" href="sketch.css">
+  <!-- Firebase Auth -->
+  <script src="../firebase-config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="../shared/auth.js"></script>
+  <script src="../shared/auth-gate.js" defer></script>
+</head>
+<body>
+  <div id="rs-header-mount"></div>
+  <script type="module">
+    import { mountHeader } from '../shared/app-header.js';
+    mountHeader({ title: 'Скетч / Whiteboard', home: '../hub.html' });
+  </script>
+
+  <main class="sk-main">
+    <!-- Левая палитра фигур -->
+    <aside class="sk-palette rs-sidebar" id="sk-palette">
+      <div class="sk-palette-search">
+        <input type="search" id="sk-search" placeholder="🔎 Поиск фигуры…" title="Поиск по имени фигуры — фильтрует в активной категории">
+      </div>
+      <div class="sk-palette-cats" id="sk-palette-cats">
+        <!-- Заполняется из sketch.js::SHAPE_LIBRARY -->
+      </div>
+      <div class="sk-palette-help muted">
+        💡 Перетащите фигуру на холст. <b>Drag</b> — переместить, <b>Del</b> — удалить, <b>двойной клик</b> — редактировать текст. Соединить две фигуры: hover → потянуть от точки-якоря.
+      </div>
+    </aside>
+
+    <!-- Центральный холст -->
+    <section class="sk-canvas-wrap">
+      <div class="sk-toolbar">
+        <button type="button" class="sk-tool-btn" data-tool="select" title="Выделение / перетаскивание (V)" data-active="1">↖ Выделить</button>
+        <button type="button" class="sk-tool-btn" data-tool="connect" title="Соединить две фигуры стрелкой (C)">↔ Соединить</button>
+        <button type="button" class="sk-tool-btn" data-tool="text" title="Текстовая аннотация без фигуры (T)">T Текст</button>
+        <span class="sk-toolbar-sep"></span>
+        <button type="button" id="sk-undo" title="Отменить (Ctrl+Z)" disabled>↶</button>
+        <button type="button" id="sk-redo" title="Вернуть (Ctrl+Y)" disabled>↷</button>
+        <span class="sk-toolbar-sep"></span>
+        <button type="button" id="sk-zoom-in" title="Увеличить (Ctrl++ или Ctrl+wheel)">+</button>
+        <span id="sk-zoom-label" title="Текущий zoom — 100% по умолчанию. Ctrl+scroll — менять с anchor под курсором.">100%</span>
+        <button type="button" id="sk-zoom-out" title="Уменьшить (Ctrl+- или Ctrl+wheel)">−</button>
+        <button type="button" id="sk-zoom-fit" title="Вписать всё содержимое в окно (F)">⛶ Fit</button>
+        <button type="button" id="sk-zoom-reset" title="Сбросить zoom и pan (Ctrl+0)">100%</button>
+        <span class="sk-toolbar-sep"></span>
+        <select id="sk-page-sel" title="Активная страница / лист скетча. Каждый sketch может иметь несколько страниц."></select>
+        <button type="button" id="sk-page-add" title="Добавить новую страницу">＋ Лист</button>
+        <button type="button" id="sk-page-del" title="Удалить текущую страницу">🗑</button>
+        <span class="sk-toolbar-sep"></span>
+        <button type="button" id="sk-export-svg" title="Экспортировать в SVG (вектор)">📤 SVG</button>
+        <button type="button" id="sk-export-png" title="Экспортировать в PNG (растр)">📤 PNG</button>
+        <button type="button" id="sk-export-json" title="Экспортировать состояние в JSON (для импорта в другой проект)">📤 JSON</button>
+        <button type="button" id="sk-import-json" title="Импортировать sketch из JSON-файла">📥 JSON</button>
+        <input type="file" id="sk-import-file" accept="application/json,.json" hidden>
+      </div>
+      <div class="sk-canvas-host" id="sk-canvas-host">
+        <svg id="sk-svg" class="sk-svg" tabindex="0">
+          <defs>
+            <!-- Стрелка для коннекторов (drawio-like) -->
+            <marker id="sk-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+            </marker>
+            <marker id="sk-arrow-sel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#1e40af"/>
+            </marker>
+            <!-- Сетка -->
+            <pattern id="sk-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e7eb" stroke-width="0.5"/>
+            </pattern>
+            <pattern id="sk-grid-major" width="100" height="100" patternUnits="userSpaceOnUse">
+              <rect width="100" height="100" fill="url(#sk-grid)"/>
+              <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#cbd5e1" stroke-width="0.8"/>
+            </pattern>
+          </defs>
+          <g id="sk-grid-layer">
+            <rect id="sk-grid-bg" x="-2000" y="-2000" width="4000" height="4000" fill="url(#sk-grid-major)"/>
+          </g>
+          <g id="sk-edges-layer"></g>
+          <g id="sk-shapes-layer"></g>
+          <g id="sk-overlay-layer"></g>
+        </svg>
+      </div>
+    </section>
+
+    <!-- Правая панель свойств -->
+    <aside class="sk-properties rs-sidebar" id="sk-properties">
+      <div class="sk-properties-empty muted">Выберите фигуру или связь, чтобы изменить свойства.</div>
+    </aside>
+  </main>
+
+  <div id="rs-footer-mount"></div>
+  <script type="module">
+    import { mountFooter } from '../shared/module-footer.js';
+    import { APP_VERSION } from '../js/engine/constants.js';
+    import { CHANGELOGS } from '../shared/module-changelogs.js';
+    mountFooter({
+      appVersion: APP_VERSION,
+      moduleId: 'sketch',
+      moduleTitle: 'Скетч',
+      entries: CHANGELOGS['sketch'] || [],
+    });
+  </script>
+  <script type="module" src="sketch.js"></script>
+</body>
+</html>
