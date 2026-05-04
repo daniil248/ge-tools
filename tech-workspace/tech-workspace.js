@@ -83,6 +83,9 @@ function newRackGroup(name) {
     widthMm: 600, depthMm: 1200,
     modelRef: null,
     pdu: { kind: 'metered', phases: '3ph', ratingA: 32, inputsPerRack: 2, modelRef: null },
+    // v0.60.101 (rooms-концепция): roomId — id помещения, в котором стоят
+    // эти стойки. null = ещё не привязано (legacy / новая группа).
+    roomId: null,
   };
 }
 function newUpsSystem(name, purpose) {
@@ -93,6 +96,10 @@ function newUpsSystem(name, purpose) {
     count: 2, ratedKva: 0, redundancy: 'N+1',
     cosPhi: 0.95, loadFactor: 0.8, autonomyMin: 15, batteryTech: 'vrla',
     modelRef: null,
+    // v0.60.101: ИБП могут стоять в одном зале со стойками (roomId = тот же
+    // что у rackGroup) или в отдельном электрощитовой/UPS-room (roomId !=
+    // зала стоек). null = не привязано.
+    roomId: null,
   };
 }
 function newCoolingUnit(name) {
@@ -101,6 +108,33 @@ function newCoolingUnit(name) {
     name: name || 'Климат',
     count: 3, kwPerUnit: 0, type: 'crac', redundancy: 'N+1',
     modelRef: null,
+    // v0.60.101: scope ∈ 'shared' | 'room'.
+    //   'shared' — общая система, обслуживает несколько помещений (chiller-
+    //              plant, AHU); roomIds[] = массив обслуживаемых залов.
+    //   'room'   — закреплена за одним залом (CRAC, InRow); roomId = id зала.
+    // Это позволяет в одном проекте иметь, например, общий чиллер + per-room
+    // CRAC, или независимые DX в каждом зале с разной технологией.
+    scope: 'room',
+    roomId: null,
+    roomIds: [],
+  };
+}
+// v0.60.101: помещение объекта (комната / зал / отдельная стройка). Главный
+// зал стоек, отдельная UPS-room, отдельная электрощитовая, etc.
+//   id        — уникальный идентификатор
+//   name      — отображаемое имя («Зал стоек 1», «UPS-room», «Холодная линия»)
+//   kind      — 'it' (IT-зал со стойками) | 'ups' (электрощитовая ИБП) |
+//               'mech' (механическое помещение / насосная) | 'office' |
+//               'other'
+//   areaSqM   — площадь, м² (для расчёта плотности нагрузки)
+//   notes     — заметки
+function newRoom(name, kind) {
+  return {
+    id: _newId('rm'),
+    name: name || 'Зал',
+    kind: kind || 'it',
+    areaSqM: 0,
+    notes: '',
   };
 }
 
@@ -186,9 +220,23 @@ function newVariant(name) {
         dateOfDesign: '',
         notes: '',
       },
-      rackGroups: [newRackGroup('Стойки IT')],
-      upsSystems: [newUpsSystem('ИБП IT', 'it')],
-      coolingUnits: [newCoolingUnit('Климат')],
+      // v0.60.101 (rooms-концепция): по умолчанию один главный IT-зал. ИБП и
+      // стойки автоматически привязываются к нему. Пользователь может
+      // добавлять новые залы и распределять оборудование. Главный плюс —
+      // возможность ставить ИБП в отдельной щитовой и иметь как общий, так
+      // и независимый климат per room.
+      ...(() => {
+        const main = newRoom('Главный зал', 'it');
+        const rg = newRackGroup('Стойки IT');  rg.roomId = main.id;
+        const us = newUpsSystem('ИБП IT', 'it'); us.roomId = main.id;
+        const cu = newCoolingUnit('Климат');     cu.scope = 'room'; cu.roomId = main.id;
+        return {
+          rooms: [main],
+          rackGroups: [rg],
+          upsSystems: [us],
+          coolingUnits: [cu],
+        };
+      })(),
       coolingSystem: newCoolingSystem(),
       // v0.59.893: блоки МЦОД — массив зданий с привязкой к sub-project mdc-config.
       // По умолчанию пустой (стационарный ЦОД); пользователь добавляет МЦОД явно.
@@ -213,6 +261,31 @@ function migrateVariant(v) {
   if (typeof v.linkedSketchProjectId === 'undefined') v.linkedSketchProjectId = null;
   if (typeof v.approvedAt === 'undefined') v.approvedAt = null;
   const c = v.concept;
+  // v0.60.101 (rooms-концепция): добавить rooms[] если нет, и привязать
+  // существующее оборудование к главному залу. roomId = null оставляем
+  // только если пользователь явно создал «не привязанный» элемент.
+  if (!Array.isArray(c.rooms) || c.rooms.length === 0) {
+    c.rooms = [newRoom('Главный зал', 'it')];
+  }
+  const _mainRoomId = c.rooms[0]?.id || null;
+  // Гарантируем поля roomId/scope в существующих элементах (preserve если уже задано).
+  if (Array.isArray(c.rackGroups)) {
+    c.rackGroups.forEach(rg => {
+      if (typeof rg.roomId === 'undefined') rg.roomId = _mainRoomId;
+    });
+  }
+  if (Array.isArray(c.upsSystems)) {
+    c.upsSystems.forEach(us => {
+      if (typeof us.roomId === 'undefined') us.roomId = _mainRoomId;
+    });
+  }
+  if (Array.isArray(c.coolingUnits)) {
+    c.coolingUnits.forEach(cu => {
+      if (typeof cu.scope !== 'string') cu.scope = 'room';
+      if (typeof cu.roomId === 'undefined') cu.roomId = _mainRoomId;
+      if (!Array.isArray(cu.roomIds)) cu.roomIds = cu.roomId ? [cu.roomId] : [];
+    });
+  }
   // racks (single) → rackGroups[]
   if (!Array.isArray(c.rackGroups)) {
     if (c.racks) {
@@ -428,7 +501,7 @@ function _bindBtnHtml(domain, refId, modelRef) {
 }
 
 // ─── Render: rack group card
-function renderRackGroupCard(rg, isReadOnly) {
+function renderRackGroupCard(rg, isReadOnly, rooms) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = calcRackGroupKw(rg);
   return `<div class="tw-card" data-card-kind="rack" data-card-id="${rg.id}">
@@ -438,6 +511,7 @@ function renderRackGroupCard(rg, isReadOnly) {
       <button type="button" class="tw-card-del" data-card-action="delete" title="Удалить группу" ${ro}>×</button>
     </div>
     <div class="tw-grid">
+      ${_roomPickerHtml(rooms, rg.roomId, isReadOnly, 'rack')}
       <label>Кол-во стоек:<input type="number" data-field="count" min="0" step="1" value="${rg.count}" ${ro}></label>
       <label>Мощность на стойку, кВт:<input type="number" data-field="kwPerRack" min="0" step="0.5" value="${rg.kwPerRack}" ${ro}></label>
       <label>Профиль:
@@ -491,8 +565,28 @@ function renderRackGroupCard(rg, isReadOnly) {
   </div>`;
 }
 
+// v0.60.101: hint-helper для выбора помещения, в котором расположено
+// оборудование. Используется в карточках стоек/ИБП. Climate использует
+// собственный двухрежимный picker (room | shared rooms[]).
+function _roomPickerHtml(rooms, currentRoomId, isReadOnly, kindHint) {
+  const ro = isReadOnly ? 'disabled' : '';
+  if (!rooms || rooms.length <= 1) {
+    // Если в проекте только одно помещение — picker лишний; показываем только метку для FYI
+    const name = rooms?.[0]?.name || 'Главный зал';
+    return `<label title="К какому помещению объекта привязана эта группа. Добавить ещё помещения можно в секции «🏠 Помещения» слева.">Помещение:
+      <input type="text" value="${escAttr(name)}" disabled style="background:#f8fafc;color:#475569"></label>`;
+  }
+  const opts = rooms.map(r => `<option value="${escAttr(r.id)}"${currentRoomId === r.id ? ' selected' : ''}>${escHtml(r.name)}</option>`).join('');
+  const tip = kindHint === 'ups'
+    ? 'В каком помещении стоят ИБП. ИБП могут быть в одном зале со стойками или в отдельной электрощитовой/UPS-room.'
+    : 'В каком помещении расположена эта группа стоек.';
+  return `<label title="${escAttr(tip)}">🏠 Помещение:
+    <select data-field="roomId" ${ro}>${opts}</select>
+  </label>`;
+}
+
 // ─── Render: ups system card
-function renderUpsCard(us, isReadOnly) {
+function renderUpsCard(us, isReadOnly, rooms) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = _upsAvail(us);
   // Phase 30.2 (v0.60.69): pre-fill для ups-config wizard.
@@ -506,6 +600,7 @@ function renderUpsCard(us, isReadOnly) {
       <button type="button" class="tw-card-del" data-card-action="delete" title="Удалить систему" ${ro}>×</button>
     </div>
     <div class="tw-grid">
+      ${_roomPickerHtml(rooms, us.roomId, isReadOnly, 'ups')}
       <label>Назначение:
         <select data-field="purpose" ${ro}>
           <option value="it"${us.purpose === 'it' ? ' selected' : ''}>⚡ IT-нагрузка</option>
@@ -567,9 +662,36 @@ function _readUpsSelected() {
 }
 
 // ─── Render: cooling unit card
-function renderCoolCard(cu, isReadOnly) {
+// v0.60.101 (rooms-концепция): cooling может быть «в помещении» (CRAC, InRow
+// — закреплён за одним залом) или «общим» (chiller-plant, AHU — обслуживает
+// несколько залов; чек-листы roomIds[]).
+function renderCoolCard(cu, isReadOnly, rooms) {
   const ro = isReadOnly ? 'disabled' : '';
   const kw = _coolAvail(cu);
+  const scope = cu.scope || 'room';
+  const roomList = Array.isArray(rooms) ? rooms : [];
+  // UI scope-specific
+  let scopePicker = '';
+  if (roomList.length > 0) {
+    if (scope === 'shared') {
+      // Чек-боксы по всем помещениям
+      const checks = roomList.map(r => {
+        const checked = (cu.roomIds || []).includes(r.id);
+        return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;margin-right:10px">
+          <input type="checkbox" data-field-roomid="${escAttr(r.id)}" ${checked ? 'checked' : ''} ${ro}> ${escHtml(r.name)}
+        </label>`;
+      }).join('');
+      scopePicker = `<div style="grid-column:1/-1" title="Какие помещения обслуживает эта общая система. Например, чиллер-плант на крыше может обслуживать все залы стоек одновременно.">
+        <div style="font-size:11.5px;color:#475569;margin-bottom:4px">🏠 Обслуживает помещения:</div>
+        <div>${checks || '<span class="muted">(нет помещений)</span>'}</div>
+      </div>`;
+    } else {
+      const opts = roomList.map(r => `<option value="${escAttr(r.id)}"${cu.roomId === r.id ? ' selected' : ''}>${escHtml(r.name)}</option>`).join('');
+      scopePicker = `<label title="В каком помещении установлен этот кондиционер. CRAC/InRow обычно стоит в самом IT-зале.">🏠 Помещение:
+        <select data-field="roomId" ${ro}>${opts}</select>
+      </label>`;
+    }
+  }
   return `<div class="tw-card" data-card-kind="cool" data-card-id="${cu.id}">
     <div class="tw-card-head">
       <input type="text" class="tw-card-name" data-field="name" value="${escAttr(cu.name)}" placeholder="Название" ${ro}>
@@ -577,6 +699,13 @@ function renderCoolCard(cu, isReadOnly) {
       <button type="button" class="tw-card-del" data-card-action="delete" title="Удалить" ${ro}>×</button>
     </div>
     <div class="tw-grid">
+      <label title="Зона обслуживания:&#10;• «В помещении» — CRAC/InRow привязан к одному залу.&#10;• «Общая» — chiller-plant / AHU обслуживает несколько залов одновременно.">📍 Зона обслуживания:
+        <select data-field="scope" ${ro}>
+          <option value="room"${scope === 'room' ? ' selected' : ''}>В помещении (CRAC/InRow per room)</option>
+          <option value="shared"${scope === 'shared' ? ' selected' : ''}>Общая (chiller-plant, AHU)</option>
+        </select>
+      </label>
+      ${scopePicker}
       <label>Кол-во кондиционеров:<input type="number" data-field="count" min="1" step="1" value="${cu.count}" ${ro}></label>
       <label>Холод на единицу, кВт:<input type="number" data-field="kwPerUnit" min="0" step="5" value="${cu.kwPerUnit}" ${ro}></label>
       <label>Тип:
@@ -820,6 +949,7 @@ function _ensureSelectedBlock(c) {
     if (kind === 'ups' && (c.upsSystems || []).some(us => us.id === id)) return;
     if (kind === 'cool' && (c.coolingUnits || []).some(cu => cu.id === id)) return;
     if (kind === 'mdc' && (c.mdcBuildings || []).some(b => b.id === id)) return;
+    if (kind === 'room' && (c.rooms || []).some(rm => rm.id === id)) return;
     if (kind === 'project' || kind === 'feed' || kind === 'areas' || kind === 'pue' || kind === 'bom' || kind === 'coolsys') return;
   }
   if ((c.rackGroups || []).length) {
@@ -1129,6 +1259,26 @@ function renderListRail(c, ro) {
   const projectSubLine = [pd.designation, pd.customer, pd.city].filter(Boolean).join(' · ') || 'данные не заполнены';
   const projectChip = pd.lat && pd.lon ? `${Number(pd.lat).toFixed(2)}, ${Number(pd.lon).toFixed(2)}` : '—';
 
+  // v0.60.101 (rooms-концепция): помещения объекта
+  const rooms = Array.isArray(c.rooms) ? c.rooms : [];
+  const ROOM_KIND_ICON = { it: '🗄', ups: '⚡', mech: '🛠', office: '🏢', other: '📦' };
+  const _countInRoom = (rid) => {
+    const rg = (c.rackGroups || []).filter(x => x.roomId === rid).reduce((s, x) => s + (Number(x.count) || 0), 0);
+    const us = (c.upsSystems || []).filter(x => x.roomId === rid).length;
+    const cu = (c.coolingUnits || []).filter(x => (x.scope === 'room' && x.roomId === rid) || (x.scope === 'shared' && (x.roomIds || []).includes(rid))).length;
+    return { rg, us, cu };
+  };
+  const roomRows = rooms.map(rm => {
+    const cnt = _countInRoom(rm.id);
+    const sub = `${cnt.rg} ст · ${cnt.us} ИБП · ${cnt.cu} клим`;
+    const icon = ROOM_KIND_ICON[rm.kind] || '🚪';
+    return `<button type="button" class="tw-rail-item${_selCls('room', rm.id)}" data-bk="room" data-bid="${escAttr(rm.id)}">
+      <span class="tw-rail-name">${icon} ${escHtml(rm.name || 'Зал')}</span>
+      <span class="tw-rail-sub">${escHtml(sub)}</span>
+      ${rm.areaSqM > 0 ? `<span class="tw-rail-chip">${rm.areaSqM} м²</span>` : ''}
+    </button>`;
+  }).join('');
+
   return `
     <div class="tw-rail-section">
       <div class="tw-rail-head">
@@ -1142,6 +1292,14 @@ function renderListRail(c, ro) {
           <span class="tw-rail-chip">${escHtml(projectChip)}</span>
         </button>
       </div>
+    </div>
+
+    <div class="tw-rail-section">
+      <div class="tw-rail-head">
+        <span class="tw-rail-title" title="Помещения объекта (IT-залы, электрощитовые, насосные и т.п.). К каждому помещению привязываются группы стоек, ИБП и кондиционеры. ИБП могут стоять в одном зале со стойками или в отдельной щитовой; климат может быть общим (chiller-plant обслуживает несколько залов) или независимым per-room (CRAC/DX в каждом зале).">🏠 Помещения <span class="muted">·${rooms.length}</span></span>
+        <button type="button" class="tw-rail-add" data-add-card="room" title="Добавить помещение (IT-зал / UPS-room / щитовая)" ${ro ? 'disabled' : ''}>➕</button>
+      </div>
+      <div class="tw-rail-list">${roomRows || '<div class="tw-rail-empty muted">Нет помещений</div>'}</div>
     </div>
 
     <div class="tw-rail-section">
@@ -1356,20 +1514,20 @@ function renderDetails(c, ro) {
     const rg = (c.rackGroups || []).find(x => x.id === sel.id);
     if (!rg) return '<div class="tw-details-empty muted">Группа удалена. Выберите блок слева.</div>';
     return _detailsHeaderHtml('🗄 Группа стоек', rg.id, ro, 'rack', `${rg.count} × ${rg.kwPerRack} кВт = ${calcRackGroupKw(rg).toFixed(1)} кВт`)
-      + renderRackGroupCard(rg, ro)
+      + renderRackGroupCard(rg, ro, c.rooms)
       + _bulkRackToolbar(c, ro);
   }
   if (sel.kind === 'ups') {
     const us = (c.upsSystems || []).find(x => x.id === sel.id);
     if (!us) return '<div class="tw-details-empty muted">Система удалена. Выберите блок слева.</div>';
     return _detailsHeaderHtml('⚡ Система ИБП', us.id, ro, 'ups', `${us.count} × ${us.ratedKva} кВА · ${_upsAvail(us).toFixed(1)} кВт доступно`)
-      + renderUpsCard(us, ro);
+      + renderUpsCard(us, ro, c.rooms);
   }
   if (sel.kind === 'cool') {
     const cu = (c.coolingUnits || []).find(x => x.id === sel.id);
     if (!cu) return '<div class="tw-details-empty muted">Группа удалена. Выберите блок слева.</div>';
     return _detailsHeaderHtml('❄ Группа кондиционеров', cu.id, ro, 'cool', `${cu.count} × ${cu.kwPerUnit} кВт · ${_coolAvail(cu).toFixed(1)} кВт доступно`)
-      + renderCoolCard(cu, ro);
+      + renderCoolCard(cu, ro, c.rooms);
   }
   // v0.59.901: топология охлаждения
   if (sel.kind === 'coolsys') {
@@ -1445,6 +1603,71 @@ function renderDetails(c, ro) {
         </div>
       </div>`;
   }
+  // v0.60.101 (rooms-концепция): редактор помещения объекта
+  if (sel.kind === 'room') {
+    const rm = (c.rooms || []).find(x => x.id === sel.id);
+    if (!rm) return '<div class="tw-details-empty muted">Помещение удалено. Выберите другое слева.</div>';
+    const ROOM_KIND_OPTIONS = [
+      { v: 'it',     l: '🗄 IT-зал (стойки)' },
+      { v: 'ups',    l: '⚡ Электрощитовая ИБП' },
+      { v: 'mech',   l: '🛠 Механическое (насосная, BMS)' },
+      { v: 'office', l: '🏢 Офис / диспетчерская' },
+      { v: 'other',  l: '📦 Прочее' },
+    ];
+    const kindOpts = ROOM_KIND_OPTIONS.map(o => `<option value="${o.v}"${rm.kind === o.v ? ' selected' : ''}>${o.l}</option>`).join('');
+    // Что в помещении
+    const racksHere = (c.rackGroups || []).filter(rg => rg.roomId === rm.id);
+    const upsHere = (c.upsSystems || []).filter(us => us.roomId === rm.id);
+    const coolHere = (c.coolingUnits || []).filter(cu => (cu.scope === 'room' && cu.roomId === rm.id) || (cu.scope === 'shared' && (cu.roomIds || []).includes(rm.id)));
+    const itKwHere = racksHere.reduce((s, rg) => s + (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0), 0);
+    const upsKvaHere = upsHere.reduce((s, us) => s + (Number(us.ratedKva) || 0) * (Number(us.count) || 0), 0);
+    const coolKwHere = coolHere.reduce((s, cu) => s + (Number(cu.count) || 0) * (Number(cu.kwPerUnit) || 0), 0);
+    const _li = (arr, fmt) => arr.length
+      ? '<ul style="margin:4px 0 0;padding-left:20px;font-size:12px">' + arr.map(fmt).join('') + '</ul>'
+      : '<div class="muted" style="font-size:12px">— ничего не привязано —</div>';
+    const headSub = `${racksHere.length} групп стоек · ${upsHere.length} ИБП · ${coolHere.length} клим. систем`;
+    return _detailsHeaderHtml('🏠 Помещение объекта', rm.id, ro, 'room', headSub)
+      + `<div class="tw-card" data-card-kind="room" data-card-id="${rm.id}">
+          <div class="tw-card-head">
+            <input type="text" class="tw-card-name" data-field="name" value="${escAttr(rm.name)}" placeholder="Например, «Главный зал», «UPS-room», «Щитовая А»" ${ro ? 'disabled' : ''}>
+          </div>
+          <div class="tw-grid">
+            <label title="Тип помещения. Используется для иконки в rail и группировки в отчёте.">Тип помещения:
+              <select data-field="kind" ${ro ? 'disabled' : ''}>${kindOpts}</select>
+            </label>
+            <label title="Площадь помещения в м². Используется для расчёта плотности нагрузки (кВт/м²) и проверки норм по ТКП 308-2011.">Площадь, м²:
+              <input type="number" data-field="areaSqM" min="0" step="1" value="${Number(rm.areaSqM) || 0}" ${ro ? 'disabled' : ''}>
+            </label>
+          </div>
+          <label style="display:block;margin-top:8px" title="Заметки по помещению (требования к температуре, особенности, ограничения)">Заметки:
+            <textarea data-field="notes" rows="2" placeholder="Особые требования, привязка к плану здания, etc." ${ro ? 'disabled' : ''} style="width:100%;font:inherit;font-size:13px;padding:6px;border:1px solid #cbd5e1;border-radius:4px;resize:vertical">${escHtml(rm.notes || '')}</textarea>
+          </label>
+          <hr style="border:none;border-top:1px dashed #cbd5e1;margin:14px 0">
+          <h5 style="margin:0 0 8px;font-size:12.5px;color:#075985">📦 Что в помещении</h5>
+          <div class="tw-grid" style="grid-template-columns:1fr 1fr 1fr">
+            <div>
+              <b>🗄 Стойки</b>
+              ${_li(racksHere, rg => `<li>${escHtml(rg.name)} — ${rg.count} × ${rg.kwPerRack} кВт = ${((rg.count || 0) * (rg.kwPerRack || 0)).toFixed(1)} кВт</li>`)}
+              <div class="muted" style="font-size:11.5px;margin-top:4px">Σ ${itKwHere.toFixed(1)} кВт IT</div>
+            </div>
+            <div>
+              <b>⚡ ИБП</b>
+              ${_li(upsHere, us => `<li>${escHtml(us.name)} — ${us.count} × ${us.ratedKva} кВА (${us.purpose})</li>`)}
+              <div class="muted" style="font-size:11.5px;margin-top:4px">Σ ${upsKvaHere.toFixed(1)} кВА</div>
+            </div>
+            <div>
+              <b>❄ Климат</b>
+              ${_li(coolHere, cu => `<li>${escHtml(cu.name)} — ${cu.count} × ${cu.kwPerUnit} кВт ${cu.scope === 'shared' ? '<span class="muted">(общая)</span>' : ''}</li>`)}
+              <div class="muted" style="font-size:11.5px;margin-top:4px">Σ ${coolKwHere.toFixed(1)} кВт холода</div>
+            </div>
+          </div>
+          <p class="muted" style="font-size:11.5px;margin-top:10px">
+            💡 Привязать оборудование к помещению можно в карточке группы стоек / ИБП / климата (поле «Помещение»).
+            Климат может быть <b>«в помещении»</b> (CRAC, InRow per room) или <b>«общим»</b> (chiller-plant обслуживает несколько залов).
+          </p>
+        </div>`;
+  }
+
   if (sel.kind === 'mdc') {
     const b = (c.mdcBuildings || []).find(x => x.id === sel.id);
     if (!b) return '<div class="tw-details-empty muted">Блок удалён. Выберите другой слева.</div>';
@@ -1785,19 +2008,19 @@ function renderAllCardsLayout(c, ro) {
       <div class="tw-section-head"><h3>🗄 Группы стоек</h3>
         <button type="button" class="tw-add-btn" data-add-card="rack" ${ro ? 'disabled' : ''}>➕ Группа стоек</button>
       </div>
-      ${(c.rackGroups || []).map(rg => renderRackGroupCard(rg, ro)).join('') || '<p class="muted">Нет групп.</p>'}
+      ${(c.rackGroups || []).map(rg => renderRackGroupCard(rg, ro, c.rooms)).join('') || '<p class="muted">Нет групп.</p>'}
     </section>
     <section class="tw-cards-section">
       <div class="tw-section-head"><h3>⚡ Системы ИБП</h3>
         <button type="button" class="tw-add-btn" data-add-card="ups" ${ro ? 'disabled' : ''}>➕ Система ИБП</button>
       </div>
-      ${(c.upsSystems || []).map(us => renderUpsCard(us, ro)).join('') || '<p class="muted">Нет.</p>'}
+      ${(c.upsSystems || []).map(us => renderUpsCard(us, ro, c.rooms)).join('') || '<p class="muted">Нет.</p>'}
     </section>
     <section class="tw-cards-section">
       <div class="tw-section-head"><h3>❄ Климат</h3>
         <button type="button" class="tw-add-btn" data-add-card="cool" ${ro ? 'disabled' : ''}>➕ Группа</button>
       </div>
-      ${(c.coolingUnits || []).map(cu => renderCoolCard(cu, ro)).join('') || '<p class="muted">Нет.</p>'}
+      ${(c.coolingUnits || []).map(cu => renderCoolCard(cu, ro, c.rooms)).join('') || '<p class="muted">Нет.</p>'}
     </section>
     <section class="tw-cards-section">
       <div class="tw-section-head"><h3>🔌 Ввод</h3></div>
@@ -1997,9 +2220,24 @@ function bindListEvents() {
     const cur = _variants.find(x => x.id === _activeId);
     if (!cur || cur.readOnly) return;
     const target = e.target;
-    if (!target || (!target.matches('input, select'))) return;
+    if (!target || (!target.matches('input, select, textarea'))) return;
     const card = target.closest('.tw-card');
     const field = target.dataset.field;
+    // v0.60.101: чек-боксы общих помещений в cool-card (scope='shared')
+    const fieldRoomId = target.dataset.fieldRoomid;
+    if (fieldRoomId && card && card.dataset.cardKind === 'cool') {
+      const cu = (cur.concept.coolingUnits || []).find(x => x.id === card.dataset.cardId);
+      if (cu) {
+        if (!Array.isArray(cu.roomIds)) cu.roomIds = [];
+        if (target.checked) {
+          if (!cu.roomIds.includes(fieldRoomId)) cu.roomIds.push(fieldRoomId);
+        } else {
+          cu.roomIds = cu.roomIds.filter(x => x !== fieldRoomId);
+        }
+        persistVariants(); renderActiveVariant();
+      }
+      return;
+    }
     // BOM-цены не имеют data-field (они идентифицируются через data-bom-key)
     if (!field && !target.classList.contains('tw-bom-price')) return;
     const value = (target.type === 'checkbox') ? target.checked
@@ -2048,6 +2286,7 @@ function bindListEvents() {
         : kind === 'ups' ? 'upsSystems'
         : kind === 'cool' ? 'coolingUnits'
         : kind === 'mdc' ? 'mdcBuildings'
+        : kind === 'room' ? 'rooms'
         : null;
       if (!arrName) return;
       const arr = cur.concept[arrName];
@@ -2055,6 +2294,24 @@ function bindListEvents() {
       if (!obj) return;
       // Поддержка nested путей вроде "pdu.kind"
       _setNested(obj, field, kind === 'ups' && field === 'loadFactor' ? value / 100 : value);
+      // v0.60.101: при смене scope климата мигрируем roomId ↔ roomIds.
+      if (kind === 'cool' && field === 'scope') {
+        if (value === 'shared') {
+          // room → shared: переносим единичный roomId в массив (если был не пустой)
+          if (obj.roomId && (!Array.isArray(obj.roomIds) || obj.roomIds.length === 0)) {
+            obj.roomIds = [obj.roomId];
+          }
+          if (!Array.isArray(obj.roomIds)) obj.roomIds = [];
+        } else if (value === 'room') {
+          // shared → room: выбираем первый roomId из массива
+          if ((!obj.roomId || !cur.concept.rooms.some(r => r.id === obj.roomId)) && Array.isArray(obj.roomIds) && obj.roomIds.length) {
+            obj.roomId = obj.roomIds[0];
+          }
+          if (!obj.roomId && cur.concept.rooms?.[0]) {
+            obj.roomId = cur.concept.rooms[0].id;
+          }
+        }
+      }
     } else if (target.classList.contains('tw-bom-price')) {
       // BOM override (per-row price input)
       const key = target.dataset.bomKey;
@@ -2117,6 +2374,12 @@ function bindListEvents() {
         if (!Array.isArray(cur.concept.mdcBuildings)) cur.concept.mdcBuildings = [];
         newObj = newMdcBuilding(`МЦОД-${cur.concept.mdcBuildings.length + 1}`);
         cur.concept.mdcBuildings.push(newObj);
+      } else if (kind === 'room') {
+        // v0.60.101: добавить помещение объекта
+        if (!Array.isArray(cur.concept.rooms)) cur.concept.rooms = [];
+        const n = cur.concept.rooms.length + 1;
+        newObj = newRoom(`Зал ${n}`, 'it');
+        cur.concept.rooms.push(newObj);
       }
       if (newObj) _selectedBlock = { kind, id: newObj.id };
       persistVariants(); renderActiveVariant();
@@ -2133,6 +2396,7 @@ function bindListEvents() {
         : bk === 'ups' ? 'upsSystems'
         : bk === 'cool' ? 'coolingUnits'
         : bk === 'mdc' ? 'mdcBuildings'
+        : bk === 'room' ? 'rooms'
         : null;
       if (!arrName) return;
       const arr = cur.concept[arrName];
@@ -2145,6 +2409,34 @@ function bindListEvents() {
           twToast('Нельзя удалить последний блок этого типа. Добавьте ещё один перед удалением.', 'warn');
           return;
         }
+        // v0.60.101: при удалении помещения переназначаем оборудование на первое оставшееся.
+        if (bk === 'room') {
+          const removingId = arr[idx].id;
+          const nextRoomId = (arr[idx + 1] || arr[idx - 1])?.id || null;
+          const orphans = [];
+          (cur.concept.rackGroups || []).forEach(rg => {
+            if (rg.roomId === removingId) { rg.roomId = nextRoomId; orphans.push('стойки «' + rg.name + '»'); }
+          });
+          (cur.concept.upsSystems || []).forEach(us => {
+            if (us.roomId === removingId) { us.roomId = nextRoomId; orphans.push('ИБП «' + us.name + '»'); }
+          });
+          (cur.concept.coolingUnits || []).forEach(cu => {
+            if (cu.scope === 'room' && cu.roomId === removingId) { cu.roomId = nextRoomId; orphans.push('климат «' + cu.name + '»'); }
+            if (cu.scope === 'shared' && Array.isArray(cu.roomIds)) {
+              cu.roomIds = cu.roomIds.filter(x => x !== removingId);
+            }
+          });
+          const warn = orphans.length
+            ? `\n\nВнимание: к этому помещению привязано:\n• ${orphans.join('\n• ')}\n\nОборудование будет перепривязано к «${arr.find(r => r.id === nextRoomId)?.name || '(нет)'}».`
+            : '';
+          const ok = await twConfirm(`Удалить помещение «${arr[idx].name || ''}»?${warn}`, 'Удаление помещения');
+          if (!ok) return;
+          arr.splice(idx, 1);
+          const next = arr[Math.min(idx, arr.length - 1)];
+          _selectedBlock = next ? { kind: 'room', id: next.id } : { kind: 'feed', id: null };
+          persistVariants(); renderActiveVariant();
+          return;
+        }
         const ok = await twConfirm(`Удалить блок «${arr[idx].name || ''}»?`, 'Удаление блока');
         if (!ok) return;
         arr.splice(idx, 1);
@@ -2154,7 +2446,7 @@ function bindListEvents() {
         persistVariants(); renderActiveVariant();
       } else if (act === 'duplicate') {
         const copy = JSON.parse(JSON.stringify(arr[idx]));
-        copy.id = _newId(bk === 'rack' ? 'rg' : bk === 'ups' ? 'us' : bk === 'mdc' ? 'mdc' : 'cu');
+        copy.id = _newId(bk === 'rack' ? 'rg' : bk === 'ups' ? 'us' : bk === 'mdc' ? 'mdc' : bk === 'room' ? 'rm' : 'cu');
         copy.name = (arr[idx].name || '') + ' (копия)';
         // Для МЦОД: при duplicate привязка к sub-проекту НЕ копируется —
         // юзер должен явно создать или привязать новое здание (иначе два
