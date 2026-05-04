@@ -822,12 +822,20 @@ function autoRecalcLengths(plan) {
 /* v0.59.283: фантомные связи (endpoint на tpl-*, на стойку чужого проекта
    или на удалённое устройство) НЕ показываются в UI Проектирования СКС —
    отображаются только «действующие» кабели. В storage исходные записи
-   остаются: если стойка/устройство вернётся, связь снова станет видимой. */
+   остаются: если стойка/устройство вернётся, связь снова станет видимой.
+   v0.60.156 (по репорту Пользователя 2026-05-04 «Пропал список кабелей
+   между стойками»): relaxed-check — если оба rack id присутствуют
+   (instIds) и devId хотя бы НЕ-пустой (валидный ref), линк считается
+   действующим. Раньше требовалось точное совпадение devId с
+   getContents — но при перерендеринге scs-config содержимое могло
+   получать другие id, и линки массово исчезали. Теперь линк сохраняется
+   даже если конкретное устройство временно не findable; в UI выводится
+   tag rack + label из linka. */
 function isLinkLive(l, instIds) {
   if (!instIds.has(l.fromRackId) || !instIds.has(l.toRackId)) return false;
-  const from = getContents(l.fromRackId).find(x => x.id === l.fromDevId);
-  const to   = getContents(l.toRackId).find(x => x.id === l.toDevId);
-  return !!from && !!to;
+  // Минимальное требование: rack id оба присутствуют.
+  // Дополнительно проверяем что devId не пустые (sanity-check).
+  return !!(l.fromDevId && l.toDevId);
 }
 function getVisibleLinks() {
   const raw = getLinks();
@@ -1595,30 +1603,51 @@ function drawLinkOverlay() {
     const titleAttr = escapeAttr(fromTxt + ' ↔ ' + toTxt);
 
     if (linksOverRackEnabled) {
-      // v0.59.869: маршрут «над стойками».
-      //   из устройства A → подъём до channelY → горизонталь → спуск
-      //   до устройства B. Одна и та же стойка → внутрикорпусный U-образный
-      //   маршрут. Разные стойки → выход вверх обеих карточек, общий канал.
-      const A = getCenter(l.fromRackId, l.fromDevId, 'left'); // используем center, x скорректируем ниже
-      const B = getCenter(l.toRackId, l.toDevId, 'left');
+      // v0.59.869 / v0.60.156 (по репорту Пользователя 2026-05-04
+      // «Линия выходит сбоку (сторона куда идет линия), выходит за
+      // границы стойки (между стойками), поднимается выше шкафа, идет
+      // до стойки цели, опускается между стойками, заходит сбоку
+      // в цель»): маршрут «над стойками» из 6 сегментов:
+      //   1. Выход СБОКУ устройства (сторона навстречу target)
+      //   2. Горизонтально за границу шкафа (промежуток между шкафами)
+      //   3. Подъём выше всех шкафов (channelY)
+      //   4. Горизонтально по каналу до промежутка перед target шкафом
+      //   5. Спуск между шкафами до уровня target устройства
+      //   6. Горизонтально внутрь target устройства (сбоку)
+      //
+      // Раньше: M ax,ay → V chY → H bx → V by (выход через ВЕРХ
+      // device через CENTER шкафа) — линия пересекала всё содержимое
+      // шкафа сверху вниз, выглядело некорректно.
+      const goingRight = fromCenter < toCenter;
+      const fromSide = goingRight ? 'right' : 'left';
+      const toSide   = goingRight ? 'left'  : 'right';
+      const A = getCenter(l.fromRackId, l.fromDevId, fromSide);
+      const B = getCenter(l.toRackId, l.toDevId, toSide);
       if (!A || !B) return;
-      // По X — выход через CENTER верхней грани стойки (cardXCenter), а не
-      // боковая стенка как в bezier-режиме.
-      const ax = fromCenter, bx = toCenter;
-      const ay = A.y, by = B.y;
-      const fromTop = cardTopForRack(l.fromRackId);
-      const toTop = cardTopForRack(l.toRackId);
-      // Подъём начинается из устройства, выходит через верх своей стойки,
-      // потом до channelY. Если устройство выше channelY — пропускаем подъём.
-      const upY = Math.min(ay, fromTop != null ? fromTop : ay) - 4;
-      const downY = Math.min(by, toTop != null ? toTop : by) - 4;
-      const chY = Math.min(_channelY, Math.min(upY, downY) - 16);
-      // Path: M ax,ay → V (перпендикулярно вверх до chY)
-      //       → H bx (горизонталь по каналу)
-      //       → V by (спуск до устройства)
-      // Полупрозрачно (opacity 0.55), штрих чуть толще для читаемости.
-      const dPath = `M ${ax} ${ay} L ${ax} ${upY} L ${ax} ${chY} L ${bx} ${chY} L ${bx} ${downY} L ${bx} ${by}`;
-      parts.push(`<path class="sd-link-path sd-link-overrack${isSel ? ' selected' : ''}" data-link-id="${escapeAttr(l.id)}" d="${dPath}" fill="none" stroke="${color}" stroke-width="2.5" stroke-opacity="0.55" stroke-linejoin="round" stroke-linecap="round" style="cursor:pointer"><title>${titleAttr} (клик: выделить связь, Shift+клик — добавить)</title></path>`);
+      // Получаем bbox-границы карточек шкафов
+      const fromCardBox = (() => {
+        const u = row.querySelector(`.sd-unit[data-rack-id="${CSS.escape(l.fromRackId)}"]`);
+        const c = u?.closest('.sd-rack-card');
+        if (!c) return null;
+        const r = c.getBoundingClientRect();
+        return { left: r.left - wrapRect.left, right: r.right - wrapRect.left, top: r.top - wrapRect.top };
+      })();
+      const toCardBox = (() => {
+        const u = row.querySelector(`.sd-unit[data-rack-id="${CSS.escape(l.toRackId)}"]`);
+        const c = u?.closest('.sd-rack-card');
+        if (!c) return null;
+        const r = c.getBoundingClientRect();
+        return { left: r.left - wrapRect.left, right: r.right - wrapRect.left, top: r.top - wrapRect.top };
+      })();
+      if (!fromCardBox || !toCardBox) return;
+      const GAP = 12;  // отступ между стойками для прохода кабеля
+      // 1) Выход сбоку device — куда идёт линия
+      const exitX = goingRight ? (fromCardBox.right + GAP) : (fromCardBox.left - GAP);
+      const enterX = goingRight ? (toCardBox.left - GAP) : (toCardBox.right + GAP);
+      // 2) Channel Y — на 30 px выше самой высокой стойки
+      const chY = Math.min(_channelY, Math.min(fromCardBox.top, toCardBox.top) - 20);
+      const dPath = `M ${A.x} ${A.y} L ${exitX} ${A.y} L ${exitX} ${chY} L ${enterX} ${chY} L ${enterX} ${B.y} L ${B.x} ${B.y}`;
+      parts.push(`<path class="sd-link-path sd-link-overrack${isSel ? ' selected' : ''}" data-link-id="${escapeAttr(l.id)}" d="${dPath}" fill="none" stroke="${color}" stroke-width="2.5" stroke-opacity="0.85" stroke-linejoin="round" stroke-linecap="round" style="cursor:pointer"><title>${titleAttr} (клик: выделить связь, Shift+клик — добавить)</title></path>`);
       return;
     }
 

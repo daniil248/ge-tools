@@ -266,7 +266,12 @@
 .sd-links-svg {
   position: absolute; top: 0; left: 0; pointer-events: none;
   width: 100%; height: 100%;
-  z-index: 5;
+  /* v0.60.156 (по репорту Пользователя 2026-05-04 «линия над стойками
+     должна быть видна, а не прятаться за прочими объектами»): z-index
+     поднят с 5 до 100 — overlay лежит над всеми rack-cards и unit-rows.
+     pointer-events:none на SVG-уровне сохраняется (клик-zone у самих
+     линий через pointer-events:stroke). */
+  z-index: 100;
 }
 .sd-link-path {
   fill: none; stroke-width: 2; opacity: .75;
