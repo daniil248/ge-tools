@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.147', date: '2026-05-04', items: [
+      '🏢 <b>Подписка-секция скрывается для internal-Пользователей</b>. По репорту Пользователя 2026-05-04 «для внутрикорпоративных пользователей не нужно выводить информацию о тарифах».',
+      '• Контекст: после v0.60.140 internal-Пользователи имеют full-access ко всем модулям (subscription-tier игнорируется). Показывать им блок «🎫 Подписка» с тарифами Free/Starter/Pro/Enterprise — лишний шум.',
+      '• <b>shared/global-settings.js</b>:',
+      '  • Порядок секций изменён: сначала «🏢 Внутрикорпоративный доступ + роль», потом «🎫 Подписка».',
+      '  • Subscription-wrap (<code>#rs-gs-subscription-wrap</code>) скрывается через <code>display:none</code> если <code>isInternalUser()===true</code>.',
+      '  • Event delegation на overlay слушает change на <code>#rs-gs-internal-toggle</code> — при переключении тумблера subscription-секция показывается/скрывается + перерендеривается. Stable selector независимо от re-render внутренней секции.',
+      '• <b>UX-эффект</b>:',
+      '  • Внутри-корпоративный сотрудник: видит ТОЛЬКО role-selector (Менеджер/ГИП/Инженер/Наблюдатель) + остальные общие настройки.',
+      '  • Внешний клиент: видит тарифы (Free/Starter/Pro/Enterprise) с кнопками триала, БЕЗ внутри-корпоративных опций.',
+      '  • Тумблер «Я сотрудник организации» остаётся как способ переключить режим.',
+      'Файлы: <code>shared/global-settings.js</code> (порядок секций + sub-wrap show/hide + event delegation на checkbox).',
+    ] },
     { version: '0.60.146', date: '2026-05-04', items: [
       '🎨 <b>cooling: эргономика sidebar-rows (sel-row + option-row)</b>. Применён паттерн <code>feedback_sidebar_item_ergonomics.md</code> (после TW v0.60.143 и service v0.60.145).',
       '• <b>.cl-sel-row</b> (подбор) и <b>.cl-option-row</b> (опция в подборе): grid → flex с min-width:0.',

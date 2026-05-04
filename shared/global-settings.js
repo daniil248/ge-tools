@@ -750,13 +750,24 @@ export function openSettingsModal() {
         <button type="button" class="rs-gs-close" aria-label="Закрыть">×</button>
       </div>
       <div class="rs-gs-body">
-        <h4>🎫 Подписка</h4>
-        <div class="muted" style="margin-bottom:8px" title="Текущий план подписки и доступные модули. Soft-enforcement (бизнес-стимул); calc-libs включены автоматически.">Управление подпиской на модули. Phase 44 v0.60.131+.</div>
-        <div id="rs-gs-subscription-section" style="margin-bottom:18px"></div>
-
+        <!-- v0.60.147 (по репорту Пользователя 2026-05-04 «для внутри-
+             корпоративных пользователей не нужно выводить информацию
+             о тарифах»): порядок — сначала Internal-секция (тумблер +
+             роль), и только если тумблер ВЫКЛЮЧЕН — секция «🎫 Подписка».
+             Для internal-Пользователя плата за модули не существует
+             (full access по v0.60.140), показывать тарифы — лишний шум. -->
         <h4>🏢 Внутрикорпоративный доступ + роль</h4>
         <div class="muted" style="margin-bottom:8px" title="Internal-режим открывает доступ к internalOnly-модулям (📋 Реестр проектов, 📊 Шаблоны отчётов, 🚚 Логистика), не входящим в коммерческие подписки. Роль внутри организации определяет permissions (canCreateProjects и др.).">Внутрикорпоративные модули + роль внутри организации. Phase 44 v0.60.133+.</div>
         <div id="rs-gs-internal-section" style="margin-bottom:18px"></div>
+
+        <!-- Subscription section показывается ТОЛЬКО для внешних Пользо-
+             вателей (не internal). Mounted в openSettingsModal под
+             условием isInternalUser()===false. -->
+        <div id="rs-gs-subscription-wrap" style="display:none">
+          <h4>🎫 Подписка</h4>
+          <div class="muted" style="margin-bottom:8px" title="Текущий план подписки и доступные модули. Soft-enforcement (бизнес-стимул); calc-libs включены автоматически.">Управление подпиской на модули. Phase 44 v0.60.131+.</div>
+          <div id="rs-gs-subscription-section" style="margin-bottom:18px"></div>
+        </div>
 
         <h4>🏢 Реквизиты компании-исполнителя</h4>
         <div class="muted" style="margin-bottom:8px" title="Реквизиты компании-исполнителя для шапки КП клиенту, договоров и отчётов. Сохраняются глобально для всех проектов; per-project override настраивается в свойствах проекта.">Реквизиты для шапки КП и договоров. Используются модулем «🛠 Сервис: монтаж и ТО» при экспорте КП клиенту. v0.60.115: добавлены default-валюта и default-НДС для каскада в калькуляторах.</div>
@@ -797,8 +808,32 @@ export function openSettingsModal() {
   if (orgHost) _renderOrgSection(orgHost);
 
   // v0.60.132 (Phase 44.3): секция «Подписка».
+  // v0.60.147 (по репорту Пользователя 2026-05-04 «для внутрикорпоративных
+  // пользователей не нужно выводить информацию о тарифах»): wrap скрывается
+  // полностью если internal=true. У них full-access ко всем модулям
+  // (v0.60.140), плата не применяется. Sync (show/hide) — event delegation
+  // на overlay body, т.к. _renderInternalRoleSection пере-рендерит свой
+  // host при toggle и стабильную ссылку на checkbox получить нельзя.
+  const subWrap = overlay.querySelector('#rs-gs-subscription-wrap');
   const subHost = overlay.querySelector('#rs-gs-subscription-section');
-  if (subHost) _renderSubscriptionSection(subHost);
+  const _syncSubVisibility = () => {
+    if (!subWrap) return;
+    if (isInternalUser()) {
+      subWrap.style.display = 'none';
+    } else {
+      subWrap.style.display = '';
+      if (subHost) _renderSubscriptionSection(subHost);
+    }
+  };
+  _syncSubVisibility();
+  // Event delegation: при изменении любого checkbox с id=rs-gs-internal-toggle
+  // (даже после re-render внутренней секции) — пересинхронизировать.
+  overlay.addEventListener('change', (ev) => {
+    if (ev.target && ev.target.id === 'rs-gs-internal-toggle') {
+      // setInternalUser уже вызван внутри _renderInternalRoleSection.
+      _syncSubVisibility();
+    }
+  });
 
   // v0.60.135 (Phase 44.3 расширение): секция «Внутрикорпоративный доступ + роль».
   const internalHost = overlay.querySelector('#rs-gs-internal-section');
