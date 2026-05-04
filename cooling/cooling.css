@@ -42,40 +42,105 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 }
 .cl-options-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .cl-sel-block { margin-bottom: 8px; }
+/* v0.60.146: применён паттерн feedback_sidebar_item_ergonomics.md —
+   flex layout с min-width:0 чтобы длинные имена подборов не выдавливали
+   action-кнопки за рамку. Длинные имена → 2-line clamp + word-break. */
 .cl-sel-row {
-  display: grid; grid-template-columns: 1fr auto; gap: 4px 8px;
-  padding: 6px 10px; background: #fef3c7; border: 1px solid #fde68a;
-  border-radius: 4px; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  row-gap: 3px;
+  padding: 8px 12px;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .cl-sel-row:hover { background: #fde68a; }
 .cl-sel-row.active { background: #fbbf24; border-color: #d97706; color: #78350f; }
-.cl-sel-name { color: #92400e; }
-.cl-sel-meta { font-size: 11px; color: #78350f; opacity: 0.75; font-weight: 400; }
+.cl-sel-name {
+  color: #92400e;
+  flex: 1 1 0;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.3;
+}
+.cl-sel-meta {
+  font-size: 11px;
+  color: #78350f;
+  opacity: 0.75;
+  font-weight: 400;
+  flex: 1 1 100%;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.cl-sel-actions {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
 .cl-sel-actions button { background: transparent; border: none; cursor: pointer; padding: 2px 4px; font-size: 11px; color: #78350f; }
 .cl-sel-actions button:hover { color: #b91c1c; }
 .cl-sel-block .cl-option-row {
-  margin-left: 14px; border-radius: 0 0 4px 4px;
+  margin-left: 14px; border-radius: 0 0 5px 5px;
 }
 .cl-option-row.main { border-color: #22c55e; background: #ecfdf5; }
 .cl-option-row.main.active { background: #d1fae5; border-color: #16a34a; }
 .cl-main-badge { font-size: 10px; color: #16a34a; font-weight: 700; margin-left: 4px; }
 .cl-option-actions button:disabled { background: transparent !important; }
 .cl-option-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 4px 8px;
-  padding: 8px 10px;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  row-gap: 3px;
+  padding: 8px 12px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
   font-size: 12px;
-  transition: background 0.1s;
+  transition: background 0.1s, border-color 0.1s;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .cl-option-row:hover { background: #eff6ff; border-color: #93c5fd; }
 .cl-option-row.active { background: #dbeafe; border-color: #1e40af; }
-.cl-option-name { font-weight: 600; color: #1e3a8a; }
-.cl-option-meta { font-size: 11px; color: #64748b; }
+.cl-option-name {
+  font-weight: 600;
+  color: #1e3a8a;
+  flex: 1 1 0;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.3;
+}
+.cl-option-meta {
+  font-size: 11px;
+  color: #64748b;
+  flex: 1 1 100%;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.cl-option-actions {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
 .cl-option-actions button {
   background: transparent; border: none; cursor: pointer; padding: 2px 4px; font-size: 12px; color: #64748b;
 }

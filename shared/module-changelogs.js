@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.146', date: '2026-05-04', items: [
+      '🎨 <b>cooling: эргономика sidebar-rows (sel-row + option-row)</b>. Применён паттерн <code>feedback_sidebar_item_ergonomics.md</code> (после TW v0.60.143 и service v0.60.145).',
+      '• <b>.cl-sel-row</b> (подбор) и <b>.cl-option-row</b> (опция в подборе): grid → flex с min-width:0.',
+      '• Длинные имена подборов и опций — 2-line clamp + word-break (раньше ellipsis обрезал бессмыслицу).',
+      '• Action-кнопки (<b>.cl-sel-actions</b> / <b>.cl-option-actions</b>) — flex-shrink:0, align-self:flex-start.',
+      '• Meta-line (.cl-sel-meta / .cl-option-meta) — flex-basis:100% + overflow-wrap:anywhere для естественного переноса.',
+      '• Padding 8×12 (было 6×10/8×10), border-radius 5px (было 4) — единообразие с TW/service.',
+      '• meteo/station-picker и inspector/ups сознательно НЕ переписаны: их 4-колоночный grid (имя/координаты/расстояние/действие) используется по назначению.',
+      'Файлы: <code>cooling/cooling.css</code> (~70 строк rewrite для .cl-sel-row + .cl-option-row).',
+    ] },
     { version: '0.60.145', date: '2026-05-04', items: [
       '🌡 <b>ASHRAE class: clamp вместо lock</b>. По уточнению Пользователя 2026-05-04 «мне не нужно блокировать ввод, а только ограничить выход за пределы класса».',
       '• Поля T мин/макс, RH мин/макс <b>остаются редактируемыми</b> (убран disabled).',
