@@ -36,6 +36,43 @@ const INSTALL_TO_CHANNEL_KEY = {
   G:  'air_spaced',
   D1: 'ground',            D2: 'ground_direct',
 };
+// v0.60.164 (по репорту Пользователя 2026-05-04 «оповещение что щит без
+// питания, только если щит не подключен к источнику энергии, но данный
+// щит подключен и просто ДГУ на данный момент не запущен»):
+// различаем два состояния:
+//   • orphan — у щита нет ни одной incoming-связи (или они не ведут к источнику).
+//     → статус «Без питания»
+//   • idle (источник подключён, но временно не работает) — есть путь к source/
+//     generator/ups, но _powered=false.
+//     → статус «В резерве» (источник в standby).
+// Helper walking up через incoming connections (БЕЗ учёта breaker on/off
+// и source._running — нам важна только топологическая связность).
+function _hasUpstreamSource(n) {
+  if (!n) return false;
+  const visited = new Set();
+  const stack = [n.id];
+  while (stack.length) {
+    const id = stack.pop();
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const node = state.nodes.get(id);
+    if (!node) continue;
+    if (id !== n.id && (node.type === 'source' || node.type === 'generator')) {
+      return true;
+    }
+    // UPS — это backup-источник. Если UPS на батареях / off — щит ниже его
+    // тоже считаем «idle», т.к. потенциальный источник есть.
+    if (id !== n.id && node.type === 'ups') return true;
+    // Walk up через incoming connections.
+    for (const c of state.conns.values()) {
+      if (c?.to?.nodeId !== id) continue;
+      const fromId = c?.from?.nodeId;
+      if (fromId && !visited.has(fromId)) stack.push(fromId);
+    }
+  }
+  return false;
+}
+
 function resolveChannelKey(n) {
   if (n && n.installMethod && INSTALL_TO_CHANNEL_KEY[n.installMethod]) {
     return INSTALL_TO_CHANNEL_KEY[n.installMethod];
@@ -2326,7 +2363,12 @@ export function renderNodes() {
       ].filter(Boolean);
     } else if (n.type === 'panel') {
       if (n.maintenance) { statusLine = 'Обслуживание'; loadCls += ' off'; }
-      else if (!n._powered) { statusLine = 'Без питания'; loadCls += ' off'; }
+      else if (!n._powered) {
+        // v0.60.164: различаем «orphan» (нет связи с источником) vs «idle»
+        // (связь есть, но источник в standby — например, ДГУ не запущен).
+        statusLine = _hasUpstreamSource(n) ? 'В резерве' : 'Без питания';
+        loadCls += ' off';
+      }
       // v0.59.654: «номин» для щита = СУММА P_ном downstream-нагрузок (а не
       // capacityA × U × cos φ — это физический лимит шин/автомата щита).
       // Юзер: «почему ты номинальную мощность щита считаешь по номиналу
@@ -2359,7 +2401,11 @@ export function renderNodes() {
       }
     } else if (n.type === 'ups') {
       if (!effectiveOn(n)) { statusLine = 'Отключён'; loadCls += ' off'; }
-      else if (!n._powered) { statusLine = 'Без питания'; loadCls += ' off'; }
+      else if (!n._powered) {
+        // v0.60.164: различаем «orphan» vs «idle» (источник в standby).
+        statusLine = _hasUpstreamSource(n) ? 'В резерве' : 'Без питания';
+        loadCls += ' off';
+      }
       else if (n._onStaticBypass) statusLine = 'БАЙПАС';
       else if (n._onBattery) {
         const sec = Math.max(0, Math.round(n._runtimeLeftSec || 0));

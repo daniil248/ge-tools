@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.164', date: '2026-05-04', items: [
+      '🔌 <b>«Без питания» vs «В резерве»</b>: разделение orphan от standby. По двум репортам Пользователя 2026-05-04: «По резерву, если макс 111,4 А а щит 160А, наверное запас все таки есть???» + «оповещение что щит без питания, только если щит не подключен к источнику энергии, но данный щит подключен и просто ДГУ на данный момент не запущен».',
+      '• <b>Свободно vs Запас</b> — formula consistency: <code>Iused = max(_loadA, _maxA)</code> вместо просто <code>_loadA</code>. Раньше при фазовой неравномерности или транзиентах <code>_loadA</code> мог превышать <code>_maxA</code> design-peak, давая Свободно=0 даже когда Запас был положительным. Теперь <code>Свободно = capacity − max(load, design-max)</code>, что согласуется с <code>Запас = (capacity − maxLoad) / capacity × 100</code>.',
+      '• <b>Status «Без питания» vs «В резерве»</b>:',
+      '  • Helper <code>_hasUpstreamSource(n)</code> — BFS через incoming connections, ищет source/generator/ups (без проверки on/off — только топологическая связность).',
+      '  • Если <code>!_powered</code> и есть upstream source → <code>«В резерве»</code> (источник подключён, но временно не работает — например, ДГУ standby или АВР не сработал).',
+      '  • Если <code>!_powered</code> и нет upstream source → <code>«Без питания»</code> (truly orphan).',
+      '  • Применяется и для panel, и для ups.',
+      '• <b>UX</b>: Пользователь больше не видит ложное «Без питания» на щите, который физически подключён к ДГУ — статус честно показывает «В резерве» когда генератор не запущен.',
+      'Файлы: <code>js/engine/recalc.js</code> (Свободно formula использует max(_loadA, _maxA)), <code>js/engine/render.js</code> (+_hasUpstreamSource helper + status differentiation для panel/ups).',
+    ] },
     { version: '0.60.163', date: '2026-05-04', items: [
       '🔌 <b>Inspector клеммной коробки: видимый upstream breaker per-channel</b>. Дополнение к v0.60.161 — Пользователь видит реальную защиту прямо в свойствах щита.',
       '• <b>js/engine/inspector/panel.js</b> — для terminal-mode щита в редакторе цепей рядом с чекбоксом «защитный аппарат» добавлен chip <code>↑ X А</code> с tooltip «Upstream автомат, который защищает эту цепь passthrough\'ом (нет своего автомата в коробке)».',

@@ -3825,15 +3825,19 @@ function recalc() {
     const Imax = Math.min(cableA, brkA);
     if (!Number.isFinite(Imax) || Imax <= 0) continue;
     const limit = (cableA <= brkA) ? 'cable' : 'breaker';
-    // Текущий ток через кабель per-line. c._loadA — фактический расчётный
-    // ток через линию с применёнными Ки и множителем нагрузки сценария
-    // (consumerRatedCurrent / _loadKw); это именно «потребляемый» ток.
-    // Для группы — суммарный по группе → делим на par на per-cable.
-    // Используем _loadA (а не _maxA), чтобы «Свободно» считалось от
-    // фактической рабочей нагрузки, а не от номинала. Пользователь:
-    // «Сами параметры в расчетах применяй согласно правил расчета».
-    const Iused = (Number(c._loadA) || 0) / Math.max(1, _par);
-    const Ifree = Math.max(0, Imax - Iused);
+    // v0.60.164 (по репорту Пользователя 2026-05-04 «По резерву, если
+    // макс 111,4 А а щит 160А, наверное запас все таки есть???»):
+    // используем MAX(_loadA, _maxA) для Iused, чтобы «Свободно» соответствовал
+    // «Запас» (margin %). Раньше использовался только _loadA — но при
+    // фазовой неравномерности или транзиентах _loadA мог превышать
+    // _maxA design-peak, давая Свободно=0 даже когда _maxA < capacity
+    // и Запас был положительным. Теперь Свободно = capacity − max(load, design-max),
+    // что согласуется с Запас = (capacity − maxLoad) / capacity × 100.
+    const _loadA  = Number(c._loadA) || 0;
+    const _maxA   = Number(c._maxA)  || 0;
+    const Iworst  = Math.max(_loadA, _maxA);
+    const Iused   = Iworst / Math.max(1, _par);
+    const Ifree   = Math.max(0, Imax - Iused);
     const U = nodeCalcVoltage(n);
     let Pfree = null;
     if (U && U > 0) {
