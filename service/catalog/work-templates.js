@@ -115,6 +115,10 @@ export function addTemplate(type, tpl) {
     unit: tpl.unit || 'шт',
     costPrice: Number(tpl.costPrice) || 0,
     clientPrice: Number(tpl.clientPrice) || 0,
+    // v0.60.105: per-template currency. Default — резолвится в UI через
+    // resolveDefaultCurrency() на момент создания (project→company→org→user).
+    costCurrency:   tpl.costCurrency   || null,
+    clientCurrency: tpl.clientCurrency || null,
   };
   data[type].push(newTpl);
   saveUserTemplates(data);

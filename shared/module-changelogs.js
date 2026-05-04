@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.105', date: '2026-05-04', items: [
+      '💱 <b>Каскад валюты по умолчанию (project → company → org → user → fallback)</b>. По репорту Пользователя 2026-05-04: «опять про валюты забыл? Валюта по умолчанию должна задаваться в настройках пользователя, в настройках компании и в настройках конкретного проекта».',
+      '• Новый модуль <code>shared/currency-defaults.js</code>: единая <code>CURRENCIES</code> (10 валют), <code>resolveDefaultCurrency(pid)</code> + <code>resolveDefaultCurrencyWithSource(pid)</code> (возвращает источник для UI-tooltip).',
+      '• Каскад: <b>📁 проект</b> (<code>project.economics.displayCurrency</code>) → <b>🏢 компания</b> (<code>company-profile.defaultCurrency</code>) → <b>👥 организация</b> (<code>org-profile.defaultCurrency</code>) → <b>👤 пользователь</b> (<code>raschet.user.defaultCurrency.v1</code>) → <b>⚙ ₽</b> (hardcoded fallback).',
+      '• <b>service work-catalog «+ Новый шаблон»</b> — раньше хардкод «Себес/ед, ₽» / «Клиент/ед, ₽». Теперь — два dropdown\'a валюты (per-cost и per-client price), default из каскада. Подсказка: «Валюта по умолчанию подтянута из 📁 из проекта (или 🏢/👥/👤/⚙)».',
+      '• Шаблон работы хранит <code>costCurrency</code> + <code>clientCurrency</code>. Legacy шаблоны без явной валюты — fallback к каскаду на момент рендера.',
+      '• Таблица каталога — раньше всегда «₽», теперь показывает реальную валюту шаблона.',
+      '👥 <b>ROADMAP Phase 41 «Организация» добавлена</b>. По запросу Пользователя «нужно еще добавить настройки организации (группа людей работающих над общими проектами и имеющая общий настройки шаблонов и общих данных)». Каскад USER → ORG → COMPANY → PROJECT → MODULE. Org-уровень: общие шаблоны работ / прайс-листы / datasheets / element-library + brand-ассеты + roles. Phase 41.6 расширяет каскад на остальные ресурсы (priceList, datasheets, brand).',
+      '🪄 <b>ROADMAP Phase 42 «Мастер составления нарядов» добавлена</b>. По запросу Пользователя 2026-05-04. Wizard-DSL (декларативные сценарии), data-driven (никаких хардкод-комбинаций — всё в каталоге <code>service/catalog/wizards/</code>), 7 seed-сценариев (ТО вентиляции/чиллера/CRAC/ИБП/ДГУ + монтаж DX/чиллер-плант), кросс-модульный pre-fill из cooling/ups-config/tech-workspace, конфигурация и promotion в org-catalog.',
+      'Файлы: <code>shared/currency-defaults.js</code> (новый, ~140 строк, каскадный резолвер), <code>shared/company-profile.js</code> (+defaultCurrency в DEFAULT_COMPANY), <code>service/ui/work-catalog.js</code> (currency dropdowns в editTemplateForm + правильная валюта в renderRows), <code>service/catalog/work-templates.js</code> (costCurrency/clientCurrency persisted), <code>ROADMAP.md</code> (+Phase 41 +Phase 42).',
+    ] },
     { version: '0.60.104', date: '2026-05-04', items: [
       '🔒 <b>Psychrometrics: блокировка полей точки на выходе детерминированного процесса</b>. По репорту Пользователя 2026-05-04: «пластинчатым рекуператором особо не по управляешь, зависимость только от количества воздуха в двух каналах и коэффициентах передачи, а у меня по факту могу задать характеристики точки после рекуператора. Давай ограничим только ввод и изменение только реально управляемых значений для комбинации процесс - точка».',
       '• <b>R (рекуператор)</b> — все 4 поля выходной точки {t, φ, d, h} становятся readonly. Управление только через η/V/ref/режим (sensible/total) на стрелке.',

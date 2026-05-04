@@ -13,6 +13,9 @@ import {
 } from '../catalog/work-templates.js';
 import { ORDER_TYPES, POSITION_CATEGORIES, UNITS } from '../calc/order-model.js';
 import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
+// v0.60.105: каскадный резолвер валюты (project → company → org → user → fallback).
+import { CURRENCIES, resolveDefaultCurrency, resolveDefaultCurrencyWithSource } from '../../shared/currency-defaults.js';
+import { getActiveProjectId } from '../../shared/project-storage.js';
 
 /**
  * Открыть модалку каталога. Возвращает Promise<void> — каталог обновляется
@@ -35,13 +38,18 @@ export async function openWorkCatalogModal() {
       const delBtn = isSeed
         ? '<button type="button" disabled style="opacity:0.3;cursor:not-allowed" title="Встроенный шаблон — нельзя удалить">🗑</button>'
         : `<button type="button" class="wc-del" data-id="${escAttr(t.id)}" title="Удалить пользовательский шаблон">🗑</button>`;
+      // v0.60.105: валюта подтягивается из самого шаблона; legacy без
+      // costCurrency — fallback к каскаду project→company→org→user→₽.
+      const _legacyFallback = resolveDefaultCurrency(getActiveProjectId());
+      const costCur = t.costCurrency || _legacyFallback;
+      const cliCur  = t.clientCurrency || _legacyFallback;
       return `<tr data-tid="${escAttr(t.id)}">
         <td title="${isSeed ? 'Встроенный (read-only)' : 'Пользовательский'}">${lock}</td>
         <td>${escHtml(t.label)}</td>
         <td title="${escAttr(POSITION_CATEGORIES.find(c => c.id === t.category)?.tip || '')}">${escHtml(catLabel)}</td>
         <td>${escHtml(t.unit)}</td>
-        <td class="num">${(t.costPrice || 0).toLocaleString('ru-RU')} ₽</td>
-        <td class="num">${(t.clientPrice || 0).toLocaleString('ru-RU')} ₽</td>
+        <td class="num">${(t.costPrice || 0).toLocaleString('ru-RU')} ${escHtml(costCur)}</td>
+        <td class="num">${(t.clientPrice || 0).toLocaleString('ru-RU')} ${escHtml(cliCur)}</td>
         <td style="white-space:nowrap">${cloneBtn}${editBtn}${delBtn}</td>
       </tr>`;
     }).join('');
@@ -172,12 +180,33 @@ export async function openWorkCatalogModal() {
  * @returns {Promise<object|null>} {label, category, unit, costPrice, clientPrice} или null
  */
 async function editTemplateForm(initial) {
-  const t = initial || { label: '', category: 'labor', unit: 'комплект', costPrice: 0, clientPrice: 0 };
+  // v0.60.105: каскад валюты по умолчанию (project → company → org → user
+  // → fallback). По репорту Пользователя 2026-05-04: «Валюта по умолчанию
+  // должна задаваться в настройках пользователя, в настройках компании и
+  // в настройках конкретного проекта».
+  let pid = null;
+  try { pid = getActiveProjectId(); } catch {}
+  const cascade = resolveDefaultCurrencyWithSource(pid);
+  const defaultCur = cascade.value;
+  const defaultSourceTip = `Валюта по умолчанию: ${cascade.sourceLabel}. Каскад: проект → компания → организация → пользователь → системный дефолт.`;
+
+  const t = initial || {
+    label: '', category: 'labor', unit: 'комплект',
+    costPrice: 0, clientPrice: 0,
+    costCurrency: defaultCur, clientCurrency: defaultCur,
+  };
+  // Бэкап: старые шаблоны без явной валюты — подставляем cascade-default.
+  const tCostCur = t.costCurrency || defaultCur;
+  const tClientCur = t.clientCurrency || defaultCur;
+
   const catOpts = POSITION_CATEGORIES.map(c =>
     `<option value="${c.id}"${c.id === t.category ? ' selected' : ''} title="${escAttr(c.tip)}">${escHtml(c.label)}</option>`
   ).join('');
   const unitOpts = UNITS.map(u =>
     `<option value="${u}"${u === t.unit ? ' selected' : ''}>${escHtml(u)}</option>`
+  ).join('');
+  const curOpts = (selected) => CURRENCIES.map(c =>
+    `<option value="${escAttr(c.code)}"${c.code === selected ? ' selected' : ''} title="${escAttr(c.label)}">${escAttr(c.code)} — ${escAttr(c.label)}</option>`
   ).join('');
 
   const body = `
@@ -194,16 +223,22 @@ async function editTemplateForm(initial) {
         <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">Единица</span>
         <select id="wc-f-unit" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px">${unitOpts}</select>
       </label>
-      <label title="Себестоимость одной единицы (₽). Используется при расчёте маржи.">
-        <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">Себес/ед, ₽</span>
-        <input type="number" min="0" step="100" id="wc-f-cost" value="${Number(t.costPrice) || 0}" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px;text-align:right">
+      <label title="Себестоимость одной единицы. Валюта подтягивается из каскада ${escAttr(cascade.sourceLabel)} — можно переопределить.">
+        <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">Себес/ед</span>
+        <div style="display:flex;gap:4px">
+          <input type="number" min="0" step="100" id="wc-f-cost" value="${Number(t.costPrice) || 0}" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px;text-align:right">
+          <select id="wc-f-cost-cur" style="width:80px;padding:6px 4px;border:1px solid #cbd5e1;border-radius:3px;font-size:11.5px" title="${escAttr(defaultSourceTip)}">${curOpts(tCostCur)}</select>
+        </div>
       </label>
-      <label title="Цена для клиента за одну единицу (₽).">
-        <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">Клиент/ед, ₽</span>
-        <input type="number" min="0" step="100" id="wc-f-client" value="${Number(t.clientPrice) || 0}" style="width:100%;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px;text-align:right">
+      <label title="Цена для клиента за одну единицу. Валюта обычно совпадает с себестоимостной, но может отличаться (напр. покупаем в $, продаём в ₸).">
+        <span style="display:block;font-size:11.5px;color:#475569;margin-bottom:3px">Клиент/ед</span>
+        <div style="display:flex;gap:4px">
+          <input type="number" min="0" step="100" id="wc-f-client" value="${Number(t.clientPrice) || 0}" style="flex:1;padding:6px 8px;border:1px solid #cbd5e1;border-radius:3px;text-align:right">
+          <select id="wc-f-client-cur" style="width:80px;padding:6px 4px;border:1px solid #cbd5e1;border-radius:3px;font-size:11.5px" title="${escAttr(defaultSourceTip)}">${curOpts(tClientCur)}</select>
+        </div>
       </label>
     </div>
-    <p class="muted" style="font-size:11px;margin:8px 0 0">💡 Цены в шаблоне — в ₽. После добавления в наряд можно переключить валюту в строке.</p>
+    <p class="muted" style="font-size:11px;margin:8px 0 0" title="${escAttr(defaultSourceTip)}">💡 Валюта по умолчанию подтянута из <b>${escHtml(cascade.sourceLabel)}</b>. Каскад настройки: проект → компания → организация → пользователь → системный дефолт. Изменить — в свойствах проекта (💰 Экономика) / ⚙ Реквизиты организации / ⚙ Личные настройки.</p>
   `;
   const result = await modalOpen(
     `<h3>${initial ? '✏ Редактирование шаблона' : '+ Новый шаблон'}</h3>`,
@@ -219,6 +254,8 @@ async function editTemplateForm(initial) {
           unit: document.getElementById('wc-f-unit')?.value || 'комплект',
           costPrice: Number(document.getElementById('wc-f-cost')?.value) || 0,
           clientPrice: Number(document.getElementById('wc-f-client')?.value) || 0,
+          costCurrency:   document.getElementById('wc-f-cost-cur')?.value   || defaultCur,
+          clientCurrency: document.getElementById('wc-f-client-cur')?.value || defaultCur,
         },
       };
     }

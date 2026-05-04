@@ -30,6 +30,10 @@ export const DEFAULT_COMPANY = {
   bankRequisites: '',// банковские реквизиты (текстовый блок)
   director: '',      // ФИО руководителя
   logoDataUrl: '',   // base64 image (опционально, в будущем)
+  // v0.60.105: валюта по умолчанию для всей компании. Используется в
+  // каскаде resolveDefaultCurrency (project→company→org→user→fallback).
+  // Пусто = унаследовать с уровня выше (org или user). Символ ('₽','$',...).
+  defaultCurrency: '',
 };
 
 /**
