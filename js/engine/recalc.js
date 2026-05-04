@@ -3125,6 +3125,45 @@ function recalc() {
         break; // один генератор управляет этим щитом
       }
       n._maxLoadKw = panelMaxKw !== null ? panelMaxKw : maxDownstreamLoad(n.id);
+      // v0.60.234 (по запросу Пользователя 2026-05-05 «для панелей так же
+      // введи номинал и расчет, согласно стандартов»): рядом с активным
+      // _maxLoadKw считаем ОБА metric — Pном (без Ки) и Pрасч (× Ки).
+      // Используются для отображения обоих значений в карточке/инспекторе.
+      // Простой walk без кеша, для не-switchPanel панелей.
+      if (panelMaxKw === null) {
+        const _walkBoth = (startId) => {
+          const visitedC = new Set();
+          const visitedN = new Set([startId]);
+          let kwName = 0, kwCalc = 0;
+          const stack = [startId];
+          while (stack.length) {
+            const cur = stack.pop();
+            for (const c2 of state.conns.values()) {
+              if (c2.from.nodeId !== cur || c2.lineMode === 'damaged' || c2.lineMode === 'disabled') continue;
+              const to = state.nodes.get(c2.to.nodeId);
+              if (!to) continue;
+              if (to.type === 'consumer' || to.type === 'consumer-container') {
+                if (visitedC.has(to.id)) continue;
+                visitedC.add(to.id);
+                kwName += consumerMaxDemandKw(to, 'nameplate');
+                kwCalc += consumerMaxDemandKw(to, 'calculated');
+              } else if (to.type === 'generator') {
+                // не идём через генератор
+              } else {
+                if (!visitedN.has(to.id)) { visitedN.add(to.id); stack.push(to.id); }
+              }
+            }
+          }
+          return { kwName, kwCalc };
+        };
+        const both = _walkBoth(n.id);
+        n._maxLoadKwNameplate = both.kwName;
+        n._maxLoadKwCalculated = both.kwCalc;
+      } else {
+        // Для switchPanel — пока используем единое значение.
+        n._maxLoadKwNameplate = panelMaxKw;
+        n._maxLoadKwCalculated = panelMaxKw;
+      }
       // v0.60.228 (по репорту Пользователя 2026-05-05 «не понимаю откуда ток
       // 171 А и 116 кВт, если максимум 75.6 кВт и 112.2 А»): sanity-clamp.
       // По определению «Максимум» ≥ «Текущая». Если walkUp-ная _loadKw

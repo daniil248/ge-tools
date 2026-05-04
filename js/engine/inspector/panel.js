@@ -2353,7 +2353,23 @@ export function panelStatusBlock(n) {
   if (n._powered) parts.push('<span class="badge on">запитан</span>');
   else parts.push('<span class="badge off">без питания</span>');
   // Максимальная расчётная нагрузка
-  if (n._maxLoadKw) parts.push(`<b>Максимум:</b> ${fmt(n._maxLoadKw)} kW · ${fmt(n._maxLoadA || 0)} A`);
+  // v0.60.234 (по запросу Пользователя 2026-05-05 «для панелей так же введи
+  // номинал и расчет, согласно стандартов»): показываем активный «Макс»
+  // плюс рядом справочно — обе метрики (Pуст / Pрасч). Активная определяется
+  // настройкой GLOBAL.panelMaxBasis (Параметры расчёта → База расчёта «Макс»).
+  if (n._maxLoadKw) {
+    const _basis = (typeof GLOBAL.panelMaxBasis === 'string') ? GLOBAL.panelMaxBasis : 'nameplate';
+    const _basisLbl = _basis === 'calculated' ? 'P<sub>расч</sub>' : 'P<sub>уст</sub>';
+    parts.push(`<b>Максимум (${_basisLbl}):</b> ${fmt(n._maxLoadKw)} kW · ${fmt(n._maxLoadA || 0)} A`);
+    // Справочно — обе метрики (если они различаются).
+    if (Number.isFinite(n._maxLoadKwNameplate) && Number.isFinite(n._maxLoadKwCalculated)
+        && Math.abs(n._maxLoadKwNameplate - n._maxLoadKwCalculated) > 0.05) {
+      parts.push(`<span class="muted" style="font-size:11px"
+        title="P_уст — сумма паспортных мощностей (Σ P_ном) без К_и. Pном — консервативная оценка. P_расч — Σ (P_ном × К_и) согласно ПУЭ 1.3.13 / IEC 60364-3 §311.1. Активная для подбора: ${_basis === 'calculated' ? 'P_расч' : 'P_уст'} (см. Параметры расчёта).">
+        — справочно: P<sub>уст</sub> ${fmt(n._maxLoadKwNameplate)} kW · P<sub>расч</sub> ${fmt(n._maxLoadKwCalculated)} kW
+      </span>`);
+    }
+  }
   // Текущая нагрузка
   parts.push(`<b>Текущая:</b> ${fmt(n._powerP || 0)} kW · ${fmt(n._loadA || 0)} A`);
   parts.push(`Q реакт.: ${fmt(n._powerQ || 0)} kvar · S полн.: ${fmt(n._powerS || 0)} kVA`);

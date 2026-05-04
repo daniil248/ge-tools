@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.234', date: '2026-05-05', items: [
+      '📊 <b>Panel: P<sub>уст</sub> + P<sub>расч</sub> рядом со справочной строкой</b>. По запросу Пользователя 2026-05-05 «для панелей так же введи номинал и расчет, согласно стандартов».',
+      '• В recalc.js для panel (без switchPanelId) делается параллельный walk downstream и вычисляются ОБА: <code>n._maxLoadKwNameplate</code> = Σ P<sub>ном</sub> (Pуст) и <code>n._maxLoadKwCalculated</code> = Σ (P<sub>ном</sub> × К<sub>и</sub>) (Pрасч).',
+      '• В инспекторе строка «Максимум» теперь показывает: <b>заголовок с пометкой какая метрика активна (P<sub>уст</sub> или P<sub>расч</sub>)</b> + справочную строку с обеими цифрами, если они различаются.',
+      '• Активная метрика (для подбора кабеля/автомата) = <code>panelMaxBasis</code> setting (v0.60.232).',
+      '• Tooltip объясняет различие и где переключить.',
+      'Файлы: <code>js/engine/recalc.js</code> (двойной walk), <code>js/engine/inspector/panel.js</code> (panelStatusBlock), <code>js/engine/electrical.js</code> (consumerMaxDemandKw + basisOverride).',
+    ] },
     { version: '0.60.233', date: '2026-05-05', items: [
       '🪄 <b>Cable journal: per-row sizing для виртуальных строк групп</b>. По уточнению Пользователя 2026-05-05 «если бы это был один кабель к группе из 8 потребителей, я бы с тобой согласился» — т.е. контейнер = упрощение N отдельных кабелей.',
       '• Каждая виртуальная строка журнала (раскрытие consumer-container или consumer.count>1) получает <b>своё</b> сечение под P<sub>ном</sub> ОДНОГО прибора. Раньше все строки группы имели одинаковое сечение от parent-conn.',

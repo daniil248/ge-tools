@@ -470,8 +470,12 @@ export function consumerCalcDemandKw(n) {
 // Не путать с consumerNominalCurrent для линии К ОДНОМУ потребителю —
 // там всегда работает Pном. Этот хелпер только для АГРЕГАЦИИ нескольких
 // потребителей (щит, секция, sibling-union).
-export function consumerMaxDemandKw(n) {
-  const basis = (typeof GLOBAL.panelMaxBasis === 'string') ? GLOBAL.panelMaxBasis : 'nameplate';
+//
+// v0.60.234: добавлен параметр basisOverride — для расчёта обоих метрик
+// (n._maxLoadKwNameplate и n._maxLoadKwCalculated) на одном узле.
+export function consumerMaxDemandKw(n, basisOverride) {
+  const basis = basisOverride
+    || ((typeof GLOBAL.panelMaxBasis === 'string') ? GLOBAL.panelMaxBasis : 'nameplate');
   if (basis === 'calculated') return consumerCalcDemandKw(n);
   return consumerTotalDemandKw(n);
 }
