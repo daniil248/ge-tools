@@ -3568,18 +3568,23 @@ function recalc() {
       if (n.type !== 'panel') continue;
       panelDownstream.set(n.id, _walkConsumers(n.id));
     }
-    // Группируем sibling-ов по ПРЕИМУЩЕСТВЕННОМУ пересечению.
-    // v0.60.235 (по репорту Пользователя 2026-05-05 «ты зачем 3 панель
-    // испортил, на ней лампочки и немного нагревателей, мне не нужно к
-    // всем панелям подключенным к общей панели применять одинаковые
-    // параметры, идем только от нагрузки»):
-    // КРИТЕРИЙ: |A ∩ B| / min(|A|, |B|) ≥ 0.5. То есть для двух панелей
-    // ≥50% потребителей меньшей из них должны быть в обеих. Это отделяет:
-    //   • IT1+IT2 (100% общий пул) — siblings ✓
-    //   • AC vs IT (1 общий резервный потребитель из 7-30) — НЕ siblings ✓
-    // Раньше любое пересечение делало группу — это было слишком агрессивно
-    // (резервные cross-feeds для АГПТ/Слаботочки ошибочно склеивали все).
-    const SIBLING_OVERLAP_THRESHOLD = 0.5;
+    // Группируем sibling-ов по СИММЕТРИЧНОМУ пересечению (Jaccard).
+    // v0.60.248 (по репорту Пользователя 2026-05-05 console-log показал
+    // siblingGroup из 25 PDC-панелей, что приводило к Макс=1777 кВт):
+    // КРИТЕРИЙ: |A ∩ B| / |A ∪ B| ≥ 0.7 (Jaccard, симметрично).
+    // Раньше |A ∩ B| / min(|A|, |B|) ≥ 0.5 — ловил ложные совпадения,
+    // когда у маленькой панели мало consumer-ов, и доля shared казалась
+    // большой. Jaccard симметричный — требует чтобы оба set-а были
+    // ПОЧТИ одинаковыми.
+    //
+    // Эффект:
+    //   • PDC1+PDC2 (truly parallel, set одинаков) — Jaccard=1.0 → siblings ✓
+    //   • PDC3+PDC4 (другая пара parallel) — отдельная группа ✓
+    //   • PDC1 и PDC5 с 1 общим consumer (cross-feed резервирование)
+    //     — Jaccard = 1/4 = 0.25 < 0.7 → НЕ siblings ✓
+    //   • IT1+IT2 для Темиртау (100% общих) — Jaccard=1.0 → siblings ✓
+    //   • AC vs IT (1 общий АГПТ-cross-feed) — Jaccard ≈ 0.1 → НЕ siblings ✓
+    const SIBLING_JACCARD_THRESHOLD = 0.7;
     const panelIds = [...panelDownstream.keys()];
     const assigned = new Set();
     const groups = [];
@@ -3588,17 +3593,17 @@ function recalc() {
       const group = [a];
       assigned.add(a);
       const aSet = panelDownstream.get(a);
-      if (!aSet || !aSet.size) continue; // panel без downstream — не sibling
+      if (!aSet || !aSet.size) continue;
       for (const b of panelIds) {
         if (a === b || assigned.has(b)) continue;
         const bSet = panelDownstream.get(b);
         if (!bSet || !bSet.size) continue;
-        // Считаем пересечение и сравниваем с min(|A|,|B|).
+        // Jaccard = |A ∩ B| / |A ∪ B|.
         let overlapCount = 0;
         for (const x of aSet) if (bSet.has(x)) overlapCount++;
-        const minSize = Math.min(aSet.size, bSet.size);
-        const ratio = minSize > 0 ? overlapCount / minSize : 0;
-        if (ratio >= SIBLING_OVERLAP_THRESHOLD) {
+        const unionSize = aSet.size + bSet.size - overlapCount;
+        const jaccard = unionSize > 0 ? overlapCount / unionSize : 0;
+        if (jaccard >= SIBLING_JACCARD_THRESHOLD) {
           group.push(b);
           assigned.add(b);
         }

@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.248', date: '2026-05-05', items: [
+      '🎯 <b>Sibling-detection: симметричный Jaccard (≥0.7)</b>. По диагностике Пользователя 2026-05-05 — console.log показал siblingGroup из 25 панелей в S3-проекте (TBC Bank), что давало Макс 1777 кВт.',
+      '• Корень: критерий v0.60.235 <code>|A ∩ B| / min(|A|, |B|) ≥ 0.5</code> — ловил ложные совпадения. Когда одна panel маленькая (2 consumer-а), а другая большая (10), 1 общий consumer давал ratio = 1/2 = 50% и они становились siblings — хотя реально это лишь cross-feed для резервирования.',
+      '• Фикс: симметричный <b>Jaccard</b> = <code>|A ∩ B| / |A ∪ B| ≥ 0.7</code>. Требует чтобы оба set-а были почти одинаковыми, а не просто «маленький подмножество большого».',
+      '• Эффект:',
+      '   — PDC1+PDC2 (truly parallel, одинаковый set) — Jaccard=1.0 → siblings ✓',
+      '   — PDC3+PDC4 (другая пара parallel) — отдельная группа ✓',
+      '   — PDC1 и PDC5 с 1 общим consumer — Jaccard=0.25 < 0.7 → НЕ siblings ✓',
+      '   — Темиртау IT1+IT2 (100% общих) — siblings, остаётся 97.3 кВт ✓',
+      '   — Темиртау AC (1 общий АГПТ) — НЕ sibling, остаётся ~7-8 кВт ✓',
+      'Файл: <code>js/engine/recalc.js</code> (sibling-detection criterion).',
+    ] },
     { version: '0.60.247', date: '2026-05-05', items: [
       '🩹 <b>Fix regression v0.60.242: BFS от consumer ТОЛЬКО к consumer/container</b>. По репорту Пользователя 2026-05-05 «потребители на мощность 225 кВт + 10 кВт дают на панели Макс 1777,4 кВт».',
       '• Корень: v0.60.242 убирал <code>continue</code> на consumer-узле для поддержки downstream sub-consumers (L10 outdoor за L7 conditioner). Но walk от consumer проходил ВСЕ outgoing conns, включая случайные backward-feed к panel/ups — BFS «выскакивал» из подсистемы и собирал чужую нагрузку.',
