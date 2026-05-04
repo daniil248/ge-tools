@@ -6437,7 +6437,12 @@ function renderConsumersTable() {
   // щита группа же подключена к конкретному щиту??»): если consumer —
   // slot-член consumer-container, у него нет прямой conn от панели
   // (conn идёт от панели к контейнеру). Fallback: ищем parent контейнера.
-  const parentPanelById0 = new Map();
+  // v0.60.246 (по репорту Пользователя 2026-05-05 «у этих нагрузок 2
+  // питающих щита, вводи один над другим, но в одной строке»): теперь
+  // собираем ВСЕ питающие щиты (multi-input — P1, P2 в АВР/parallel),
+  // не только первый. Map<nodeId, Panel[]>. Первый элемент — primary
+  // (для backward-compat фильтров и поиска).
+  const parentPanelById0 = new Map(); // nodeId → Panel[] (все питающие)
   // Pre-build: containerByMemberId map
   const _containerByMember = new Map();
   for (const cn of S.nodes.values()) {
@@ -6446,28 +6451,30 @@ function renderConsumersTable() {
       if (s && s.kind === 'linked' && s.nodeId) _containerByMember.set(s.nodeId, cn);
     }
   }
-  for (const n of consumers) {
-    let parent = null;
-    // 1) Прямая conn от панели/ИБП к этому consumer.
+  // Helper: собрать все panel/ups parents для целевого узла.
+  const _collectParents = (targetId) => {
+    const list = [];
+    const seen = new Set();
     for (const c of S.conns.values()) {
-      if (c.to?.nodeId === n.id) {
-        const from = S.nodes.get(c.from?.nodeId);
-        if (from && (from.type === 'panel' || from.type === 'ups')) { parent = from; break; }
-      }
+      if (c.to?.nodeId !== targetId) continue;
+      const from = S.nodes.get(c.from?.nodeId);
+      if (!from || (from.type !== 'panel' && from.type !== 'ups')) continue;
+      if (seen.has(from.id)) continue;
+      seen.add(from.id);
+      // Сортировка по input-порту, чтобы P1 был первым.
+      list.push({ panel: from, port: c.to.port | 0 });
     }
-    // 2) Если consumer — член контейнера, берём parent контейнера.
-    if (!parent) {
+    list.sort((a, b) => a.port - b.port);
+    return list.map(x => x.panel);
+  };
+  for (const n of consumers) {
+    let parents = _collectParents(n.id);
+    // Fallback: если consumer — член контейнера, берём parents контейнера.
+    if (!parents.length) {
       const container = _containerByMember.get(n.id);
-      if (container) {
-        for (const c of S.conns.values()) {
-          if (c.to?.nodeId === container.id) {
-            const from = S.nodes.get(c.from?.nodeId);
-            if (from && (from.type === 'panel' || from.type === 'ups')) { parent = from; break; }
-          }
-        }
-      }
+      if (container) parents = _collectParents(container.id);
     }
-    parentPanelById0.set(n.id, parent);
+    parentPanelById0.set(n.id, parents);
   }
 
   const F = _consumersTableFilters;
@@ -6486,16 +6493,16 @@ function renderConsumersTable() {
       if ((n.consumerSubtype || '') !== F.subtype) return false;
     }
     if (exceptKey !== 'parent' && F.parent) {
-      const p = parentPanelById0.get(n.id);
-      const pTag = p ? (_effectiveTag(p) || p.tag || p.name || '') : '';
-      if (pTag !== F.parent) return false;
+      // v0.60.246: parents теперь массив; фильтр matches если ЛЮБОЙ из parents совпадает.
+      const ps = parentPanelById0.get(n.id) || [];
+      const matched = ps.some(p => (_effectiveTag(p) || p.tag || p.name || '') === F.parent);
+      if (!matched) return false;
     }
     if (F.ancestorIds && !F.ancestorIds.has(n.id)) return false;
     if (q) {
       const catLabel = _resolveCatalogEntry(n)?.label || '';
-      const pTag = parentPanelById0.get(n.id)
-        ? (_effectiveTag(parentPanelById0.get(n.id)) || '')
-        : '';
+      const ps = parentPanelById0.get(n.id) || [];
+      const pTag = ps.map(p => _effectiveTag(p) || '').filter(Boolean).join(' ');
       const hay = [n.tag, n.name, catLabel, n.phase, pTag].filter(Boolean).join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
@@ -6516,8 +6523,9 @@ function renderConsumersTable() {
       if (sub) distinctSubs.add(sub);
     }
     if (_passesFilter(n, 'parent')) {
-      const p = parentPanelById0.get(n.id);
-      if (p) distinctParents.add(_effectiveTag(p) || p.tag || p.name || '?');
+      // v0.60.246: добавляем КАЖДОГО из parents в distinct.
+      const ps = parentPanelById0.get(n.id) || [];
+      for (const p of ps) distinctParents.add(_effectiveTag(p) || p.tag || p.name || '?');
     }
   }
 
@@ -6534,7 +6542,9 @@ function renderConsumersTable() {
       case 'name': return (n.name || '').toLowerCase();
       case 'category': return (_resolveCatalogEntry(n)?.label || '').toLowerCase();
       case 'parent': {
-        const p = parentPanelById.get(n.id);
+        // v0.60.246: parents теперь массив; сортируем по первому (primary).
+        const ps = parentPanelById.get(n.id) || [];
+        const p = ps[0];
         return p ? (_effectiveTag(p) || p.tag || p.name || '').toLowerCase() : '~';
       }
       case 'demand': return Number(n.demandKw) || 0;
@@ -6684,10 +6694,21 @@ function renderConsumersTable() {
         ${ifShow('tag', `<td style="padding:5px 8px;font-weight:600"><a href="#" class="ctc-jump" data-id="${esc(n.id)}" title="Перейти к потребителю на схеме" style="color:#1976d2;text-decoration:none">${esc(n.tag || '?')} <span style="font-size:10px;opacity:0.7">↗</span></a></td>`)}
         ${ifShow('name', `<td style="padding:5px 8px"><input class="ctc-name" data-id="${esc(n.id)}" type="text" value="${esc(n.name || '')}" style="width:140px;padding:3px 6px;font-size:11px"></td>`)}
         ${ifShow('parent', `<td style="padding:5px 8px;font-size:11px">${(() => {
-          const p = parentPanelById.get(n.id);
-          if (!p) return '<span class="muted" style="color:#c62828;font-size:10px" title="Нет входящего питания">— orphan —</span>';
-          const pt = _effectiveTag(p) || p.tag || p.name || '?';
-          return `<a href="#" class="ctc-parent-jump" data-parent-id="${esc(p.id)}" style="color:#1976d2;text-decoration:none">${esc(pt)}</a>`;
+          // v0.60.246 (по запросу Пользователя 2026-05-05 «у этих нагрузок 2
+          // питающих щита, вводи один над другим, но в одной строке»):
+          // показываем ВСЕ питающие щиты стопкой с метками P1/P2/...
+          const ps = parentPanelById.get(n.id) || [];
+          if (!ps.length) return '<span class="muted" style="color:#c62828;font-size:10px" title="Нет входящего питания">— orphan —</span>';
+          if (ps.length === 1) {
+            const p = ps[0];
+            const pt = _effectiveTag(p) || p.tag || p.name || '?';
+            return `<a href="#" class="ctc-parent-jump" data-parent-id="${esc(p.id)}" style="color:#1976d2;text-decoration:none">${esc(pt)}</a>`;
+          }
+          // Multiple feeds — stack them with P1/P2/... labels.
+          return '<div style="display:flex;flex-direction:column;gap:1px;line-height:1.3">' + ps.map((p, i) => {
+            const pt = _effectiveTag(p) || p.tag || p.name || '?';
+            return `<div style="display:flex;align-items:center;gap:4px"><span class="muted" style="font-size:9px;color:#64748b;font-weight:600;min-width:18px" title="Вход ${i+1}">P${i+1}</span><a href="#" class="ctc-parent-jump" data-parent-id="${esc(p.id)}" style="color:#1976d2;text-decoration:none">${esc(pt)}</a></div>`;
+          }).join('') + '</div>';
         })()}</td>`)}
         ${ifShow('category', `<td style="padding:5px 8px;font-size:11px"><div>${esc(catLabel)}</div><div class="muted" style="font-size:10px">${esc(CAT_LABELS[catCat] || catCat)}</div></td>`)}
         ${ifShow('subtype', (() => {

@@ -564,6 +564,24 @@ export function openPanelParamsModal(n) {
       h.push('</div>');
     } else {
       // v0.59.328: клеммная коробка — редактор цепей и перемычек.
+      // v0.60.245 (по репорту Пользователя 2026-05-05 «я тебя ранее просил
+      // добавить номинал клеммной коробки? где?»): добавлен Номинал (In, А)
+      // отдельным полем — лимит пропускной способности корпуса/шинок.
+      // Используется для расчёта Свободно/Запас на карточке коробки.
+      {
+        const curA = n.capacityA ?? 100;
+        let opts = '';
+        let hasCur = false;
+        for (const v of BREAKER_SERIES) {
+          if (v === curA) hasCur = true;
+          opts += `<option value="${v}"${v === curA ? ' selected' : ''}>${v} А</option>`;
+        }
+        if (!hasCur) opts = `<option value="${curA}" selected>${curA} А</option>` + opts;
+        h.push(`<div class="field">
+          <label>Номинал клеммной коробки (In, А)${helpIcon('Номинальный ток корпуса / клеммников коробки. Лимитирует суммарный ток всех цепей. Используется для расчёта запаса и индикации перегруза. Стандартный ряд: 16/25/32/40/63/80/100/125/160/200/250 А.')}</label>
+          <select id="pp-capacityA">${opts}</select>
+        </div>`);
+      }
       h.push(`<div class="muted" style="font-size:11px;margin-bottom:8px">Клеммная коробка — пассивный узел: клеммник + корпус. Вход i → выход i. В каждой цепи можно поставить защитный аппарат; перемычки между входами допустимы только <b>до защиты</b>.</div>`);
       const N = n.inputs || 0;
       const prot = Array.isArray(n.channelProtection) ? n.channelProtection : [];
@@ -1004,7 +1022,8 @@ export function openPanelParamsModal(n) {
         }
       });
       n.channelJumpers = jumps;
-      n.capacityA = 0;
+      // v0.60.245: capacityA для клеммной коробки теперь редактируемый
+      // (было n.capacityA = 0 — игнорировался). Читается через readNum ниже.
       n.kSim = 1;
     }
     n.kSim = readNum('pp-kSim', n.kSim ?? 1);
