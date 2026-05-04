@@ -397,7 +397,17 @@ function _downloadText(text, filename, mime) {
 async function init() {
   ensureDefaultSketch();
   const list = loadSketchList();
-  _activeSketchId = list[0]?.id;
+  // v0.60.170: поддержка ?sketch=<sid> URL-параметра — для перехода из
+  // reverse-link chip (shared/sketch-refs-reverse.js) с уже выбранным sid.
+  let initialSid = list[0]?.id;
+  try {
+    const params = new URLSearchParams(location.search);
+    const fromUrl = params.get('sketch');
+    if (fromUrl && list.some(s => s.id === fromUrl)) {
+      initialSid = fromUrl;
+    }
+  } catch {}
+  _activeSketchId = initialSid;
   renderSketchSelect();
   wireToolbar();
 

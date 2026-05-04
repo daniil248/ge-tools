@@ -4,6 +4,10 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.170', date: '2026-05-04', items: [
+      '🔗 <b>Sketch URL-deep-link</b>: <code>?sketch=&lt;sid&gt;</code> поддержка в sketch.js init. Когда reverse-link chip (<code>shared/sketch-refs-reverse.js</code>) открывает sketch из popover\'a — приходит уже с этим sketch\'ем выбранным, а не на первом из списка. Phase 3.5 follow-up.',
+      'Файл: <code>sketch/sketch.js</code> (init читает <code>?sketch=</code> URL-param, fallback на <code>list[0]?.id</code>).',
+    ] },
     { version: '0.60.169', date: '2026-05-04', items: [
       '🔁 <b>Reverse-link chips: «📎 N sketch\'ей»</b> в исходных модулях. Phase 3.5 ROADMAP — продолжение v0.60.168.',
       '• <b>Идея</b>: после v0.60.168 sketch\'и могут ссылаться на стойки, схемы, НКУ, ИБП и т.д. Но из исходного модуля было непонятно, упоминается ли данный объект где-то в sketch\'ах. Теперь рядом с каждым referenceable объектом — чип <code>📎 N sketch\'ей</code> с popover\'ом списка и переходом.',
