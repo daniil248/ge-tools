@@ -47,19 +47,31 @@ let _pendingLoad = null;
 const $ = (id) => document.getElementById(id);
 
 // ─── Source resolution: self-hosted vs CDN ──────────────────────────────────
+// v0.60.167 (по репорту Пользователя «что то не работает»): self-hosted
+// detection теперь через VERSION-файл (легче чем HEAD на index.html, который
+// шумит 404 в консоли). Если drawio-app/VERSION читается → используем local.
+// Иначе — silently fallback на embed.diagrams.net.
 async function resolveDrawioSrc() {
-  // Try self-hosted ./drawio-app/index.html first (HEAD-check).
   const localPath = './drawio-app/index.html';
+  const versionPath = './drawio-app/VERSION';
   try {
-    const res = await fetch(localPath, { method: 'HEAD', cache: 'no-cache' });
+    // GET тихо проваливается без консольного error если drawio-app/ нет
+    // (нужен silent mode — ловим 404 без шума).
+    const res = await fetch(versionPath, { cache: 'no-cache' });
     if (res.ok) {
-      const params = '?embed=1&proto=json&spin=1&modified=unsavedChanges'
-        + '&keepmodified=1&saveAndExit=0&noSaveBtn=0&libraries=1&ui=kennedy&lang=ru';
-      return localPath + params;
+      const text = await res.text();
+      if (text && text.trim().length > 0) {
+        const params = '?embed=1&proto=json&modified=unsavedChanges'
+          + '&keepmodified=1&saveAndExit=0&noSaveBtn=0&libraries=1&ui=kennedy&lang=ru';
+        return localPath + params;
+      }
     }
-  } catch {}
-  // Fallback: official hosted drawio (embed.diagrams.net).
-  return 'https://embed.diagrams.net/?embed=1&proto=json&spin=1'
+  } catch (e) {
+    // 404 / network error → silent fallback. Не логируем — это ожидаемо
+    // для дефолтной установки без self-hosted drawio.
+  }
+  // Fallback: официальный hosted drawio (embed.diagrams.net).
+  return 'https://embed.diagrams.net/?embed=1&proto=json'
        + '&modified=unsavedChanges&keepmodified=1&saveAndExit=0'
        + '&noSaveBtn=0&libraries=1&ui=kennedy&lang=ru';
 }
@@ -359,12 +371,29 @@ async function init() {
     ? '✓ drawio (self-hosted)'
     : '✓ drawio (embed.diagrams.net)');
   const iframe = $('sk-drawio-iframe');
-  if (iframe) iframe.src = src;
+  if (iframe) {
+    // v0.60.167: iframe.onload — fallback hide loading-overlay через 3 сек
+    // после load-event (на случай если drawio init-message не пришёл).
+    iframe.addEventListener('load', () => {
+      // Если init-event не пришёл за 3 сек после load — всё равно
+      // снимаем overlay (drawio мог загрузиться, но не отправить init
+      // из-за разных embed-конфигов).
+      setTimeout(() => {
+        if (!_drawioReady) {
+          setLoadingVisible(false);
+          setStatus(isLocal
+            ? '⚠ drawio загружен (self-hosted), init не пришёл'
+            : '⚠ drawio загружен (embed.diagrams.net), init не пришёл');
+        }
+      }, 3000);
+    });
+    iframe.src = src;
+  }
 
   // Если drawio не отвечает init за 8 сек — подсказка о fallback.
   setTimeout(() => {
     if (!_drawioReady) {
-      setStatus('⚠ drawio долго не отвечает. Проверьте интернет.');
+      setStatus('⚠ drawio долго не отвечает. Проверьте интернет / firewall.');
     }
   }, 8000);
 }

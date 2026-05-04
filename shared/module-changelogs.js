@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.167', date: '2026-05-04', items: [
+      '🩹 <b>sketch hotfix v0.60.166</b>: silent self-hosted detection + iframe-load fallback. По репорту Пользователя «что то не работает».',
+      '• <b>Self-hosted detection через VERSION-файл</b>: вместо HEAD-check на <code>./drawio-app/index.html</code> (который шумел 404 в консоли при отсутствии self-hosted) — теперь GET на <code>./drawio-app/VERSION</code> (легче и tighter detection).',
+      '• <b>Silent fallback</b>: 404 ошибка не логируется, она ожидаема для дефолтной установки без self-hosted drawio.',
+      '• <b>iframe.onload + 3s timeout</b>: если drawio загрузился, но не отправил <code>init</code> postMessage за 3 сек — overlay снимается с warning (drawio загружен, но init не пришёл). Раньше overlay висел вечно если embed-протокол не дал init.',
+      '• <b>8-сек timeout</b>: если drawio совсем не отвечает за 8 сек — подсказка «Проверьте интернет / firewall».',
+      '• Убран <code>spin=1</code> из embed URL (у нас свой spinner — не нужен дублирующий drawio-spinner).',
+      'Файлы: <code>sketch/sketch.js</code> (resolveDrawioSrc + iframe.onload fallback).',
+    ] },
     { version: '0.60.166', date: '2026-05-04', items: [
       '🎨 <b>Скетч-модуль: переход на ОФИЦИАЛЬНЫЙ drawio (jgraph/drawio)</b>. По репорту Пользователя 2026-05-04 «давай drawio просто заберем с гитхаба и интегрируем в наш продукт https://github.com/jgraph/drawio, вместо нашего псевдо drawio» + «обновлять так же будем с гитхаба».',
       '• <b>Удалены</b>: <code>sketch/shape-library.js</code> + <code>sketch/library-store.js</code> (псевдо-drawio с 6 категориями фигур и custom-библиотеками). drawio имеет полный набор официальных библиотек (BPMN, AWS, Azure, GCP, networking, electrical, UML, mindmap, и т.д. — сотни фигур), наш велосипед был лишним.',
