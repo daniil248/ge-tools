@@ -6,6 +6,7 @@ import { getEcoMethod } from '../methods/economic/index.js';
 import { nodeVoltage, nodeVoltageLN, nodeCalcVoltage, nodeCalcVoltageEff, isThreePhase, nodeWireCount, cableWireCount, computeCurrentA,
          consumerNominalCurrent, consumerRatedCurrent, consumerInrushCurrent,
          consumerTotalDemandKw, consumerCountEffective, consumerCalcDemandKw, consumerGroupItems,
+         consumerMaxDemandKw,
          upsChargeKw, sourceImpedance, isNodeDC, effectiveUpsCapacity } from './electrical.js';
 import { CONSUMER_CATALOG, STARTER_TYPES } from './constants.js';
 import { effectiveOn, effectiveLoadFactor } from './modes.js';
@@ -431,7 +432,8 @@ function _bfsDownstreamWithActiveTies(startId, activeTieKeys) {
     if (cur.type === 'consumer') {
       if (!visitedConsumers.has(curId)) {
         visitedConsumers.add(curId);
-        const kw = consumerTotalDemandKw(cur);
+        // v0.60.232: GLOBAL.panelMaxBasis ('nameplate' = Pуст / 'calculated' = Pрасч).
+        const kw = consumerMaxDemandKw(cur);
         if (throughUps) upsConsumerKw += kw; else directKw += kw;
       }
       continue;
@@ -1948,7 +1950,12 @@ function recalc() {
     // Кабель должен выдержать максимально возможную нагрузку через ДАННУЮ связь.
     let maxKwDownstream;
     if (toN.type === 'consumer' || toN.type === 'consumer-container') {
-      maxKwDownstream = consumerTotalDemandKw(toN);
+      // v0.60.232: для линии к одному потребителю — Pном (consumerTotalDemandKw)
+      // правильно для подбора кабеля/автомата конкретного прибора.
+      // Для линии к группе/контейнеру — учитываем GLOBAL.panelMaxBasis.
+      maxKwDownstream = (toN.type === 'consumer-container')
+        ? consumerMaxDemandKw(toN)
+        : consumerTotalDemandKw(toN);
     } else if (toN.type === 'ups') {
       // Для линии К ИБП: макс. нагрузка = min(номинал, share_downstream) / КПД + charge
       const capKw = Number(toN.capacityKw) || 0;
@@ -3078,7 +3085,8 @@ function recalc() {
               if (!to) continue;
               if (to.type === 'consumer') {
                 if (visitedC.has(to.id)) continue; visitedC.add(to.id);
-                const kw = consumerTotalDemandKw(to);
+                // v0.60.232: учёт GLOBAL.panelMaxBasis.
+                const kw = consumerMaxDemandKw(to);
                 if (thruUps) uKw += kw; else dKw += kw;
               } else if (to.type === 'ups') {
                 if (visitedU.has(to.id)) continue; visitedU.add(to.id);
@@ -3335,7 +3343,8 @@ function recalc() {
               if (to.type === 'consumer') {
                 if (visitedC.has(to.id)) continue;
                 visitedC.add(to.id);
-                const kw = consumerTotalDemandKw(to);
+                // v0.60.232: учёт GLOBAL.panelMaxBasis.
+                const kw = consumerMaxDemandKw(to);
                 if (throughUps) upsConsKw += kw; else directKw += kw;
               } else if (to.type === 'ups') {
                 if (visitedU.has(to.id)) continue;
@@ -3505,7 +3514,8 @@ function recalc() {
       for (const cid of unionConsumers) {
         const c = state.nodes.get(cid);
         if (!c) continue;
-        unionKw += consumerTotalDemandKw(c);
+        // v0.60.232: учёт GLOBAL.panelMaxBasis (nameplate vs calculated).
+        unionKw += consumerMaxDemandKw(c);
       }
       // Применяем clamp ко всем sibling-ам.
       for (const id of grp) {

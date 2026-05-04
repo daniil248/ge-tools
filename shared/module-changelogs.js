@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.232', date: '2026-05-05', items: [
+      '⚙ <b>Setting panelMaxBasis: «Pуст» vs «Pрасч» для агрегации «Макс»</b>. По запросу Пользователя 2026-05-05 «давай сделаем вариант В, пусть пользователь решает, как ему считать».',
+      '• <b>nameplate</b> (default) — «Макс» = Σ P<sub>ном</sub> downstream без учёта К<sub>и</sub>. Консервативно. Pуст.',
+      '• <b>calculated</b> — «Макс» = Σ (P<sub>ном</sub> × К<sub>и</sub>) = P<sub>расч</sub>. Соответствует ПУЭ 1.3.13 / IEC 60364-3 §311.1 — стандартная практика для агрегаторов (щитов и PDM, питающих много потребителей через общую линию).',
+      '• Применяется в: <code>_bfsDownstreamWithActiveTies</code> (maxDownstreamLoad) → влияет на _maxLoadKw панелей. Также в sibling-clamp (v0.60.229) и scenario-walks для генераторов с triggerGroups.',
+      '• <b>НЕ влияет</b> на расчёт линии к ОДНОМУ потребителю — там всегда P<sub>ном</sub> по правилам подбора кабеля/автомата на отдельную нагрузку.',
+      '• UI: новая секция «База расчёта «Макс» для щитов и PDM» в модалке «⚙ Параметры расчёта» с двумя radio-кнопками + объяснением.',
+      'Файлы: <code>js/engine/constants.js</code> (GLOBAL.panelMaxBasis), <code>js/engine/electrical.js</code> (новая <code>consumerMaxDemandKw</code>), <code>js/engine/recalc.js</code> (4 точки: BFS, sibling-clamp, 2× scenario-walk, cable max), <code>index.html</code> (modal section), <code>js/main.js</code> (open/save).',
+    ] },
     { version: '0.60.231', date: '2026-05-05', items: [
       '🏷 <b>Перегруз: явное указание «(кабель)» / «(автомат)» в карточке</b>. По репорту Пользователя 2026-05-05 «откуда перегруз 7.5 кВт если запас 16.9%».',
       '• Корень: «Запас» относится к НОМИНАЛУ САМОГО ЩИТА (capacityA), «Свободно/Перегруз» — к ПИТАЮЩЕМУ КОНТУРУ (входной кабель Iz / автомат In). Это две РАЗНЫЕ метрики:',

@@ -462,6 +462,20 @@ export function consumerCalcDemandKw(n) {
   return per * cnt * kuSafe;
 }
 
+// v0.60.232 (по запросу Пользователя 2026-05-05 «давай сделаем вариант В,
+// пусть пользователь решает, как ему считать»): возвращает demand для
+// агрегации «Макс» на уровне щита, в зависимости от GLOBAL.panelMaxBasis:
+//   • 'nameplate'  → consumerTotalDemandKw(n)  — Pуст (Σ P_ном)
+//   • 'calculated' → consumerCalcDemandKw(n)   — Pрасч (Σ P_ном × Ки)
+// Не путать с consumerNominalCurrent для линии К ОДНОМУ потребителю —
+// там всегда работает Pном. Этот хелпер только для АГРЕГАЦИИ нескольких
+// потребителей (щит, секция, sibling-union).
+export function consumerMaxDemandKw(n) {
+  const basis = (typeof GLOBAL.panelMaxBasis === 'string') ? GLOBAL.panelMaxBasis : 'nameplate';
+  if (basis === 'calculated') return consumerCalcDemandKw(n);
+  return consumerTotalDemandKw(n);
+}
+
 // v0.59.866: проверка однородности параметров слотов контейнера.
 // Возвращает { homogeneous, count, common, mismatches[] }:
 //   homogeneous — все linked-члены и placeholder'ы имеют одинаковые

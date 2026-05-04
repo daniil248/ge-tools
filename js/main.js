@@ -1872,6 +1872,11 @@ function openSettingsModal() {
   document.querySelectorAll('input[name="set-calcVoltageMode"]').forEach(r => {
     r.checked = (r.value === calcVMode);
   });
+  // v0.60.232: радиокнопки panelMaxBasis (nameplate/calculated).
+  const pBasis = G.panelMaxBasis === 'calculated' ? 'calculated' : 'nameplate';
+  document.querySelectorAll('input[name="set-panelMaxBasis"]').forEach(r => {
+    r.checked = (r.value === pBasis);
+  });
   openModal('modal-settings');
 }
 
@@ -1895,6 +1900,11 @@ function saveSettingsModal() {
     calcVoltageMode:      (() => {
       const r = document.querySelector('input[name="set-calcVoltageMode"]:checked');
       return r && r.value === 'nominal' ? 'nominal' : 'real';
+    })(),
+    // v0.60.232: база для агрегации «Макс» (nameplate/calculated).
+    panelMaxBasis:        (() => {
+      const r = document.querySelector('input[name="set-panelMaxBasis"]:checked');
+      return r && r.value === 'calculated' ? 'calculated' : 'nameplate';
     })(),
   };
   if (window.Raschet && typeof window.Raschet.setGlobal === 'function') {
