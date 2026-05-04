@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.141', date: '2026-05-04', items: [
+      '📋 <b>cable: auto-pick методики расчёта по country проекта</b>. Расширение правила <code>feedback_auto_norm_by_location.md</code> на cable-модуль (раньше только suppression-config).',
+      '• <b>cable/cable-calc.js</b> при init() читает country активного проекта через <code>resolveAutoNormForActiveProject(\'cable\')</code> из <code>shared/auto-norm.js</code>.',
+      '• <b>Маппинг auto-norm → cable method id</b>: <code>iec-60364→iec</code> / <code>pue-7→pue</code> / <code>nec→nec</code>.',
+      '• <b>По country</b>: KZ→IEC 60364, RU/BY→ПУЭ-7, US/CA→NEC (NFPA 70), EU→IEC 60364. Без определения country fallback на IEC.',
+      '• <b>Toast</b>: «📋 Методика расчёта кабеля авто-выбрана: «X» по стране проекта 🇰🇿 Казахстан. Можно изменить вручную.» — один раз за сессию (sessionStorage flag).',
+      '• <b>Override</b>: Пользователь свободно меняет методику в существующем dropdown\'е — auto-pick применяется ТОЛЬКО при первом открытии cable.',
+      '• Memory rule <code>feedback_auto_norm_by_location.md</code> обновлён — cable теперь ✅, остальные модули (scs, cooling, panel, mv) остаются ⏳.',
+      'Файлы: <code>cable/cable-calc.js</code> (+import auto-norm helpers; ~25 строк auto-pick logic в init).',
+    ] },
     { version: '0.60.140', date: '2026-05-04', items: [
       '🏢 <b>Internal-Пользователь = full access ко всем модулям</b>. Hotfix по репорту Пользователя 2026-05-04: «как мне самому теперь использовать все модули???»',
       '• <b>Проблема</b>: после v0.60.131-137 модули заблокированы 🔒 для free-плана. Тумблер «Internal» в настройках открывал только internalOnly-модули (reports/logistics/projects), но не снимал subscription-локи на остальные модули. Разработчик платформы (= internal-Пользователь) не мог пользоваться своими же модулями без активации триала Enterprise.',

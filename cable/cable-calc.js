@@ -2,6 +2,9 @@ import { GLOBAL } from '../js/engine/constants.js';
 import { formatVoltageLevelLabel } from '../js/engine/electrical.js';
 import { rsToast } from '../shared/dialog.js';
 import { getMethod, listMethods, calcVoltageDrop, findMinSizeForVdrop, getEcoMethod, listEcoMethods } from '../js/methods/index.js';
+// v0.60.141: auto-pick методики кабельного расчёта по country проекта
+// (правило feedback_auto_norm_by_location.md). KZ→iec, RU/BY→pue, US/CA→nec, EU→iec.
+import { resolveAutoNormForActiveProject, getProjectCountry, detectCountryCode, countryLabel } from '../shared/auto-norm.js';
 import { runModules, listModules } from '../shared/calc-modules/index.js';
 import * as Report from '../shared/report/index.js';
 import * as B      from '../shared/report/blocks.js';
@@ -169,7 +172,36 @@ function init() {
     if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') calculate();
   });
 
-  switchMethod('iec');
+  // v0.60.141: auto-pick методики по country проекта.
+  // Маппинг auto-norm id → cable method id.
+  const _autoNormToCableMethod = (autoNormId) => {
+    if (autoNormId === 'iec-60364') return 'iec';
+    if (autoNormId === 'pue-7') return 'pue';
+    if (autoNormId === 'nec') return 'nec';
+    return null;
+  };
+  const _autoNorm = resolveAutoNormForActiveProject('cable');
+  const _autoMethodId = _autoNormToCableMethod(_autoNorm) || 'iec';
+  switchMethod(_autoMethodId);
+  // Reflect выбранный method в UI dropdown'е.
+  if (els.methodStandard) els.methodStandard.value = _autoMethodId;
+  // Toast «📋 Авто-выбран» только если auto-pick реально что-то определил
+  // и Пользователь ещё не открывал cable в этой сессии.
+  if (_autoNorm) {
+    try {
+      const _shownKey = 'raschet.cable.autoNormHint.shown';
+      if (!sessionStorage.getItem(_shownKey)) {
+        const _country = getProjectCountry(null);
+        const _code = detectCountryCode(_country);
+        const _flag = _code ? countryLabel(_code) : '';
+        const _methodLbl = listMethods().find(m => m.id === _autoMethodId)?.label || _autoMethodId;
+        setTimeout(() => {
+          rsToast(`📋 Методика расчёта кабеля авто-выбрана: «${_methodLbl}» по стране проекта ${_flag}. Можно изменить вручную.`, 'info');
+        }, 500);
+        sessionStorage.setItem(_shownKey, '1');
+      }
+    } catch {}
+  }
   switchEcoMethod('pue_eco');
   renderModulesList();
   calculate();
