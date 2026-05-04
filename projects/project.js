@@ -580,6 +580,182 @@ function _deriveLcmFromStatus(status) {
   return map[status || 'draft'] || 'concept';
 }
 
+// v0.60.97 (Phase 38.1 START): План-график задач проекта.
+// Минимальная версия: список задач с CRUD. Gantt + critical path — TODO 38.3.
+const PLAN_DISCIPLINES = [
+  { id: 'concept',     label: '💡 Концепция',          color: '#7c3aed' },
+  { id: 'electrical',  label: '⚡ Электрика',          color: '#1d4ed8' },
+  { id: 'low-voltage', label: '🌐 Слаботочка / СКС',   color: '#0d9488' },
+  { id: 'cooling',     label: '❄ Климат',              color: '#0891b2' },
+  { id: 'fire-safety', label: '🔥 Безопасность',       color: '#b91c1c' },
+  { id: 'mechanical',  label: '⚙ Механика',            color: '#92400e' },
+  { id: 'arch',        label: '🏛 Архитектура',         color: '#475569' },
+  { id: 'commissioning',label: '🔧 ПНР / monitoring',  color: '#047857' },
+  { id: 'other',       label: '📋 Прочее',             color: '#64748b' },
+];
+const PLAN_STATUSES = [
+  { id: 'todo',        label: '○ Не начата',  color: '#64748b' },
+  { id: 'in-progress', label: '🔵 В работе',  color: '#1d4ed8' },
+  { id: 'review',      label: '🟡 На проверке', color: '#b45309' },
+  { id: 'done',        label: '✅ Завершено', color: '#15803d' },
+  { id: 'blocked',     label: '🛑 Заблокирована', color: '#991b1b' },
+];
+
+function _planKey(pid) { return `raschet.project.${pid}.plan.tasks.v1`; }
+function _loadPlanTasks(pid) {
+  try { return JSON.parse(localStorage.getItem(_planKey(pid)) || '[]'); }
+  catch { return []; }
+}
+function _savePlanTasks(pid, tasks) {
+  try { localStorage.setItem(_planKey(pid), JSON.stringify(tasks)); }
+  catch (e) { console.warn('[plan] save failed:', e); }
+}
+function _newTaskId() { return 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+
+function renderProjectPlan(p, host) {
+  const tasks = _loadPlanTasks(p.id);
+  const total = tasks.length;
+  const done = tasks.filter(t => t.status === 'done').length;
+  const inProgress = tasks.filter(t => t.status === 'in-progress').length;
+  const blocked = tasks.filter(t => t.status === 'blocked').length;
+  const progress = total > 0 ? Math.round(done / total * 100) : 0;
+
+  // Group by discipline
+  const grouped = {};
+  for (const t of tasks) {
+    const d = t.discipline || 'other';
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(t);
+  }
+
+  const summaryHtml = total > 0 ? `
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:12px">
+      <span><b>${total}</b> задач</span>
+      <span style="color:#15803d">✅ ${done} выполнено</span>
+      <span style="color:#1d4ed8">🔵 ${inProgress} в работе</span>
+      ${blocked > 0 ? `<span style="color:#991b1b">🛑 ${blocked} заблок.</span>` : ''}
+      <span style="margin-left:auto">Прогресс: <b>${progress}%</b></span>
+      <div style="width:120px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+        <div style="width:${progress}%;height:100%;background:#15803d;transition:width 0.3s"></div>
+      </div>
+    </div>
+  ` : `<p class="muted" style="margin-bottom:10px;font-size:12px">Задач пока нет. Добавьте первую — она появится в списке ниже.</p>`;
+
+  const discChips = PLAN_DISCIPLINES.map(d => `<option value="${d.id}">${esc(d.label)}</option>`).join('');
+  const statChips = PLAN_STATUSES.map(s => `<option value="${s.id}"${s.id === 'todo' ? ' selected' : ''}>${esc(s.label)}</option>`).join('');
+
+  let groupsHtml = '';
+  if (total > 0) {
+    for (const disc of PLAN_DISCIPLINES) {
+      const arr = grouped[disc.id];
+      if (!arr || !arr.length) continue;
+      const rows = arr.map(t => {
+        const stMeta = PLAN_STATUSES.find(s => s.id === t.status) || PLAN_STATUSES[0];
+        const dueWarn = t.endDate && new Date(t.endDate) < new Date() && t.status !== 'done';
+        return `<tr data-task-id="${esc(t.id)}" style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:5px 8px"><b>${esc(t.title || '—')}</b></td>
+          <td style="padding:5px 8px">
+            <select class="pr-task-status" data-task-id="${esc(t.id)}" style="padding:2px 4px;font-size:11.5px;border:1px solid #cbd5e1;border-radius:3px">
+              ${PLAN_STATUSES.map(s => `<option value="${s.id}"${s.id === t.status ? ' selected' : ''}>${esc(s.label)}</option>`).join('')}
+            </select>
+          </td>
+          <td style="padding:5px 8px;font-size:11.5px;color:${dueWarn ? '#991b1b' : '#475569'}" title="${dueWarn ? 'Просрочена!' : 'Дата окончания'}">${esc(t.endDate || '—')}</td>
+          <td style="padding:5px 8px;text-align:right">
+            <button type="button" class="pr-task-edit" data-task-id="${esc(t.id)}" title="Редактировать" style="padding:2px 6px;font-size:11px;border:1px solid #cbd5e1;background:#fff;border-radius:3px;cursor:pointer">✎</button>
+            <button type="button" class="pr-task-del" data-task-id="${esc(t.id)}" title="Удалить" style="padding:2px 6px;font-size:11px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b;border-radius:3px;cursor:pointer">×</button>
+          </td>
+        </tr>`;
+      }).join('');
+      groupsHtml += `<div style="margin-bottom:12px">
+        <h4 style="margin:0 0 4px;font-size:12.5px;color:${disc.color}">${esc(disc.label)} <span class="muted">·${arr.length}</span></h4>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #e2e8f0;border-radius:4px;overflow:hidden">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  host.innerHTML = `
+    ${summaryHtml}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;margin-bottom:10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px">
+      <input type="text" id="pr-task-title" placeholder="Название задачи..." style="flex:1;min-width:200px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:13px">
+      <select id="pr-task-disc" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+        ${discChips}
+      </select>
+      <select id="pr-task-status" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+        ${statChips}
+      </select>
+      <input type="date" id="pr-task-due" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+      <button type="button" id="pr-task-add" class="pr-btn-sel" style="background:#1d4ed8;color:#fff;border:none">+ Добавить</button>
+    </div>
+    ${groupsHtml || ''}
+  `;
+
+  // Handlers
+  const addBtn = host.querySelector('#pr-task-add');
+  if (addBtn) addBtn.addEventListener('click', () => {
+    const title = host.querySelector('#pr-task-title').value.trim();
+    if (!title) { prToast('Введите название задачи', 'error'); return; }
+    const t = {
+      id: _newTaskId(),
+      title,
+      discipline: host.querySelector('#pr-task-disc').value || 'other',
+      status: host.querySelector('#pr-task-status').value || 'todo',
+      endDate: host.querySelector('#pr-task-due').value || null,
+      progressPct: 0,
+      createdAt: Date.now(),
+    };
+    const arr = _loadPlanTasks(p.id);
+    arr.push(t);
+    _savePlanTasks(p.id, arr);
+    prToast(`✓ Задача «${title}» добавлена`);
+    renderProjectPlan(p, host);
+  });
+
+  // Status change
+  host.querySelectorAll('.pr-task-status').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const id = e.target.dataset.taskId;
+      const arr = _loadPlanTasks(p.id);
+      const t = arr.find(x => x.id === id);
+      if (!t) return;
+      t.status = e.target.value;
+      if (t.status === 'done') t.progressPct = 100;
+      _savePlanTasks(p.id, arr);
+      renderProjectPlan(p, host);
+    });
+  });
+
+  // Delete
+  host.querySelectorAll('.pr-task-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.taskId;
+      const arr = _loadPlanTasks(p.id);
+      const t = arr.find(x => x.id === id);
+      if (!t) return;
+      if (!confirm(`Удалить задачу «${t.title}»?`)) return;
+      _savePlanTasks(p.id, arr.filter(x => x.id !== id));
+      prToast('✓ Удалена', 'info');
+      renderProjectPlan(p, host);
+    });
+  });
+
+  // Edit (rename)
+  host.querySelectorAll('.pr-task-edit').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.taskId;
+      const arr = _loadPlanTasks(p.id);
+      const t = arr.find(x => x.id === id);
+      if (!t) return;
+      const newTitle = await prPrompt('Изменить задачу', 'Название', t.title || '');
+      if (newTitle == null) return;
+      t.title = String(newTitle).trim() || t.title;
+      _savePlanTasks(p.id, arr);
+      renderProjectPlan(p, host);
+    });
+  });
+}
+
 // v0.60.96 (Phase 39.2): per-state checklists. Что должно быть у проекта,
 // чтобы перейти в данное состояние. <code>artifacts</code> — массив проверок,
 // каждая возвращает {ok:bool, label, hint} по чтению LS-данных проекта.
@@ -846,6 +1022,7 @@ function render() {
   const propsHost = document.getElementById('pr-detail-properties');
   const modulesHost = document.getElementById('pr-detail-modules');
   const actionsHost = document.getElementById('pr-detail-actions');
+  const planHost = document.getElementById('pr-detail-plan'); // v0.60.97 Phase 38
   const metaHost = document.getElementById('pr-detail-meta');
 
   if (!p) {
@@ -1570,6 +1747,9 @@ function render() {
       setTimeout(() => { location.href = './'; }, 700);
     });
   }
+
+  // v0.60.97 (Phase 38.1 START): рендер плана задач
+  if (planHost) renderProjectPlan(p, planHost);
 
   if (metaHost) {
     metaHost.innerHTML = `

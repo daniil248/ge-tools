@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.97', date: '2026-05-03', items: [
+      '📅 <b>Phase 38.1 START: список задач проекта</b>. В /projects/&lt;id&gt;/ добавлена секция «📅 План-график» с минимальной CRUD для задач.',
+      '• Поля задачи: title / discipline / status / endDate / progressPct + ts.',
+      '• 9 дисциплин: 💡 Концепция / ⚡ Электрика / 🌐 Слаботочка / ❄ Климат / 🔥 Безопасность / ⚙ Механика / 🏛 Архитектура / 🔧 ПНР / 📋 Прочее.',
+      '• 5 статусов: ○ Не начата / 🔵 В работе / 🟡 На проверке / ✅ Завершено / 🛑 Заблокирована.',
+      '• Сводка: общее кол-во, выполнено, в работе, прогресс-бар.',
+      '• Группировка по дисциплинам в табличном виде.',
+      '• Inline status-change через select. Edit (rename) + delete.',
+      '• Storage: <code>raschet.project.&lt;pid&gt;.plan.tasks.v1</code>.',
+      '• TODO Phase 38.3+: Gantt + dependencies + critical path + auto-progress из CDE.',
+      'Файлы: <code>projects/project.html</code>, <code>projects/project.js</code> (~150 строк renderProjectPlan).',
+    ] },
     { version: '0.60.96', date: '2026-05-03', items: [
       '✅ <b>Phase 39.2: per-state checklists для жизненного цикла</b>. В picker каждое состояние показывает auto-detection «Что нужно для перехода».',
       '• <code>LCM_CHECKLISTS</code> — массив проверок per-state, каждая читает project LS и возвращает true/false.',
