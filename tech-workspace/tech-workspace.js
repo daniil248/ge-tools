@@ -888,6 +888,7 @@ function _ensureSelectedBlock(c) {
     if (kind === 'ups' && (c.upsSystems || []).some(us => us.id === id)) return;
     if (kind === 'cool' && (c.coolingUnits || []).some(cu => cu.id === id)) return;
     if (kind === 'mdc' && (c.mdcBuildings || []).some(b => b.id === id)) return;
+    if (kind === 'room' && (c.rooms || []).some(r => r.id === id)) return;
     if (kind === 'project' || kind === 'feed' || kind === 'areas' || kind === 'pue' || kind === 'bom' || kind === 'coolsys') return;
   }
   if ((c.rackGroups || []).length) {
@@ -1197,6 +1198,29 @@ function renderListRail(c, ro) {
   const projectSubLine = [pd.designation, pd.customer, pd.city].filter(Boolean).join(' · ') || 'данные не заполнены';
   const projectChip = pd.lat && pd.lon ? `${Number(pd.lat).toFixed(2)}, ${Number(pd.lon).toFixed(2)}` : '—';
 
+  // v0.60.113 (rooms-концепция UI, продолжение v0.60.111 data-model):
+  // секция «🏠 Помещения» — список помещений объекта со счётчиком
+  // привязанного оборудования. Click → редактор помещения.
+  const _rooms = Array.isArray(c.rooms) ? c.rooms : [];
+  const ROOM_KIND_ICON = { it: '🗄', ups: '⚡', mech: '🛠', office: '🏢', other: '📦' };
+  const _countInRoom = (rid) => {
+    const rg = (c.rackGroups || []).filter(x => x.roomId === rid).reduce((s, x) => s + (Number(x.count) || 0), 0);
+    const us = (c.upsSystems || []).filter(x => x.roomId === rid).length;
+    const cu = (c.coolingUnits || []).filter(x => (x.scope === 'room' && x.roomId === rid) || (x.scope === 'shared' && Array.isArray(x.roomIds) && x.roomIds.includes(rid))).length;
+    return { rg, us, cu };
+  };
+  const roomRows = _rooms.map(rm => {
+    const cnt = _countInRoom(rm.id);
+    const subLine = `${cnt.rg} ст · ${cnt.us} ИБП · ${cnt.cu} клим`;
+    const icon = ROOM_KIND_ICON[rm.kind] || '🚪';
+    const chip = rm.areaSqM > 0 ? `<span class="tw-rail-chip">${rm.areaSqM} м²</span>` : '';
+    return `<button type="button" class="tw-rail-item${_selCls('room', rm.id)}" data-bk="room" data-bid="${escAttr(rm.id)}">
+      <span class="tw-rail-name">${icon} ${escHtml(rm.name || 'Зал')}</span>
+      <span class="tw-rail-sub">${escHtml(subLine)}</span>
+      ${chip}
+    </button>`;
+  }).join('');
+
   return `
     <div class="tw-rail-section">
       <div class="tw-rail-head">
@@ -1210,6 +1234,14 @@ function renderListRail(c, ro) {
           <span class="tw-rail-chip">${escHtml(projectChip)}</span>
         </button>
       </div>
+    </div>
+
+    <div class="tw-rail-section">
+      <div class="tw-rail-head">
+        <span class="tw-rail-title" title="Помещения объекта (IT-залы, электрощитовые, насосные и т.п.). К каждому помещению привязываются группы стоек, ИБП и кондиционеры. ИБП могут стоять в одном зале со стойками или в отдельной щитовой; климат может быть общим (chiller-plant обслуживает несколько залов) или независимым per-room (CRAC/DX в каждом зале).">🏠 Помещения <span class="muted">·${_rooms.length}</span></span>
+        <button type="button" class="tw-rail-add" data-add-card="room" title="Добавить помещение (IT-зал / UPS-room / щитовая)" ${ro ? 'disabled' : ''}>➕</button>
+      </div>
+      <div class="tw-rail-list">${roomRows || '<div class="tw-rail-empty muted">Нет помещений</div>'}</div>
     </div>
 
     <div class="tw-rail-section">
@@ -1512,6 +1544,68 @@ function renderDetails(c, ro) {
           })()}
         </div>
       </div>`;
+  }
+  // v0.60.113: редактор помещения объекта (rooms-концепция UI).
+  if (sel.kind === 'room') {
+    const rm = (c.rooms || []).find(x => x.id === sel.id);
+    if (!rm) return '<div class="tw-details-empty muted">Помещение удалено. Выберите другое слева.</div>';
+    const ROOM_KIND_OPTS = [
+      { v: 'it',     l: '🗄 IT-зал (стойки)' },
+      { v: 'ups',    l: '⚡ Электрощитовая ИБП' },
+      { v: 'mech',   l: '🛠 Механическое (насосная, BMS)' },
+      { v: 'office', l: '🏢 Офис / диспетчерская' },
+      { v: 'other',  l: '📦 Прочее' },
+    ];
+    const kindOpts = ROOM_KIND_OPTS.map(o => `<option value="${o.v}"${rm.kind === o.v ? ' selected' : ''}>${o.l}</option>`).join('');
+    const racksHere = (c.rackGroups || []).filter(rg => rg.roomId === rm.id);
+    const upsHere = (c.upsSystems || []).filter(us => us.roomId === rm.id);
+    const coolHere = (c.coolingUnits || []).filter(cuRoom => (cuRoom.scope === 'room' && cuRoom.roomId === rm.id) || (cuRoom.scope === 'shared' && Array.isArray(cuRoom.roomIds) && cuRoom.roomIds.includes(rm.id)));
+    const itKwHere = racksHere.reduce((s, rg) => s + (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0), 0);
+    const upsKvaHere = upsHere.reduce((s, us) => s + (Number(us.ratedKva) || 0) * (Number(us.count) || 0), 0);
+    const coolKwHere = coolHere.reduce((s, cuRoom) => s + (Number(cuRoom.count) || 0) * (Number(cuRoom.kwPerUnit) || 0), 0);
+    const _li = (arr, fmt) => arr.length
+      ? '<ul style="margin:4px 0 0;padding-left:20px;font-size:12px">' + arr.map(fmt).join('') + '</ul>'
+      : '<div class="muted" style="font-size:12px">— ничего не привязано —</div>';
+    const headSub = `${racksHere.length} групп стоек · ${upsHere.length} ИБП · ${coolHere.length} клим. систем`;
+    return _detailsHeaderHtml('🏠 Помещение объекта', rm.id, ro, 'room', headSub)
+      + `<div class="tw-card" data-card-kind="room" data-card-id="${escAttr(rm.id)}">
+          <div class="tw-card-head">
+            <input type="text" class="tw-card-name" data-field="name" value="${escAttr(rm.name)}" placeholder="Например: Главный зал, UPS-room, Щитовая А" ${ro ? 'disabled' : ''}>
+          </div>
+          <div class="tw-grid">
+            <label title="Тип помещения. Используется для иконки в rail и группировки в отчёте.">Тип помещения:
+              <select data-field="kind" ${ro ? 'disabled' : ''}>${kindOpts}</select>
+            </label>
+            <label title="Площадь помещения в м². Используется для расчёта плотности нагрузки кВт/м² и проверки норм по ТКП 308-2011 / ASHRAE.">Площадь, м²:
+              <input type="number" data-field="areaSqM" min="0" step="1" value="${Number(rm.areaSqM) || 0}" ${ro ? 'disabled' : ''}>
+            </label>
+          </div>
+          <label style="display:block;margin-top:8px" title="Заметки (требования к температуре/влажности, особенности, ограничения)">Заметки:
+            <textarea data-field="notes" rows="2" placeholder="Особые требования, привязка к плану здания, etc." ${ro ? 'disabled' : ''} style="width:100%;font:inherit;font-size:13px;padding:6px;border:1px solid #cbd5e1;border-radius:4px;resize:vertical">${escHtml(rm.notes || '')}</textarea>
+          </label>
+          <hr style="border:none;border-top:1px dashed #cbd5e1;margin:14px 0">
+          <h5 style="margin:0 0 8px;font-size:12.5px;color:#075985">📦 Что в помещении</h5>
+          <div class="tw-grid" style="grid-template-columns:1fr 1fr 1fr">
+            <div>
+              <b>🗄 Стойки</b>
+              ${_li(racksHere, rg => '<li>' + escHtml(rg.name || '') + ' — ' + (rg.count || 0) + ' × ' + (rg.kwPerRack || 0) + ' кВт</li>')}
+              <div class="muted" style="font-size:11.5px;margin-top:4px">Σ ${itKwHere.toFixed(1)} кВт IT</div>
+            </div>
+            <div>
+              <b>⚡ ИБП</b>
+              ${_li(upsHere, us => '<li>' + escHtml(us.name || '') + ' — ' + (us.count || 0) + ' × ' + (us.ratedKva || 0) + ' кВА (' + (us.purpose || '') + ')</li>')}
+              <div class="muted" style="font-size:11.5px;margin-top:4px">Σ ${upsKvaHere.toFixed(1)} кВА</div>
+            </div>
+            <div>
+              <b>❄ Климат</b>
+              ${_li(coolHere, cuRoom => '<li>' + escHtml(cuRoom.name || '') + ' — ' + (cuRoom.count || 0) + ' × ' + (cuRoom.kwPerUnit || 0) + ' кВт ' + (cuRoom.scope === 'shared' ? '<span class="muted">(общая)</span>' : '') + '</li>')}
+              <div class="muted" style="font-size:11.5px;margin-top:4px">Σ ${coolKwHere.toFixed(1)} кВт холода</div>
+            </div>
+          </div>
+          <p class="muted" style="font-size:11.5px;margin-top:10px">
+            💡 Привязка оборудования: в карточке группы стоек / ИБП / климата — поле «🏠 Помещение». Климат может быть «в помещении» (CRAC/InRow per room) или «общим» (chiller-plant обслуживает несколько залов).
+          </p>
+        </div>`;
   }
   if (sel.kind === 'mdc') {
     const b = (c.mdcBuildings || []).find(x => x.id === sel.id);
@@ -2116,6 +2210,7 @@ function bindListEvents() {
         : kind === 'ups' ? 'upsSystems'
         : kind === 'cool' ? 'coolingUnits'
         : kind === 'mdc' ? 'mdcBuildings'
+        : kind === 'room' ? 'rooms'
         : null;
       if (!arrName) return;
       const arr = cur.concept[arrName];
@@ -2123,6 +2218,23 @@ function bindListEvents() {
       if (!obj) return;
       // Поддержка nested путей вроде "pdu.kind"
       _setNested(obj, field, kind === 'ups' && field === 'loadFactor' ? value / 100 : value);
+      // v0.60.113: при смене scope климата (room ↔ shared) мигрируем
+      // roomId ↔ roomIds[]. Иначе UI показывает picker без значения.
+      if (kind === 'cool' && field === 'scope') {
+        if (value === 'shared') {
+          if (obj.roomId && (!Array.isArray(obj.roomIds) || obj.roomIds.length === 0)) {
+            obj.roomIds = [obj.roomId];
+          }
+          if (!Array.isArray(obj.roomIds)) obj.roomIds = [];
+        } else if (value === 'room') {
+          if ((!obj.roomId || !cur.concept.rooms?.some(r => r.id === obj.roomId)) && Array.isArray(obj.roomIds) && obj.roomIds.length) {
+            obj.roomId = obj.roomIds[0];
+          }
+          if (!obj.roomId && cur.concept.rooms?.[0]) {
+            obj.roomId = cur.concept.rooms[0].id;
+          }
+        }
+      }
     } else if (target.classList.contains('tw-bom-price')) {
       // BOM override (per-row price input)
       const key = target.dataset.bomKey;
@@ -2185,6 +2297,12 @@ function bindListEvents() {
         if (!Array.isArray(cur.concept.mdcBuildings)) cur.concept.mdcBuildings = [];
         newObj = newMdcBuilding(`МЦОД-${cur.concept.mdcBuildings.length + 1}`);
         cur.concept.mdcBuildings.push(newObj);
+      } else if (kind === 'room') {
+        // v0.60.113: добавить помещение объекта.
+        if (!Array.isArray(cur.concept.rooms)) cur.concept.rooms = [];
+        const n = cur.concept.rooms.length + 1;
+        newObj = newRoom(`Зал ${n}`, 'it');
+        cur.concept.rooms.push(newObj);
       }
       if (newObj) _selectedBlock = { kind, id: newObj.id };
       persistVariants(); renderActiveVariant();
@@ -2201,6 +2319,7 @@ function bindListEvents() {
         : bk === 'ups' ? 'upsSystems'
         : bk === 'cool' ? 'coolingUnits'
         : bk === 'mdc' ? 'mdcBuildings'
+        : bk === 'room' ? 'rooms'
         : null;
       if (!arrName) return;
       const arr = cur.concept[arrName];
@@ -2213,6 +2332,39 @@ function bindListEvents() {
           twToast('Нельзя удалить последний блок этого типа. Добавьте ещё один перед удалением.', 'warn');
           return;
         }
+        // v0.60.113: при удалении помещения переназначаем оборудование на
+        // соседнее (или null если последнее). Sacred-params: предупреждаем
+        // юзера какие группы потеряют roomId.
+        if (bk === 'room') {
+          const removingId = arr[idx].id;
+          const nextRoomId = (arr[idx + 1] || arr[idx - 1])?.id || null;
+          const orphans = [];
+          (cur.concept.rackGroups || []).forEach(rg => {
+            if (rg.roomId === removingId) { rg.roomId = nextRoomId; orphans.push('стойки «' + (rg.name || '') + '»'); }
+          });
+          (cur.concept.upsSystems || []).forEach(us => {
+            if (us.roomId === removingId) { us.roomId = nextRoomId; orphans.push('ИБП «' + (us.name || '') + '»'); }
+          });
+          (cur.concept.coolingUnits || []).forEach(cuRoom => {
+            if (cuRoom.scope === 'room' && cuRoom.roomId === removingId) {
+              cuRoom.roomId = nextRoomId;
+              orphans.push('климат «' + (cuRoom.name || '') + '»');
+            }
+            if (cuRoom.scope === 'shared' && Array.isArray(cuRoom.roomIds)) {
+              cuRoom.roomIds = cuRoom.roomIds.filter(x => x !== removingId);
+            }
+          });
+          const warnLine = orphans.length
+            ? `\n\nПривязанное оборудование (${orphans.length}):\n• ${orphans.slice(0, 5).join('\n• ')}${orphans.length > 5 ? `\n• …и ещё ${orphans.length - 5}` : ''}\n\nБудет перепривязано к «${arr.find(r => r.id === nextRoomId)?.name || '(нет)'}».`
+            : '';
+          const ok = await twConfirm(`Удалить помещение «${arr[idx].name || ''}»?${warnLine}`, 'Удаление помещения');
+          if (!ok) return;
+          arr.splice(idx, 1);
+          const next = arr[Math.min(idx, arr.length - 1)];
+          _selectedBlock = next ? { kind: 'room', id: next.id } : { kind: 'project', id: null };
+          persistVariants(); renderActiveVariant();
+          return;
+        }
         const ok = await twConfirm(`Удалить блок «${arr[idx].name || ''}»?`, 'Удаление блока');
         if (!ok) return;
         arr.splice(idx, 1);
@@ -2222,7 +2374,7 @@ function bindListEvents() {
         persistVariants(); renderActiveVariant();
       } else if (act === 'duplicate') {
         const copy = JSON.parse(JSON.stringify(arr[idx]));
-        copy.id = _newId(bk === 'rack' ? 'rg' : bk === 'ups' ? 'us' : bk === 'mdc' ? 'mdc' : 'cu');
+        copy.id = _newId(bk === 'rack' ? 'rg' : bk === 'ups' ? 'us' : bk === 'mdc' ? 'mdc' : bk === 'room' ? 'rm' : 'cu');
         copy.name = (arr[idx].name || '') + ' (копия)';
         // Для МЦОД: при duplicate привязка к sub-проекту НЕ копируется —
         // юзер должен явно создать или привязать новое здание (иначе два
