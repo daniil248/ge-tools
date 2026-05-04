@@ -7725,13 +7725,25 @@ async function init() {
         if (sel.vendor)   n.manufacturer = sel.vendor;
         if (sel.model)    n.model = sel.model;
         if (sel.engineModel) n.engineModel = sel.engineModel;
-        // capacityKw — номинал ДГУ (по выбранному режиму = ESP/PRP/COP).
-        // Берём nameplateKw модели, чтобы лимит реально соответствовал железу.
-        if (Number.isFinite(Number(sel.nameplateKw))) {
-          n.capacityKw = Math.round(Number(sel.nameplateKw));
-        }
         // SFC для топливных расчётов в инспекторе/отчётах.
         if (Number.isFinite(Number(sel.sfcLkWh))) n.fuelSfcLkWh = Number(sel.sfcLkWh);
+        // v0.60.223 (по репорту Пользователя 2026-05-04 «раньше в полях были
+        // значения, сейчас убрал, хотел получить с конфигуратора»):
+        // заполняем таблицу ISO 8528 в «Параметры источника (IEC 60909)».
+        // sel.ratings = { ESP: {kW, kVA}, PRP: {...}, ... } из dgu-config.
+        // sel.cosNom — номинальный cos φ ДГУ (типовой 0.8 по ISO 8528).
+        if (sel.ratings && typeof sel.ratings === 'object') {
+          n.genRatings = JSON.parse(JSON.stringify(sel.ratings));
+        }
+        if (sp.mode) n.genRatingMode = sp.mode;
+        if (Number.isFinite(Number(sel.cosNom))) n.genCosPhi = Number(sel.cosNom);
+        // Синхронизация capacityKw / snomKva с активным режимом — иначе
+        // _applyGenIsoFields в инспекторе при следующей переоткрытии модалки
+        // перепишет capacityKw на snomKva×cosPhi.
+        const _act = (n.genRatings || {})[sp.mode];
+        if (_act && Number.isFinite(Number(_act.kW)))  n.capacityKw = Math.round(Number(_act.kW));
+        else if (Number.isFinite(Number(sel.nameplateKw))) n.capacityKw = Math.round(Number(sel.nameplateKw));
+        if (_act && Number.isFinite(Number(_act.kVA))) n.snomKva = Math.round(Number(_act.kVA));
         // Mode/redundancy — переносим как metadata; UI инспектора может
         // использовать в подсказках.
         if (sp.mode)        n.dguMode = sp.mode;
@@ -7743,7 +7755,7 @@ async function init() {
         n.appliedConfig.dgu = JSON.parse(JSON.stringify({ selected: sel, spec: sp, ts: msg.ts || Date.now() }));
         if (window.Raschet.rerender) window.Raschet.rerender();
         const lbl = `${sel.vendor || ''} ${sel.model || ''}`.trim() || 'ДГУ';
-        rsToast(`ДГУ «${lbl}» (${n.capacityKw} кВт) применена к узлу «${n.tag || n.name || n.id}».`, 'ok');
+        rsToast(`ДГУ «${lbl}» (${n.capacityKw} кВт / ${n.snomKva} кВА) применена к узлу «${n.tag || n.name || n.id}».`, 'ok');
       } catch (e) { console.warn('dgu.apply error', e); }
     }
     // v0.59.193: унифицированная обработка *-config:apply из mountEmbeddedPicker.
@@ -7797,6 +7809,7 @@ async function init() {
       } catch {}
     }
     // v0.60.216: bridge для dgu-config (на случай отсутствия opener).
+    // v0.60.223: тот же набор полей что postMessage-handler (genRatings + snomKva).
     if (ev.key.startsWith('raschet.dgu.bridge.')) {
       try {
         const obj = JSON.parse(ev.newValue || '{}');
@@ -7811,8 +7824,16 @@ async function init() {
         if (sel.vendor)   n.manufacturer = sel.vendor;
         if (sel.model)    n.model = sel.model;
         if (sel.engineModel) n.engineModel = sel.engineModel;
-        if (Number.isFinite(Number(sel.nameplateKw))) n.capacityKw = Math.round(Number(sel.nameplateKw));
         if (Number.isFinite(Number(sel.sfcLkWh))) n.fuelSfcLkWh = Number(sel.sfcLkWh);
+        if (sel.ratings && typeof sel.ratings === 'object') {
+          n.genRatings = JSON.parse(JSON.stringify(sel.ratings));
+        }
+        if (sp.mode) n.genRatingMode = sp.mode;
+        if (Number.isFinite(Number(sel.cosNom))) n.genCosPhi = Number(sel.cosNom);
+        const _act = (n.genRatings || {})[sp.mode];
+        if (_act && Number.isFinite(Number(_act.kW)))  n.capacityKw = Math.round(Number(_act.kW));
+        else if (Number.isFinite(Number(sel.nameplateKw))) n.capacityKw = Math.round(Number(sel.nameplateKw));
+        if (_act && Number.isFinite(Number(_act.kVA))) n.snomKva = Math.round(Number(_act.kVA));
         if (sp.mode)       n.dguMode = sp.mode;
         if (sp.redundancy) n.redundancy = sp.redundancy;
         if (Number.isFinite(Number(sp.derateMultiplier))) n.dguClimateDerate = Number(sp.derateMultiplier);
@@ -7821,7 +7842,7 @@ async function init() {
         n.appliedConfig.dgu = JSON.parse(JSON.stringify({ selected: sel, spec: sp, ts: obj.ts || Date.now() }));
         if (window.Raschet.rerender) window.Raschet.rerender();
         const lbl = `${sel.vendor || ''} ${sel.model || ''}`.trim() || 'ДГУ';
-        rsToast(`ДГУ «${lbl}» (${n.capacityKw} кВт) применена к узлу «${n.tag || n.name || n.id}» (через storage-bridge).`, 'ok');
+        rsToast(`ДГУ «${lbl}» (${n.capacityKw} кВт / ${n.snomKva} кВА) применена к узлу «${n.tag || n.name || n.id}» (через storage-bridge).`, 'ok');
       } catch {}
     }
   });

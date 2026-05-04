@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.223', date: '2026-05-04', items: [
+      '⚡ <b>ДГУ apply: заполняем всю таблицу ISO 8528 (kW + kVA по всем режимам)</b>. По репорту Пользователя 2026-05-04 «раньше в полях были значения, сейчас убрал, хотел получить с конфигуратора».',
+      '• <code>dgu-config/dgu-config.js</code> sendApplyToHost: payload теперь содержит <code>selected.ratings = {COP, DCC, PRP, LTP, ESP: {kW, kVA}}</code> и <code>selected.cosNom = 0.8</code> (типовой ISO 8528). Для отсутствующих в datasheet режимов используется <code>getDguModePowerKw</code> с ISO-fallback (v0.60.216). kVA вычисляется как kW/0.8 — это ровно соответствует datasheet (например AJ Power DA3-AJ165-P1: nameplateKw=132 → 132/0.8=165 ✓ модель «165 kVA»).',
+      '• <code>js/main.js</code> raschet.dgu.apply handler: пишет <code>n.genRatings</code>, <code>n.genRatingMode</code>, <code>n.genCosPhi</code> и синхронизирует <code>n.capacityKw</code>/<code>n.snomKva</code> с активным режимом. Раньше apply писал только <code>capacityKw=nameplateKw</code> — модалка «Параметры источника (IEC 60909)» оставалась пустой, и при сохранении инспектор переписывал capacityKw обратно на <code>snomKva×cosPhi</code> (рассинхрон data-flow).',
+      '• Storage-bridge (на случай отсутствия opener) — тот же расширенный набор полей.',
+      '• Toast после apply теперь показывает «X кВт / Y кВА» (раньше только кВт).',
+      'Файлы: <code>dgu-config/dgu-config.js</code> (sendApplyToHost), <code>js/main.js</code> (postMessage и storage-event handlers).',
+    ] },
     { version: '0.60.222', date: '2026-05-04', items: [
       '💡 <b>Inspector: tooltips в сводке ДГУ</b>. По правилу feedback_tooltips «каждая переменная в любом месте проекта должна иметь hover-tooltip с расшифровкой». В green-блоке «✓ ДГУ сконфигурирована» (v0.60.218) добавлены title-атрибуты на каждом поле:',
       '• Модель — «Производитель и модель ДГУ из каталога. Записано через apply из dgu-config».',

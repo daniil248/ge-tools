@@ -581,16 +581,49 @@ function sendApplyToHost(spec) {
   if (!_nodeId) return;
   const best = _lastBest;
   if (!best) return;
+
+  // v0.60.223 (по репорту Пользователя 2026-05-04 «раньше в полях были
+  // значения, сейчас убрал, хотел получить с конфигуратора»):
+  // вычисляем kW и kVA для ВСЕХ ISO 8528 режимов (ESP/PRP/LTP/COP/DCC),
+  // чтобы передать в схему в формате n.genRatings = { mode: {kW, kVA} }.
+  // kVA вычисляется через cos φ = 0.8 — ISO 8528-1 «typical synchronous
+  // generator power factor». Это ровно соответствует данным datasheet:
+  // например AJ Power DA3-AJ165-P1: nameplateKw=132, model «165 kVA» →
+  // 132/0.8 = 165 ✓. Для отсутствующих в каталоге режимов используется
+  // ISO-fallback из getDguModePowerKw (помечается «*» в подборе).
+  const _COS_NOM = 0.8;
+  const ratings = {};
+  for (const mode of ['COP', 'DCC', 'PRP', 'LTP', 'ESP']) {
+    const mp = getDguModePowerKw(best, mode);
+    if (Number.isFinite(mp.kw) && mp.kw > 0) {
+      ratings[mode] = {
+        kW:  Math.round(mp.kw * 10) / 10,
+        kVA: Math.round((mp.kw / _COS_NOM) * 10) / 10,
+      };
+    } else {
+      ratings[mode] = { kW: null, kVA: null };
+    }
+  }
+  // Активная мощность для текущего режима (= n.capacityKw в схеме).
+  const activeMp = getDguModePowerKw(best, _state.mode);
+  const activeKw = Number.isFinite(activeMp.kw) ? Math.round(activeMp.kw) : best.nameplateKw;
+
   const payload = {
     nodeId: _nodeId,
     selected: {
       vendor: best.vendor,
       model: best.model,
-      nameplateKw: best.nameplateKw,
+      nameplateKw: activeKw,    // активный режим (для n.capacityKw)
       espKw: best.espKw, prpKw: best.prpKw, copKw: best.copKw,
       engineModel: best.engineModel,
+      cylinders: best.cylinders,
+      displacement: best.displacement,
       sfcLkWh: best.sfcLkWh,
       physical: best.physical || null,
+      // v0.60.223: полная таблица режимов + cos φ для заполнения полей
+      // ISO 8528 в инспекторе (n.genRatings + n.genCosPhi + n.snomKva).
+      ratings,
+      cosNom: _COS_NOM,
     },
     spec: {
       mode: _state.mode,
