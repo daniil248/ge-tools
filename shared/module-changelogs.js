@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.208', date: '2026-05-04', items: [
+      '🔁 <b>Auto-merge legacy SCS при загрузке проекта</b>. По репорту Пользователя 2026-05-04 «постоянно появляется легаси СКС». Раньше badge «СКС · N связей (legacy в родителе)» висел при каждом заходе на страницу проекта и требовал ручного клика «🔀 Объединить».',
+      '• <b>Авто-merge</b>: если в проекте уже есть scs-design подпроект, ключи <code>raschet.project.&lt;pid&gt;.scs-design.*</code> автоматически переносятся в <code>raschet.project.&lt;subid&gt;.scs-design.*</code> при render проекта. Badge не отображается.',
+      '• Если sub-проекта нет — badge показывается как раньше с кнопкой ручного merge (потому что sub нужно создать).',
+      '⚠ <b>Известная open-issue (требует deeper fix)</b>: ghost CR01/MR01 в правом списке «Стойки проекта» — scheme-rack-bridge регенерирует виртуальные racks из scheme node\'а, и они появляются заново после удаления materialized экземпляра. Нужна настройка soft-delete-list per project (отдельная сессия).',
+      'Файл: <code>projects/project.js</code> (auto-merge SCS-legacy логика).',
+    ] },
     { version: '0.60.207', date: '2026-05-04', items: [
       '🔌 <b>Конфигуратор ДГУ принимает контекст из схемы</b>. По репорту Пользователя 2026-05-04 «почему в конфигуратор ДГУ не передалась реальная максимальная мощность необходимая для схемы?? а так же условия объекта». В v0.60.202 была привязка к схеме (кнопка), но без передачи URL-params — DGU-конфигуратор стартовал с дефолтов 500/0/25/60.',
       '• <b>Передаётся в URL</b>: <code>nodeId</code>, <code>name</code>, <code>loadKw</code> (= <code>n._maxLoadKw</code> или fallback <code>n.capacityKw</code>), <code>mode</code> (PRP / ESP в зависимости от <code>backupMode</code>), <code>redundancy</code>, <code>autonomy</code>, <code>vendor</code>.',

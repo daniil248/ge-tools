@@ -1935,6 +1935,48 @@ function render() {
       try { scsLinks = scsLinksRaw ? (JSON.parse(scsLinksRaw) || []) : []; } catch {}
       try { const o = scsPlanRaw ? JSON.parse(scsPlanRaw) : null; hasPlan = !!(o && (o.items || []).length); } catch {}
       if ((Array.isArray(scsLinks) && scsLinks.length) || hasPlan) {
+        // v0.60.208 (по репорту Пользователя 2026-05-04 «постоянно появляется
+        // легаси СКС»): если у проекта УЖЕ есть scs-design подпроект,
+        // автоматически переносим parent.scs-design.* → sub.scs-design.*
+        // без UI и без badge'а. Раньше badge висел постоянно, требуя ручного
+        // клика «🔀 Объединить» каждый раз.
+        // Используем listSubProjects напрямую (синхронно), без import().
+        try {
+          const existingSubs = listSubProjects(p.id, 'scs-design');
+          if (existingSubs && existingSubs[0] && existingSubs[0].id) {
+            const dest = existingSubs[0];
+            const prefix = 'raschet.project.' + p.id + '.scs-design.';
+            const subPrefix = 'raschet.project.' + dest.id + '.scs-design.';
+            const toMove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith(prefix)) toMove.push(k);
+            }
+            let moved = 0;
+            for (const k of toMove) {
+              const v = localStorage.getItem(k);
+              if (v == null) continue;
+              try {
+                // Если destination уже имеет ключ — не перезаписываем (sub
+                // важнее parent), parent просто удаляем.
+                const dstKey = subPrefix + k.slice(prefix.length);
+                if (!localStorage.getItem(dstKey)) {
+                  localStorage.setItem(dstKey, v);
+                }
+                localStorage.removeItem(k);
+                moved++;
+              } catch (e) {}
+            }
+            if (moved > 0) {
+              console.info(`[project.js] auto-merged ${moved} legacy SCS keys into sub-project ${dest.id}`);
+              // Обновляем локальные переменные чтобы пропустить badge.
+              scsLinks = [];
+              hasPlan = false;
+            }
+          }
+        } catch (e) { console.warn('[project.js] auto-merge legacy scs failed:', e); }
+      }
+      if ((Array.isArray(scsLinks) && scsLinks.length) || hasPlan) {
         const href = '../scs-design/?project=' + encodeURIComponent(p.id) + '&from=projects';
         const meta = `${scsLinks.length} связ${scsLinks.length === 1 ? 'ь' : (scsLinks.length < 5 ? 'и' : 'ей')}` + (hasPlan ? ' · план' : '');
         // v0.59.571: дублирующая legacy-строка — реальные данные ещё в parent
