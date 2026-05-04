@@ -884,7 +884,9 @@ function renderProjectPlan(p, host) {
       const arr = _loadPlanTasks(p.id);
       const t = arr.find(x => x.id === id);
       if (!t) return;
-      if (!confirm(`Удалить задачу «${t.title}»?`)) return;
+      // v0.60.139: replaced confirm() with prConfirm (no browser dialogs).
+      const ok = await prConfirm('Удалить задачу?', `Удалить задачу «${t.title}»?`);
+      if (!ok) return;
       _savePlanTasks(p.id, arr.filter(x => x.id !== id));
       prToast('✓ Удалена', 'info');
       renderProjectPlan(p, host);

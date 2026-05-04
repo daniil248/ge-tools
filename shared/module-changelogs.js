@@ -4,6 +4,22 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.139', date: '2026-05-04', items: [
+      '🚫 <b>Sweep: замена browser dialogs (alert/confirm/prompt) на in-page UI</b>. Реализация правила <code>feedback_style.md</code> «No browser dialogs» — раньше встречались в нескольких файлах.',
+      '• <b>projects/projects.js</b> (5 мест): «Бэкап» / «Восстановить» / «Восстановить связи» — confirm() и alert() заменены на prConfirm/prToast. Стратегия восстановления (REPLACE / MERGE) теперь через двойной prConfirm с описанием в HTML-формате.',
+      '• <b>projects/project.js</b> (1 место): удаление задачи через prConfirm.',
+      '• <b>cooling/cooling.js</b> (1 место): «Перейти в проект и открыть подбор» через util.modalOpen.',
+      '• <b>scs-design/scs-design.js</b> (1 место): force-merge legacy через sdConfirmInline.',
+      '• <b>battery/battery-calc.js</b> (1 место): сохранение конфигурации АКБ через rsPrompt (legacy fallback на window.prompt убран).',
+      '• <b>service/report/kp-editor.js</b> (3 места): clone/delete/reset KP-шаблона через rsPrompt/rsConfirm.',
+      '• <b>shared/card-presets-editor.js</b> (7 мест): rename/delete/create/duplicate/reset-all/reset-type/import пресетов через rsPrompt/rsConfirm + cpeToast (in-modal).',
+      '• <b>shared/currency-rates/rates-dialog.js</b> (1 место): очистка кеша курсов через rsConfirm.',
+      '• <b>shared/table-presets.js</b>: убран final fallback на window.prompt/confirm — теперь fallback на window.rsPrompt/rsConfirm + warning в console если ни одного не доступно.',
+      '• <b>js/engine/inspector/consumer.js</b> (1 место): merge групп через rsConfirm с HTML-форматом (жирный + курсив).',
+      '• <b>js/engine/export.js</b> (1 место): toast вместо alert при ошибке открытия редактора пресетов.',
+      '• <b>Принцип</b>: всё через <code>shared/dialog.js</code> (rsConfirm/rsPrompt/rsToast) или модуль-специфичные обёртки (prConfirm/sdConfirmInline/util.modalOpen). Browser dialogs выпадают из flow приложения, ломают UX и не стилизуются — новый код ВСЕГДА через in-page UI.',
+      'Файлы: <code>projects/projects.js</code> (5×), <code>projects/project.js</code> (1×), <code>cooling/cooling.js</code> (1×), <code>scs-design/scs-design.js</code> (1×), <code>battery/battery-calc.js</code> (1× + import rsPrompt), <code>service/report/kp-editor.js</code> (3× + import rsConfirm/rsPrompt), <code>shared/card-presets-editor.js</code> (7× + import rsConfirm/rsPrompt), <code>shared/currency-rates/rates-dialog.js</code> (1× + import rsConfirm), <code>shared/table-presets.js</code> (fallback updated), <code>js/engine/inspector/consumer.js</code> (1× + import rsConfirm), <code>js/engine/export.js</code> (1×).',
+    ] },
     { version: '0.60.138', date: '2026-05-04', items: [
       '📐 <b>rack-config: эксплуатационные клиренсы (front/rear + accessFront/Rear)</b>. Реализация правила <code>feedback_rack_clearances.md</code> на per-rack уровне.',
       '• <b>rack-config/index.html</b> — новая секция «📐 Эксплуатационные зазоры» (между «Боковые стенки» и «Кабельные вводы»):',

@@ -291,7 +291,7 @@ function _renderBackupNudge() {
       const r = downloadBackup({ appVersion: APP_VERSION });
       prToast(`✓ Бэкап скачан: ${r.keyCount} ключей`, 'ok');
       _renderBackupNudge();
-    } catch (e) { alert('Ошибка: ' + (e.message || e)); }
+    } catch (e) { prToast('Ошибка: ' + (e.message || e), 'err'); }
   });
   document.getElementById('pr-nudge-dismiss')?.addEventListener('click', () => {
     try { sessionStorage.setItem('raschet.backupNudgeDismissed', '1'); } catch {}
@@ -830,7 +830,8 @@ function _initAfterDom() {
       prToast(`✓ Бэкап скачан: ${payload.keyCount} ключей, ${(JSON.stringify(payload).length / 1024).toFixed(0)} KB`, 'ok');
     } catch (e) {
       console.error('[backup] failed:', e);
-      alert('Ошибка бэкапа: ' + (e.message || e));
+      // v0.60.139: replaced alert() with prToast (правило «No browser dialogs»).
+      prToast('Ошибка бэкапа: ' + (e.message || e), 'err');
     }
   });
   // v0.59.877: «📤 Импортировать проект» — импорт ОДНОГО проекта из JSON.
@@ -866,18 +867,30 @@ function _initAfterDom() {
     if (!file) return;
     try {
       const payload = await readBackupFile(file);
-      const summary = `Бэкап от: ${payload.exportedAt || 'неизвестно'}\nВерсия: ${payload.appVersion || '?'}\nКлючей в бэкапе: ${payload.keyCount || Object.keys(payload.data || {}).length}\n\nСтратегия:\n  • OK = MERGE (объединить с текущими данными — безопаснее)\n  • Cancel = отмена`;
-      const useMerge = confirm(summary);
-      if (!useMerge) { e.target.value = ''; return; }
-      const wantReplace = confirm('Хотите ПОЛНОСТЬЮ ЗАМЕНИТЬ текущие данные данными из бэкапа?\n\n  • OK = REPLACE (стереть текущие, записать из бэкапа)\n  • Cancel = MERGE (рекомендуется)');
+      // v0.60.139: replaced confirm()/alert() with prConfirm/prToast (no browser dialogs).
+      // Шаг 1: подтвердить, что вообще хотим восстанавливать.
+      const summaryHtml = `<b>Бэкап от:</b> ${payload.exportedAt || 'неизвестно'}<br>
+        <b>Версия:</b> ${payload.appVersion || '?'}<br>
+        <b>Ключей в бэкапе:</b> ${payload.keyCount || Object.keys(payload.data || {}).length}<br><br>
+        Продолжить восстановление?`;
+      const proceed = await prConfirm('Восстановление из бэкапа', summaryHtml, { okLabel: 'Продолжить', cancelLabel: 'Отмена', isHtml: true });
+      if (!proceed) { e.target.value = ''; return; }
+      // Шаг 2: выбрать стратегию (MERGE / REPLACE). MERGE — безопаснее, default.
+      const wantReplace = await prConfirm(
+        'Стратегия восстановления',
+        '<b>Полностью заменить</b> текущие данные данными из бэкапа?<br><br>' +
+        '<span style="color:#16a34a">OK = REPLACE</span> (стереть текущие, записать из бэкапа) — <i>осторожно</i>.<br>' +
+        '<span style="color:#3b82f6">Отмена = MERGE</span> (объединить с текущими — безопаснее, рекомендуется).',
+        { okLabel: '✕ REPLACE (стереть всё)', cancelLabel: '↪ MERGE (объединить)', isHtml: true }
+      );
       const strategy = wantReplace ? 'replace' : 'merge';
       const result = restoreFromJson(payload, { strategy });
-      alert(`✓ Восстановлено: ${result.written} ключей (стратегия: ${result.strategy}).\nСтраница перезагрузится.`);
+      prToast(`✓ Восстановлено: ${result.written} ключей (стратегия: ${result.strategy}). Страница перезагрузится…`, 'ok');
       e.target.value = '';
-      location.reload();
+      setTimeout(() => location.reload(), 1500);
     } catch (err) {
       console.error('[restore] failed:', err);
-      alert('Ошибка восстановления: ' + (err.message || err));
+      prToast('Ошибка восстановления: ' + (err.message || err), 'err');
       e.target.value = '';
     }
   });
@@ -977,12 +990,14 @@ function _initAfterDom() {
       } catch (e) { log.push(`migrateOrphanSchemes failed: ${e.message || e}`); }
 
       const summary = log.join('\n');
-      alert('🔧 Восстановление завершено:\n\n' + summary + '\n\nСтраница перезагрузится.');
+      // v0.60.139: replaced alert() with prConfirm/prToast (no browser dialogs).
       console.info('[restore-links]', summary);
+      const summaryHtml = '<pre style="margin:0;font-size:12px;white-space:pre-wrap">' + summary.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])) + '</pre>';
+      await prConfirm('🔧 Восстановление завершено', summaryHtml + '<br><b>Страница перезагрузится.</b>', { okLabel: 'OK', cancelLabel: '', isHtml: true });
       location.reload();
     } catch (e) {
       console.error('[restore-links] failed:', e);
-      alert('Ошибка восстановления: ' + (e.message || e) + '\n\nДанные не изменены.');
+      prToast('Ошибка восстановления: ' + (e.message || e) + ' · Данные не изменены.', 'err');
     }
   });
 

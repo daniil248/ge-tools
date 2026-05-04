@@ -9,7 +9,7 @@ import { snapshot, notifyChange } from '../history.js';
 import { setEffectiveLoadFactor } from '../modes.js';
 import { render } from '../render.js';
 import { formatVoltageLevelLabel } from '../electrical.js';
-import { rsPrompt } from '../../../shared/dialog.js';
+import { rsPrompt, rsConfirm } from '../../../shared/dialog.js';
 import { getTerm, getTermTooltip, isTermUsed } from '../../methods/terms.js';
 
 let _renderInspector = null;
@@ -1649,7 +1649,7 @@ export function openConsumerParamsModal(n) {
   // с тем же tag — оставить как есть; если нет — добавить).
   {
     document.querySelectorAll('.cp-merge-other-group').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const otherId = btn.dataset.otherId;
         const other = state.nodes.get(otherId);
         if (!other) return;
@@ -1657,7 +1657,16 @@ export function openConsumerParamsModal(n) {
         const myTag = effectiveTag(n) || n.tag || n.id;
         const otherAliases = Array.isArray(other.linkedAliases)
           ? other.linkedAliases.filter(Boolean) : [];
-        if (!confirm(`🔀 Объединить группы:\n\n  ОСТАВИТЬ: «${myTag}» (${n.count || 1} экз.) — эта группа\n  УДАЛИТЬ: «${otherTag}» (${other.count || 1} экз.) — её слоты перенесём сюда\n\nЭкземпляры из ${otherTag} с теми же tag, что в этой группе, не дублируются. Уникальные — добавляются как новые слоты.\n\nЭто необратимо без Ctrl+Z. Продолжить?`)) return;
+        // v0.60.139: replaced confirm() with rsConfirm (no browser dialogs).
+        const _mergeOk = await rsConfirm(
+          '🔀 Объединить группы?',
+          `<b>ОСТАВИТЬ:</b> «${escHtml(myTag)}» (${n.count || 1} экз.) — эта группа<br>` +
+          `<b>УДАЛИТЬ:</b> «${escHtml(otherTag)}» (${other.count || 1} экз.) — её слоты перенесём сюда<br><br>` +
+          `Экземпляры из «${escHtml(otherTag)}» с теми же tag, что в этой группе, не дублируются. Уникальные — добавляются как новые слоты.<br><br>` +
+          `<i>Действие необратимо без Ctrl+Z.</i>`,
+          { okLabel: 'Объединить', cancelLabel: 'Отмена', isHtml: true }
+        );
+        if (!_mergeOk) return;
         try { snapshot('group-merge:' + n.id + '←' + other.id); } catch {}
         if (!Array.isArray(n.linkedAliases)) n.linkedAliases = [];
         // Build set of existing alias tags in n

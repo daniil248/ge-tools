@@ -28,6 +28,8 @@ import {
   createUserPreset, deleteUserPreset, renameUserPreset, setUserPresetFields,
 } from './card-presets.js';
 import { CARD_FIELDS, listCardFields, requiredFieldIds, shortLabel as registryShortLabel, fieldUnit } from './card-fields-registry.js';
+// v0.60.139: in-page dialog helpers вместо browser dialogs.
+import { rsConfirm, rsPrompt } from './dialog.js';
 
 // v0.59.876: маленький toast внутри модалки — feedback для действий
 // (drag, ×, 🔗). Появляется в правом нижнем углу модалки на ~2 сек.
@@ -576,15 +578,17 @@ function wire(host) {
 
   // Preset actions / bulk
   root.querySelectorAll('button[data-action]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const action = btn.dataset.action;
       const id = btn.dataset.id;
+      // v0.60.139: replaced browser confirm()/prompt() with rsConfirm/rsPrompt.
       if (action === 'activate') { setUserActivePresetId(id); render(host); wire(host); }
       else if (action === 'reset-all') {
         const cur = getPresetById(id);
         if (!cur || cur.system) return;
-        if (!confirm(`Сбросить ВСЕ зоны и подписи в пресете «${cur.name}»? Активные поля останутся как есть.`)) return;
+        const ok = await rsConfirm(`Сбросить ВСЕ зоны и подписи в пресете «${cur.name}»?`, 'Активные поля останутся как есть.', { okLabel: 'Сбросить', cancelLabel: 'Отмена' });
+        if (!ok) return;
         delete cur.zoneLayout;
         delete cur.fieldLabels;
         const all = loadUserPresets();
@@ -594,17 +598,19 @@ function wire(host) {
       }
       else if (action === 'rename') {
         const cur = getPresetById(id);
-        const newName = prompt('Новое имя пресета:', cur?.name || '');
+        const newName = await rsPrompt('Новое имя пресета:', cur?.name || '');
         if (newName) { renameUserPreset(id, newName); render(host); wire(host); }
       } else if (action === 'delete') {
         const cur = getPresetById(id);
-        if (cur && confirm(`Удалить пресет «${cur.name}»? Действие необратимо.`)) {
+        if (!cur) return;
+        const ok = await rsConfirm(`Удалить пресет «${cur.name}»?`, 'Действие необратимо.', { okLabel: 'Удалить', cancelLabel: 'Отмена' });
+        if (ok) {
           deleteUserPreset(id);
           if (_state.selectedPresetId === id) _state.selectedPresetId = null;
           render(host); wire(host);
         }
       } else if (action === 'create') {
-        const name = prompt('Имя нового пресета:', 'Мой пресет');
+        const name = await rsPrompt('Имя нового пресета:', 'Мой пресет');
         if (name) {
           const p = createUserPreset(name, _state.selectedPresetId || 'full');
           _state.selectedPresetId = p.id;
@@ -613,7 +619,7 @@ function wire(host) {
         }
       } else if (action === 'duplicate') {
         const src = getPresetById(id);
-        const name = prompt('Имя копии:', (src?.name || '') + ' (копия)');
+        const name = await rsPrompt('Имя копии:', (src?.name || '') + ' (копия)');
         if (name) {
           const p = createUserPreset(name, id);
           _state.selectedPresetId = p.id;
@@ -626,7 +632,8 @@ function wire(host) {
         const sel = getPresetById(_state.selectedPresetId);
         if (!sel || sel.system) return;
         const kind = _state.activeModeTab, type = _state.activeTypeTab;
-        if (!confirm(`Сбросить пользовательские подписи и зоны для типа «${type}» в пресете «${sel.name}»?`)) return;
+        const ok = await rsConfirm(`Сбросить пользовательские подписи и зоны для типа «${type}» в пресете «${sel.name}»?`, '', { okLabel: 'Сбросить', cancelLabel: 'Отмена' });
+        if (!ok) return;
         if (sel.fieldLabels?.[kind]?.[type]) delete sel.fieldLabels[kind][type];
         if (sel.zoneLayout?.[kind]?.[type]) delete sel.zoneLayout[kind][type];
         const all = loadUserPresets();
@@ -799,9 +806,9 @@ function wire(host) {
         const text = await file.text();
         const data = JSON.parse(text);
         _importJson(data);
-        alert('Импорт успешен.');
+        cpeToast('Импорт успешен.', 'ok');
         render(host); wire(host);
-      } catch (err) { alert(`Ошибка импорта: ${err.message || err}`); }
+      } catch (err) { cpeToast(`Ошибка импорта: ${err.message || err}`, 'err'); }
     });
   }
 }

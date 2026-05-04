@@ -17,6 +17,8 @@ import {
   cloneKpTemplate, deleteKpTemplate, updateKpTemplate, resetDefaultKpTemplate,
 } from './kp-template.js';
 import { escAttr, escHtml, modalOpen, toast } from '../../meteo/util.js';
+// v0.60.139: rsPrompt/rsConfirm для замены browser dialogs.
+import { rsConfirm, rsPrompt } from '../../shared/dialog.js';
 
 /**
  * Открыть модалку редактора шаблона КП.
@@ -168,7 +170,8 @@ export async function openKpTemplateEditor() {
     // Clone
     const cloneBtn = overlay.querySelector('#kpe-clone');
     if (cloneBtn) cloneBtn.addEventListener('click', async () => {
-      const name = prompt('Название нового шаблона:', active.name + ' (копия)');  // временно prompt — TODO заменить на in-page modal
+      // v0.60.139: replaced prompt() with rsPrompt (no browser dialogs).
+      const name = await rsPrompt('Название нового шаблона:', active.name + ' (копия)');
       if (!name?.trim()) return;
       const newTpl = cloneKpTemplate(active.id, name.trim());
       setActiveKpTemplateId(newTpl.id);
@@ -181,7 +184,8 @@ export async function openKpTemplateEditor() {
     const delBtn = overlay.querySelector('#kpe-delete');
     if (delBtn) delBtn.addEventListener('click', async () => {
       if (active.id === 'kp-default') return;
-      const ok = confirm(`Удалить шаблон «${active.name}»? Дефолтный шаблон останется.`);
+      // v0.60.139: replaced confirm() with rsConfirm (no browser dialogs).
+      const ok = await rsConfirm(`Удалить шаблон «${active.name}»?`, 'Дефолтный шаблон останется. Удаление необратимо.', { okLabel: 'Удалить', cancelLabel: 'Отмена' });
       if (!ok) return;
       deleteKpTemplate(active.id);
       setActiveKpTemplateId('kp-default');
@@ -193,7 +197,8 @@ export async function openKpTemplateEditor() {
     // Reset default
     const resetBtn = overlay.querySelector('#kpe-reset');
     if (resetBtn) resetBtn.addEventListener('click', async () => {
-      const ok = confirm('Сбросить дефолтный шаблон к исходным значениям? Пользовательские шаблоны останутся.');
+      // v0.60.139: replaced confirm() with rsConfirm (no browser dialogs).
+      const ok = await rsConfirm('Сбросить дефолтный шаблон?', 'К исходным значениям. Пользовательские шаблоны останутся.', { okLabel: 'Сбросить', cancelLabel: 'Отмена' });
       if (!ok) return;
       resetDefaultKpTemplate();
       if (active.id === 'kp-default') active = getActiveKpTemplate();

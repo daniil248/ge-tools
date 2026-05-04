@@ -841,9 +841,16 @@ async function saveActiveSelectionToProject() {
     arr.push(newSel);
     localStorage.setItem(key, JSON.stringify(arr));
     util.toast(`✔ Подбор «${sel.name}» сохранён в проект.`, 'ok');
-    // Опциональный быстрый переход
-    setTimeout(() => {
-      if (confirm('Перейти в проект и открыть подбор?')) {
+    // Опциональный быстрый переход. v0.60.139: убран confirm() (no browser dialogs);
+    // вместо этого toast с CTA-кнопкой, либо просто toast без перехода.
+    // Используем modalOpen из meteo/util.js для in-page подтверждения.
+    setTimeout(async () => {
+      const goToProject = await util.modalOpen(
+        '<h3>Перейти в проект?</h3>',
+        '<p>Открыть проект и перейти к сохранённому подбору?</p>',
+        async () => ({ ok: true })
+      );
+      if (goToProject) {
         location.href = `../cooling/?projectId=${encodeURIComponent(result.projectId)}`;
       }
     }, 500);

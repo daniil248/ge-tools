@@ -6,7 +6,7 @@
 // ======================================================================
 
 import { listBatteries, addBattery, removeBattery, clearCatalog, getBattery, makeBatteryId } from './battery-catalog.js';
-import { rsToast, rsConfirm } from '../shared/dialog.js';
+import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
 import { parseBatteryXlsx } from './battery-data-parser.js';
 import { calcAutonomy, calcRequiredBlocks, interpTimeByPower } from './battery-discharge.js';
 import * as Report from '../shared/report/index.js';
@@ -2981,9 +2981,10 @@ async function _saveBatteryConfiguration() {
   } else {
     defaultLabel = `${battery.supplier || ''} ${battery.type || battery.model || ''} · ${strings}×${blocksPerString}`.trim();
   }
+  // v0.60.139: replaced prompt() with rsPrompt (no browser dialogs).
   const name = (window.scsPrompt
     ? await window.scsPrompt('Сохранение конфигурации АКБ', 'Имя конфигурации:', defaultLabel)
-    : prompt('Имя конфигурации АКБ:', defaultLabel));
+    : await rsPrompt('Имя конфигурации АКБ:', defaultLabel));
   if (!name) return;
   const projectCode = _getActiveProjectCode();
   const id = _nextConfigId('battery', projectCode);

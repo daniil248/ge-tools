@@ -420,9 +420,10 @@ function _renderProjectBadgeImpl(pid, host) {
       }
     }
     if (!dest || !dest.id) return;
-    const ok = confirm(
-      `Принять legacy-данные из родителя «${parent.name}» в подпроект «${dest.name || dest.designation || 'СКС'}»?\n\n` +
-      (createdSub ? 'СКС-подпроект будет создан автоматически.\n' : '') +
+    // v0.60.139: replaced confirm() with sdConfirmInline (no browser dialogs).
+    const ok = await sdConfirmInline(
+      `Принять legacy-данные из родителя «${parent.name}» в подпроект «${dest.name || dest.designation || 'СКС'}»? ` +
+      (createdSub ? 'СКС-подпроект будет создан автоматически. ' : '') +
       `Существующие ключи подпроекта будут ПЕРЕЗАПИСАНЫ данными родителя.`
     );
     if (!ok) {

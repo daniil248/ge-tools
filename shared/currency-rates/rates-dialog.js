@@ -8,6 +8,8 @@
 
 import { fetchRates, listSources, getActiveSourceId, setActiveSourceId, getCachedDates, clearCache } from './index.js';
 import './sources/index.js';
+// v0.60.139: in-page dialog вместо browser confirm.
+import { rsConfirm } from '../dialog.js';
 
 const STYLE_ID = 'rates-dialog-style';
 
@@ -131,8 +133,10 @@ export function open() {
       modal.querySelector('#rd-fetch').addEventListener('click', () => doFetch(false));
       modal.querySelector('#rd-refetch').addEventListener('click', () => doFetch(true));
       modal.querySelector('#rd-close').addEventListener('click', close);
-      modal.querySelector('#rd-clear-cache').addEventListener('click', () => {
-        if (confirm('Удалить весь кеш курсов из LocalStorage?')) {
+      modal.querySelector('#rd-clear-cache').addEventListener('click', async () => {
+        // v0.60.139: replaced confirm() with rsConfirm (no browser dialogs).
+        const ok = await rsConfirm('Очистить кеш курсов?', 'Удалить весь кеш курсов валют из LocalStorage?', { okLabel: 'Очистить', cancelLabel: 'Отмена' });
+        if (ok) {
           clearCache();
           render();
         }

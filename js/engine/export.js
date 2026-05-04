@@ -780,7 +780,7 @@ export function initToolbar() {
           try {
             const editor = await import('../../shared/card-presets-editor.js');
             editor.openCardPresetEditor();
-          } catch (e) { console.warn('[card-preset-editor]', e); alert('Не удалось открыть редактор: ' + (e.message || e)); }
+          } catch (e) { console.warn('[card-preset-editor]', e); try { (await import('../../shared/dialog.js')).rsToast('Не удалось открыть редактор: ' + (e.message || e), 'err'); } catch {} }
         });
       }
     } catch (e) { console.warn('[card-preset-picker]', e); }

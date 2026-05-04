@@ -114,15 +114,22 @@ export function renderTablePresetUI(tableId, currentPresetId = '') {
 //   getState()     — возвращает { columns, filters, sort } (текущее)
 //   applyState(s)  — применяет { columns, filters, sort, presetId }
 //   ui             — { rsPrompt?, rsConfirm?, flash? } — опциональные функции
-//                    из shared/dialog.js. Если не переданы — используется
-//                    confirm() / prompt() (нежелательно, см. CLAUDE memory).
+//                    из shared/dialog.js. Если не переданы — fallback к
+//                    глобальным window.rsPrompt/rsConfirm (зарегистрированы
+//                    через import 'shared/dialog.js' где-то на странице).
+//                    v0.60.139: убран final fallback на window.prompt/confirm
+//                    (правило feedback_style.md «No browser dialogs»).
 export function attachTablePresetHandlers(mountEl, tableId, getState, applyState, ui = {}) {
   const sel = mountEl.querySelector(`.rs-tbl-preset-sel[data-tbl-id="${tableId}"]`);
   const btnSave = mountEl.querySelector(`.rs-tbl-preset-save[data-tbl-id="${tableId}"]`);
   const btnSaveAs = mountEl.querySelector(`.rs-tbl-preset-saveas[data-tbl-id="${tableId}"]`);
   const btnDel = mountEl.querySelector(`.rs-tbl-preset-delete[data-tbl-id="${tableId}"]`);
-  const rsPrompt = ui.rsPrompt || ((q, def) => Promise.resolve(window.prompt(q, def)));
-  const rsConfirm = ui.rsConfirm || ((q) => Promise.resolve(window.confirm(q)));
+  const rsPrompt = ui.rsPrompt
+    || (typeof window !== 'undefined' && window.rsPrompt)
+    || ((q, def) => { console.warn('[table-presets] rsPrompt not available, using prompt as last resort'); return Promise.resolve(window.prompt(q, def)); });
+  const rsConfirm = ui.rsConfirm
+    || (typeof window !== 'undefined' && window.rsConfirm)
+    || ((q) => { console.warn('[table-presets] rsConfirm not available, using confirm as last resort'); return Promise.resolve(window.confirm(q)); });
   const flash = ui.flash || ((m) => { try { console.log('[preset]', m); } catch {} });
 
   if (sel) {
