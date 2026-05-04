@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.209', date: '2026-05-04', items: [
+      '👻 <b>Ghost CR01/MR01 после удаления — фикс через soft-delete blacklist</b>. По репорту Пользователя 2026-05-04 «постоянно появляться удаляемые мной CR01, MR01» (часть #2). После v0.60.208 (auto-merge legacy SCS) осталась проблема: <code>scheme-rack-bridge</code> регенерировал виртуальные стойки из scheme-node\'ов после удаления materialized экземпляра.',
+      '• <b>Per-project blacklist</b>: <code>raschet.project.&lt;pid&gt;.scs-config.virtual-rack-blacklist.v1</code> = массив ключей вида <code>«&lt;schemeNodeId&gt;#&lt;schemeIndex&gt;»</code>.',
+      '• <b>API в shared/scheme-rack-bridge.js</b>: <code>addVirtualRackToBlacklist</code>, <code>removeVirtualRackFromBlacklist</code>, <code>getVirtualRackBlacklist</code>, <code>clearVirtualRackBlacklist</code>.',
+      '• <b>loadSchemeVirtualRacks</b>: фильтрует виртуалы по blacklist — soft-deleted не появляются в списке.',
+      '• <b>scs-config bulkDelete</b>: при удалении materialized rack с <code>schemeNodeId</code> добавляет <code>virtualKey</code> в blacklist. Bridge больше не регенерирует ghost.',
+      '• <b>NB</b>: scheme-node остаётся в Конструкторе схем (его никто не трогает). Чтобы вернуть виртуал — пере-материализовать через UI или вручную <code>removeVirtualRackFromBlacklist</code>.',
+      'Файлы: <code>shared/scheme-rack-bridge.js</code> (filter + 4 helpers), <code>scs-config/scs-config.js</code> (bulkDelete вызов addVirtualRackToBlacklist).',
+    ] },
     { version: '0.60.208', date: '2026-05-04', items: [
       '🔁 <b>Auto-merge legacy SCS при загрузке проекта</b>. По репорту Пользователя 2026-05-04 «постоянно появляется легаси СКС». Раньше badge «СКС · N связей (legacy в родителе)» висел при каждом заходе на страницу проекта и требовал ручного клика «🔀 Объединить».',
       '• <b>Авто-merge</b>: если в проекте уже есть scs-design подпроект, ключи <code>raschet.project.&lt;pid&gt;.scs-design.*</code> автоматически переносятся в <code>raschet.project.&lt;subid&gt;.scs-design.*</code> при render проекта. Badge не отображается.',

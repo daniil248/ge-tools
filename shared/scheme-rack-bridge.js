@@ -62,6 +62,17 @@ export function loadSchemeVirtualRacks(pid) {
   const scheme = loadJson(schemeKey, null);
   if (!scheme || !Array.isArray(scheme.nodes)) return [];
 
+  // v0.60.209 (по репорту Пользователя 2026-05-04 «постоянно появляться
+  // удаляемые мной CR01, MR01»): per-project blacklist скрытых
+  // (soft-deleted) виртуальных стоек. Хранится как массив ключей вида
+  // «<schemeNodeId>#<schemeIndex>» — идентичный formed virtualKey.
+  // При удалении materialized stoiki мы добавляем эту key в blacklist;
+  // bridge скрывает соответствующие виртуалы → они больше не появляются
+  // в списке стоек проекта (НЕ удаляя scheme-node — пользователь может
+  // продолжить редактировать схему; виртуал просто soft-hidden).
+  const blacklistKey = projectKey(pid, 'scs-config', 'virtual-rack-blacklist.v1');
+  const blacklist = new Set(loadJson(blacklistKey, []) || []);
+
   const out = [];
   for (const n of scheme.nodes) {
     if (!isRackNode(n)) continue;
@@ -93,6 +104,9 @@ export function loadSchemeVirtualRacks(pid) {
       // v0.59.776: skip linked slot — alias-узел отдельный consumer-node
       // и эмитит свой виртуал самостоятельно.
       if (aliases[i - 1]) continue;
+      // v0.60.209: skip soft-deleted виртуал.
+      const _vKey = `${n.id}#${i}`;
+      if (blacklist.has(_vKey)) continue;
       const tag = total > 1 ? `${baseTag}-${i}` : baseTag;
       out.push({
         id: `scheme-${n.id}-${i}`,
@@ -112,6 +126,52 @@ export function loadSchemeVirtualRacks(pid) {
     }
   }
   return out;
+}
+
+/**
+ * v0.60.209: per-project blacklist для virtual racks (soft-delete).
+ * Когда пользователь удаляет materialized stoiku, добавляем сюда
+ * её virtualKey (= '<schemeNodeId>#<schemeIndex>'); bridge скрывает
+ * соответствующие виртуалы из списка проекта.
+ *
+ * Если пользователь хочет вернуть виртуал — clearVirtualRackBlacklist
+ * (или пере-материализация автоматически: при создании rack с
+ * schemeNodeId+schemeIndex — удалить из blacklist).
+ */
+const _BLACKLIST_KEY_SUFFIX = ['scs-config', 'virtual-rack-blacklist.v1'];
+function _blKey(pid) { return projectKey(pid, _BLACKLIST_KEY_SUFFIX[0], _BLACKLIST_KEY_SUFFIX[1]); }
+
+export function getVirtualRackBlacklist(pid) {
+  if (!pid) return [];
+  return loadJson(_blKey(pid), []) || [];
+}
+
+export function addVirtualRackToBlacklist(pid, schemeNodeId, schemeIndex) {
+  if (!pid || !schemeNodeId) return;
+  const key = _blKey(pid);
+  const arr = loadJson(key, []) || [];
+  const vKey = `${schemeNodeId}#${schemeIndex || 1}`;
+  if (!arr.includes(vKey)) {
+    arr.push(vKey);
+    try { localStorage.setItem(key, JSON.stringify(arr)); } catch {}
+  }
+}
+
+export function removeVirtualRackFromBlacklist(pid, schemeNodeId, schemeIndex) {
+  if (!pid || !schemeNodeId) return;
+  const key = _blKey(pid);
+  const arr = loadJson(key, []) || [];
+  const vKey = `${schemeNodeId}#${schemeIndex || 1}`;
+  const idx = arr.indexOf(vKey);
+  if (idx >= 0) {
+    arr.splice(idx, 1);
+    try { localStorage.setItem(key, JSON.stringify(arr)); } catch {}
+  }
+}
+
+export function clearVirtualRackBlacklist(pid) {
+  if (!pid) return;
+  try { localStorage.removeItem(_blKey(pid)); } catch {}
 }
 
 /**

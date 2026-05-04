@@ -48,7 +48,11 @@ import {
 // Без этого Компоновщик показывал только реальные inst-* стойки и POR-
 // objects type='rack' (mirror создаёт по 1 на узел), не видя N-кратных
 // слотов из «×N»-узла.
-import { loadSchemeVirtualRacks, loadPorGroupVirtualRacks } from '../shared/scheme-rack-bridge.js';
+import {
+  loadSchemeVirtualRacks, loadPorGroupVirtualRacks,
+  // v0.60.209: per-project blacklist (soft-delete) для виртуалов schema.
+  addVirtualRackToBlacklist,
+} from '../shared/scheme-rack-bridge.js';
 // v0.59.580: жадный импорт POR — иначе window.RaschetPOR undefined,
 // rack-storage._loadPorRacks возвращает [], в sidebar Компоновщика
 // «В проекте нет физических шкафов» при том что в POR есть 16 стоек
@@ -4304,6 +4308,21 @@ async function bulkDelete() {
   );
   if (!ok) return;
   const idsToDelete = new Set(allowedSel.map(r => r.id));
+  // v0.60.209 (по репорту Пользователя «постоянно появляться удаляемые
+  // мной CR01, MR01»): для materialized стоек, происходящих из scheme
+  // (n.schemeNodeId), записываем virtualKey в per-project blacklist.
+  // Иначе scheme-rack-bridge при следующей перезагрузке снова сгенерирует
+  // virtual для того же schema-node → ghost.
+  try {
+    const pid = (typeof getActiveProjectId === 'function') ? getActiveProjectId() : null;
+    if (pid) {
+      for (const r of allowedSel) {
+        if (r && r.schemeNodeId) {
+          addVirtualRackToBlacklist(pid, r.schemeNodeId, r.schemeIndex || 1);
+        }
+      }
+    }
+  } catch (e) { console.warn('[scs-config] virtual-rack blacklist write failed:', e); }
   state.racks = state.racks.filter(r => !idsToDelete.has(r.id));
   for (const id of idsToDelete) {
     delete state.contents[id];
