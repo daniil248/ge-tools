@@ -298,7 +298,17 @@ export function setActiveProjectId(id) {
 export function ensureDefaultProject() {
   const arr = listProjects();
   if (arr.length) {
-    if (!getActiveProjectId()) setActiveProjectId(arr[0].id);
+    // v0.60.106 FIX: возвращать АКТИВНЫЙ проект, а не arr[0]. Раньше при
+    // наличии нескольких проектов всегда возвращался первый по списку,
+    // даже если getActiveProjectId() указывал на другой → переключение
+    // проекта через project-context badge не имело эффекта в модулях,
+    // которые делают `_pid = ensureDefaultProject()`.
+    const aid = getActiveProjectId();
+    if (aid) {
+      const cur = arr.find(p => p && p.id === aid);
+      if (cur) return cur;
+    }
+    setActiveProjectId(arr[0].id);
     return arr[0];
   }
   const p = createProject({

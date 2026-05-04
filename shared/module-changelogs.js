@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.106', date: '2026-05-04', items: [
+      '🐛 <b>Hotfix: <code>ensureDefaultProject()</code> возвращал <code>arr[0]</code>, игнорируя активный проект</b>. По репорту Пользователя «не работает» (после переключения проекта через badge в Технологе ЦОД остался на старом проекте). Корень бага: при наличии нескольких проектов возвращался первый по списку, даже если <code>getActiveProjectId()</code> указывал на другой. Это скрывалось пока был один проект, но v0.60.103 (project-switcher через badge) этот баг проявил.',
+      '• <b>Fix</b>: <code>ensureDefaultProject()</code> теперь сначала проверяет <code>getActiveProjectId()</code> → находит соответствующий проект в <code>listProjects()</code> → возвращает его. Только если active не задан или указывает на удалённый — fallback на arr[0].',
+      '• Затрагивает все модули, использующие <code>ensureDefaultProject()</code> для определения <code>_pid</code>: tech-workspace, scs-config, scs-design, schematic и др.',
+      'Файлы: <code>shared/project-storage.js::ensureDefaultProject()</code> (~10 строк, +фикс).',
+    ] },
     { version: '0.60.105', date: '2026-05-04', items: [
       '💱 <b>Каскад валюты по умолчанию (project → company → org → user → fallback)</b>. По репорту Пользователя 2026-05-04: «опять про валюты забыл? Валюта по умолчанию должна задаваться в настройках пользователя, в настройках компании и в настройках конкретного проекта».',
       '• Новый модуль <code>shared/currency-defaults.js</code>: единая <code>CURRENCIES</code> (10 валют), <code>resolveDefaultCurrency(pid)</code> + <code>resolveDefaultCurrencyWithSource(pid)</code> (возвращает источник для UI-tooltip).',
