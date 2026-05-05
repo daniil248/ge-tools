@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.341', date: '2026-05-06', items: [
+      '🔌 <b>Стандартные header/footer во всех модулях</b>. По запросу Пользователя 2026-05-06: «проверь все модули и размести в каждом стандартный хедер и футер, нестандартные замени».',
+      '<b>Аудит проведён по 30 модулям</b>. Большинство уже имеет стандартные mountHeader + mountFooter. Найдены и исправлены:',
+      '• <b>help/index.html</b> — добавлен mountFooter (был только header)',
+      '• <b>suppression-config/index.html</b> — добавлен mountFooter (АГПТ был без footer)',
+      '<b>Не трогаем</b>:',
+      '• <b>scs-config/index.html</b> — это redirect-stub на rack.html (где headers/footers уже стандартные)',
+      '• <b>configurator3d/index.html</b> — custom dark 3D playground page с кастомной панелью управления; стандартный header несовместим с layout',
+      '• <b>index.html</b> (Конструктор схем) — special case со встроенным header через rs-header-mount; module-footer присутствует',
+      'Files: <code>help/index.html</code>, <code>suppression-config/index.html</code> (+ mountFooter import + mount call).',
+    ] },
     { version: '0.60.340', date: '2026-05-06', items: [
       '🔌 <b>calcClimateDerate резолвит профиль из engines catalog</b>. Интеграция engines/index.js с расчётным слоем ДГУ.',
       '<b>Resolver приоритет</b>:',
