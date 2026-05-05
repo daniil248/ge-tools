@@ -221,13 +221,38 @@ export function openImpedanceModal(n) {
     h.push(`<div class="field check"><input type="checkbox" id="imp-auxBrk"${n.auxBreakerOn !== false ? ' checked' : ''}><label>Автомат СН включён</label></div>`);
   }
 
-  // Вычисленные значения (справка)
+  // Вычисленные значения (справка).
+  // v0.60.267 (по репорту Пользователя 2026-05-06 «а ну проверь, откуда 380 кВт
+  // активной мощности появилось????»):
+  // Для городской сети (isUtility) Пользователь вводит capacityKw напрямую
+  // (Разрешённая мощность по ТУ, кВт) — это УЖЕ активная мощность. Поле
+  // snomKva не показывается, остаётся дефолтным 400 → формула snomKva×cosPhi
+  // = 400 × 0.95 = 380 kW. Бред.
+  //
+  // Корректно:
+  //   • utility: P (kW) = capacityKw (уже задано в kW).
+  //   • transformer: P (kW) = snomKva × cosPhi (Snom в kVA, формула классич).
+  //   • generator: P (kW) = capacityKw (если задано) или snomKva × cosPhi.
+  //   • other: P (kW) = capacityKw || snomKva × cosPhi.
   const U = nodeVoltage(n);
   const Zs = sourceImpedance(n);
   const IkMax = Zs > 0 ? (1.1 * U) / (Math.sqrt(3) * Zs) : Infinity;
-  const Pkw = (n.snomKva || 0) * (Number(n.cosPhi) || 0.92);
+  let Pkw, pFormulaLabel;
+  if (isUtility) {
+    Pkw = Number(n.capacityKw) || 0;
+    pFormulaLabel = 'Активная мощность (по ТУ)';
+  } else if (isTransformer) {
+    Pkw = (Number(n.snomKva) || 0) * (Number(n.cosPhi) || 0.92);
+    pFormulaLabel = 'Активная мощность (P = Snom × cos φ)';
+  } else if (subtype === 'generator') {
+    Pkw = Number(n.capacityKw) || ((Number(n.snomKva) || 0) * (Number(n.cosPhi) || 0.85));
+    pFormulaLabel = 'Активная мощность';
+  } else {
+    Pkw = Number(n.capacityKw) || ((Number(n.snomKva) || 0) * (Number(n.cosPhi) || 0.92));
+    pFormulaLabel = 'Активная мощность';
+  }
   h.push(`<div class="inspector-section"><div style="font-size:12px;line-height:1.8">` +
-    `Активная мощность (P = Snom × cos φ): <b>${fmt(Pkw)} kW</b><br>` +
+    `${pFormulaLabel}: <b>${fmt(Pkw)} kW</b><br>` +
     `Zs (полное сопротивление): <b>${(Zs * 1000).toFixed(2)} мОм</b><br>` +
     (isFinite(IkMax) ? `Ik max (c=1.1): <b>${fmt(IkMax / 1000)} кА</b> при ${U} В` : 'Ik: ∞ (Zs = 0)') +
     `</div></div>`);

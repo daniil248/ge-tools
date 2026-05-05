@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.267', date: '2026-05-06', items: [
+      '🐛 <b>Hotfix: «Активная мощность 380 kW» при ТУ 2500 кВт</b>. По репорту Пользователя 2026-05-06 «а ну проверь, откуда 380 кВт активной мощности появилось????» (скриншот: Городская сеть UT1 с capacityKw=2500, cos φ=0.95, в правой панели «Активная мощность (P = Snom × cos φ): 380 kW»).',
+      '• Корень: для источника типа «Городская сеть (utility)» Пользователь вводит <code>capacityKw</code> напрямую (Разрешённая мощность по ТУ, кВт) — это уже активная мощность. Поле <code>snomKva</code> для utility НЕ показывается (бессмысленно для ЛЭП), но значение остаётся дефолтным <b>400</b>. Формула <code>Pkw = snomKva × cosPhi = 400 × 0.95 = 380 kW</code> — бессмысленна.',
+      '• Фикс: расчёт Pkw в info-блоке source-инспектора теперь зависит от subtype:',
+      '   ▸ <b>utility</b>: P (kW) = capacityKw (как введено в ТУ)',
+      '   ▸ <b>transformer</b>: P (kW) = snomKva × cos φ (классическая формула, Snom в kVA)',
+      '   ▸ <b>generator / other</b>: P (kW) = capacityKw (если задано) || snomKva × cos φ',
+      '• Label рядом с числом тоже зависит от subtype: «Активная мощность (по ТУ)» для utility, «P = Snom × cos φ» для трансформатора, «Активная мощность» для остальных.',
+      'File: <code>js/engine/inspector/source.js</code>.',
+    ] },
     { version: '0.60.266', date: '2026-05-06', items: [
       '🔁 <b>Shared→Solo: collab автоматически останавливается при unshare</b>. Завершение цикла solo-shared transitions из v0.60.261/264.',
       '• Сценарий: Пользователь открывает shared-проект → collab активен (presence + locks + sync). Удаляет всех member-ов через share-modal → проект снова solo, но collab продолжал работать, тратя writes на heartbeat.',
