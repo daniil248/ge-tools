@@ -9,7 +9,7 @@
 // APP_VERSION — единая версия Raschet. Она же отображается в футере
 // каждой подпрограммы. Отдельной нумерации у модулей нет: любая правка
 // по любому модулю инкрементит эту версию.
-export const APP_VERSION = '0.60.254';
+export const APP_VERSION = '0.60.255';
 
 // ================= Константы =================
 export const NODE_H = 120;      // 3 × 40px grid
@@ -798,6 +798,12 @@ export const DEFAULTS = {
     inputSide: 'top',
     slots: [],          // [{kind:'linked',nodeId}|{kind:'placeholder',demandKw,...}]
     priorities: [1, 2],
+    // v0.60.250: kitMode — режим «сборка» (cond+outdoor) вместо «группа».
+    // false (default) = обычная группа однотипных потребителей.
+    // true = composite-сборка с внутренними conns между slot-членами;
+    //   маркируется _isKitInternal на conns в recalc; в кабельном журнале
+    //   internal cables показываются отдельной группой.
+    kitMode: false,
   }),
 };
 

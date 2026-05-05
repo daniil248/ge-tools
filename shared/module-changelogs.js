@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.255', date: '2026-05-06', items: [
+      '🧩 <b>Kit-container Phase 2: UI режим «Сборка» + кнопки парных наборов</b>. По запросу Пользователя 2026-05-06 «продолжай полностью реализацию нового типа контейнера от и до».',
+      '• В модалке «Состав контейнера» добавлен toggle «📦 Группа / 🧩 Сборка» — переключает <code>n.kitMode</code> на consumer-container.',
+      '• В режиме Сборка (kitMode=true) header-кнопки заменены тремя пресетами: «+ Кондиционер (water)» (только cond без outdoor), «+ Кондиционер + outdoor» (cond+1 outdoor + kit-internal conn), «+ Кондиционер + 2× outdoor» (двухконтурный).',
+      '• Каждая кнопка создаёт linked-slot узлы и conn между ними; conns автоматически помечаются <code>_isKitInternal=true</code> через recalc <code>_markKitInternalConns</code>.',
+      '• В заголовке: счётчик членов с >1 входов («с ATS / multi-input: N») и contextual banner «Внутренние кабели kit-internal. ATS трактуется per-member: у каждого прибора может быть свой активный ввод» — ответ на вопрос Пользователя «у кондиционеров с ATS активный только один ввод, но в группе могут быть разные вводы активны».',
+      '🔧 <b>Cond per-unit отображение: декомпозиция «Σ (own + downstream)»</b>. По уточнению Пользователя 2026-05-06 «давай после суммарной мощности добавим в скобках X+Y и туда уже укажем каждый компонент, то же и для тока».',
+      '• Корень: для cond с присоединённым outdoor (daisy-chain) <code>_loadKw</code> = own + outdoor (через walkUp). Карточка делила <code>_loadKw / count</code> и показывала «19 kW per unit» вместо «15» — выглядело как cond поглотил мощность outdoor.',
+      '• Фикс: строки «Расчёт P / I» показывают суммарную мощность КАБЕЛЯ (15+4=19 kW per unit), а в скобках — декомпозицию: «19 kW (15+4) / 28.9 A (22.8+6.1)».',
+      '• Footer-label показывает только собственное Pрасч узла («4 × 15.0 kW = 60.0 kW») — без выпадения downstream-составляющей; эта детализация уже видна в строке «Расчёт» через скобки.',
+      'Файлы: <code>js/engine/constants.js</code> (DEFAULTS.consumer-container.kitMode), <code>js/engine/inspector.js</code> (modal UI + handlers), <code>js/engine/render.js</code> (decomposition).',
+    ] },
     { version: '0.60.254', date: '2026-05-06', items: [
       '🩹 <b>Hotfix: 404 на <code>shared/catalogs/dgu.js</code></b>. По репорту Пользователя 2026-05-06 (скриншот консоли «Failed to load resource: 404» + «[catalog-bridge] dgu-datasheets Failed to fetch dynamically imported module»).',
       '• Корень: каталог DGU был разделён на per-vendor файлы в <code>shared/catalogs/dgu/</code> (v0.60.214), но re-export shim <code>shared/catalogs/dgu.js</code> не был создан. catalog-bridge.js пытался импортировать <code>./catalogs/dgu.js</code> и падал с 404.',

@@ -1320,26 +1320,59 @@ export function openContainerMembersModal(container) {
   const body = document.getElementById('container-members-body');
   const title = document.getElementById('container-members-title');
   if (!modal || !body) return;
-  if (title) title.textContent = `Состав контейнера ${effectiveTag(container) || ''}`;
+  // v0.60.255: режим контейнера — обычная Группа vs Сборка (kitMode).
+  const _isKit = !!container.kitMode;
+  if (title) title.textContent = `${_isKit ? 'Состав сборки' : 'Состав контейнера'} ${effectiveTag(container) || ''}`;
   const slots = Array.isArray(container.slots) ? container.slots : [];
   const h = [];
-  // Σ-подсводка
+  // Σ-подсводка + per-member powered-state (для Kit-сборок с разными ATS).
   let totalKw = 0, linkedCount = 0, phCount = 0;
+  // v0.60.255: считаем сколько членов с inputs>1 (multi-input/ATS) — для info-чипа.
+  let multiInputCount = 0;
   for (const s of slots) {
     if (!s) continue;
     if (s.kind === 'linked' && s.nodeId) {
       const a = state.nodes.get(s.nodeId);
-      if (a) { totalKw += (Number(a.demandKw) || 0) * Math.max(1, Number(a.count) || 1); linkedCount++; }
+      if (a) {
+        totalKw += (Number(a.demandKw) || 0) * Math.max(1, Number(a.count) || 1);
+        linkedCount++;
+        if ((Number(a.inputs) || 1) > 1) multiInputCount++;
+      }
     } else if (s.kind === 'placeholder') {
       totalKw += Number(s.demandKw) || 0; phCount++;
     }
   }
   h.push(`<div style="padding:8px 12px;background:#f5f7fa;border-bottom:1px solid #e0e7ee;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <span>Σ <b>${totalKw.toFixed(2)} кВт</b> · реальных потребителей: <b>${linkedCount}</b> · placeholder-слотов: <b>${phCount}</b></span>
+    <span>Σ <b>${totalKw.toFixed(2)} кВт</b> · реальных потребителей: <b>${linkedCount}</b> · placeholder-слотов: <b>${phCount}</b>${multiInputCount > 0 ? ` · <span title="Сколько членов имеют > 1 входа (multi-input / ATS).">с ATS / multi-input: <b>${multiInputCount}</b></span>` : ''}</span>
     <span style="display:inline-flex;gap:4px">
       <button type="button" class="cm-view-toggle" data-view="cards" style="padding:4px 10px;font-size:11px;border:1px solid #cbd5e1;background:${_containerMembersView === 'cards' ? '#dbeafe' : '#fff'};color:${_containerMembersView === 'cards' ? '#1e40af' : '#64748b'};border-radius:4px;cursor:pointer;font-weight:${_containerMembersView === 'cards' ? '600' : '400'}" title="Карточный вид (компактный обзор)">📋 Карточки</button>
       <button type="button" class="cm-view-toggle" data-view="table" style="padding:4px 10px;font-size:11px;border:1px solid #cbd5e1;background:${_containerMembersView === 'table' ? '#dbeafe' : '#fff'};color:${_containerMembersView === 'table' ? '#1e40af' : '#64748b'};border-radius:4px;cursor:pointer;font-weight:${_containerMembersView === 'table' ? '600' : '400'}" title="Табличный вид с фильтрами и групповым редактированием">📊 Таблица</button>
     </span>
+  </div>`);
+  // v0.60.255: kitMode toggle + контекстный banner.
+  // По запросу Пользователя 2026-05-05 «реализация позволит учитывать
+  // отдельно кондиционер, отдельно наружный блок, отдельно кабель между
+  // кондиционеров и наружным блоком и все это для лаконичности на схеме
+  // обернуть так чтобы группа содержала сколько угодно экземпляров внутри
+  // и при этом отображалась как 2 устройства».
+  // По уточнению Пользователя 2026-05-06 «у кондиционеров с ATS активный
+  // только один ввод, но в группе могут быть разные вводы активны, это
+  // нужно учитывать» — ATS активный вход тракторируется per-member
+  // (recalc.activeInputs работает per-узел), Σ powered считается отдельно
+  // для каждого slot-узла; в банере показано info-напоминание.
+  h.push(`<div style="padding:8px 12px;border-bottom:1px solid #e0e7ee;background:${_isKit ? '#ecfdf5' : '#fff'};display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px">
+    <span style="color:${_isKit ? '#065f46' : '#475569'};font-weight:600" title="Группа = много однотипных потребителей с общим питающим кабелем (контейнер показывается как ОДИН узел).
+Сборка (kit) = композитный набор разнотипных приборов с внутренними кабелями (cond → outdoor); каждый член считается отдельно, но контейнер на схеме показывается как один блок.">Режим:</span>
+    <span style="display:inline-flex;border:1px solid #cbd5e1;border-radius:4px;overflow:hidden">
+      <button type="button" id="cm-kitmode-off" style="padding:4px 12px;font-size:11px;border:none;background:${!_isKit ? '#dbeafe' : '#fff'};color:${!_isKit ? '#1e40af' : '#64748b'};cursor:pointer;font-weight:${!_isKit ? '600' : '400'};border-right:1px solid #cbd5e1" title="Группа однотипных потребителей. Один питающий кабель → много одинаковых приборов.">📦 Группа</button>
+      <button type="button" id="cm-kitmode-on" style="padding:4px 12px;font-size:11px;border:none;background:${_isKit ? '#bbf7d0' : '#fff'};color:${_isKit ? '#065f46' : '#64748b'};cursor:pointer;font-weight:${_isKit ? '600' : '400'}" title="Сборка (kit). Композитный набор разнотипных приборов: например, кондиционер + наружный блок (или 2 наружных для двухконтурных).
+Внутренние кабели (cond → outdoor) маркируются как «kit-internal» и группируются отдельно в кабельном журнале.
+ВАЖНО: каждый прибор считается отдельно по своим P/cos/Ки, многоввод (ATS) тракторируется per-member.">🧩 Сборка</button>
+    </span>
+    ${_isKit
+      ? `<span style="color:#047857;font-size:11px;font-style:italic">Внутренние кабели (cond→outdoor) помечены как kit-internal. ATS трактуется per-member: у каждого прибора может быть свой активный ввод.</span>`
+      : `<span style="color:#64748b;font-size:11px;font-style:italic">Однотипные приборы с общим питающим кабелем. Переключите в «Сборку» для cond+outdoor.</span>`
+    }
   </div>`);
   if (!slots.length) {
     h.push('<div style="padding:24px;text-align:center;color:#778899">Контейнер пуст. Drop потребителя на канвасе сюда — добавится.</div>');
@@ -1728,7 +1761,17 @@ export function openContainerMembersModal(container) {
   }
   h.push('<button type="button" id="cm-delete-container" title="Удалить контейнер целиком вместе со всеми linked-потребителями (необратимо)" style="padding:6px 14px;font-size:12px;border:1px solid #dc2626;background:#fee2e2;color:#991b1b;border-radius:4px;cursor:pointer">🗑 Удалить группу полностью</button>');
   h.push('</div>');
-  h.push('<button type="button" id="cm-add-placeholder" style="padding:6px 14px;font-size:12px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:4px;cursor:pointer">➕ Добавить placeholder-слот</button>');
+  // v0.60.255: кнопки добавления — в kit-mode показываем парные сборки;
+  // в обычном режиме — стандартный placeholder.
+  h.push('<div style="display:flex;gap:6px;flex-wrap:wrap">');
+  if (_isKit) {
+    h.push('<button type="button" id="cm-add-kit-cond-only" style="padding:6px 12px;font-size:11px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;border-radius:4px;cursor:pointer" title="Кондиционер БЕЗ внешнего блока — water-cooled / chiller-fed. Создаёт один conditioner-узел в сборке.">+ Кондиционер (water)</button>');
+    h.push('<button type="button" id="cm-add-kit-cond-1out" style="padding:6px 12px;font-size:11px;border:1px solid #16a34a;background:#bbf7d0;color:#15803d;border-radius:4px;cursor:pointer;font-weight:600" title="Стандартный сплит: кондиционер + наружный блок. Создаёт пару узлов и conn между ними. Conn между cond и outdoor помечается как kit-internal.">+ Кондиционер + outdoor</button>');
+    h.push('<button type="button" id="cm-add-kit-cond-2out" style="padding:6px 12px;font-size:11px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;border-radius:4px;cursor:pointer" title="Двухконтурный кондиционер: cond + 2 outdoor (например VRF / dual-circuit DX). Создаёт триплет узлов и 2 conn от cond к каждому outdoor.">+ Кондиционер + 2× outdoor</button>');
+  } else {
+    h.push('<button type="button" id="cm-add-placeholder" style="padding:6px 14px;font-size:12px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:4px;cursor:pointer">➕ Добавить placeholder-слот</button>');
+  }
+  h.push('</div>');
   h.push('</div>');
   body.innerHTML = h.join('');
   modal.classList.remove('hidden');
@@ -2066,6 +2109,98 @@ function _wireContainerMembersModal(n, body, modal) {
       refresh();
     });
   }
+
+  // v0.60.255: kitMode toggle.
+  // Переключение режима «Группа ↔ Сборка» — меняет n.kitMode и пересчитывает
+  // _isKitInternal на conns (через recalc → _markKitInternalConns).
+  const kitOff = body.querySelector('#cm-kitmode-off');
+  const kitOn  = body.querySelector('#cm-kitmode-on');
+  if (kitOff) kitOff.addEventListener('click', () => {
+    if (!n.kitMode) return;
+    snapshot('container-kitmode-off:' + n.id);
+    n.kitMode = false;
+    refresh();
+  });
+  if (kitOn) kitOn.addEventListener('click', () => {
+    if (n.kitMode) return;
+    snapshot('container-kitmode-on:' + n.id);
+    n.kitMode = true;
+    refresh();
+  });
+
+  // v0.60.255: helper для создания одного consumer-узла как linked-slot
+  // в kit-сборке. Возвращает id нового узла.
+  function _addKitMember({ name, subtype, kw, cos, phase, voltage }) {
+    const id = uid('n');
+    const tag = nextFreeTag('consumer');
+    const node = {
+      id, type: 'consumer', name, tag,
+      x: Number(n.x) || 0, y: Number(n.y) || 0,
+      ...DEFAULTS.consumer(),
+      consumerSubtype: subtype || 'custom',
+      demandKw: Number(kw) || 0,
+      cosPhi: Number(cos) || 0.85,
+      phase: phase || '3ph',
+      voltage: Number(voltage) || 400,
+      kUse: 1,
+      inputs: 1, outputs: 0, count: 1, priorities: [1],
+      containerId: n.id,
+      pageIds: [], // members не на canvas — отображаются через container-узел
+    };
+    state.nodes.set(id, node);
+    if (!Array.isArray(n.slots)) n.slots = [];
+    n.slots.push({ kind: 'linked', nodeId: id });
+    return id;
+  }
+  // v0.60.255: helper для создания внутреннего kit-conn между двумя
+  // members. Conn маркируется _isKitInternal в recalc автоматически.
+  function _addKitConn(fromId, toId) {
+    const cid = uid('c');
+    state.conns.set(cid, {
+      id: cid,
+      from: { nodeId: fromId, port: 0 },
+      to:   { nodeId: toId,   port: 0 },
+      material: GLOBAL.defaultMaterial,
+      insulation: GLOBAL.defaultInsulation,
+      installMethod: GLOBAL.defaultInstallMethod,
+      ambientC: GLOBAL.defaultAmbient,
+      grouping: GLOBAL.defaultGrouping,
+      bundling: 'touching',
+      lengthM: 5,
+      cableMark: GLOBAL.projectMainCableLv || null,
+    });
+    return cid;
+  }
+
+  // v0.60.255: «+ Кондиционер (water-cooled)» — только cond, без outdoor.
+  body.querySelector('#cm-add-kit-cond-only')?.addEventListener('click', () => {
+    if (!n.kitMode) { try { window.scToast?.('Включите режим «🧩 Сборка»', 'warn'); } catch {} ; return; }
+    snapshot('container-add-kit-cond-only:' + n.id);
+    _addKitMember({ name: 'Кондиционер', subtype: 'conditioner', kw: 10, cos: 0.85, phase: '3ph', voltage: 400 });
+    refresh();
+  });
+
+  // v0.60.255: «+ Кондиционер + outdoor» — cond + 1 outdoor + kit-internal conn.
+  body.querySelector('#cm-add-kit-cond-1out')?.addEventListener('click', () => {
+    if (!n.kitMode) { try { window.scToast?.('Включите режим «🧩 Сборка»', 'warn'); } catch {} ; return; }
+    snapshot('container-add-kit-cond-1out:' + n.id);
+    const condId = _addKitMember({ name: 'Кондиционер', subtype: 'conditioner', kw: 10, cos: 0.85, phase: '3ph', voltage: 400 });
+    const outId  = _addKitMember({ name: 'Наруж. блок', subtype: 'outdoor_unit', kw: 0.6, cos: 0.85, phase: '1ph', voltage: 230 });
+    _addKitConn(condId, outId);
+    refresh();
+  });
+
+  // v0.60.255: «+ Кондиционер + 2× outdoor» — cond + 2 outdoor + 2 kit-internal conns.
+  body.querySelector('#cm-add-kit-cond-2out')?.addEventListener('click', () => {
+    if (!n.kitMode) { try { window.scToast?.('Включите режим «🧩 Сборка»', 'warn'); } catch {} ; return; }
+    snapshot('container-add-kit-cond-2out:' + n.id);
+    const condId = _addKitMember({ name: 'Кондиционер (2-контурный)', subtype: 'conditioner', kw: 16, cos: 0.85, phase: '3ph', voltage: 400 });
+    const out1Id = _addKitMember({ name: 'Наруж. блок №1', subtype: 'outdoor_unit', kw: 0.6, cos: 0.85, phase: '1ph', voltage: 230 });
+    const out2Id = _addKitMember({ name: 'Наруж. блок №2', subtype: 'outdoor_unit', kw: 0.6, cos: 0.85, phase: '1ph', voltage: 230 });
+    _addKitConn(condId, out1Id);
+    _addKitConn(condId, out2Id);
+    refresh();
+  });
   // v0.60.180 (по репорту Пользователя 2026-05-04): «↩ Расформировать
   // группу» — когда linked=1, ph=0. Возвращает consumer на canvas с
   // pageIds + positions контейнера; перенаправляет state.conns/sysConns

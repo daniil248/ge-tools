@@ -2065,11 +2065,17 @@ export function renderNodes() {
           }
         } else {
           // Простой консьюмер с count > 1 (групповой потребитель): Pрасч × count.
+          // v0.60.255: footer показывает ТОЛЬКО собственную мощность узла
+          // (без downstream). Декомпозиция «total = own+down» отображается
+          // в строке «Расчёт» через _kwDecomp скобки. Это избегает дублирования
+          // и сохраняет лаконичность footer'а.
           const _pCalcPerUnit = (Number(n.demandKw) || 0) * (Number(n.kUse) || 1);
-          const _pCalcTotal = (Number(n._loadKw) || (_pCalcPerUnit * (n.count || 1)));
-          gLabel = (n.groupMode === 'individual' && Array.isArray(n.items))
-            ? `Σ ${_fmtKwFixed(_pCalcTotal)} (${cntEff} шт.)`
-            : `${n.count || 1} × ${_fmtKwFixed(_pCalcPerUnit)} = ${_fmtKwFixed(_pCalcTotal)}`;
+          const _pCalcOwn = consumerCalcDemandKw(n);
+          if (n.groupMode === 'individual' && Array.isArray(n.items)) {
+            gLabel = `Σ ${_fmtKwFixed(_pCalcOwn)} (${cntEff} шт.)`;
+          } else {
+            gLabel = `${n.count || 1} × ${_fmtKwFixed(_pCalcPerUnit)} = ${_fmtKwFixed(_pCalcOwn)}`;
+          }
         }
       } else if (_showKw) {
         const _showVal = _isContainer ? (_calcKwTotal || totalKw) : (Number(n._loadKw) || totalKw);
@@ -2681,8 +2687,22 @@ export function renderNodes() {
         const Pnom = _isUniformGroup ? (PnomTotal / cnt) : PnomTotal;
         const Inom = (Pnom > 0 && Ucalc) ? computeCurrentA(Pnom, Ucalc, cosC, isThreePhase(n)) : 0;
         const Snom = Pnom > 0 ? Pnom / cosC : 0;
-        const PcalcTotal = Number(n._loadKw) || 0;
-        const Pcalc = _isUniformGroup ? (PcalcTotal / cnt) : PcalcTotal;
+        // v0.60.255 (по уточнению Пользователя 2026-05-06 «давай после
+        // суммарной мощности добавим в скобках X+Y и туда уже укажем каждый
+        // компонент, то же и для тока»):
+        // Pcalc per unit = ОБЩАЯ нагрузка на входной кабель (own + downstream).
+        // В декомпозиции (X+Y) показываем: own (cond) + downstream (outdoor).
+        // Это корректно физически — на кабель PDC→cond уходит вся мощность
+        // включая outdoor (daisy-chain через cond). Собственный cond и
+        // outdoor показываются отдельно через декомпозицию.
+        const PcalcOwn = consumerCalcDemandKw(n);
+        const PcalcTotalAll = Number(n._loadKw) || PcalcOwn;
+        const PcalcDownstream = Math.max(0, PcalcTotalAll - PcalcOwn);
+        // Per-unit для homogeneous-group: делим на count.
+        const _PcalcOwnPerUnit = _isUniformGroup ? (PcalcOwn / cnt) : PcalcOwn;
+        const _PcalcDownPerUnit = _isUniformGroup ? (PcalcDownstream / cnt) : PcalcDownstream;
+        const Pcalc = _PcalcOwnPerUnit + _PcalcDownPerUnit; // = total per-unit
+        const _hasDownstream = _PcalcDownPerUnit > 0.05;
         // v0.60.188 (по репорту Пользователя 2026-05-04 «да почему они у тебя
         // опять разные???»): Icalc для consumer теперь вычисляется ИЗ Pcalc
         // через computeCurrentA — как для consumer-container. Раньше
@@ -2693,9 +2713,15 @@ export function renderNodes() {
         // v0.60.184 (по репорту Пользователя): для consumer на карточке
         // показываем Номинал (Pnom/Inom) + Расчёт (Pcalc/Icalc) + Свободно
         // + cos φ + U (опц.). Скрываем: Макс, ΔU, Фаза.
+        // v0.60.255: декомпозиция «P_total (own + downstream)» если есть
+        // daisy-chain downstream-узел (outdoor блок присоединён к выходу).
+        const _IcalcOwn = (_PcalcOwnPerUnit > 0 && Ucalc) ? computeCurrentA(_PcalcOwnPerUnit, Ucalc, cosC, isThreePhase(n)) : 0;
+        const _IcalcDown = (_PcalcDownPerUnit > 0 && Ucalc) ? computeCurrentA(_PcalcDownPerUnit, Ucalc, cosC, isThreePhase(n)) : 0;
+        const _kwDecomp = _hasDownstream ? ` (${fmtDigits(_PcalcOwnPerUnit)}+${fmtDigits(_PcalcDownPerUnit)})` : '';
+        const _aDecomp  = _hasDownstream ? ` (${fmtDigits(_IcalcOwn)}+${fmtDigits(_IcalcDown)})` : '';
         valueMap = {
-          demandKw:   { v: fmtDigits(Pcalc) },           // Расчёт P
-          currentA:   { v: fmtDigits(Icalc) },           // Расчёт I
+          demandKw:   { v: fmtDigits(Pcalc) + _kwDecomp },  // Расчёт P + декомпозиция
+          currentA:   { v: fmtDigits(Icalc) + _aDecomp },   // Расчёт I + декомпозиция
           nominalKw:  { v: fmtDigits(Pnom)  },           // Номинал P
           capacityA:  { v: fmtDigits(Inom)  },           // Номинал I
           kvAOrVA:    { v: fmtDigits(Snom)  },
