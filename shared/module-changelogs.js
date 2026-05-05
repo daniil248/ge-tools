@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.268', date: '2026-05-06', items: [
+      '🐛 <b>Hotfix продолжение: SnomNameplate на карточке utility-source</b>. Парный фикс к v0.60.267 — та же проблема была в render.js для отображения карточки на канвасе.',
+      '• Корень: <code>SnomNameplate = (Number(n.snomKva) > 0) ? n.snomKva : capacityKw/cos</code>. Для utility snomKva всегда 400 (дефолт, поле не показывается) → fallback на capacityKw/cos НЕ срабатывает → карточка показывала 400 кВА вместо 2632 кВА (= 2500/0.95).',
+      '• Фикс: для <code>n.sourceSubtype === \'utility\'</code> игнорируем snomKva и считаем S = capacityKw / cos. Применено в 2 местах render.js — loadLines на канвасе и valueMap для snomKva-поля.',
+      '• Существующие utility-проекты с stuck-default snomKva=400 в данных будут отображаться корректно после reload — фикс на стороне renderer.',
+      'File: <code>js/engine/render.js</code>.',
+    ] },
     { version: '0.60.267', date: '2026-05-06', items: [
       '🐛 <b>Hotfix: «Активная мощность 380 kW» при ТУ 2500 кВт</b>. По репорту Пользователя 2026-05-06 «а ну проверь, откуда 380 кВт активной мощности появилось????» (скриншот: Городская сеть UT1 с capacityKw=2500, cos φ=0.95, в правой панели «Активная мощность (P = Snom × cos φ): 380 kW»).',
       '• Корень: для источника типа «Городская сеть (utility)» Пользователь вводит <code>capacityKw</code> напрямую (Разрешённая мощность по ТУ, кВт) — это уже активная мощность. Поле <code>snomKva</code> для utility НЕ показывается (бессмысленно для ЛЭП), но значение остаётся дефолтным <b>400</b>. Формула <code>Pkw = snomKva × cosPhi = 400 × 0.95 = 380 kW</code> — бессмысленна.',

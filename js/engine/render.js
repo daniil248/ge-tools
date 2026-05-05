@@ -2385,7 +2385,11 @@ export function renderNodes() {
         : 0;
       // v0.59.656: для трансформатора/источника nameplate — Snom (kVA) и Pnom (kW=Snom×cosφ).
       // n.snomKva — паспортная мощность; если не задана, считаем S = Pnom/cosφ.
-      const SnomNameplate = (Number(n.snomKva) > 0)
+      // v0.60.268 (по продолжению фикса v0.60.267 «380 kW»): для utility-источника
+      // (Городская сеть) snomKva не вводится — может остаться дефолтным 400.
+      // Игнорируем его и пересчитываем S из capacityKw / cosφ.
+      const _isUtilitySrc = n.sourceSubtype === 'utility';
+      const SnomNameplate = (!_isUtilitySrc && Number(n.snomKva) > 0)
         ? Number(n.snomKva)
         : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cos) : 0);
       if (!effectiveOn(n)) { statusLine = `Отключён`; loadCls += ' off'; }
@@ -2776,7 +2780,9 @@ export function renderNodes() {
         };
         labelMap = null;
       } else if (n.type === 'source') {
-        const SnomNameplate = (Number(n.snomKva) > 0)
+        // v0.60.268: см. комментарий выше (utility-фикс).
+        const _isUtilitySrc2 = n.sourceSubtype === 'utility';
+        const SnomNameplate = (!_isUtilitySrc2 && Number(n.snomKva) > 0)
           ? Number(n.snomKva)
           : (n.capacityKw > 0 ? n.capacityKw / Math.max(0.1, cos) : 0);
         valueMap = {
