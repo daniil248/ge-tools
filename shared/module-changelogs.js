@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.318', date: '2026-05-06', items: [
+      '🔧 <b>Fix: дирейтинг engine-profile не применялся при первом рендере</b>. По репорту Пользователя 2026-05-06: «ты дирейтинг не изменил для двигателя» — на скриншоте profile = Generic ISO 3046-1 при том что авто-pick модель имеет engine Volvo Penta TAD732GE.',
+      '<b>Корень</b>: <code>recalcAndRender</code> читал <code>engineName</code> из <code>_lastBest</code>, который устанавливается только в <code>renderSuggestResult</code> (после <code>calcDgu</code>). На первом запуске <code>_lastBest=null</code> → engineName не передавался → calc fallback к generic ISO 3046-1.',
+      '<b>Fix (двухпроходный подход)</b>:',
+      '1. Pass 1: <code>calcDgu</code> с generic профилем для оценки требуемой мощности',
+      '2. Pre-find probable best candidate из <code>listDgus</code> на основе generic-req (или ручного выбора)',
+      '3. Pass 2: <code>calcDgu</code> с engine-specific профилем из найденного candidate',
+      '<b>Эффект</b>: для AJ Power DA3-AJ165-P1 (Volvo TAD732GE) при 500м/30°C дирейтинг теперь 0% (volvo-tad-twd профиль), а не -6.5% (generic).',
+      'Files: <code>dgu-config/dgu-config.js</code> (recalcAndRender — 2-pass logic).',
+    ] },
     { version: '0.60.317', date: '2026-05-06', items: [
       '🐛 <b>CRITICAL: deletePage не сохранял удаление страниц</b>. По репорту Пользователя 2026-05-06: «эти страницы я уже удалил раз 10??? после Ctrl+R все опять на своих местах».',
       '<b>Корень</b>: <code>deletePage</code> в <code>js/engine/export.js</code> мутировал <code>state.pages</code> и rendering, но НЕ вызывал <code>snapshot()</code> и <code>notifyChange()</code>. Изменение оставалось только в памяти. После reload state восстанавливался из LS/cloud в исходном виде.',

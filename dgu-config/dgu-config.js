@@ -612,16 +612,38 @@ function _renderContextBanner() {
 
 function recalcAndRender() {
   syncStateFromInputs();
-  // v0.60.312: engine name из последнего подбора (если есть). detectEngineProfile
-  // в calc подберёт правильный derate profile (Perkins/Cummins/CAT/Volvo/MTU
-  // современные turbo+aftercooled vs generic ISO 3046-1).
+  // v0.60.318 (по репорту Пользователя 2026-05-06: «ты дирейтинг не изменил
+  // для двигателя» — на скриншоте profile = Generic ISO 3046-1 при том что
+  // авто-pick модель имеет engine Volvo Penta TAD732GE):
+  // Раньше engineName бралось из _lastBest от ПРЕДЫДУЩЕГО рендера. На первом
+  // запуске _lastBest=null → calc использовал generic профиль → derate -6.5%
+  // вместо правильного 0% для современного turbo. Двухпроходный подход:
+  // 1) calc с generic для получения req. nameplate
+  // 2) предсказание engine из лучшего candidate
+  // 3) re-calc с engine-specific профилем
   const _calcInput = { ..._state };
-  if (_lastBest && _lastBest.engineModel) {
-    _calcInput.engineName = _lastBest.engineModel;
-    _calcInput.modelName = _lastBest.model;
-  }
   if (_state.engineProfileOverride) {
     _calcInput.engineProfile = _state.engineProfileOverride;
+  } else {
+    // pass 1: generic profile для оценки требуемой мощности
+    const _genericRes = calcDgu(_calcInput);
+    const _genericReq = _genericRes.spec.nameplateKw;
+    // pre-find probable best для извлечения engine
+    const _candidates = listDgus(_state.vendor ? { vendor: _state.vendor } : {})
+      .filter(d => Number.isFinite(_modeKw(d).kw))
+      .sort((a, b) => _modeKw(a).kw - _modeKw(b).kw);
+    // если есть ручной выбор — берём его engine, иначе — лучший по generic
+    let _probable = null;
+    if (_state.selectedDguId) {
+      _probable = _candidates.find(d => `${d.vendor}::${d.model}` === _state.selectedDguId);
+    }
+    if (!_probable) {
+      _probable = _candidates.find(d => _modeKw(d).kw >= _genericReq);
+    }
+    if (_probable && _probable.engineModel) {
+      _calcInput.engineName = _probable.engineModel;
+      _calcInput.modelName = _probable.model;
+    }
   }
   const res = calcDgu(_calcInput);
   $('dg-calc-result').innerHTML = renderCalcResult(res);
