@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.262', date: '2026-05-06', items: [
+      '⚠ <b>File-storage Phase 5: external change detection</b>. По смежной задаче «совместная работа на сетевом ресурсе»: writer мог перезаписать правки коллеги, который тоже временно открыл файл — теперь детектируется.',
+      '• Каждые 30с в file-mode опрашиваем mtime файла через <code>handle.getFile().lastModified</code>.',
+      '• Если mtime > stored + 1с (с 1.5с tolerance под наш собственный write) — флаг <code>externalChangeDetected=true</code>.',
+      '• Toast: для read-only — «⚠ Файл изменён извне. Нажмите ↻ Перечитать»; для writer — красный warning «⚠ Следующее автосохранение перезапишет внешние правки».',
+      '• Badge подсвечивается красным если writer-mode + externalChange. Indicator «⚠ изменён извне» в badge'е.',
+      '• «↻ Перечитать» сбрасывает флаг и обновляет mtime baseline.',
+      '• Watcher останавливается при «✕ Закрыть файл» / `_stopExternalChangeWatcher`.',
+      '• Watcher только локальный — никаких Firestore-операций. Не нагружает квоту.',
+      'Files: <code>js/engine/export.js</code> (watcher + badge ext-warn).',
+    ] },
     { version: '0.60.261', date: '2026-05-06', items: [
       '🔋🔋 <b>Firestore quota: solo-skip + lock debounce</b>. Дополнительная оптимизация после v0.60.260.',
       '<b>Найден главный сжигатель квоты:</b> на КАЖДЫЙ клик по узлу/связи acquireLock + releaseLock = 2 writes. При активной работе с 30 кликами/мин = 86 400 writes/day только на локи. Покрывал ~4× Spark-квоту.',

@@ -172,11 +172,21 @@ export function initToolbar() {
         <button type="button" id="btn-file-reload" title="Перечитать содержимое файла с диска (например, если коллега в режиме «писатель» сохранил свежие правки)." style="padding:1px 6px;font-size:10px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:3px;cursor:pointer;opacity:0.85">↻ Перечитать</button>
         <button type="button" id="btn-file-close" title="Закрыть файл (выйти из file-mode). Schема в браузере остаётся, но автосохранение в файл прекращается." style="padding:1px 6px;font-size:10px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:3px;cursor:pointer;opacity:0.85">✕ Закрыть файл</button>
       </span>`;
+    // v0.60.262: external-change indicator.
+    const extWarn = fm.externalChangeDetected
+      ? ' · <span style="color:#b91c1c;font-weight:600" title="Файл изменён извне после открытия. Используйте «↻ Перечитать» или сохранение перезапишет правки.">⚠ изменён извне</span>'
+      : '';
     if (fm.readOnly) {
       badge.style.background = '#fef3c7';
       badge.style.borderLeftColor = '#d97706';
       badge.style.color = '#92400e';
-      badge.innerHTML = `👁 <b>${escapeHtml(fm.fileName)}</b> · только чтение${tsStr}${btns}`;
+      badge.innerHTML = `👁 <b>${escapeHtml(fm.fileName)}</b> · только чтение${tsStr}${extWarn}${btns}`;
+    } else if (fm.externalChangeDetected) {
+      // writer-mode + ext-change — подсвечиваем красным.
+      badge.style.background = '#fef2f2';
+      badge.style.borderLeftColor = '#b91c1c';
+      badge.style.color = '#7f1d1d';
+      badge.innerHTML = `📁 <b>${escapeHtml(fm.fileName)}</b>${accessNote}${tsStr}${extWarn}${btns}`;
     } else {
       badge.style.background = '#f0fdf4';
       badge.style.borderLeftColor = '#15803d';
@@ -199,6 +209,9 @@ export function initToolbar() {
         deserialize(r.payload.scheme);
         render(); renderInspector();
         fm2.lastSavedAtMs = Date.now();
+        // v0.60.262: после reload ext-change-флаг сбрасывается + mtime синхронизируется.
+        fm2.lastSeenMtime = r.file?.lastModified || Date.now();
+        fm2.externalChangeDetected = false;
         _updateFileModeBadge();
         flash(`↻ Перечитан: ${r.payload.fileName}`, 'success');
       } catch (e) {
@@ -208,12 +221,58 @@ export function initToolbar() {
     const closeBtn = document.getElementById('btn-file-close');
     if (closeBtn) closeBtn.onclick = async () => {
       window.Raschet._fileMode = null;
+      _stopExternalChangeWatcher(); // v0.60.262
       try { await forgetHandle(); } catch {}
       _updateFileModeBadge();
       flash('Файл закрыт. Автосохранение в файл выключено.', 'success');
     };
   };
   function escapeHtml(s) { return String(s || '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
+  // v0.60.262: external change watcher — каждые 30с проверяем mtime файла.
+  // Если изменился (кто-то записал извне, например коллега-писатель в режиме
+  // совместной работы или другой процесс на сетевом ресурсе) — показываем
+  // banner с предложением «↻ Перечитать» (для read-only) или предупреждение
+  // «⚠ Файл изменён извне — следующее автосохранение перезапишет правки
+  // коллеги» (для writer-mode).
+  let _externalWatchTimer = null;
+  function _stopExternalChangeWatcher() {
+    if (_externalWatchTimer) { clearInterval(_externalWatchTimer); _externalWatchTimer = null; }
+  }
+  function _startExternalChangeWatcher() {
+    _stopExternalChangeWatcher();
+    _externalWatchTimer = setInterval(async () => {
+      try {
+        const fm = window.Raschet?._fileMode;
+        if (!fm || !fm.handle) { _stopExternalChangeWatcher(); return; }
+        // Проверка permission — если отозвано, остановим watcher.
+        const perm = await ensurePermission(fm.handle, 'read');
+        if (perm !== 'granted') { _stopExternalChangeWatcher(); return; }
+        const file = await fm.handle.getFile();
+        const mtime = file.lastModified;
+        // Сравниваем с lastSeenMtime, накидываем 1.5s tolerance чтобы не
+        // ловить наш собственный write (writer-mode записывает файл и mtime
+        // меняется — это НЕ внешнее изменение).
+        const ownWriteTolerance = 1500;
+        const lastOwn = fm.lastSavedAtMs || 0;
+        const isOwnWrite = Math.abs(mtime - lastOwn) < ownWriteTolerance;
+        if (mtime > (fm.lastSeenMtime || 0) + 1000 && !isOwnWrite) {
+          fm.lastSeenMtime = mtime;
+          fm.externalChangeDetected = true;
+          // Уведомляем Пользователя — toast + bg-цвет в badge.
+          if (fm.readOnly) {
+            flash(`⚠ Файл «${fm.fileName}» изменён извне. Нажмите «↻ Перечитать» в badge'е чтобы загрузить свежее содержимое.`, 'info');
+          } else {
+            flash(`⚠ Файл «${fm.fileName}» изменён ИЗВНЕ во время вашей работы. Следующее автосохранение перезапишет внешние правки! Используйте «↻ Перечитать» (вы потеряете локальные изменения) или явный save.`, 'error');
+          }
+          _updateFileModeBadge();
+        }
+      } catch (e) {
+        // File мог быть удалён, диск отключён — затаскать в console, не толкать тосты.
+        console.warn('[file-watch]', e.message);
+      }
+    }, 30000);
+  }
 
   bind('btn-file-open', async () => {
     try {
@@ -229,8 +288,11 @@ export function initToolbar() {
         readOnly: !!result.readOnly && !result.handle,
         supportedAccess: !!result.handle,
         lastSavedAtMs: Date.now(),
+        // v0.60.262: lastSeenMtime — для внешнего conflict-detection.
+        lastSeenMtime: result.file?.lastModified || Date.now(),
       };
       _updateFileModeBadge();
+      _startExternalChangeWatcher();
       // v0.60.260: запоминаем handle в IndexedDB для авто-восстановления при reload.
       if (result.handle) await rememberHandle(result.handle, { fileName: window.Raschet._fileMode.fileName, readOnly: false });
       const acc = result.handle ? 'авто-save в тот же файл' : 'без авто-save (старый браузер) — используйте «Сохранить в файл»';
@@ -252,8 +314,10 @@ export function initToolbar() {
         readOnly: true,
         supportedAccess: !!result.handle,
         lastSavedAtMs: Date.now(),
+        lastSeenMtime: result.file?.lastModified || Date.now(),
       };
       _updateFileModeBadge();
+      _startExternalChangeWatcher();
       if (result.handle) await rememberHandle(result.handle, { fileName: window.Raschet._fileMode.fileName, readOnly: true });
       flash(`👁 Открыт только для чтения: ${result.payload.fileName}. Изменения локально, в файл не сохраняются.`, 'success');
     } catch (e) {
@@ -299,6 +363,14 @@ export function initToolbar() {
     const r = await writeProjectToHandle(fm.handle, payload);
     // v0.60.260: refresh badge timestamp.
     fm.lastSavedAtMs = Date.now();
+    // v0.60.262: после нашего write обновляем lastSeenMtime, чтобы external-watcher
+    // не подумал что это «внешнее изменение». Точное mtime в ОС может слегка
+    // отличаться (1-2с), tolerance в watcher'е это покрывает.
+    try {
+      const file = await fm.handle.getFile();
+      fm.lastSeenMtime = file.lastModified;
+    } catch {}
+    fm.externalChangeDetected = false; // наш own-write — не conflict
     _updateFileModeBadge();
     return r;
   };
@@ -361,8 +433,10 @@ export function initToolbar() {
             readOnly: !!remembered.readOnly,
             supportedAccess: true,
             lastSavedAtMs: Date.now(),
+            lastSeenMtime: r.file?.lastModified || Date.now(),
           };
           _updateFileModeBadge();
+          _startExternalChangeWatcher();
           flash(`📁 Восстановлен: ${r.payload.fileName || fname}`, 'success');
         } catch (e) {
           // Handle мог быть невалиден (файл удалён, permission отозвано постоянно).
