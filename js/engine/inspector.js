@@ -2889,29 +2889,13 @@ function _configuratorForNode(n) {
 // только свои тематические поля; Общее собирает общий фундамент.
 export function renderGeneralPanel(n) {
   const h = [];
-  // v0.60.277: read-only info-block про другие дисциплины (n.systems).
-  // Конструктор схем = дисциплина электрика, но узел может быть в нескольких
-  // системах одновременно (Tech-workspace их редактирует). Электрик видит
-  // эти metadata только для контекста — без возможности менять.
-  try {
-    const sys = Array.isArray(n.systems) ? n.systems : [];
-    const others = sys.filter(s => s && s !== 'electrical');
-    if (others.length) {
-      const allSystems = getAllSystems();
-      const chips = others.map(sid => {
-        const m = allSystems.find(s => s.id === sid);
-        if (!m) return '';
-        return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:${m.color}15;border:1px solid ${m.color};border-radius:3px;font-size:10px;color:${m.color};font-weight:600">${m.icon} ${escHtml(m.label)}</span>`;
-      }).filter(Boolean).join(' ');
-      if (chips) {
-        h.push(`<div class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">
-          <div class="muted" style="font-size:11px;margin-bottom:4px" title="Этот элемент относится также к другим инженерным системам. Параметры этих дисциплин редактируются в Технологе ЦОД (или в дисциплинарном модуле). Конструктор схем работает только с электрической частью.">🧩 <b>Также в системах:</b></div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">${chips}</div>
-          <div class="muted" style="font-size:10px;margin-top:4px">Редактируется в Технологе ЦОД / дисциплинарном модуле.</div>
-        </div>`);
-      }
-    }
-  } catch {}
+  // v0.60.278 (по уточнению Пользователя 2026-05-06 «опять же это все должно
+  // быть привязано только к проекту. Отдельно такие списки не актуальны»):
+  // chip-info «Также в системах: ...» убран. Электрику не нужно видеть
+  // информацию о других дисциплинах — это шум. Multi-discipline концепция
+  // живёт ТОЛЬКО в проектном контексте (Tech-workspace / ГИП / Администратор).
+  // Конструктор схем = чистая дисциплина электрика, без отвлечений.
+  // Данные n.systems сохраняются — Tech-workspace их видит и редактирует.
   // v0.58.49: «В работе» — общий переключатель эксплуатационного состояния.
   // Применим к source/generator/ups (остальные не имеют бинарного on/off).
   // Выключенный узел пропадает из расчёта всех систем, а не только электрики.
