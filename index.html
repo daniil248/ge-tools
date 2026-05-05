@@ -76,11 +76,11 @@
       <aside id="palette">
         <div id="palette-resizer"></div>
         <div class="brand">Raschet</div>
-        <div class="subtitle" title="Универсальный редактор: электрика, СКС, гидравлика, механика — переключается видом страницы (Свойства страницы → Вид)">Конструктор схем · универсальный</div>
+        <!-- v0.60.279 (по парадигме v0.60.277/278: Конструктор = дисциплина электрика). Старый подзаголовок «универсальный редактор: электрика, СКС, гидравлика, механика» дезинформировал — page-kinds сокращены до schematic+layout (v0.60.154), система-tab убран (v0.60.277). Теперь это электрический редактор. -->
+        <div class="subtitle" title="Редактор электрических принципиальных схем. Multi-discipline (СКС, механика, ОВ, ВК и т.п.) — отдельные модули и Технолог ЦОД.">Конструктор электрических схем</div>
 
         <h3>Элементы</h3>
-        <!-- v0.59.346: индикатор «вид текущей страницы» — даёт понять, что
-             редактор универсальный и палитра/расчёты зависят от вида. -->
+        <!-- v0.59.346: индикатор «вид текущей страницы». v0.60.154: page-kinds сокращены до schematic+layout. -->
         <div id="pal-page-kind-bar" style="display:flex;align-items:center;gap:6px;margin:4px 0 8px;padding:5px 8px;background:#0f172a;border:1px solid #334155;border-radius:4px;font-size:11px;color:#cbd5e1">
           <span style="opacity:0.7">Страница:</span>
           <span id="pal-page-kind-label" style="font-weight:600;color:#fbbf24">⚡ Принципиальная</span>
