@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.256', date: '2026-05-06', items: [
+      '🔇 <b>Margin warning: nothing-better suppression</b>. По запросу Пользователя 2026-05-06 «давай добавим на предупреждение о низком запасе или переразмере еще условие, что если следующий шаг вниз или вверх выходит за указанные пользователем пределы, то предупреждение не выводим».',
+      '• Корень: если щит 630 А с нагрузкой 430.9 А (margin 46% > 30%), а ближайший шаг вниз — 400 А (недостаточен), Пользователь физически не может выбрать лучший вариант → сообщение «избыточный запас» бесполезно и засоряет UI.',
+      '• Фикс: после расчёта <code>_marginWarn</code> проверяем, есть ли в <code>BREAKER_SERIES</code> хоть один номинал, дающий margin в диапазоне <code>[marginMinPct, marginMaxPct]</code>. Если нет — гасим warn, исходное значение сохраняется в <code>_marginWarnSuppressedNoStep</code> для диагностики.',
+      '• Применено в 3 местах: первичный расчёт margin, sibling-clamp пересчёт, и автоматический подбор <code>autoCapA</code>.',
+      '🔢 <b>BREAKER_SERIES: добавлены 315 А и 500 А</b>. По репорту Пользователя «кстати кажется есть еще шаг 500А, если это так то добавь в список».',
+      '• 500 A: IEC 60947-2 — Schneider ComPacT NSX500 / NS630 с rating plug 500 A; ABB Tmax T5 / Tmax XT5 with 500 A trip; Siemens 3VA. Уже присутствует в <code>FUSE_SERIES</code> (gG-предохранители 500 А).',
+      '• 315 A: стандартный промежуточный шаг (250→315→400) — есть в FUSE_SERIES и в trip-plugs MCCB Schneider/ABB.',
+      'Файлы: <code>js/engine/constants.js</code> (BREAKER_SERIES), <code>js/engine/recalc.js</code> (helper <code>_hasFeasibleSeriesStep</code> + 3 места применения).',
+    ] },
     { version: '0.60.255', date: '2026-05-06', items: [
       '🧩 <b>Kit-container Phase 2: UI режим «Сборка» + кнопки парных наборов</b>. По запросу Пользователя 2026-05-06 «продолжай полностью реализацию нового типа контейнера от и до».',
       '• В модалке «Состав контейнера» добавлен toggle «📦 Группа / 🧩 Сборка» — переключает <code>n.kitMode</code> на consumer-container.',

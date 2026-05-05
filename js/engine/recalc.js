@@ -781,6 +781,30 @@ function panelCosPhi(panelId) {
   return P / Math.sqrt(P * P + Q * Q);
 }
 
+// v0.60.256 (по запросу Пользователя 2026-05-06 «давай добавим на
+// предупреждение о низком запасе или переразмере еще условие, что если
+// следующий шаг вниз или вверх выходит за указанные пользователем
+// пределы, то предупреждение не выводим»):
+// Проверяем, существует ли в стандартном ряду BREAKER_SERIES хотя бы один
+// номинал, который при данной maxA даёт margin в [minP, maxP] (т.е. в
+// диапазоне допустимого запаса по мнению Пользователя). Если нет — текущий
+// capA является лучшим возможным выбором, и предупреждение должно быть
+// подавлено: «нет шага лучше, ничего не поделаешь».
+//
+// Пример: capA=630, maxA=430.9 → margin=46.2% > 30%. Шаги ниже: 500 даёт
+// margin=16% (попадает в [2,30]) → есть feasible-шаг → предупреждаем
+// (Пользователь МОЖЕТ снизить до 500). Без 500 в серии: 400 даёт margin=-7%
+// (undersize) → нет feasible-шага → НЕ предупреждаем.
+function _hasFeasibleSeriesStep(maxA, minP, maxP) {
+  if (!(maxA > 0)) return true; // без нагрузки логика margin не применима
+  for (const v of BREAKER_SERIES) {
+    if (v <= 0) continue;
+    const m = ((v - maxA) / maxA) * 100;
+    if (m >= minP && m <= maxP) return true;
+  }
+  return false;
+}
+
 // ================= Расчёт мощности =================
 // v0.59.528: пометить связи, идущие ВНУТРИ интегрированного ИБП.
 // Это связи между родительским type='ups' kind='ups-integrated' и его
@@ -3260,12 +3284,23 @@ function recalc() {
         n._marginPct = margin;
         const hi = Number(n.marginMaxPct);
         const maxP = isFinite(hi) ? hi : 30;
+        const lo = Number(n.marginMinPct);
+        const minP = isFinite(lo) ? lo : 0;
         if (margin < 0) n._marginWarn = 'undersize';   // номинал < макс.тока → красный
         else if (margin > maxP) n._marginWarn = 'oversize'; // избыточный запас → фиолетовый
         else n._marginWarn = null;
+        // v0.60.256: если в BREAKER_SERIES нет шага, который дал бы margin в
+        // [minP, maxP] — текущий capA лучший возможный, гасим предупреждение.
+        if (n._marginWarn && !_hasFeasibleSeriesStep(maxA, minP, maxP)) {
+          n._marginWarnSuppressedNoStep = n._marginWarn;
+          n._marginWarn = null;
+        } else {
+          n._marginWarnSuppressedNoStep = null;
+        }
       } else {
         n._marginPct = null;
         n._marginWarn = null;
+        n._marginWarnSuppressedNoStep = null;
       }
 
       // Фаза 1.19.3: Ik3 на MV-шинах (IEC 60909) с учётом MV-кабелей.
@@ -3698,12 +3733,22 @@ function recalc() {
             n._marginPct = margin;
             const hi = Number(n.marginMaxPct);
             const maxP = isFinite(hi) ? hi : 30;
+            const lo = Number(n.marginMinPct);
+            const minP = isFinite(lo) ? lo : 0;
             if (margin < 0) n._marginWarn = 'undersize';
             else if (margin > maxP) n._marginWarn = 'oversize';
             else n._marginWarn = null;
+            // v0.60.256: nothing-better suppression.
+            if (n._marginWarn && !_hasFeasibleSeriesStep(newMaxA, minP, maxP)) {
+              n._marginWarnSuppressedNoStep = n._marginWarn;
+              n._marginWarn = null;
+            } else {
+              n._marginWarnSuppressedNoStep = null;
+            }
           } else {
             n._marginPct = null;
             n._marginWarn = null;
+            n._marginWarnSuppressedNoStep = null;
           }
           // Пересчёт _capacityKwFromA — может зависеть от capA × U × cos.
           // (Сама формула не зависит от _maxLoadA, но cos φ мог поменяться
@@ -3796,13 +3841,22 @@ function recalc() {
         n._marginPct = margin;
         const hi = Number(n.marginMaxPct);
         const maxP = isFinite(hi) ? hi : 30;
+        const lo = Number(n.marginMinPct);
+        const minP = isFinite(lo) ? lo : 0;
         if (margin < 0) n._marginWarn = 'undersize';
         else if (margin > maxP) n._marginWarn = 'oversize';
         else n._marginWarn = null;
-      } else { n._marginPct = null; n._marginWarn = null; }
+        // v0.60.256: nothing-better suppression.
+        if (n._marginWarn && !_hasFeasibleSeriesStep(maxA, minP, maxP)) {
+          n._marginWarnSuppressedNoStep = n._marginWarn;
+          n._marginWarn = null;
+        } else {
+          n._marginWarnSuppressedNoStep = null;
+        }
+      } else { n._marginPct = null; n._marginWarn = null; n._marginWarnSuppressedNoStep = null; }
     } else {
       n._capacityKwFromA = 0;
-      n._marginPct = null; n._marginWarn = null;
+      n._marginPct = null; n._marginWarn = null; n._marginWarnSuppressedNoStep = null;
     }
   }
 
