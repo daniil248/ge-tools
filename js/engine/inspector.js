@@ -1720,6 +1720,7 @@ export function openContainerMembersModal(container) {
           </div>
           <div style="display:flex;gap:4px;margin-top:6px">
             <button type="button" data-cm-edit="${escAttr(a.id)}" style="flex:1;padding:4px 8px;font-size:11px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:4px;cursor:pointer" title="Открыть полный инспектор члена">⚙ Редактировать</button>
+            <button type="button" data-cm-copy="${escAttr(String(i))}" style="padding:4px 8px;font-size:11px;border:1px solid #16a34a;background:#dcfce7;color:#15803d;border-radius:4px;cursor:pointer" title="Создать копию этого потребителя в той же группе (новый тег + такие же параметры)">📋</button>
             <button type="button" data-cm-extract="${escAttr(String(i))}" style="padding:4px 8px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:4px;cursor:pointer" title="Извлечь как standalone-потребителя">↗</button>
             <button type="button" data-cm-unlink="${escAttr(String(i))}" style="padding:4px 8px;font-size:11px;border:1px solid #94a3b8;background:#fff;border-radius:4px;cursor:pointer" title="Разъединить (member → placeholder)">✂</button>
             <button type="button" data-cm-remove="${escAttr(String(i))}" style="padding:4px 8px;font-size:11px;border:1px solid #ef4444;background:#fff;color:#b91c1c;border-radius:4px;cursor:pointer" title="Удалить из группы">×</button>
@@ -1990,6 +1991,45 @@ function _wireContainerMembersModal(n, body, modal) {
     _render();
     notifyChange();
   };
+  // v0.60.354 (по запросу Пользователя 2026-05-06: «как скопировать
+  // кондиционер который в группе??? только вытащить скопировать и заново
+  // разместить???»): кнопка 📋 — клонирует child прямо в группе.
+  body.querySelectorAll('[data-cm-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = Number(btn.getAttribute('data-cm-copy'));
+      if (!Array.isArray(n.slots) || !Number.isFinite(idx) || idx < 0 || idx >= n.slots.length) return;
+      const slot = n.slots[idx];
+      if (!slot || slot.kind !== 'linked' || !slot.nodeId) return;
+      const a = state.nodes.get(slot.nodeId);
+      if (!a) return;
+      snapshot('container-copy:' + n.id + ':' + a.id);
+      // Глубокая копия (без id, конкретно-инстансных полей).
+      const clone = JSON.parse(JSON.stringify(a));
+      clone.id = uid();
+      // Новый тег: используем nextFreeTag по subtype (consumer → ACU/L).
+      try {
+        clone.tag = nextFreeTag('consumer');
+        // Если original был ACU* — выбираем ACU prefix (CONSUMER_SUBTYPE_PREFIX
+        // в graph.js handles это).
+      } catch {}
+      // Сбросить per-instance ссылки (outdoor blocks, alias и т.п.).
+      delete clone.linkedOutdoorId;
+      delete clone.linkedOutdoorIds;
+      delete clone.linkedAlias;
+      delete clone.containerId;
+      // Расчётные поля сбросить.
+      clone._loadKw = 0; clone._powered = false; clone._maxLoadKw = 0; clone._maxLoadA = 0;
+      clone.containerId = n.id;
+      // pageIds совпадает с container'ом (т.к. children наследуют от него).
+      clone.pageIds = Array.isArray(n.pageIds) ? n.pageIds.slice() : [];
+      state.nodes.set(clone.id, clone);
+      // Вставить новый linked-slot после оригинального.
+      n.slots.splice(idx + 1, 0, { kind: 'linked', nodeId: clone.id });
+      notifyChange();
+      refresh();
+    });
+  });
+
   body.querySelectorAll('[data-cm-extract]').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.getAttribute('data-cm-extract'));

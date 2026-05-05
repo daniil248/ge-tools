@@ -295,6 +295,20 @@ export function effectiveTag(n) {
       return parentTag ? `${parentTag}.${baseTag}` : baseTag;
     }
   }
+  // v0.60.353 (по репорту Пользователя 2026-05-06: «у второго блока
+  // потерялось Z1 (имя зоны)»): outdoor-блок наследует zone от
+  // linkedIndoorId родителя. Раньше outdoor с positions вне zone bounds
+  // (Y_offset 80px вниз от cond) терял zone prefix.
+  if (n.consumerSubtype === 'outdoor_unit' && n.linkedIndoorId) {
+    const parent = state.nodes.get(n.linkedIndoorId);
+    if (parent) {
+      const parentZone = findZoneForMember(parent);
+      if (parentZone) {
+        const prefix = zonePrefix(parentZone);
+        if (prefix) return `${prefix}.${baseTag}`;
+      }
+    }
+  }
   const z = findZoneForMember(n);
   if (z) {
     const prefix = zonePrefix(z);

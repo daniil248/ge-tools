@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.354', date: '2026-05-06', items: [
+      '🏭 <b>VRF-группа: связывание indoor-блоков под общий outdoor</b> + <b>📋 Дублирование child\'а в группе</b>.',
+      '<b>VRF-группа</b> (по запросу Пользователя: «про VRF сделай как предложил, группа VRF»). Реальность VRF: 1 outdoor (компрессор+конденсатор) обслуживает несколько indoor (фанкойлов). Питание indoor\'ов <b>независимое</b> — НЕ daisy-chain. Связь — refrigerant lines + сигнальная шина (low-voltage, не учитывается в power BOM).',
+      'UI: в карточке кондиционера, когда <code>outdoorType === \'vrf\'</code>, появляется секция <b>«🏭 VRF-группа»</b> с полем <code>vrfGroupId</code>. Все cond с одним ID логически связаны в одну VRF-систему. Карточка показывает список всех indoor\'ов в группе. Не влияет на recalc — только для отчётов.',
+      '<b>📋 Дублирование child\'а в группе</b> (по репорту Пользователя: «как скопировать кондиционер который в группе??? только вытащить скопировать и заново разместить???»). Кнопка «📋» в карточке члена группы — глубокая копия consumer\'а с новым тегом, сбросом per-instance ссылок (linkedOutdoorIds, linkedAlias) и расчётных полей. Новый slot вставляется после оригинального.',
+      'Files: <code>js/engine/inspector/consumer.js</code> (VRF UI + apply-handler), <code>js/engine/inspector.js</code> (📋 кнопка + handler).',
+    ] },
+    { version: '0.60.353', date: '2026-05-06', items: [
+      '🐛 <b>3 фикса карточки наружного блока</b>. По репорту Пользователя 2026-05-06: «у второго блока потерялось Z1 (имя зоны). Оповещение очень не видно, при проблемах нужно нормально выводить окно. Закрытие карточки внутреннего блока должно возвращать на карточку кондиционера».',
+      '<b>1. Zone prefix наследуется от parent indoor</b> (zones.js): outdoor с positionsByPage вне zone bounds (Y_offset 80px+ вниз) терял zone prefix. Теперь <code>effectiveTag</code> для <code>consumerSubtype===\'outdoor_unit\'</code> с <code>linkedIndoorId</code> делает fallback на zone родителя.',
+      '<b>2. Auto-backfill conn cond→outdoor</b> (consumer.js cable-button): outdoor\'ы созданные до v0.60.351 не имели conn → toast «Связь не найдена» прятался за UI. Теперь при отсутствии conn авто-создаётся (с дефолтами 5м, projectMainCableLv).',
+      '<b>3. Return-to-cond observer</b> (consumer.js outdoor-open-btn): после закрытия outdoor-modal автоматически открывается родительская cond-modal (как в openContainerMembersModal — MutationObserver на .hidden class). Раньше Пользователь оставался на пустом канвасе.',
+      'Files: <code>js/engine/zones.js</code> (effectiveTag fallback), <code>js/engine/inspector/consumer.js</code> (backfill + observer).',
+    ] },
     { version: '0.60.352', date: '2026-05-06', items: [
       '🔌 <b>Селектор «Порт группы» для single-input детей в multi-input контейнере</b>. По репорту Пользователя 2026-05-06: «Если внутри блоки с одним вводом, они должны выбираться к какому порту группы они подключены, чтобы правильно подключатся к щитам».',
       '<b>UI</b>: в карточке члена группы (cards-вид модалки контейнера) если <code>child.inputs===1</code> и <code>container.inputs>1</code> — появляется select «Порт группы: P1 / P2 / …». Значение пишется в <code>child.assignedGroupPort</code> (0-indexed).',

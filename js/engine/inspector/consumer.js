@@ -746,6 +746,43 @@ export function openConsumerParamsModal(n) {
     h.push('</div>');
     h.push(`<button type="button" id="cp-outdoor-add-btn" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:6px;padding:7px 12px;background:#dcfce7;color:#15803d;border:1px dashed #86efac;border-radius:5px;cursor:pointer;font:inherit;font-size:12px;font-weight:600" title="Добавить ещё один независимый наружный блок. Тег = ${escAttr(effectiveTag(n))}.OU<номер>. Тип берётся из селектора выше (можно изменить в карточке блока).">+ Добавить наружный блок</button>`);
     h.push('<div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.5">Каждый блок — полноценный consumer-узел (мощность, К<sub>и</sub>, cos φ, фазы) + виртуальный кабель cond→outdoor (попадает в общую спецификацию). Длина кабеля автоматически пересчитывается при перемещении блока на плане. На схеме не отображается отдельным узлом, но виден в плане, реестре и BOM.</div>');
+    // v0.60.354 (по запросу Пользователя 2026-05-06: «про VRF сделай как
+    // предложил, группа VRF»): VRF-группа — несколько indoor-кондиционеров,
+    // которые делят общий outdoor (компрессор+конденсатор). Реализовано
+    // как просто текстовая метка `vrfGroupId` — все cond с одним и тем же
+    // vrfGroupId считаются связанными в VRF-систему. Не влияет на
+    // электрический расчёт (каждый indoor запитан independently от своего
+    // panel'а) — только для отчётов и группировки в BOM.
+    if (_ouType === 'vrf') {
+      h.push('<details class="inspector-section" open style="margin-top:8px;padding:8px 10px;background:#fff7ed;border:1px solid #fdba74;border-radius:5px">');
+      h.push('<summary style="cursor:pointer;font-size:12px;font-weight:600;color:#9a3412">🏭 VRF-группа</summary>');
+      const _vrfId = String(n.vrfGroupId || '').trim();
+      h.push(field('Идентификатор VRF-системы', `<input type="text" id="cp-vrfGroupId" value="${escAttr(_vrfId)}" placeholder="например VRF-1, VRF-Z1, ..." title="Все кондиционеры с этим же ID считаются indoor-блоками одной VRF-системы и делят общий outdoor (компрессор+конденсатор). Электрически каждый indoor по-прежнему запитан независимо от своего щита — общий только outdoor (физически — refrigerant lines).">`));
+      // Список других conditioner'ов с тем же vrfGroupId.
+      if (_vrfId) {
+        const _siblings = [];
+        for (const m of state.nodes.values()) {
+          if (m.id === n.id) continue;
+          if (m.consumerSubtype !== 'conditioner') continue;
+          if (String(m.vrfGroupId || '').trim() === _vrfId) _siblings.push(m);
+        }
+        if (_siblings.length) {
+          h.push(`<div style="margin-top:6px;font-size:11px;color:#7c2d12"><b>В этой VRF-системе ${_siblings.length + 1} indoor-блок(ов):</b></div>`);
+          h.push('<ul style="list-style:disc;padding-left:18px;margin:4px 0 0 0;font-size:11px;color:#9a3412">');
+          h.push(`<li><b>${escHtml(effectiveTag(n))}</b> · ${Number(n.demandKw) || 0} кВт <span style="color:#a16207">(этот)</span></li>`);
+          for (const s of _siblings) {
+            h.push(`<li>${escHtml(effectiveTag(s))} · ${Number(s.demandKw) || 0} кВт</li>`);
+          }
+          h.push('</ul>');
+        } else {
+          h.push('<div style="margin-top:6px;font-size:11px;color:#a16207;font-style:italic">В этой VRF-системе пока только один indoor (этот). Назначьте такой же ID другим кондиционерам, чтобы связать их в систему.</div>');
+        }
+      } else {
+        h.push('<div style="margin-top:6px;font-size:11px;color:#a16207;font-style:italic">Введите ID, чтобы группа активировалась. Все кондиционеры с одинаковым ID будут логически связаны в одну VRF-систему.</div>');
+      }
+      h.push('<div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.5;color:#7c2d12">VRF-системы: 1 outdoor (компрессор+конденсатор) обслуживает несколько indoor (фанкойлов). Питание indoor\'ов независимое (каждый со своим автоматом и кабелем от ближайшего щита). Связь между ними — refrigerant lines + сигнальная шина (low-voltage, не учитывается в power BOM).</div>');
+      h.push('</details>');
+    }
     h.push('</details>');
   }
 
@@ -1196,6 +1233,10 @@ export function openConsumerParamsModal(n) {
 
   // v0.60.345 + v0.60.351: button-handler «📋 Карточка» — открыть consumer-modal
   // для существующего outdoor-узла.
+  // v0.60.353 (по репорту Пользователя 2026-05-06: «Закрытие карточки
+  // внутреннего блока должно возвращать на карточку кондиционера»):
+  // ставим MutationObserver — после закрытия outdoor-modal автоматически
+  // открываем cond-modal обратно (как в openContainerMembersModal).
   document.querySelectorAll('.cp-outdoor-open-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.getAttribute('data-ou-idx')) || 0;
@@ -1203,6 +1244,20 @@ export function openConsumerParamsModal(n) {
       const ouNode = ouIds[idx] ? state.nodes.get(ouIds[idx]) : null;
       if (!ouNode) return;
       openConsumerParamsModal(ouNode);
+      // Return-to-cond: после закрытия outdoor-modal вернуться к cond.
+      const cpModal = document.getElementById('modal-consumer-params');
+      if (cpModal) {
+        const _observer = new MutationObserver(() => {
+          if (cpModal.classList.contains('hidden')) {
+            _observer.disconnect();
+            // Re-open cond через setTimeout, чтобы DOM успел очиститься.
+            setTimeout(() => {
+              if (state.nodes.get(n.id)) openConsumerParamsModal(n);
+            }, 50);
+          }
+        });
+        _observer.observe(cpModal, { attributes: true, attributeFilter: ['class'] });
+      }
     });
   });
 
@@ -1262,8 +1317,26 @@ export function openConsumerParamsModal(n) {
             (c.to?.nodeId === n.id && c.from?.nodeId === ouId)) { conn = c; break; }
       }
       if (!conn) {
-        flash('Связь cond→outdoor не найдена. Удалите и создайте outdoor заново.', 'warn');
-        return;
+        // v0.60.353: backfill для outdoor'ов созданных до v0.60.351
+        // (когда auto-conn ещё не было). Раньше показывали toast, который
+        // прятался за кнопкой Применить — теперь авто-создаём conn с
+        // дефолтами и продолжаем.
+        const connId = uid('c');
+        conn = {
+          id: connId,
+          from: { nodeId: n.id, port: 0 },
+          to:   { nodeId: ouId, port: 0 },
+          material:      window.GLOBAL?.defaultMaterial      || 'Cu',
+          insulation:    window.GLOBAL?.defaultInsulation    || 'PVC',
+          installMethod: window.GLOBAL?.defaultInstallMethod || 'tray',
+          ambientC:      window.GLOBAL?.defaultAmbient       || 30,
+          grouping:      window.GLOBAL?.defaultGrouping      || 1,
+          bundling: 'touching',
+          lengthM: 5,
+          cableMark: window.GLOBAL?.projectMainCableLv || null,
+          isOutdoorLink: true,
+        };
+        state.conns.set(connId, conn);
       }
       const newLen = await rsPrompt('Длина кабеля cond→outdoor (м)', String(conn.lengthM ?? 5));
       if (newLen == null) return;
@@ -2477,6 +2550,13 @@ export function openConsumerParamsModal(n) {
       if (_ocEl) n.outdoorCount = Math.max(1, Math.min(2, Number(_ocEl.value) || 1));
       const _otEl = document.getElementById('cp-outdoorType');
       if (_otEl && _otEl.value) n.outdoorType = String(_otEl.value);
+      // v0.60.354: vrfGroupId — текстовый идентификатор VRF-системы.
+      const _vrfEl = document.getElementById('cp-vrfGroupId');
+      if (_vrfEl) {
+        const _v = String(_vrfEl.value || '').trim();
+        if (_v) n.vrfGroupId = _v;
+        else delete n.vrfGroupId;
+      }
       n.outputs = 1;
       // v0.60.350 (по репорту Пользователя 2026-05-06: «при изменении
       // базового обозначения, обозначение наружного блока должно
