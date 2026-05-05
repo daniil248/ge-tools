@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.253', date: '2026-05-06', items: [
+      '🔌 <b>Auto-cable cond→outdoor: наследуется проектная марка</b>. По репорту Пользователя 2026-05-06 «есть кабель по умолчанию, но для размещенного наружного блока кабель не выбрался автоматически».',
+      '• Корень: при auto-create conn между cond и outdoor устанавливались material/insulation/installMethod/ambientC/grouping/bundling, но <code>cableMark</code> оставался null → инспектор показывал «не выбрано (указать вручную)».',
+      '• Фикс: cableMark наследуется из <code>GLOBAL.projectMainCableLv</code> (выставляется в «Параметры проекта» → «Основная марка кабеля по проекту»). Так же делает auto-conn в integrated UPS composites.',
+      'Файл: <code>js/engine/inspector/consumer.js</code>.',
+    ] },
     { version: '0.60.252', date: '2026-05-06', items: [
       '🔌 <b>Auto-created outdoor block: pageIds наследуются от cond</b>. По репорту Пользователя 2026-05-06 «авторазмещенный наружный блок отображается как неразмещенный и только при повторном перетаскивании на холст он считается как размещенный».',
       '• Корень: при auto-create outdoor (consumer.consumerSubtype=outdoor_unit) у нового узла не выставлялись <code>pageIds</code> → он считался «не на текущей странице» → попадал в палитру «Неразмещённые».',

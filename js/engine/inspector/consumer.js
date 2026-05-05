@@ -2298,6 +2298,11 @@ export function openConsumerParamsModal(n) {
           grouping: GLOBAL.defaultGrouping,
           bundling: 'touching',
           lengthM: 5,
+          // v0.60.253 (по репорту Пользователя 2026-05-06 «есть кабель по
+          // умолчанию, но для размещенного наружного блока кабель не
+          // выбрался автоматически»): наследуем основную марку проекта
+          // (GLOBAL.projectMainCableLv — выставляется в «Параметры проекта»).
+          cableMark: GLOBAL.projectMainCableLv || null,
         });
       } else {
         const outdoor = state.nodes.get(n.linkedOutdoorId);
