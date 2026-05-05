@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.344', date: '2026-05-06', items: [
+      '🔧 <b>Header chip на hub: показ standaloneProj из LS</b>. По репорту Пользователя 2026-05-06: «проект Без проекта не переключается».',
+      '<b>Корень</b>: на hub.html без URL <code>?project=</code> chip всегда показывал «Без проекта», даже если в LS active был задан. Picker открывался по клику и показывал активный проект (TBC Bank), но chip-статус расходился — Пользователь не мог понять состояние.',
+      '<b>Fix в shared/app-header.js</b>: на hub без URL загружаем <code>standaloneProj</code> из <code>getActiveProjectId()</code> — теперь chip показывает правильный активный проект, и picker даёт корректный switch.',
+      'Files: <code>shared/app-header.js</code> (standaloneProj logic — добавлен hub в whitelist).',
+    ] },
     { version: '0.60.343', date: '2026-05-06', items: [
       '🐛 <b>CRITICAL: hub-link на Конструктор открывал пустой редактор</b>. По репорту Пользователя 2026-05-06: «по ссылке на первом скрине открывается как бы схема, но не та».',
       '<b>Корень</b>: Constructor (<code>index.html</code>) интерпретирует <code>?project=X</code> как SCHEME id (Firestore «projects» collection — это схемы, не контексты). Hub-link rewrite (v0.60.306) передаёт project-CONTEXT id (из shared/project-storage.js). При клике «Конструктор схем» из hub в project-mode → <code>openProject(\'p_tyux2vnmz4\')</code> с context-id → не находится в schemes → пустой редактор.',

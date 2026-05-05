@@ -145,7 +145,13 @@ export function mountHeader(opts = {}) {
   // в project-mode (URL содержит ?project=). Теперь — в standalone тоже,
   // с другим стилем (🔒) и кликом → модалка переключения/создания.
   let standaloneProj = null;
-  if (!inProjectMode && !isHub && !isProjectsList) {
+  // v0.60.344 (по репорту Пользователя 2026-05-06: «проект Без проекта не
+  // переключается»): на hub показываем standaloneProj если LS active задан,
+  // даже без URL ?project=. Раньше hub был исключён из standaloneProj-логики
+  // (`!isHub`), поэтому header chip всегда «Без проекта» — пользователь не
+  // мог понять что LS active отличается. Picker открывался по клику и
+  // показывал активный проект, но chip-статус расходился.
+  if (!inProjectMode && !isProjectsList) {
     try {
       const aid = getActiveProjectId();
       if (aid) standaloneProj = getProject(aid);
