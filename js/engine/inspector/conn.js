@@ -276,6 +276,27 @@ export function renderInspectorConn(c) {
         `<span class="muted">Методика: ${methodLabel}</span>` +
         `</div>`);
 
+      // v0.60.332 (по репорту Пользователя 2026-05-06: «всё должно быть
+      // автоматически, как было ранее»): индикатор ручного override'а
+      // (manualCableSize / manualBreakerIn). Кнопка «↺ Снять» возвращает
+      // авто-подбор. Раньше при manual override не было видно что cable
+      // не auto-подобран → пользователь думал что алгоритм работает плохо.
+      const _isManualCable = !!c.manualCableSize;
+      const _isManualBrk = !!c.manualBreakerIn;
+      if (_isManualCable || _isManualBrk) {
+        const _items = [];
+        if (_isManualCable) _items.push(`сечение <b>${c.manualCableSize} мм²</b>`);
+        if (_isManualBrk) _items.push(`автомат <b>${c.manualBreakerIn} A</b>`);
+        h.push(`<div style="margin-top:6px;padding:8px 10px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:3px;font-size:11.5px;color:#78350f">
+          🔒 <b>Ручная фиксация:</b> ${_items.join(' и ')}. Авто-подбор отключён.
+          ${(!inLeIz || c._breakerUndersize) ? '<br><span style="color:#b91c1c;font-weight:600">⚠ Текущий выбор не покрывает Iрасч. Снимите фиксацию для корректного авто-подбора.</span>' : ''}
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            ${_isManualCable ? `<button type="button" data-conn-clear-manual="cableSize" style="padding:3px 10px;font-size:11px;background:#fff;border:1px solid #cbd5e1;border-radius:3px;cursor:pointer;font-family:inherit">↺ Снять фиксацию сечения</button>` : ''}
+            ${_isManualBrk ? `<button type="button" data-conn-clear-manual="breakerIn" style="padding:3px 10px;font-size:11px;background:#fff;border:1px solid #cbd5e1;border-radius:3px;cursor:pointer;font-family:inherit">↺ Снять фиксацию автомата</button>` : ''}
+          </div>
+        </div>`);
+      }
+
       // Справка: как подбирался кабель
       if (GLOBAL.showHelp !== false && c._cableSize) {
         const Iraw = c._maxA || 0;
@@ -1075,6 +1096,24 @@ export function renderInspectorConn(c) {
   // DOM и input теряет фокус. Для select/checkbox используем 'change' и
   // renderInspector() разрешён (эти контролы теряют фокус штатно, а нам нужно
   // перерисовать зависимые блоки — иконки, справочные значения и т.п.).
+  // v0.60.332: clear-manual handlers (unlock auto cable/breaker selection).
+  inspectorBody.querySelectorAll('[data-conn-clear-manual]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.connClearManual;
+      snapshot('conn:' + c.id + ':clear-manual:' + field);
+      if (field === 'cableSize') {
+        delete c.manualCableSize;
+        delete c.manualCableParallel;
+      } else if (field === 'breakerIn') {
+        delete c.manualBreakerIn;
+      } else if (field === 'fuseIn') {
+        delete c.manualFuseIn;
+      }
+      render();
+      notifyChange();
+      renderInspector();
+    });
+  });
   inspectorBody.querySelectorAll('[data-conn-prop]').forEach(inp => {
     const isSelect = inp.tagName === 'SELECT';
     const isCheckbox = inp.type === 'checkbox';
