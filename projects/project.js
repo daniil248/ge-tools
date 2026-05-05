@@ -1108,6 +1108,143 @@ function _wireImplStagesBlock(p, host) {
   });
 }
 
+// v0.60.295 (Этап 1.4-followup по запросу Пользователя 2026-05-06: «для
+// плана нужно организовать диаграмму Ганта»):
+// Простая SVG Gantt-диаграмма с временной осью (auto-scale по диапазону
+// задач), горизонтальными bar'ами по дисциплинам, цвет = discipline,
+// прозрачность = status. Этапы реализации (impl-stages) показаны как
+// vertical milestone lines на оси.
+function _renderGanttChart(tasks, p) {
+  // Собираем диапазон дат: от min startDate (или createdAt) до max endDate.
+  const dates = [];
+  for (const t of tasks) {
+    if (t.startDate) dates.push(new Date(t.startDate).getTime());
+    if (t.endDate) dates.push(new Date(t.endDate).getTime());
+    if (!t.startDate && !t.endDate && t.createdAt) dates.push(t.createdAt);
+  }
+  if (!dates.length) {
+    return `<div style="padding:14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:6px;text-align:center;color:#64748b;font-size:12.5px;margin-bottom:14px">
+      📊 Gantt: задайте даты начала/окончания у задач — диаграмма появится автоматически.
+    </div>`;
+  }
+  let minMs = Math.min(...dates);
+  let maxMs = Math.max(...dates);
+  // Расширим диапазон на 10% с каждой стороны (визуальный air).
+  const span = Math.max(7 * 86400e3, maxMs - minMs); // мин. 7 дней
+  minMs -= span * 0.05;
+  maxMs += span * 0.05;
+  const totalMs = maxMs - minMs;
+  // Определяем тики оси (months или weeks в зависимости от диапазона).
+  const totalDays = totalMs / 86400e3;
+  const useMonths = totalDays > 60;
+  const ticks = [];
+  const startTick = new Date(minMs);
+  if (useMonths) {
+    startTick.setUTCDate(1); startTick.setUTCHours(0, 0, 0, 0);
+    let t = startTick.getTime();
+    while (t < maxMs) {
+      ticks.push(t);
+      const d = new Date(t);
+      d.setUTCMonth(d.getUTCMonth() + 1);
+      t = d.getTime();
+    }
+  } else {
+    // weeks
+    startTick.setUTCDay = startTick.setUTCDay || (() => {});
+    const day = startTick.getUTCDay();
+    startTick.setUTCDate(startTick.getUTCDate() - day + 1); // понедельник
+    startTick.setUTCHours(0, 0, 0, 0);
+    let t = startTick.getTime();
+    while (t < maxMs) { ticks.push(t); t += 7 * 86400e3; }
+  }
+  // Группировка задач по дисциплинам (только с datами).
+  const grouped = {};
+  for (const t of tasks) {
+    const d = t.discipline || 'other';
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(t);
+  }
+  const disciplinesUsed = PLAN_DISCIPLINES.filter(d => grouped[d.id]?.length > 0);
+  // Layout
+  const W = 1100;
+  const padL = 200; // место под labels дисциплин
+  const padR = 20;
+  const padT = 40;  // место под date axis
+  const padB = 30;
+  const rowH = 28;
+  const rowGap = 2;
+  const totalH = padT + padB + disciplinesUsed.reduce((s, d) => s + grouped[d.id].length * (rowH + rowGap), 0);
+  const innerW = W - padL - padR;
+  const x = (ms) => padL + ((ms - minMs) / totalMs) * innerW;
+  // Today line.
+  const nowMs = Date.now();
+  const showToday = nowMs >= minMs && nowMs <= maxMs;
+  // SVG building.
+  const fmtTick = (ms) => {
+    const d = new Date(ms);
+    if (useMonths) return d.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' });
+    return `${String(d.getUTCDate()).padStart(2, '0')}.${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  };
+  let svg = `<svg width="100%" viewBox="0 0 ${W} ${totalH}" style="display:block;background:#fff;border:1px solid #e5e7eb;border-radius:6px" preserveAspectRatio="xMinYMin meet">`;
+  // Tick lines + labels
+  for (const tk of ticks) {
+    const tx = x(tk);
+    svg += `<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${totalH - padB}" stroke="#f1f5f9" stroke-width="1"/>`;
+    svg += `<text x="${tx}" y="${padT - 8}" font-size="10" fill="#64748b" text-anchor="middle">${fmtTick(tk)}</text>`;
+  }
+  // Implementation stages — vertical milestone lines.
+  const stages = _getImplStages(p);
+  for (const s of stages) {
+    if (s.finishedAt && s.finishedAt >= minMs && s.finishedAt <= maxMs) {
+      const sx = x(s.finishedAt);
+      svg += `<line x1="${sx}" y1="${padT}" x2="${sx}" y2="${totalH - padB}" stroke="#15803d" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>`;
+      svg += `<text x="${sx + 3}" y="${padT - 22}" font-size="9" fill="#15803d" font-weight="600">${esc(s.icon || '')} ${esc(s.name)} ✓</text>`;
+    }
+  }
+  // Today line
+  if (showToday) {
+    const tx = x(nowMs);
+    svg += `<line x1="${tx}" y1="${padT}" x2="${tx}" y2="${totalH - padB}" stroke="#dc2626" stroke-width="1.5" opacity="0.7"/>`;
+    svg += `<text x="${tx + 3}" y="${totalH - padB + 12}" font-size="10" fill="#dc2626" font-weight="600">сегодня</text>`;
+  }
+  // Task bars
+  let y = padT;
+  for (const disc of disciplinesUsed) {
+    const arr = grouped[disc.id];
+    // Discipline label group (на левой панели, перед первой задачей дисциплины).
+    svg += `<text x="${padL - 8}" y="${y + 14}" font-size="11" fill="${disc.color}" font-weight="600" text-anchor="end">${esc(disc.label)}</text>`;
+    for (const t of arr) {
+      const sMs = t.startDate ? new Date(t.startDate).getTime() : (t.createdAt || nowMs);
+      const eMs = t.endDate ? new Date(t.endDate).getTime() : sMs + 7 * 86400e3;
+      const x1 = x(sMs);
+      const x2 = x(Math.max(eMs, sMs + 86400e3 * 0.5)); // мин. ширина 0.5 дня
+      const w = Math.max(2, x2 - x1);
+      const stMeta = PLAN_STATUSES.find(s => s.id === t.status) || PLAN_STATUSES[0];
+      const opacity = t.status === 'done' ? 0.85 : (t.status === 'blocked' ? 0.7 : (t.status === 'todo' ? 0.5 : 0.95));
+      const stroke = t.status === 'done' ? '#15803d' : (t.status === 'blocked' ? '#991b1b' : disc.color);
+      svg += `<g class="tw-gantt-bar" data-task-id="${esc(t.id)}">
+        <rect x="${x1}" y="${y + 4}" width="${w}" height="${rowH - 8}" rx="3" fill="${disc.color}" opacity="${opacity}" stroke="${stroke}" stroke-width="1"/>
+        <text x="${x1 + 5}" y="${y + 17}" font-size="11" fill="#fff" font-weight="500" style="pointer-events:none">${esc(t.title.slice(0, 40))}${t.title.length > 40 ? '…' : ''}</text>
+        <title>${esc(t.title)} · ${esc(stMeta.label)}${t.startDate ? ` · ${esc(t.startDate)} → ${esc(t.endDate || '?')}` : ''}</title>
+      </g>`;
+      y += rowH + rowGap;
+    }
+  }
+  svg += `</svg>`;
+  return `<div style="margin:14px 0;padding:6px 0">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <h4 style="margin:0;font-size:13px;color:#0f172a">📊 Диаграмма Ганта</h4>
+      <span class="muted" style="font-size:11px">диапазон: ${fmtTick(minMs)} — ${fmtTick(maxMs)} · ${disciplinesUsed.length} дисциплин · ${tasks.length} задач${showToday ? ' · 🔴 сегодня' : ''}${stages.some(s => s.finishedAt) ? ' · 🟢 milestones этапов' : ''}</span>
+    </div>
+    <div style="overflow-x:auto;background:#f8fafc;padding:4px;border-radius:6px">${svg}</div>
+    <p class="muted" style="font-size:11px;margin:6px 0 0">
+      Bars — задачи (цвет дисциплины, прозрачность = статус: 50% не начата / 95% в работе / 85% ✓ / 70% 🛑).
+      Зелёные пунктирные линии — завершённые этапы реализации (impl-stages).
+      Красная вертикальная — сегодня. Hover на bar — детали (title с status и датами).
+    </p>
+  </div>`;
+}
+
 function renderProjectPlan(p, host) {
   const tasks = _loadPlanTasks(p.id);
   const total = tasks.length;
@@ -1185,9 +1322,18 @@ function renderProjectPlan(p, host) {
       <select id="pr-task-status" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
         ${statChips}
       </select>
-      <input type="date" id="pr-task-due" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+      <!-- v0.60.295: startDate для Gantt-диаграммы. -->
+      <label style="font-size:11px;color:#64748b;display:flex;flex-direction:column;gap:1px">
+        старт
+        <input type="date" id="pr-task-start" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+      </label>
+      <label style="font-size:11px;color:#64748b;display:flex;flex-direction:column;gap:1px">
+        срок
+        <input type="date" id="pr-task-due" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12px">
+      </label>
       <button type="button" id="pr-task-add" class="pr-btn-sel" style="background:#1d4ed8;color:#fff;border:none">+ Добавить</button>
     </div>
+    ${total > 0 ? _renderGanttChart(tasks, p) : ''}
     ${groupsHtml || ''}
   `;
 
@@ -1201,6 +1347,8 @@ function renderProjectPlan(p, host) {
       title,
       discipline: host.querySelector('#pr-task-disc').value || 'other',
       status: host.querySelector('#pr-task-status').value || 'todo',
+      // v0.60.295: startDate + endDate для Gantt-диаграммы.
+      startDate: host.querySelector('#pr-task-start')?.value || null,
       endDate: host.querySelector('#pr-task-due').value || null,
       progressPct: 0,
       createdAt: Date.now(),
