@@ -238,18 +238,80 @@
       try { proj = typeof getProject === 'function' ? getProject(pid) : null; } catch (e) { /* noop */ }
       if (!proj) return;
       const KIND_LABEL = { datacenter: '🏢 ЦОД', factory: '🏭 Завод', 'pump-station': '💧 Насосная', office: '🏢 Офис', custom: '✏ Свой' };
-      const kindLabel = KIND_LABEL[proj.objectKind || 'datacenter'] || '🏢 ЦОД';
+      const objKind = proj.objectKind || 'datacenter';
+      const kindLabel = KIND_LABEL[objKind] || '🏢 ЦОД';
+      const nameSafe = String(proj.name || '(без имени)').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      const pidSafe = encodeURIComponent(pid);
+      // v0.60.311 (Phase 47.3.3): per-objectKind module relevance map.
+      // Ключ — module path (href без слэша). Значение — массив relevant kinds.
+      // 'all' — модуль виден для всех типов (универсальные утилиты).
+      const MODULE_KINDS = {
+        // Управление проектом / общее — всегда видны
+        'projects/': ['all'], 'help/': ['all'], 'modules/': ['all'],
+        // Концепция и проектирование
+        'tech-workspace/': ['datacenter', 'factory', 'pump-station', 'office', 'custom'],
+        'index.html': ['datacenter', 'factory', 'pump-station', 'office', 'custom'],
+        'schematic/': ['datacenter', 'factory', 'pump-station', 'office', 'custom'],
+        'sketch/': ['all'],
+        'scs-design/': ['datacenter', 'office', 'custom'],
+        'scs-config/': ['datacenter', 'office', 'custom'],
+        // Конфигураторы оборудования
+        'rack-config/': ['datacenter', 'office', 'custom'],
+        'panel-config/': ['datacenter', 'factory', 'pump-station', 'office', 'custom'],
+        'mv-config/': ['datacenter', 'factory', 'custom'],
+        'ups-config/': ['datacenter', 'factory', 'office', 'custom'],
+        'pdu-config/': ['datacenter', 'office', 'custom'],
+        'mdc-config/': ['datacenter', 'custom'],
+        'suppression-config/': ['datacenter', 'factory', 'custom'],
+        // Точечные расчёты — все базовые
+        'cable/': ['all'], 'battery/': ['datacenter', 'custom'],
+        'psychrometrics/': ['datacenter', 'factory', 'custom'],
+        'meteo/': ['all'], 'cooling/': ['datacenter', 'factory', 'custom'],
+        // Сервис / общее
+        'service/': ['all'], 'catalog/': ['all'], 'reports/': ['all'],
+        'logistics/': ['all'], 'dgu-config/': ['datacenter', 'factory', 'pump-station', 'custom'],
+      };
+      const isRelevant = (href) => {
+        const norm = href.replace(/^\.\//, '').split(/[?&#]/)[0];
+        const kinds = MODULE_KINDS[norm];
+        if (!kinds) return true; // неизвестный модуль — показываем
+        if (kinds.includes('all') || kinds.includes(objKind)) return true;
+        return false;
+      };
+      // Hidden-by-objectKind: посчитаем сколько и навесим флаг
+      let _hiddenByKind = 0, _totalCards = 0;
+      const _allCards = document.querySelectorAll('.hub-card');
+      const _showAllKey = 'raschet.hub.projectMode.showAllKinds';
+      const _showAll = localStorage.getItem(_showAllKey) === '1';
+      _allCards.forEach(card => {
+        const href = card.getAttribute('href');
+        if (!href) return;
+        _totalCards++;
+        if (!isRelevant(href)) {
+          _hiddenByKind++;
+          if (!_showAll) {
+            card.dataset.hiddenByKind = '1';
+            card.style.display = 'none';
+          } else {
+            card.dataset.hiddenByKind = '1';
+            card.style.opacity = '0.45';
+          }
+        }
+      });
       const banner = document.createElement('div');
       banner.id = 'rs-project-banner';
       banner.style.cssText = 'background:linear-gradient(180deg,#dbeafe 0%,#eff6ff 100%);border-bottom:2px solid #1e40af;padding:10px 24px;display:flex;align-items:center;gap:14px;font-size:13px;flex-wrap:wrap';
-      const nameSafe = String(proj.name || '(без имени)').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-      const pidSafe = encodeURIComponent(pid);
+      const filterChip = _hiddenByKind > 0
+        ? `<span style="padding:3px 10px;background:#fff;border:1px solid #cbd5e1;color:#475569;border-radius:10px;font-size:11px" title="Модули, нерелевантные для типа объекта «${kindLabel}», скрыты или приглушены">📦 ${_totalCards - _hiddenByKind}/${_totalCards} модулей</span>
+           <button type="button" id="rs-toggle-allkinds" style="padding:5px 10px;background:#fff;border:1px solid #cbd5e1;color:#475569;border-radius:4px;cursor:pointer;font-size:11.5px" title="Переключить отображение модулей нерелевантных для типа объекта">${_showAll ? '🙈 Скрыть нерелевантные' : '👁 Показать все модули'}</button>`
+        : '';
       banner.innerHTML = `
         <span style="font-size:20px" title="Активный проект">📁</span>
         <div style="flex:1;min-width:200px">
           <div style="font-weight:600;color:#1e3a8a;font-size:14px">${nameSafe}</div>
           <div style="color:#475569;font-size:11.5px;margin-top:2px">${kindLabel} · все модули открываются в контексте этого проекта</div>
         </div>
+        ${filterChip}
         <a href="projects/project.html?project=${pidSafe}" style="padding:6px 12px;background:#1e40af;color:#fff;border-radius:4px;text-decoration:none;font-size:12px;font-weight:500" title="Открыть карточку проекта (общее, команда, экономика, проверки, согласование)">📋 Карточка проекта</a>
         <a href="hub.html" style="padding:6px 12px;background:#fff;border:1px solid #cbd5e1;color:#475569;border-radius:4px;text-decoration:none;font-size:12px" title="Выйти из контекста проекта (показать все модули как generic hub)">✕ Без проекта</a>
       `;
@@ -259,6 +321,10 @@
       } else {
         document.body.insertBefore(banner, document.body.firstChild.nextSibling);
       }
+      document.getElementById('rs-toggle-allkinds')?.addEventListener('click', () => {
+        localStorage.setItem(_showAllKey, _showAll ? '0' : '1');
+        location.reload();
+      });
       // Rewrite all hub-card hrefs to include ?project=X.
       // Skip external links (http/https) и уже несущие ?project=.
       document.querySelectorAll('.hub-card').forEach(card => {
