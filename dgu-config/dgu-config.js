@@ -369,12 +369,18 @@ function renderCalcResult(res) {
       </div>
     </div>
 
-    <h4 style="margin:12px 0 4px;font-size:12px;color:#475569">Раскладка climate derate (ISO 3046-1):</h4>
+    <h4 style="margin:12px 0 4px;font-size:12px;color:#475569">Раскладка climate derate <span title="${escAttr(spec.derate.profile.note || '')}">(${escHtml(spec.derate.profile.label)})</span>:</h4>
+    ${spec.derate.profile.id !== 'iso-naturally-aspirated' ? `
+      <div class="muted" style="font-size:11px;margin:0 0 6px;padding:6px 10px;background:#dbeafe;border-left:3px solid #1e40af;border-radius:3px;color:#1e3a8a">
+        ℹ Engine-specific профиль: <b>${escHtml(spec.derate.profile.label)}</b>. ${escHtml(spec.derate.profile.note || '')}
+        ${Number.isFinite(d.effAltBaseline) ? `<br>Эффективная baseline-высота при ${_state.ambientTC}°C: <b>${Math.round(d.effAltBaseline)} м</b> — ниже неё дирейтинга нет.` : ''}
+      </div>
+    ` : ''}
     <table class="dg-derate-table">
       <thead><tr><th>Фактор</th><th class="num">Значение</th><th class="num">Derate, %</th><th>Норма</th></tr></thead>
       <tbody>
-        <tr><td>Высота над уровнем моря</td><td class="num">${fmt(_state.altitudeM)} м</td><td class="num" style="color:${d.altDerate < 0 ? '#c62828' : '#16a34a'}">${fmt(d.altDerate, 2)}%</td><td>−3% за 300м &gt; 100м</td></tr>
-        <tr><td>T наружного воздуха</td><td class="num">${fmt(_state.ambientTC)} °C</td><td class="num" style="color:${d.tDerate < 0 ? '#c62828' : '#16a34a'}">${fmt(d.tDerate, 2)}%</td><td>−2.5% за 5°C &gt; 25°C</td></tr>
+        <tr><td>Высота над уровнем моря</td><td class="num">${fmt(_state.altitudeM)} м</td><td class="num" style="color:${d.altDerate < 0 ? '#c62828' : '#16a34a'}">${fmt(d.altDerate, 2)}%</td><td>выше ${Math.round(d.effAltBaseline || 100)}м</td></tr>
+        <tr><td>T наружного воздуха</td><td class="num">${fmt(_state.ambientTC)} °C</td><td class="num" style="color:${d.tDerate < 0 ? '#c62828' : '#16a34a'}">${fmt(d.tDerate, 2)}%</td><td>выше baseline°C</td></tr>
         <tr><td>Относительная влажность</td><td class="num">${fmt(_state.humidityPct)} %</td><td class="num" style="color:${d.rhDerate < 0 ? '#c62828' : '#16a34a'}">${fmt(d.rhDerate, 2)}%</td><td>−1% за 25% &gt; 60% RH</td></tr>
         <tr style="font-weight:600;border-top:2px solid #cbd5e1"><td>Σ Climate derate</td><td></td><td class="num" style="color:${d.totalDerate < 0 ? '#c62828' : '#16a34a'}">${fmt(d.totalDerate, 2)}%</td><td>от nameplate</td></tr>
       </tbody>
@@ -569,7 +575,18 @@ function _renderContextBanner() {
 
 function recalcAndRender() {
   syncStateFromInputs();
-  const res = calcDgu(_state);
+  // v0.60.312: engine name из последнего подбора (если есть). detectEngineProfile
+  // в calc подберёт правильный derate profile (Perkins/Cummins/CAT/Volvo/MTU
+  // современные turbo+aftercooled vs generic ISO 3046-1).
+  const _calcInput = { ..._state };
+  if (_lastBest && _lastBest.engineModel) {
+    _calcInput.engineName = _lastBest.engineModel;
+    _calcInput.modelName = _lastBest.model;
+  }
+  if (_state.engineProfileOverride) {
+    _calcInput.engineProfile = _state.engineProfileOverride;
+  }
+  const res = calcDgu(_calcInput);
   $('dg-calc-result').innerHTML = renderCalcResult(res);
   $('dg-suggest-result').innerHTML = renderSuggestResult(res.spec);
 

@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.312', date: '2026-05-06', items: [
+      '🐛 <b>CRITICAL: ДГУ margin=0% давал больше чем margin=5%</b>. По репорту Пользователя 2026-05-06: «при margin 0% значение выше чем при 5%, 121 vs 132».',
+      '<b>Корень</b>: <code>const margin = Number(input.safetyMarginPct) || 15;</code> — Number(0) || 15 даёт 15 (0 falsy в JS). Margin=0 интерпретировался как «не задано → дефолт 15%». Margin=5 работал корректно.',
+      '<b>Fix</b>: <code>Number.isFinite(_marginInput) ? _marginInput : 15</code> — теперь 0 валидное значение.',
+      '⚙ <b>Engine-aware climate derate profiles</b>. По репорту Пользователя 2026-05-06: «проверь данные по дирейтингу, наш дизель вроде имеет другие показатели».',
+      '<b>Корень</b>: generic ISO 3046-1 (-3%/300м выше 100м) — для naturally aspirated двигателей. Современные turbocharged + aftercooled (Perkins 1100/1300, Cummins QSB, CAT C-series, Volvo TWD) НЕ ИМЕЮТ дирейтинга до ~1500-2400м. По datasheet Perkins 1106A-70TAG2 дирейтинг 0% при 500м/30°C, начинается с 2300м.',
+      '<b>3 профиля</b> в новом <code>ENGINE_DERATE_PROFILES</code>:',
+      '• <b>iso-naturally-aspirated</b>: текущий generic (default fallback)',
+      '• <b>modern-turbo-aftercooled</b>: baseline 1500м, для современных Perkins/Cummins/CAT/Volvo/MTU',
+      '• <b>perkins-1106a-70tag2</b>: точный профиль из официального datasheet (baseline 2300м@30°C, T-shift -7.5м/°C)',
+      '<b>Auto-detect</b>: <code>detectEngineProfile(engineName, modelName)</code> — heuristic по названию двигателя. Для Perkins 1106A-70TAG2 → точный профиль.',
+      '<b>UI</b>: в раскладке derate показывается profile.label + note + effAltBaseline (фактическая высота начала дирейтинга с учётом T-сдвига).',
+      'Files: <code>dgu-config/calc/dgu-calc.js</code> (3 профиля + detectEngineProfile + margin fix), <code>dgu-config/dgu-config.js</code> (engineName в calcDgu input + табличка с профилем).',
+    ] },
     { version: '0.60.311', date: '2026-05-06', items: [
       '🎯 <b>Phase 47.3.3: фильтр модулей по objectKind в project-mode hub</b>. По плану архитектуры 2026-05-06 ROADMAP Phase 47.3.',
       '<b>Per-objectKind module relevance map</b> в hub.html: каждому модулю прописаны типы объекта, для которых он релевантен. Универсальные утилиты (Проекты, Помощь, Каталог, Сервис, Reports, Logistics, кабель, метео) — <code>[\'all\']</code>.',

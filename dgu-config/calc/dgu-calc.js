@@ -81,27 +81,75 @@ export const DGU_MODE_GROUPS = [
 ];
 
 /**
- * Climate derate по ISO 3046-1.
- * Возвращает множитель допустимой мощности (1.0 = без derate).
+ * v0.60.312 (по репорту Пользователя 2026-05-06: «проверь данные по
+ * дирейтингу, наш дизель вроде имеет другие показатели»):
+ * Engine-profile aware climate derate. Раньше использовалась только
+ * generic ISO 3046-1 формула (-3%/300м выше 100м, -2.5%/5°C выше 25°C),
+ * которая корректна для NATURALLY ASPIRATED двигателей. Современные
+ * turbocharged + aftercooled engines (Perkins 1100/1300, Cummins QSB,
+ * CAT C-series, Volvo TWD) имеют namely БОЛЕЕ ВЫСОКИЙ baseline
+ * altitude (1500-2400м) — до этой высоты дирейтинга НЕТ.
  *
- * Формула (упрощённая):
- *   derate = 1 − (altitude_m − 100)/100 × 0.03   (3% за каждые 300м над 100м)
- *          − (T_amb − 25)/5      × 0.025         (2.5% за каждые 5°C выше 25°C)
- *          − (RH − 60)/25        × 0.01          (1% за каждые 25% выше 60% RH)
+ * Profiles encoded по datasheet'ам производителей:
+ */
+export const ENGINE_DERATE_PROFILES = {
+  // Generic ISO 3046-1: naturally aspirated, конструктивный default.
+  'iso-naturally-aspirated': {
+    label: 'Generic ISO 3046-1 (naturally aspirated)',
+    altBaselineM: 100,
+    altPerHundredPct: 1.0,      // -1% per 100m above baseline
+    tempBaselineC: 25,
+    tempPer5Pct: 2.5,           // -2.5% per 5°C above baseline
+    note: 'Консервативная generic формула. Для современных turbo-двигателей дирейтинг будет завышен.',
+  },
+  // Современный turbocharged + aftercooled (Perkins 1100/1300, Cummins QSB,
+  // CAT C-series, Volvo TWD, Iveco N-series). Per datasheet'ам — нет
+  // дирейтинга до ~1500м при 25-30°C, slope ~1% за 100м после baseline.
+  'modern-turbo-aftercooled': {
+    label: 'Современный turbo+aftercooled (Perkins/Cummins/CAT/Volvo)',
+    altBaselineM: 1500,
+    altPerHundredPct: 1.0,
+    tempBaselineC: 25,
+    tempPer5Pct: 2.0,           // менее агрессивный t-derate
+    note: 'Подходит для большинства современных Tier 4 / Stage IIIA двигателей. Подтверждён datasheet\'ами Perkins 1106A, Cummins QSB7, CAT C9.',
+  },
+  // Perkins 1106A-70TAG2 — точная аппроксимация официального derate chart.
+  // Per Perkins doc: baseline = 2300m@30°C, 2150m@40°C, 2050m@50°C.
+  'perkins-1106a-70tag2': {
+    label: 'Perkins 1106A-70TAG2 (точный по datasheet)',
+    altBaselineM: 2300,           // при 25-30°C
+    altPerHundredPct: 1.1,        // ~1.1% per 100m above baseline
+    tempBaselineC: 30,            // tempBaseline сдвинут вверх (datasheet attribute)
+    tempPer5Pct: 1.5,
+    altShiftPerC: 7.5,            // понижение altBaseline на 7.5м за каждый °C выше 30
+    note: 'Точные данные из Perkins datasheet. Дирейтинг отсутствует до 2300м при 30°C.',
+  },
+};
+
+/**
+ * Climate derate.
  *
  * @param {object} climate — { altitudeM, ambientTC, humidityPct }
- * @returns {{ multiplier:number, breakdown:object }}
+ * @param {string=} profileId — id из ENGINE_DERATE_PROFILES (default 'iso-naturally-aspirated')
+ * @returns {{ multiplier:number, breakdown:object, profile:object }}
  */
-export function calcClimateDerate(climate = {}) {
+export function calcClimateDerate(climate = {}, profileId) {
   const altM = Number(climate.altitudeM) || 0;
   const tAmb = Number(climate.ambientTC) || 25;
   const rh = Number(climate.humidityPct) || 60;
+  const profile = ENGINE_DERATE_PROFILES[profileId] || ENGINE_DERATE_PROFILES['iso-naturally-aspirated'];
 
-  // Altitude derate: −3% per 300m выше 100м
-  const altDerate = altM > 100 ? Math.max(0, (altM - 100) / 100) * 0.01 : 0;
-  // Temperature derate: −2.5% per 5°C выше 25°C
-  const tDerate = tAmb > 25 ? (tAmb - 25) / 5 * 0.025 : 0;
-  // Humidity derate: −1% per 25% выше 60% RH
+  // Effective altitude baseline: для perkins сдвигается на altShiftPerC × max(0, T-tempBaseline)
+  const altShift = (profile.altShiftPerC || 0) * Math.max(0, tAmb - profile.tempBaselineC);
+  const effAltBaseline = profile.altBaselineM - altShift;
+
+  const altDerate = altM > effAltBaseline
+    ? Math.max(0, (altM - effAltBaseline) / 100) * (profile.altPerHundredPct / 100)
+    : 0;
+  const tDerate = tAmb > profile.tempBaselineC
+    ? (tAmb - profile.tempBaselineC) / 5 * (profile.tempPer5Pct / 100)
+    : 0;
+  // RH derate — общий стандарт (не engine-specific).
   const rhDerate = rh > 60 ? (rh - 60) / 25 * 0.01 : 0;
 
   const totalDerate = altDerate + tDerate + rhDerate;
@@ -110,12 +158,38 @@ export function calcClimateDerate(climate = {}) {
   return {
     multiplier,
     breakdown: {
-      altDerate: -(altDerate * 100), // в процентах (отрицательное = снижение)
+      altDerate: -(altDerate * 100),
       tDerate: -(tDerate * 100),
       rhDerate: -(rhDerate * 100),
       totalDerate: -(totalDerate * 100),
+      effAltBaseline,             // фактическая высота, с которой начинается дирейтинг (с учётом T-сдвига)
+    },
+    profile: {
+      id: profileId || 'iso-naturally-aspirated',
+      label: profile.label,
+      note: profile.note,
     },
   };
+}
+
+/**
+ * Эвристика выбора engine profile по названию модели/двигателя.
+ * Возвращает id профиля. Если ничего не подобрано — generic ISO.
+ */
+export function detectEngineProfile(engineName, modelName) {
+  const s = ((engineName || '') + ' ' + (modelName || '')).toLowerCase();
+  // Точные совпадения сначала
+  if (/1106a-70tag2|1106a-70/i.test(s)) return 'perkins-1106a-70tag2';
+  // Современные turbo-aftercooled engines
+  if (/perkins\s*(1[01]\d{2}|1[34]\d{2})/i.test(s)) return 'modern-turbo-aftercooled';
+  if (/cummins\s*(qsb|qsl|qst|qsx|qsk|6bt|6lt|nt855)/i.test(s)) return 'modern-turbo-aftercooled';
+  if (/(caterpillar|^cat\s)\s*c[0-9]{1,2}/i.test(s)) return 'modern-turbo-aftercooled';
+  if (/volvo\s*(twd|tad|tid)/i.test(s)) return 'modern-turbo-aftercooled';
+  if (/iveco\s*(n|c)[0-9]/i.test(s)) return 'modern-turbo-aftercooled';
+  if (/mtu\s*(2000|4000)/i.test(s)) return 'modern-turbo-aftercooled';
+  if (/john\s*deere\s*(4045|6068|6090|6135)/i.test(s)) return 'modern-turbo-aftercooled';
+  // Default: generic ISO
+  return 'iso-naturally-aspirated';
 }
 
 /**
@@ -139,7 +213,12 @@ export function calcDguRequired(input) {
   const loadKw = Number(input.loadKw) || 0;
   const mode = input.mode || 'ESP';
   const modeMeta = DGU_MODES[mode] || DGU_MODES.ESP;
-  const margin = Number(input.safetyMarginPct) || 15;
+  // v0.60.312 (по репорту Пользователя 2026-05-06: «при margin 0% значение
+  // выше чем при 5% — 132 vs 121, проверяй»): `|| 15` интерпретирует 0 как
+  // falsy и заменяет на default 15. Поэтому margin=0 давал 132, margin=5
+  // давал 121. Используем Number.isFinite + fallback только если NaN/null.
+  const _marginInput = Number(input.safetyMarginPct);
+  const margin = Number.isFinite(_marginInput) ? _marginInput : 15;
   const redundancy = input.redundancy || 'N';
   // v0.60.78 fix (Пользователь 2026-05-03 «где дирейтинги???»): climate
   // приходил как nested object input.climate, но UI передаёт ПЛОСКИЕ поля
@@ -148,7 +227,12 @@ export function calcDguRequired(input) {
   const climateArg = input.climate
     ? input.climate
     : { altitudeM: input.altitudeM, ambientTC: input.ambientTC, humidityPct: input.humidityPct };
-  const derate = calcClimateDerate(climateArg);
+  // v0.60.312: engine-specific derate profile. Если передан engineProfile —
+  // используем его. Иначе пробуем detect по engineName/modelName. Если
+  // ничего не подобрано — generic ISO 3046-1.
+  const profileId = input.engineProfile
+    || detectEngineProfile(input.engineName, input.modelName);
+  const derate = calcClimateDerate(climateArg, profileId);
 
   // Базовая требуемая = loadKw × (1 + margin) / loadFactor / derateMultiplier
   const baseRequired = loadKw * (1 + margin / 100) / modeMeta.maxLoadFactor / derate.multiplier;
