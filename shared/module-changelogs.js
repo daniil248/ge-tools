@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.334', date: '2026-05-06', items: [
+      '📚 <b>Method-specific метки в breakdown инспектора панели</b>. Дополнение к v0.60.333 — теперь и в синем поле панели методика видима.',
+      '<b>Заголовок blue field</b>: «📊 Как получены значения (<code>methodLabel</code>):» — IEC 60364 / ПУЭ / РТМ 36.18.32.4-92 / NEC (NFPA 70).',
+      '<b>Ссылка на К<sub>и</sub>-стандарт</b> рядом с P<sub>расч</sub>:',
+      '• <b>iec</b> → IEC 60364-3 §311.1',
+      '• <b>pue</b> / <b>rtm</b> → ПУЭ 1.3.13',
+      '• <b>nec</b> → NEC 220.42 (Demand Factor)',
+      'Files: <code>js/engine/inspector/panel.js</code> (panelStatusBlock — _methodLabel + _kiStandard helpers).',
+    ] },
     { version: '0.60.333', date: '2026-05-06', items: [
       '📚 <b>Метод-специфичные нормативные ссылки в blue field</b>. По уточнению Пользователя 2026-05-06: «не забывай что у нас есть разные методики расчёта, IEC ПУЭ ...».',
       '<b>Раньше</b>: rule-label всегда писал «IEC 60364-4-43» и «IEC 60364-5-525», независимо от выбранной методики.',

@@ -2512,13 +2512,21 @@ export function panelStatusBlock(n) {
     const _siblingNote = n._maxLoadKwClampedToSiblings
       ? `<br><b style="color:#0369a1">🔄 Sibling-clamp:</b> щит входит в группу из ${n._maxLoadKwSiblingGroup?.length || '?'} sibling-щитов (parallel feed). Макс выровнен по union всех downstream consumer-ов группы.`
       : '';
+    // v0.60.334: метод-специфичный label + ссылка на стандарт.
+    const _methodLabel = GLOBAL.calcMethod === 'pue' ? 'ПУЭ'
+      : GLOBAL.calcMethod === 'rtm' ? 'РТМ 36.18.32.4-92 (агрегация) + ПУЭ (кабель)'
+      : GLOBAL.calcMethod === 'nec' ? 'NEC (NFPA 70)'
+      : 'IEC 60364';
+    const _kiStandard = GLOBAL.calcMethod === 'pue' ? 'ПУЭ 1.3.13'
+      : GLOBAL.calcMethod === 'nec' ? 'NEC 220.42 (Demand Factor)'
+      : 'IEC 60364-3 §311.1';
     helpBlock = `<div style="background:#eef5ff;border:1px solid #bbdefb;border-radius:4px;padding:8px 10px;font-size:11px;margin-top:10px;color:#1565c0;line-height:1.6">
-      <b>📊 Как получены значения:</b><br>
+      <b>📊 Как получены значения (${_methodLabel}):</b><br>
       <b>1) Downstream consumers</b> (${downstreamConsumers.length} шт., через panel/channel/JB/ups):<br>
       ${consumerRows || '<div style="margin-left:8px;color:#64748b">— нет ниже</div>'}
       ${_moreNote}
       <br><b>2) P<sub>уст</sub> (паспорт):</b> Σ (count − R) × demandKw = <b>${_pNomTotal.toFixed(1)} kW</b> · I = P / (${_phK} × U × cosφ) = ${_pNomTotal.toFixed(1)} / (${_phK}×${_U}×${_cos.toFixed(2)}) = <b>${(_pNomTotal > 0 ? computeCurrentA(_pNomTotal, _U, _cos, _ph3) : 0).toFixed(1)} A</b>
-      <br><b>3) P<sub>расч</sub> (с К<sub>и</sub>):</b> Σ (count − R) × demandKw × К<sub>и</sub> = <b>${_pCalcTotal.toFixed(1)} kW</b> · <b>${(_pCalcTotal > 0 ? computeCurrentA(_pCalcTotal, _U, _cos, _ph3) : 0).toFixed(1)} A</b>
+      <br><b>3) P<sub>расч</sub> (с К<sub>и</sub>):</b> Σ (count − R) × demandKw × К<sub>и</sub> = <b>${_pCalcTotal.toFixed(1)} kW</b> · <b>${(_pCalcTotal > 0 ? computeCurrentA(_pCalcTotal, _U, _cos, _ph3) : 0).toFixed(1)} A</b> <span class="muted" style="font-size:10.5px">(${_kiStandard})</span>
       <br><b>4) Активная для подбора:</b> ${_basis === 'calculated' ? 'P<sub>расч</sub>' : 'P<sub>уст</sub>'} (Параметры расчёта → База расчёта Макс)
       <br><b>5) Текущая</b> (walkUp от запитанных consumer\'ов с К<sub>и</sub> и режим-фактором): <b>${_pCurrent.toFixed(1)} kW · ${_aCurrent.toFixed(1)} A</b>
       <br><b>6) Макс. итог</b>: max(active basis, Текущая) с учётом sibling-clamp = <b>${_pMax.toFixed(1)} kW · ${_aMax.toFixed(1)} A</b>${_clampNote}${_siblingNote}
