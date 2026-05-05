@@ -228,13 +228,17 @@
   <script type="module">
     import { getProject, getActiveProjectId, setActiveProjectId } from './shared/project-storage.js';
     document.addEventListener('DOMContentLoaded', () => {
+      // v0.60.342 (по репорту Пользователя 2026-05-06: «Без проекта и проект...
+      // зачем???»): banner показывается ТОЛЬКО при явном URL ?project=X.
+      // Раньше fallback к getActiveProjectId() приводил к конфликту: header chip
+      // показывал «Без проекта» (LS active не задан), а banner показывал
+      // имя проекта (взято из LS). Теперь — banner только когда Пользователь
+      // явно перешёл в project-mode hub через URL.
       let pid = null;
-      let pidFromUrl = false;
+      const pidFromUrl = true;
       try {
         const url = new URL(location.href);
-        const urlPid = url.searchParams.get('project');
-        if (urlPid) { pid = urlPid; pidFromUrl = true; }
-        else if (typeof getActiveProjectId === 'function') pid = getActiveProjectId();
+        pid = url.searchParams.get('project') || null;
       } catch (e) { /* noop */ }
       if (!pid) return;
       let proj = null;

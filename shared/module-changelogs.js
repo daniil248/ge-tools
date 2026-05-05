@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.342', date: '2026-05-06', items: [
+      '🔧 <b>3 UX-фикса по репорту Пользователя 2026-05-06</b>: «2 раза карточка проекта зачем??? минипроекты в проектах зачем??? Без проекта и проект ... зачем???»',
+      '<b>1) «Карточка проекта» дважды в шапке</b> (back-button + breadcrumb-title с тем же лейблом). Fix в <code>shared/app-header.js</code>: back-button не показывается если <code>prev.moduleId === moduleId</code> (циклический возврат на ту же страницу).',
+      '<b>2) Мини-проекты в Списке проектов</b>: audit-панель «🧪 Мини-проекты (N)» дублировала dropdown\'ы модулей. Sketch\'и теперь доступны только через picker своих модулей (scs-design, mv-config, tech-workspace, etc.). Fix в <code>projects/projects.js</code>: <code>renderSketches</code> возвращает пустой host (legacy renderer оставлен закомментированным).',
+      '<b>3) «Без проекта» chip vs project banner на hub</b>: chip показывал «Без проекта» (LS active не задан), banner — имя проекта (взято из LS). Конфликт. Fix в <code>hub.html</code>: banner показывается ТОЛЬКО при явном URL <code>?project=X</code>. Без URL — обычный generic hub.',
+      'Files: <code>shared/app-header.js</code>, <code>projects/projects.js</code>, <code>hub.html</code>.',
+    ] },
     { version: '0.60.341', date: '2026-05-06', items: [
       '🔌 <b>Стандартные header/footer во всех модулях</b>. По запросу Пользователя 2026-05-06: «проверь все модули и размести в каждом стандартный хедер и футер, нестандартные замени».',
       '<b>Аудит проведён по 30 модулям</b>. Большинство уже имеет стандартные mountHeader + mountFooter. Найдены и исправлены:',

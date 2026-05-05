@@ -605,6 +605,14 @@ function render() {
 function renderSketches() {
   const host = document.getElementById('pr-sketches');
   if (!host) return;
+  // v0.60.342 (по репорту Пользователя 2026-05-06: «минипроекты в проектах
+  // зачем???»): мини-проекты живут в dropdown'ах своих модулей и не должны
+  // дублироваться в общем «Списке проектов». Раньше показывалась audit-панель
+  // с группировкой по ownerModule + кнопкой «Удалить пустые». Доступ к
+  // мини-проектам — через picker модулей (scs-design, mv-config, tw, etc.).
+  host.innerHTML = '';
+  return;
+  // eslint-disable-next-line no-unreachable
   const sketches = listProjects().filter(p => p.kind === 'sketch');
   if (!sketches.length) { host.innerHTML = ''; return; }
 

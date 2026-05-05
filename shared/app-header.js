@@ -129,7 +129,12 @@ export function mountHeader(opts = {}) {
     ? (prev || (ctx.fromModule ? { moduleId: ctx.fromModule, url: null } : null))
     : null;
 
-  const backBtnHtml = effectivePrev
+  // v0.60.342 (по репорту Пользователя 2026-05-06: «2 раза карточка
+  // проекта, зачем???»): не показываем back-button если prev module === current
+  // module — иначе в шапке дублируется лейбл «Карточка проекта × 2»
+  // (breadcrumb-title текущей страницы + back-кнопка с тем же label).
+  const _backIsSelf = effectivePrev && effectivePrev.moduleId === moduleId;
+  const backBtnHtml = (effectivePrev && !_backIsSelf)
     ? `<button type="button" class="rs-back-btn" title="Вернуться: ${esc(moduleLabel(effectivePrev.moduleId))}" aria-label="Назад" data-from="${esc(effectivePrev.moduleId)}">←&nbsp;${esc(moduleLabel(effectivePrev.moduleId).replace(/^[^\s]+\s/,''))}</button>`
     : '';
   // v0.60.103: бейдж проекта показывается ВО ВСЕХ режимах кроме hub /
