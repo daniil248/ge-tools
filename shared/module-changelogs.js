@@ -4,6 +4,22 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.289', date: '2026-05-06', items: [
+      '🔐 <b>Этап 1.3 Phase 47: visibility 3 уровня + team-tab</b>. По плану архитектуры обсуждённой 2026-05-06 (после удаления /chief/): «3 уровня видимости как в Teams: 1) не виден / 2) виден, нужен запрос / 3) виден, можно сам присоединиться».',
+      '<b>В <code>js/projects.js</code></b> — расширен <code>setVisibility</code>:',
+      '• <code>private</code> (default) — видят только members + owner',
+      '• <code>discoverable</code> — виден в общем каталоге, нужен accessRequest',
+      '• <code>public</code> — виден всем, любой залогиненный присоединяется без подтверждения',
+      '• <code>link</code> (legacy) — оставлен для обратной совместимости (виден по прямой ссылке)',
+      '<b>В карточке проекта (tab «👥 Команда»)</b>:',
+      '• Radio-selector «Видимость» с тремя опциями (icon + label + desc).',
+      '• Только <b>owner</b> может менять (visual-disable + warning «Только владелец...»).',
+      '• Только в cloud-режиме (Firebase) — в local-mode заглушка «доступно только в облаке».',
+      '• Под visibility — список участников с именами/ролями (members + memberUids), либо banner «👤 В команде только владелец».',
+      '• Управление участниками (invite / remove / role-change) пока — через стандартный «Поделиться» в Конструкторе схем (Этап 1.4 интегрирует в карточку).',
+      '<b>UX:</b> на смену visibility — <code>setVisibility</code> запрос, локальный update <code>p.visibility</code>, тост «✔ Видимость: ...», перерисовка.',
+      'Files: <code>js/projects.js</code> (setVisibility 3-level), <code>projects/project.html</code> (team panel cleanup), <code>projects/project.js</code> (renderTeam — visibility selector + members list), <code>js/engine/constants.js</code> (APP_VERSION).',
+    ] },
     { version: '0.60.288', date: '2026-05-06', items: [
       '📑 <b>Этап 1.2 Phase 47: tabs в карточке проекта</b>. Длинная страница со всеми секциями превратилась в табовый view для лёгкой навигации. Раньше всё на одной странице → длинный скролл, теперь группировка по ролевой логике.',
       '<b>Tabs:</b>',

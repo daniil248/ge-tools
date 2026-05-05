@@ -483,7 +483,12 @@ const Fs = {
   },
 
   async setVisibility(projectId, visibility) {
-    if (!['private', 'link'].includes(visibility)) return;
+    // v0.60.289 (Этап 1.3 Phase 47): 3 уровня видимости как в Teams.
+    //   private (default) — видят только members + owner
+    //   discoverable — виден в общем каталоге, нужен запрос доступа (accessRequest)
+    //   public — виден и любой залогиненный может присоединиться без подтверждения
+    //   link (legacy) — виден по прямой ссылке (оставлен для обратной совместимости)
+    if (!['private', 'link', 'discoverable', 'public'].includes(visibility)) return;
     await fsDb().collection('projects').doc(projectId).update({
       visibility,
       updatedAt: ts(),

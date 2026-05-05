@@ -1427,6 +1427,7 @@ function render() {
   const economicsHost = document.getElementById('pr-detail-economics'); // v0.60.98
   const planHost = document.getElementById('pr-detail-plan'); // v0.60.97 Phase 38
   const metaHost = document.getElementById('pr-detail-meta');
+  const teamHost = document.getElementById('pr-detail-team'); // v0.60.289
 
   if (!p) {
     if (headHost) headHost.innerHTML = `
@@ -2212,6 +2213,79 @@ function render() {
           ${p.ownerModule ? `<tr><td style="padding:6px 10px;color:#64748b">Создан в модуле</td><td style="padding:6px 10px">${esc(p.ownerModule)}</td></tr>` : ''}
         </tbody>
       </table>`;
+  }
+
+  // v0.60.289 (Этап 1.3 Phase 47): team-tab content — visibility 3 уровня.
+  // Members management (invite/remove/roles) пока через стандартный «Поделиться»
+  // в Конструкторе схем (Этап 1.4 интегрирует здесь).
+  if (teamHost) {
+    const isCloud = !!(window.Storage && window.Storage.isCloud);
+    const role = p._role || 'guest';
+    const isOwner = role === 'owner';
+    const vis = p.visibility || 'private';
+    const VIS_OPTS = [
+      { id: 'private', icon: '🔒', label: 'Private', desc: 'Видят только участники проекта (members + owner). Default.' },
+      { id: 'discoverable', icon: '👁', label: 'Discoverable', desc: 'Виден в общем каталоге проектов; для входа нужен запрос доступа (owner одобряет).' },
+      { id: 'public', icon: '🌐', label: 'Public', desc: 'Виден всем; любой залогиненный может присоединиться без подтверждения.' },
+    ];
+    teamHost.innerHTML = `
+      <div style="margin-bottom:18px">
+        <h4 style="margin:0 0 10px;font-size:14px;color:#0f172a">🔐 Видимость проекта</h4>
+        ${!isCloud
+          ? `<p class="muted" style="font-size:12px;margin:0 0 8px">Доступно только в облачном режиме (Firebase). В локальном режиме все проекты — private.</p>`
+          : ''
+        }
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${VIS_OPTS.map(o => `
+            <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid ${o.id === vis ? '#0ea5e9' : '#cbd5e1'};border-radius:5px;cursor:${isOwner && isCloud ? 'pointer' : 'not-allowed'};background:${o.id === vis ? '#f0f9ff' : '#fff'};${!isOwner || !isCloud ? 'opacity:0.6' : ''}">
+              <input type="radio" name="pr-vis" value="${esc(o.id)}"${o.id === vis ? ' checked' : ''}${(!isOwner || !isCloud) ? ' disabled' : ''} style="margin-top:3px">
+              <div style="flex:1">
+                <div style="font-weight:600">${o.icon} ${esc(o.label)}</div>
+                <div class="muted" style="font-size:11.5px;color:#64748b;margin-top:2px">${esc(o.desc)}</div>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+        ${!isOwner ? `<p class="muted" style="font-size:11px;margin:8px 0 0;color:#92400e">⚠ Только владелец проекта может менять видимость (текущая роль: <b>${esc(role)}</b>). Этап 1.3 — пока owner-only; роли (electrician/mechanic/technologist/GIP/admin) — Этап 1.4.</p>` : ''}
+      </div>
+      <div>
+        <h4 style="margin:0 0 10px;font-size:14px;color:#0f172a">👥 Участники проекта</h4>
+        <p class="muted" style="font-size:12.5px;margin:0 0 10px;line-height:1.5">
+          Управление участниками (приглашение по email, удаление, изменение ролей) пока — через
+          стандартный <b>«Поделиться»</b> в шапке Конструктора схем при открытом проекте.
+          Интеграция в эту карточку — <b>Этап 1.4</b>.
+        </p>
+        ${Array.isArray(p.memberUids) && p.memberUids.length > 0
+          ? `<div style="padding:10px 12px;background:#f0fdf4;border-left:3px solid #15803d;border-radius:4px;font-size:12.5px">
+              ✓ В команде <b>${p.memberUids.length}</b> участник(ов) (включая owner).
+              ${p.members && Object.keys(p.members || {}).length
+                ? `<div style="margin-top:6px;font-size:11.5px;color:#475569">${Object.entries(p.members).map(([uid, m]) => `<div>• ${esc(m.email || uid.slice(0, 8))} <span style="color:#64748b">(${m.role || 'viewer'})</span></div>`).join('')}</div>`
+                : ''
+              }
+            </div>`
+          : `<div style="padding:10px 12px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:12.5px;color:#78350f">
+              👤 В команде только владелец. Чтобы добавить участников — откройте проект в Конструкторе и нажмите «Поделиться».
+            </div>`
+        }
+      </div>
+    `;
+    // Wire visibility radio change handler.
+    if (isOwner && isCloud) {
+      teamHost.querySelectorAll('input[name="pr-vis"]').forEach(radio => {
+        radio.addEventListener('change', async () => {
+          const v = radio.value;
+          if (v === p.visibility) return;
+          try {
+            await window.Storage.setVisibility(p.id, v);
+            p.visibility = v; // local update
+            prToast(`✔ Видимость: ${VIS_OPTS.find(o => o.id === v)?.label || v}`, 'ok');
+            render();
+          } catch (e) {
+            prToast('Ошибка: ' + (e.message || e), 'err');
+          }
+        });
+      });
+    }
   }
 
   // v0.60.110: восстановить focused input после re-render. Делаем синхронно
