@@ -2412,11 +2412,43 @@ function openProjectParamsModal() {
       }
     } catch (e) { console.warn('[project-params] cable-types', e); }
   })();
+  // v0.60.365: префикс-grid по типам consumer'ов
+  (async () => {
+    try {
+      const c = await import('./engine/constants.js');
+      const grid = document.getElementById('pp-prefix-grid');
+      if (!grid) return;
+      const overrides = (G.consumerSubtypePrefixes && typeof G.consumerSubtypePrefixes === 'object') ? G.consumerSubtypePrefixes : {};
+      const labels = {
+        conditioner: 'Кондиционер', motor: 'Двигатель', pump: 'Насос',
+        fan: 'Вентилятор', heater: 'Обогрев', lighting: 'Освещение',
+        socket: 'Розетки', server: 'IT-стойка', elevator: 'Лифт',
+        'fire-alarm': 'Пожарка', sks: 'СКС', cctv: 'Видео', access: 'СКУД',
+      };
+      const subtypes = Object.keys(c.CONSUMER_SUBTYPE_PREFIX || {});
+      grid.innerHTML = subtypes.map(st => {
+        const def = c.CONSUMER_SUBTYPE_PREFIX[st] || '';
+        const ovr = overrides[st] || '';
+        const label = labels[st] || st;
+        return `<div class="field" style="margin-bottom:0">
+          <label style="font-size:11px;color:#475569" title="Подтип: ${st}. Default: ${def}. Пусто → используется default.">${label}</label>
+          <input type="text" data-pp-prefix="${st}" value="${ovr}" placeholder="${def}" maxlength="6" style="width:100%;padding:4px 6px;font-size:12px;text-transform:uppercase">
+        </div>`;
+      }).join('');
+    } catch (e) { console.warn('[project-params] prefixes', e); }
+  })();
   openModal('modal-project-params');
 }
 
 function saveProjectParamsModal() {
   const get = (id) => document.getElementById(id)?.value;
+  // v0.60.365: собираем consumerSubtypePrefixes из grid'а
+  const prefixOverrides = {};
+  document.querySelectorAll('[data-pp-prefix]').forEach(inp => {
+    const st = inp.getAttribute('data-pp-prefix');
+    const v = String(inp.value || '').trim().toUpperCase();
+    if (st && v) prefixOverrides[st] = v;
+  });
   const patch = {
     defaultMaterial:      get('pp-material') || 'Cu',
     defaultInsulation:    get('pp-insulation') || 'PVC',
@@ -2426,6 +2458,7 @@ function saveProjectParamsModal() {
     defaultAmbient:       Number(get('pp-ambient')) || 30,
     projectMainCableLv:   get('pp-mainCableLv') || null,
     projectMainCableHv:   get('pp-mainCableHv') || null,
+    consumerSubtypePrefixes: Object.keys(prefixOverrides).length > 0 ? prefixOverrides : null,
   };
   if (window.Raschet && typeof window.Raschet.setGlobal === 'function') {
     window.Raschet.setGlobal(patch);

@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.365', date: '2026-05-06', items: [
+      '🅰 <b>UI редактирования letter-prefixes по типам в «Параметры проекта»</b>. Завершение запроса Пользователя 2026-05-06: «с записью в реестре настройки, чтобы пользователь мог задавать для проекта или для организации настройки по типам».',
+      '<b>Где</b>: модалка «Параметры проекта» (🔧 в хедере) → новая секция «<b>Буквенные обозначения потребителей (по типам)</b>» внизу.',
+      '<b>Что</b>: grid с input\'ами для каждого consumer-подтипа, у которого есть префикс по умолчанию. Пользователь может задать project-override (например, заменить ACU → AC, M → MOT). Пустое поле = использовать default из <code>CONSUMER_SUBTYPE_PREFIX</code>.',
+      '<b>Save</b>: значения собираются из <code>data-pp-prefix</code> атрибутов и записываются в <code>GLOBAL.consumerSubtypePrefixes</code>. Сериализуется с проектом.',
+      '<b>Resolver</b> (уже работал v0.60.361): <code>resolveConsumerPrefix(subtype)</code> читает GLOBAL.consumerSubtypePrefixes сначала → fallback на defaults.',
+      '<b>Применение</b>: только к НОВЫМ узлам. Существующие узлы сохраняют свои теги (переименовать вручную через карточку).',
+      '<b>TODO</b>: org-level fallback (через subscription/internal infrastructure) — следующая фаза.',
+      'Files: <code>index.html</code> (секция в modal-project-params), <code>js/main.js</code> (populate grid + saveProjectParamsModal extension), <code>js/engine/constants.js</code> (version).',
+    ] },
     { version: '0.60.364', date: '2026-05-06', items: [
       '🔄 <b>Режимы резервирования N / N+1 / N+2 / 2N / Custom</b> в карточке consumer + <b>extra-wide табличные модалки</b>.',
       '<b>1. Redundancy modes</b> (по запросу Пользователя 2026-05-06: «режим работы N, N+1, N+2, 2N влияющий на коэффициент загрузки. Только не тупо разделить на N+1 и умножить на N а нормально, согласно норм и правил расчета»).',
