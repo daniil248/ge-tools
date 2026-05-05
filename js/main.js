@@ -1553,6 +1553,10 @@ function exitCloudMode() {
     if (els.btnShare) els.btnShare.classList.add('hidden');
     if (els.btnHistory) els.btnHistory.classList.add('hidden');
     if (els.btnRequestAccess) els.btnRequestAccess.classList.add('hidden');
+    // v0.60.275: btnSave скрываем — для cloud-mode он будет показан заново
+    // через openProject; для file-mode — через _updateFileModeBadge сразу
+    // после exitCloudMode.
+    if (els.btnSave) els.btnSave.classList.add('hidden');
     const url = new URL(location.href);
     url.searchParams.delete('project');
     history.replaceState({}, '', url);

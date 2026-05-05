@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.275', date: '2026-05-06', items: [
+      '🔘 <b>btnSave «Сохранить» в шапке теперь видна в file-mode (writer)</b>. Замечен gap UX после v0.60.270.',
+      '• Корень: btnSave управляется через openProject (показ при загрузке cloud-проекта) и backToProjects/exitCloudMode (скрытие). Для file-mode визуальный state не учитывался — кнопка оставалась hidden, и Пользователь мог сохранить только через 3-сек autosave.',
+      '• Фикс: <code>_updateFileModeBadge()</code> также управляет btnSave.classList — show при <code>fm.handle && !fm.readOnly</code>, hide при read-only. Срабатывает на каждом setStateFileMode.',
+      '• <code>exitCloudMode()</code> и close-file handler также скрывают btnSave для чистоты UI.',
+      '• <code>saveCurrent()</code> в file-mode уже корректно обновляет save-state визуально (через updateSaveButton → btnSave classes dirty/saving/saved/save-error). Раньше эти эффекты были невидимы из-за hidden-флага.',
+      'Files: <code>js/engine/export.js</code> (badge update), <code>js/main.js</code> (exitCloudMode), <code>js/engine/constants.js</code>.',
+    ] },
     { version: '0.60.274', date: '2026-05-06', items: [
       '📋 <b>ROADMAP.md обновлён согласно правилу [Roadmap maintenance rule]</b>. Содержательная функциональность за v0.60.254-273 (20 версий) занесена в раздел «Завершено».',
       '• Header: версия v0.60.273, упоминание Phase 45 (file-storage), Phase 46 (quota optimization), 1.28.20 Phase 3 (kit-container).',

@@ -155,6 +155,16 @@ export function initToolbar() {
     const badge = document.getElementById('file-mode-badge');
     if (!badge) return;
     const fm = window.Raschet?._fileMode;
+    // v0.60.275: управляем btn-save в шапке. В file-mode (writer) кнопка
+    // должна быть видна — Пользователь хочет иметь явный «Сохранить» кроме
+    // 3-сек autosave. В read-only file-mode скрываем (нечего сохранять).
+    // В нет-file-mode оставляем как есть (cloud-mode сам управляет через
+    // openProject / backToProjects).
+    const saveBtn = document.getElementById('btn-save');
+    if (saveBtn && fm) {
+      if (fm.handle && !fm.readOnly) saveBtn.classList.remove('hidden');
+      else saveBtn.classList.add('hidden');
+    }
     if (!fm) {
       badge.classList.add('hidden');
       badge.textContent = '';
@@ -224,6 +234,9 @@ export function initToolbar() {
       _stopExternalChangeWatcher(); // v0.60.262
       try { await forgetHandle(); } catch {}
       _updateFileModeBadge();
+      // v0.60.275: после закрытия файла btnSave прячем (нет проекта для save).
+      const saveBtn = document.getElementById('btn-save');
+      if (saveBtn) saveBtn.classList.add('hidden');
       flash('Файл закрыт. Автосохранение в файл выключено.', 'success');
     };
   };
