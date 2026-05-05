@@ -956,10 +956,18 @@ function _newTaskId() { return 't-' + Date.now().toString(36) + '-' + Math.rando
 // возможностью добавлять этапы в любом месте». Этапы хранятся в
 // project.implStages — массив, можно расставлять / переименовывать /
 // удалять / вставлять между.
+// v0.60.293 (по запросу Пользователя 2026-05-06: «мне нужно добавить
+// производство. И сделать этот план настраиваемым»):
+// Стандартный набор этапов расширен — добавлен «Производство» (заказ /
+// изготовление оборудования) между РД и Монтажом. План полностью
+// настраиваемый: rename / insert / delete / status-cycle уже есть с
+// v0.60.290 (Этап 1.4); Этап 1.4-fix v0.60.293 — разрешает редактирование
+// в local-mode (где role=guest) и для editor (не только owner).
 const IMPL_STAGES_DEFAULT = [
   { id: 'concept', name: 'Концепция', icon: '💡', status: 'pending' },
   { id: 'sketch', name: 'Эскиз (П)', icon: '✏', status: 'pending' },
   { id: 'docs', name: 'РД (рабочая)', icon: '📐', status: 'pending' },
+  { id: 'production', name: 'Производство', icon: '🏗', status: 'pending' },
   { id: 'install', name: 'Монтаж', icon: '🔧', status: 'pending' },
   { id: 'commissioning', name: 'ПНР', icon: '🚀', status: 'pending' },
   { id: 'operation', name: 'Эксплуатация', icon: '🏭', status: 'pending' },
@@ -993,8 +1001,14 @@ function _saveImplStages(pid, stages) {
 }
 function _renderImplStagesBlock(p) {
   const stages = _getImplStages(p);
-  const isOwner = (p._role || 'guest') === 'owner';
-  const ro = !isOwner; // только owner может менять (как visibility)
+  // v0.60.293: editable если owner / editor ИЛИ local-mode (нет Firebase).
+  // p._role может быть undefined если getProject не выставил — для local-mode
+  // считаем 'owner' (single user). Для cloud-mode default 'guest' если
+  // ownerId не совпадает.
+  const isCloud = !!(window.Storage && window.Storage.isCloud);
+  const role = p._role || (isCloud ? 'guest' : 'owner');
+  const canEdit = role === 'owner' || role === 'editor';
+  const ro = !canEdit;
   // Visual timeline: dots с горизонтальной линией.
   const dotsHtml = stages.map((s, idx) => {
     const meta = IMPL_STATUS_META[s.status] || IMPL_STATUS_META.pending;
@@ -1026,7 +1040,7 @@ function _renderImplStagesBlock(p) {
     <div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding:8px 4px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
       ${dotsHtml}
     </div>
-    ${ro ? '<p class="muted" style="font-size:11px;margin:6px 0 0">⚠ Только владелец может менять этапы (текущая роль: ' + esc(p._role || 'guest') + ').</p>' : ''}
+    ${ro ? '<p class="muted" style="font-size:11px;margin:6px 0 0">⚠ Только owner / editor проекта может менять этапы. Текущая роль: <b>' + esc(p._role || 'guest') + '</b>. Для редактирования откройте проект как владелец.</p>' : ''}
   </div>`;
 }
 function _wireImplStagesBlock(p, host) {
@@ -1579,6 +1593,7 @@ function render() {
   const metaHost = document.getElementById('pr-detail-meta');
   const teamHost = document.getElementById('pr-detail-team'); // v0.60.289
   const summaryHost = document.getElementById('pr-detail-summary'); // v0.60.292
+  const equipmentHost = document.getElementById('pr-detail-equipment'); // v0.60.293
 
   if (!p) {
     if (headHost) headHost.innerHTML = `
@@ -2370,8 +2385,12 @@ function render() {
   // Members management (invite/remove/roles) пока через стандартный «Поделиться»
   // в Конструкторе схем (Этап 1.4 интегрирует здесь).
   if (teamHost) {
+    // v0.60.293 (по репорту Пользователя 2026-05-06: «как мне сменить роль?» —
+    // _role был 'guest' даже в local-mode т.к. getProject не выставляет
+    // _role explicitly): для local-mode default = 'owner' (single user без
+    // Firebase коллабораций).
     const isCloud = !!(window.Storage && window.Storage.isCloud);
-    const role = p._role || 'guest';
+    const role = p._role || (isCloud ? 'guest' : 'owner');
     const isOwner = role === 'owner';
     const vis = p.visibility || 'private';
     const VIS_OPTS = [
@@ -2533,6 +2552,181 @@ function render() {
         • <b>1.5.3</b>: проверка корректности схем (висячие связи, перегруз, дубли портов)<br>
         • <b>1.5.4</b>: проверка расчётов (ΔU, токи, селективность; cooling vs IT; cross-discipline баланс)<br>
         • <b>1.5.5</b>: согласование разделов (✓ checklist с timestamp + подписью + историей ревизий)
+      </div>
+    `;
+  }
+
+  // v0.60.293 (Этап 1.5.2 Phase 47): cross-discipline equipment list.
+  // Объединяет оборудование из Конструктора схем (engine.scheme.v1) и
+  // Технолога объекта (tech-workspace.variants.v1). Read-only view для
+  // ГИП / Администратора — все позиции в одном месте, можно увидеть какие
+  // позиции есть в одной дисциплине но отсутствуют в другой.
+  if (equipmentHost) {
+    const _readJSON = (key, fallback) => {
+      try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+      catch { return fallback; }
+    };
+    const pid = p.id;
+    const scheme = _readJSON(`raschet.project.${pid}.engine.scheme.v1`, null);
+    const twVariants = _readJSON(`raschet.project.${pid}.tech-workspace.variants.v1`, []);
+    const twActiveId = (() => { try { return JSON.parse(localStorage.getItem(`raschet.project.${pid}.tech-workspace.activeVariantId.v1`) || '""'); } catch { return null; } })();
+    const twActive = Array.isArray(twVariants) ? twVariants.find(v => v.id === twActiveId) || twVariants[0] : null;
+
+    // ── 1. Из Конструктора схем ──
+    // scheme.nodes может быть Array или Object (ключ=id). Нормализуем.
+    let schemeNodes = [];
+    if (scheme?.nodes) {
+      schemeNodes = Array.isArray(scheme.nodes) ? scheme.nodes : Object.values(scheme.nodes);
+    }
+    const NODE_TYPE_LABEL = {
+      source: '⚡ Источник', generator: '🔋 Генератор', ups: '🔌 ИБП',
+      panel: '🗂 Щит', 'consumer-container': '📦 Группа', consumer: '💡 Потребитель',
+      'junction-box': '📦 Клеммная', channel: '🔗 Канал', zone: '🏢 Зона',
+    };
+    const constructorItems = schemeNodes
+      .filter(n => n && n.type && n.type !== 'channel' && n.type !== 'zone')
+      .map(n => {
+        const tag = n.tag || n.id || '';
+        const name = n.name || '';
+        const typeLbl = NODE_TYPE_LABEL[n.type] || n.type;
+        const specs = [];
+        if (n.capacityKw) specs.push(`${n.capacityKw} кВт`);
+        if (n.snomKva) specs.push(`${n.snomKva} кВА`);
+        if (n.demandKw) specs.push(`${n.demandKw} кВт`);
+        if (n.count && n.count > 1) specs.push(`×${n.count}`);
+        if (n.capacityA) specs.push(`In=${n.capacityA} А`);
+        return { tag, name, type: n.type, typeLbl, specs: specs.join(' · ') };
+      })
+      .sort((a, b) => (a.tag || '').localeCompare(b.tag || '', undefined, { numeric: true }));
+
+    // ── 2. Из Технолога объекта (active variant) ──
+    const twItems = [];
+    if (twActive?.concept) {
+      const c = twActive.concept;
+      for (const rg of (c.rackGroups || [])) {
+        if (!rg.count) continue;
+        twItems.push({
+          tag: rg.tagPrefix || rg.name || 'SR',
+          name: rg.name || '',
+          type: 'rack-group',
+          typeLbl: '🗄 Стойка',
+          qty: rg.count,
+          specs: `${rg.kwPerRack || 0} кВт/стойку · ${rg.profile || ''}`,
+          modelRef: rg.modelRef ? `${rg.modelRef.manufacturer || ''} ${rg.modelRef.model || ''}`.trim() : null,
+        });
+      }
+      for (const us of (c.upsSystems || [])) {
+        if (!us.count) continue;
+        twItems.push({
+          tag: us.tagPrefix || us.name || 'UPS',
+          name: us.name || '',
+          type: 'ups-system',
+          typeLbl: '🔌 ИБП-система',
+          qty: us.count,
+          specs: `${us.ratedKva || 0} кВА · ${us.purpose || ''} · ${us.redundancy || ''}`,
+          modelRef: us.modelRef ? `${us.modelRef.manufacturer || ''} ${us.modelRef.model || ''}`.trim() : null,
+        });
+      }
+      for (const cu of (c.coolingUnits || [])) {
+        if (!cu.count) continue;
+        twItems.push({
+          tag: cu.tagPrefix || cu.name || 'AC',
+          name: cu.name || '',
+          type: 'cooling-unit',
+          typeLbl: '❄ Кондиционер',
+          qty: cu.count,
+          specs: `${cu.kwPerUnit || 0} кВт холода · ${cu.type || ''} · ${cu.redundancy || ''}`,
+          modelRef: cu.modelRef ? `${cu.modelRef.manufacturer || ''} ${cu.modelRef.model || ''}`.trim() : null,
+        });
+      }
+      if (c.feed?.tp?.needed) {
+        twItems.push({
+          tag: 'TP',
+          name: 'Трансформатор подстанции',
+          type: 'tp',
+          typeLbl: '⚡ ТП',
+          qty: c.feed.tp.redundancy === '2' || c.feed.tp.redundancy === '2-avr' ? 2 : 1,
+          specs: `${c.feed.tp.kva || 0} кВА · ${c.feed.tp.redundancy || ''}`,
+          modelRef: c.feed.tp.modelRef ? `${c.feed.tp.modelRef.manufacturer || ''} ${c.feed.tp.modelRef.model || ''}`.trim() : null,
+        });
+      }
+      if (c.feed?.dgu?.needed) {
+        twItems.push({
+          tag: 'GE',
+          name: 'Дизельный генератор',
+          type: 'dgu',
+          typeLbl: '🔋 ДГУ',
+          qty: c.feed.dgu.redundancy === '2N' ? 2 : (c.feed.dgu.redundancy === 'N+1' ? 2 : 1),
+          specs: `${c.feed.dgu.kw || 0} кВт · ${c.feed.dgu.mode || ''}`,
+          modelRef: c.feed.dgu.modelRef ? `${c.feed.dgu.modelRef.manufacturer || ''} ${c.feed.dgu.modelRef.model || ''}`.trim() : null,
+        });
+      }
+    }
+
+    const totalConstructor = constructorItems.length;
+    const totalTw = twItems.length;
+    const tableHtml = (items, sourceLabel, sourceColor) => {
+      if (!items.length) return `<p class="muted" style="font-size:12px;font-style:italic">Нет позиций.</p>`;
+      return `<table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
+        <thead style="background:#f8fafc">
+          <tr>
+            <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Tag</th>
+            <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Имя</th>
+            <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Тип</th>
+            <th style="text-align:right;padding:6px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Кол-во</th>
+            <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Характеристики</th>
+            <th style="text-align:left;padding:6px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Модель</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(it => `<tr>
+            <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;font-weight:600">${esc(it.tag || '—')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9">${esc(it.name || '')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;color:${sourceColor}">${esc(it.typeLbl || it.type || '')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;text-align:right">${it.qty || 1}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:11.5px">${esc(it.specs || '')}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #f1f5f9;color:${it.modelRef ? '#15803d' : '#94a3b8'};font-size:11.5px">${it.modelRef ? esc(it.modelRef) : '<i>не привязана</i>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+    };
+
+    // ── 3. Cross-reference: общие теги ──
+    const tagsConstr = new Set(constructorItems.map(it => (it.tag || '').toUpperCase()).filter(Boolean));
+    const tagsTw = new Set(twItems.map(it => (it.tag || '').toUpperCase()).filter(Boolean));
+    const sharedTags = [...tagsConstr].filter(t => tagsTw.has(t));
+
+    equipmentHost.innerHTML = `
+      <p class="muted" style="font-size:12.5px;margin:0 0 14px;line-height:1.6">
+        Объединённый перечень оборудования проекта из <b>Конструктора схем</b> (детальная электрическая модель)
+        и <b>Технолога объекта</b> (концепция со счётчиками). Read-only view для ГИП / Администратора.
+        Привязка модели (выбранный артикул из каталога) показана отдельной колонкой.
+      </p>
+
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:12.5px">
+        <span><b>${totalConstructor}</b> позиций в Конструкторе</span>
+        <span><b>${totalTw}</b> позиций в Технологе</span>
+        ${sharedTags.length > 0 ? `<span style="color:#15803d">✓ <b>${sharedTags.length}</b> совпадений по тегу</span>` : ''}
+      </div>
+
+      <h4 style="margin:14px 0 8px;font-size:13px;color:#92400e">⚡ Из Конструктора электрических схем (${totalConstructor})</h4>
+      ${tableHtml(constructorItems, 'Конструктор', '#92400e')}
+
+      <h4 style="margin:18px 0 8px;font-size:13px;color:#5b21b6">🏗 Из Технолога объекта · вариант: «${esc(twActive?.name || '?')}» (${totalTw})</h4>
+      ${tableHtml(twItems, 'Технолог', '#5b21b6')}
+
+      ${sharedTags.length > 0 ? `
+        <h4 style="margin:18px 0 8px;font-size:13px;color:#15803d">🔗 Cross-reference: совпадение по тегу (${sharedTags.length})</h4>
+        <p class="muted" style="font-size:11.5px;margin:0 0 8px">Позиции с одинаковым тегом в обеих дисциплинах. Best-effort-matching — реальное соответствие может требовать ручной проверки.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${sharedTags.map(t => `<span style="padding:3px 10px;background:#dcfce7;border:1px solid #86efac;border-radius:3px;font-size:11.5px;color:#15803d;font-weight:600">${esc(t)}</span>`).join('')}
+        </div>
+      ` : ''}
+
+      <div style="margin-top:18px;padding:14px 16px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;color:#78350f;font-size:12.5px;line-height:1.7">
+        🚧 <b>В разработке (Phase 47.2.3+)</b>: автоматическое сведение позиций между дисциплинами
+        (детект «один логический рак ID#42 в TW = consumer-container в Конструкторе»),
+        порты по системам (⚡ электрика / 🌊 трубы / 💨 ОВК), пересечение с СКС-связями.
       </div>
     `;
   }

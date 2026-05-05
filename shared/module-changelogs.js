@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.293', date: '2026-05-06', items: [
+      '🏗 <b>Этапы реализации: добавлено «Производство» + фикс роли local-mode</b>. По репортам Пользователя 2026-05-06.',
+      '<b>1. «мне нужно добавить производство. И сделать этот план настраиваемым»</b>:',
+      '• В IMPL_STAGES_DEFAULT добавлен этап «🏗 Производство» между РД и Монтажом — стандартный pipeline теперь: Концепция → Эскиз (П) → РД (рабочая) → <b>Производство</b> → Монтаж → ПНР → Эксплуатация (7 этапов).',
+      '• План уже настраиваемый (rename / insert-after / delete / status-cycle с v0.60.290) — но user не видел кнопок т.к. role=guest. Теперь видит.',
+      '<b>2. «как мне сменить роль?» + role=guest даже для local-проекта</b>:',
+      '• Корень: <code>getProject(pid)</code> возвращает raw LS-данные без <code>_role</code>. <code>p._role || \'guest\'</code> → guest. UI блокировался.',
+      '• Фикс: для local-mode default <code>_role=\'owner\'</code> (single user без Firebase коллаборации). Для cloud — \'guest\' если <code>ownerId</code> не совпадает.',
+      '• Применено в <code>_renderImplStagesBlock</code> (Этап 1.4 plan) и в team-tab (Этап 1.3 visibility).',
+      '<b>3. Footer на странице проекта</b>: <code>entries: CHANGELOGS[\'projects\']</code> → пустой массив (ключ не существует) → footer без changelog. Изменено на <code>CHANGELOGS[\'engine\']</code>.',
+      '<b>Cross-discipline equipment</b> (Этап 1.5.2 Phase 47, начато): добавлен таб «📦 Оборудование» в карточку проекта с двумя таблицами — позиции из Конструктора схем и из Технолога объекта, cross-reference по тегу. Будет дополнен в следующих подэтапах.',
+      'Files: <code>projects/project.js</code> (Производство в default + role-fix + equipment render), <code>projects/project.html</code> (equipment tab + footer key).',
+    ] },
     { version: '0.60.292', date: '2026-05-06', items: [
       '🧐 <b>Этап 1.5.1 Phase 47: «Сводка ГИП» — cross-discipline view проекта</b>. Минимальный viable view для ГИП / Администратора проекта, объединяющий данные из Конструктора схем, Технолога объекта и СКС-design.',
       '<b>Новый таб «🧐 Сводка ГИП»</b> в карточке проекта (между «Общее» и «Модули и связи»).',

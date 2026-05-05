@@ -37,7 +37,8 @@
          сводка, согласование) добавятся как новые tabs в Этапе 1.5. -->
     <nav id="pr-detail-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:12px 0;padding:6px;background:#fff;border-radius:8px;border:1px solid #e5e7eb">
       <button type="button" class="pr-tab pr-tab-active" data-tab="general"  title="Реквизиты, тип объекта, локация, общие данные">📋 Общее</button>
-      <button type="button" class="pr-tab" data-tab="summary" title="Cross-discipline сводка: оборудование, ошибки, расчёты по всем дисциплинам (Этап 1.5 ГИП)">🧐 Сводка ГИП</button>
+      <button type="button" class="pr-tab" data-tab="summary" title="Cross-discipline сводка: метаданные проекта и обзор по дисциплинам (Этап 1.5.1)">🧐 Сводка ГИП</button>
+      <button type="button" class="pr-tab" data-tab="equipment" title="Перечень всего оборудования проекта (Этап 1.5.2): объединение Конструктора схем и Технолога объекта">📦 Оборудование</button>
       <button type="button" class="pr-tab" data-tab="modules"  title="Модули проекта (Конструктор, Технолог, СКС, BOM) и sketch'и проекта">🔗 Модули и связи</button>
       <button type="button" class="pr-tab" data-tab="economics" title="Тариф, валюта, дата курса">💰 Экономика</button>
       <button type="button" class="pr-tab" data-tab="plan"     title="Этапы реализации + План-график задач (Phase 38)">📅 План</button>
@@ -49,6 +50,12 @@
     <section class="pr-card pr-tab-panel" data-tab-panel="summary" hidden>
       <h3 style="margin:0 0 12px">🧐 Сводка проекта (cross-discipline)</h3>
       <div id="pr-detail-summary"></div>
+    </section>
+
+    <!-- v0.60.293 (Этап 1.5.2 Phase 47): Перечень оборудования (cross-discipline). -->
+    <section class="pr-card pr-tab-panel" data-tab-panel="equipment" hidden>
+      <h3 style="margin:0 0 12px">📦 Перечень оборудования проекта</h3>
+      <div id="pr-detail-equipment"></div>
     </section>
 
     <section class="pr-card pr-tab-panel" data-tab-panel="general">
@@ -153,7 +160,7 @@
     import { mountFooter as mountModuleFooter } from '../shared/module-footer.js';
     import { APP_VERSION } from '../js/engine/constants.js';
     import { CHANGELOGS } from '../shared/module-changelogs.js';
-    mountModuleFooter({ appVersion: APP_VERSION, moduleId: 'projects', moduleTitle: 'Карточка проекта', entries: CHANGELOGS['projects'] || [] });
+    mountModuleFooter({ appVersion: APP_VERSION, moduleId: 'projects', moduleTitle: 'Карточка проекта', entries: CHANGELOGS['engine'] || [] });
   </script>
 </body>
 </html>
