@@ -4,6 +4,20 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.339', date: '2026-05-06', items: [
+      '⚙ <b>Engines catalog (Phase 30.4 foundation)</b>. По запросу Пользователя 2026-05-06: «может двигатели вынесешь отдельно или это не целесообразно?» — да, целесообразно.',
+      '<b>Структура</b> <code>shared/catalogs/engines/</code>:',
+      '• <code>perkins.js</code> — 7 двигателей (1106A-70TAG2/3, 2206A-E13TAG3, 2506A-E15, 4006-23TAG3A, 4008-30TAG3, 4016-61TRG3)',
+      '• <code>volvo-penta.js</code> — 5 (TAD531/732/941/1342GE, TWD1683GE)',
+      '• <code>cummins.js</code> — 7 (X2.5-G3, QSL9-G7, NTAA855-G7A, QSX15-G8, QSK23-G3, QSK60-G3, QSK78-G16)',
+      '• <code>caterpillar.js</code> — 6 (C9.3, C18, C32, 3516B, 3520C, C175-16)',
+      '• <code>mtu.js</code> — 3 (12V2000G65, 16V4000G94S, 20V4000G94S)',
+      '• <code>index.js</code> — агрегатор + helpers: <code>getEngine(id)</code>, <code>listEngines()</code>, <code>getEngineDerateProfile(id)</code>, <code>detectEngineByModel(text)</code>',
+      '<b>Каждая запись</b>: id, manufacturer, series, model, cylinders, displacement, sfcLkWh, emissionTier, aspiration, derateProfile (полная кривая со всеми параметрами), source, note.',
+      '<b>Single source of truth</b>: один и тот же двигатель используется множеством vendor\'ов ДГУ (Perkins 1106A в AJ Power и FG Wilson; Volvo TAD732GE в AJ Power; etc.) — engine-data описана раз. Следующая фаза — миграция DGU-каталога на <code>engineRef: \'perkins-1106a-70tag2\'</code> вместо дублирования полей.',
+      '<b>Helper detectEngineByModel</b> — heuristic match по строке engineModel для legacy-DGU-записей. Возвращает id двигателя или null.',
+      'Files: <code>shared/catalogs/engines/{perkins,volvo-penta,cummins,caterpillar,mtu,index}.js</code> — 28 двигателей в 5 vendor-файлах.',
+    ] },
     { version: '0.60.338', date: '2026-05-06', items: [
       '🔍 <b>Real rule checks в оставшихся blue field в conn-инспекторе</b>. Дополнение к v0.60.337 для других веток.',
       '<b>Покрыты ещё 2 template-claim места</b>:',
