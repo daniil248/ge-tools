@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.319', date: '2026-05-06', items: [
+      '👁 <b>Auto-detected engine profile теперь видим</b>. По репорту Пользователя 2026-05-06: «не подставил правильный профиль, отдал это на откуп пользователю, а он не увидел что можно менять профиль».',
+      '<b>Корень</b>: profile auto-detect был «невидимым» — селектор показывал «Auto», но Пользователь не видел КАКОЙ профиль выбран автоматически. И что вообще можно менять профиль вручную.',
+      '<b>Fix — visible hint под селектором</b>:',
+      '• 🔧 <b>Зелёный</b> блок: «Auto: <b>Volvo Penta TAD/TWD</b><br>← по двигателю «Volvo Penta TAD732GE» из подобранной модели» + note профиля',
+      '• ⚠ <b>Жёлтый</b>: «Generic ISO 3046-1 (engine X не в базе паспортов). Консервативная оценка — для точного дирейтинга выберите профиль вручную.»',
+      '• ✏ <b>Жёлтый</b> при ручном override: «Ручной выбор: X. Auto-detect отключён.»',
+      'Теперь Пользователь сразу видит: (1) какой профиль применён, (2) как его поменять, (3) почему generic — не самый точный.',
+      'Files: <code>dgu-config/index.html</code> (hint div), <code>dgu-config/dgu-config.js</code> (_renderProfileAutoHint helper).',
+    ] },
     { version: '0.60.318', date: '2026-05-06', items: [
       '🔧 <b>Fix: дирейтинг engine-profile не применялся при первом рендере</b>. По репорту Пользователя 2026-05-06: «ты дирейтинг не изменил для двигателя» — на скриншоте profile = Generic ISO 3046-1 при том что авто-pick модель имеет engine Volvo Penta TAD732GE.',
       '<b>Корень</b>: <code>recalcAndRender</code> читал <code>engineName</code> из <code>_lastBest</code>, который устанавливается только в <code>renderSuggestResult</code> (после <code>calcDgu</code>). На первом запуске <code>_lastBest=null</code> → engineName не передавался → calc fallback к generic ISO 3046-1.',

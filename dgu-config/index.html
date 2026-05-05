@@ -96,6 +96,10 @@
             <option value="volvo-tad-twd">Volvo Penta TAD/TWD</option>
             <option value="mtu-large">MTU 12V/16V 2000/4000</option>
           </select>
+          <!-- v0.60.319: показываем что auto-detect выбрал — ранее Пользователь
+               не замечал, что профиль можно/нужно менять, и не видел результат
+               авто-определения. -->
+          <div id="dg-profile-auto-hint" style="font-size:11px;margin-top:3px;padding:4px 6px;background:#dbeafe;border-radius:3px;color:#1e3a8a;line-height:1.4;display:none"></div>
         </label>
 
         <h4 class="dg-section-h4" title="Параметры топливной системы.">⛽ Топливо</h4>

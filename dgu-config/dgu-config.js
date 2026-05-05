@@ -610,29 +610,43 @@ function _renderContextBanner() {
   bar.innerHTML = projHtml + meteoHtml + srcHtml;
 }
 
+// v0.60.319: видимый индикатор auto-detected профиля под селектором.
+function _renderProfileAutoHint(profile, fromEngine, isManual) {
+  const el = document.getElementById('dg-profile-auto-hint');
+  if (!el) return;
+  if (isManual) {
+    el.style.display = 'block';
+    el.style.background = '#fef3c7';
+    el.style.color = '#78350f';
+    el.innerHTML = `✏ <b>Ручной выбор:</b> ${escHtml(profile?.label || '—')}. Auto-detect отключён.`;
+    return;
+  }
+  if (!profile) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.style.background = profile.id === 'iso-naturally-aspirated' ? '#fef3c7' : '#dcfce7';
+  el.style.color = profile.id === 'iso-naturally-aspirated' ? '#78350f' : '#14532d';
+  if (profile.id === 'iso-naturally-aspirated') {
+    el.innerHTML = `⚠ <b>Auto:</b> Generic ISO 3046-1${fromEngine ? ` (engine «${escHtml(fromEngine)}» не в базе паспортов)` : ' (нет данных по модели)'}.<br><span style="color:#78350f">Консервативная оценка — для точного дирейтинга выберите профиль вручную.</span>`;
+  } else {
+    el.innerHTML = `🔧 <b>Auto:</b> <b>${escHtml(profile.label)}</b>${fromEngine ? `<br>← по двигателю «${escHtml(fromEngine)}» из подобранной модели` : ''}.${profile.note ? `<br><span style="font-size:10.5px;opacity:0.85">${escHtml(profile.note)}</span>` : ''}`;
+  }
+}
+
 function recalcAndRender() {
   syncStateFromInputs();
-  // v0.60.318 (по репорту Пользователя 2026-05-06: «ты дирейтинг не изменил
-  // для двигателя» — на скриншоте profile = Generic ISO 3046-1 при том что
-  // авто-pick модель имеет engine Volvo Penta TAD732GE):
-  // Раньше engineName бралось из _lastBest от ПРЕДЫДУЩЕГО рендера. На первом
-  // запуске _lastBest=null → calc использовал generic профиль → derate -6.5%
-  // вместо правильного 0% для современного turbo. Двухпроходный подход:
-  // 1) calc с generic для получения req. nameplate
-  // 2) предсказание engine из лучшего candidate
-  // 3) re-calc с engine-specific профилем
+  // v0.60.318: 2-pass engine profile detection. v0.60.319: дополнительно
+  // показываем результат auto-detect Пользователю явно (см. ниже).
   const _calcInput = { ..._state };
+  let _autoDetectedProfile = null;
+  let _autoDetectedFromEngine = null;
   if (_state.engineProfileOverride) {
     _calcInput.engineProfile = _state.engineProfileOverride;
   } else {
-    // pass 1: generic profile для оценки требуемой мощности
     const _genericRes = calcDgu(_calcInput);
     const _genericReq = _genericRes.spec.nameplateKw;
-    // pre-find probable best для извлечения engine
     const _candidates = listDgus(_state.vendor ? { vendor: _state.vendor } : {})
       .filter(d => Number.isFinite(_modeKw(d).kw))
       .sort((a, b) => _modeKw(a).kw - _modeKw(b).kw);
-    // если есть ручной выбор — берём его engine, иначе — лучший по generic
     let _probable = null;
     if (_state.selectedDguId) {
       _probable = _candidates.find(d => `${d.vendor}::${d.model}` === _state.selectedDguId);
@@ -643,9 +657,13 @@ function recalcAndRender() {
     if (_probable && _probable.engineModel) {
       _calcInput.engineName = _probable.engineModel;
       _calcInput.modelName = _probable.model;
+      _autoDetectedFromEngine = _probable.engineModel;
     }
   }
   const res = calcDgu(_calcInput);
+  _autoDetectedProfile = res.spec.derate.profile;
+  // v0.60.319: показываем результат auto-detect в sidebar возле селектора.
+  _renderProfileAutoHint(_autoDetectedProfile, _autoDetectedFromEngine, !!_state.engineProfileOverride);
   $('dg-calc-result').innerHTML = renderCalcResult(res);
   $('dg-suggest-result').innerHTML = renderSuggestResult(res.spec);
 
