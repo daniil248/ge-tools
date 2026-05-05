@@ -4,6 +4,57 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.302', date: '2026-05-06', items: [
+      '✓ <b>Этап 1.5.5 Phase 47: согласование разделов</b>. По плану архитектуры 2026-05-06 + ROADMAP Phase 47.2.10.',
+      '<b>Новый таб «✓ Согласование»</b> в карточке проекта (между «Проверки» и «Модули»).',
+      '<b>7 разделов</b> для согласования: ⚡ Электрика / 🏗 Технологическая часть / 🔗 СКС / ❄ Холодоснабжение / 💰 Экономика / 📅 План / 🛡 Проверки.',
+      '<b>4 статуса</b>: ⏳ не согласовано / ✓ согласовано / ✕ отклонено / 🔄 на доработку.',
+      '<b>Каждое согласование пишет</b>: signedByUid + signedByEmail (из Auth.currentUser), timestamp, revision-номер (++ при approval), comment (prompt у Пользователя), append-only в history.',
+      '<b>UI</b>: 4 кнопки на раздел (Согласовать / Отклонить / Доработка / ↺ Сброс). Counter-чипы сверху (✓ X из 7 / ⏳ Y / ✕ Z). Если все 7 согласованы — целевой banner «🎉 Все разделы согласованы».',
+      '<b>История ревизий</b>: details/summary с раскрытием полной timeline изменений раздела (status + email + timestamp + comment, новые сверху).',
+      '<b>RBAC</b>: только owner / gip / admin могут менять статус. Иначе — read-only с warn-banner.',
+      '<b>Storage</b>: <code>project.approvals = { sectionId: { status, signedByUid, signedByEmail, timestamp, revision, comment, history: [...] } }</code>. Append-only, ↺ Сброс пишет в history запись «pending — статус сброшен».',
+      '<b>Phase 47.2.10 закрыт</b>: вся Phase 47.2 (47.2.1-47.2.10) ✅. Phase 47.1 (objectKind) и 47.3-47.4 (project-scoped hub + multi-discipline) — открыты.',
+      'Files: <code>projects/project.html</code> (новый tab + панель approvals), <code>projects/project.js</code> (renderApprovals ~150 строк), <code>ROADMAP.md</code>.',
+    ] },
+    { version: '0.60.301', date: '2026-05-06', items: [
+      '⚖ <b>Этап 1.5.4 Phase 47: проверка расчётов (cross-discipline баланс мощностей)</b>. По плану архитектуры 2026-05-06 + ROADMAP Phase 47.2.9.',
+      '<b>5 cross-discipline балансовых проверок</b> в табе «🛡 Проверки» карточки проекта:',
+      '<b>4.1 IT-нагрузка TW vs Конструктор</b>: суммарная IT-нагрузка из rackGroups (TW) сравнивается с суммой consumer-узлов с <code>system=\'it\'</code> или <code>subtype=\'rack\'</code> (Конструктор). Расхождение > 20% → warn.',
+      '<b>4.2 Тепловой баланс</b>: <code>cooling ≥ IT + UPS-потери + 5% aux</code>. UPS-потери считаются как <code>load × (1 - efficiency)</code>. Если cooling недостаточен → warn.',
+      '<b>4.3 PUE consistency</b>: <code>total = IT × PUE_target</code>. Сравнивается с фактической суммарной нагрузкой Конструктора. Расхождение > 25% → info.',
+      '<b>4.4 Источник vs нагрузка</b>: суммарный <code>Snom × cosφ</code> всех source/generator vs суммарная установленная мощность потребителей. > 100% → error, > 85% → warn (рекомендуется резерв 15-20%).',
+      '<b>4.5 ИБП TW vs Конструктор</b>: <code>ratedKva × 0.95</code> (TW) vs <code>capacityKw</code> узлов type=\'ups\' (Конструктор). Расхождение > 25% → warn.',
+      'Удалён placeholder «В разработке (Phase 47.2.9)» — теперь только Phase 47.2.10 (согласование разделов) остаётся в pending.',
+      'File: <code>projects/project.js</code> (новый блок «4. Cross-discipline баланс мощностей» в renderValidation, ~95 строк).',
+    ] },
+    { version: '0.60.300', date: '2026-05-06', items: [
+      '⚡ <b>Fix: «не согласованность данных Макс»</b>. По репорту Пользователя 2026-05-06: на скриншоте трансформатор T1 показывал Макс=47.9 кВт при Текущая=107 кВт (Макс < Текущая невозможно), и ДГУ — Макс=41.1 кВт при downstream JB2 Макс=107 кВт.',
+      '<b>Корень проблемы</b>: sibling-clamp работает на panels (включая JB-как-panel-terminal), поднимая их _maxLoadKw до union-max всех siblings. Но upstream <code>source</code> / <code>generator</code> вычислялись ДО sibling-clamp loop и получали свой Макс через BFS-walk consumer-ов. После clamp дочерних panels — upstream source ничем не обновлялся.',
+      '<b>Fix #1 (in-block)</b>: при расчёте source/generator <code>_maxLoadKw</code> делаем sanity-clamp <code>max(_loadKw, max(child._maxLoadKw))</code>. Гарантирует «Макс ≥ Текущая» (как у panel в 3265).',
+      '<b>Fix #2 (post-clamp пропагация)</b>: после sibling-clamp loop отдельный pass пробегает все source/generator, читает уже-clamped значения детей и поднимает Макс upstream если нужно.',
+      'Files: <code>js/engine/recalc.js</code> (in-block clamp + post-clamp propagation pass).',
+    ] },
+    { version: '0.60.299', date: '2026-05-06', items: [
+      '⚡ <b>Fix ДГУ: «нагрузка не передается корректно на параметры»</b>. По репорту Пользователя 2026-05-06: ДГУ показывал Макс=50.2 кВт, при том что downstream-сборка JB2→UPS→IT имеет 114.2 кВт.',
+      '<b>Корень проблемы</b>: <code>_bfsDownstreamWithActiveTies</code> (BFS для <code>maxDownstreamLoad</code>) при достижении узла <code>type=\'generator\'</code> с <code>auxInput</code> срабатывал leaf-блок (только <code>auxDemandKw</code>, без обхода downstream). Этот блок предназначен для walk-а ОТ ЩСН к ДГУ-aux (ЩСН питает только собственные нужды ДГУ). Но он также срабатывал когда BFS СТАРТУЕТ от самого ДГУ — отсекая весь его downstream.',
+      '<b>Fix</b>: добавлен гард <code>curId !== startId</code>. Leaf-логика срабатывает только когда дошли до ДГУ ИЗВНЕ; если walk стартует от ДГУ — обход продолжается через outgoing conns (JB→UPS→IT и т.д.).',
+      'File: <code>js/engine/recalc.js</code> (<code>_bfsDownstreamWithActiveTies</code>: добавлен <code>_startIsGenerator</code> + гард в leaf-блоке).',
+    ] },
+    { version: '0.60.298', date: '2026-05-06', items: [
+      '👯 <b>Fix: дубли проектов после cloud-sync</b>. По репорту Пользователя 2026-05-06: после синхронизации с облаком в «Мои схемы» каждый проект показывался дважды — «Тестовый · пусто» рядом с «Тестовый · 1 схема» и т.п.',
+      '<b>Корень проблемы</b>: <code>js/main.js</code> при открытии облачной схемы создавал local stub с cloud-id, не проверяя есть ли уже local-контекст с таким же именем. Один проект существовал и как local-only ctx (без схем), и как cloud-imported ctx (со схемой) — две разные ID, одно имя.',
+      '<b>Fix #1 (превентивный)</b>: при импорте cloud-проекта ищем local ctx с таким же именем без схем. Если найден — НЕ создаём stub, а добавляем cloud-porPid в массив <code>_cloudIds</code> существующего ctx и используем его id для <code>setActiveProjectId</code>.',
+      '<b>Fix #2 (рендер)</b>: построение <code>cloudIdToLocal</code> map в группировке схем. Если у схемы <code>projectId</code> = cloud-id, и есть local ctx с этим cloud-id в <code>_cloudIds</code> — схема группируется под местным ctx. Это убирает дубль в рендере для уже существующих local-стабов.',
+      'Files: <code>js/main.js</code> (dedup при импорте + cloudIdToLocal map в группировке).',
+    ] },
+    { version: '0.60.297', date: '2026-05-06', items: [
+      '👑 <b>Fix: «сделай меня владельцем мне нужно менять параметры»</b>. По репорту Пользователя 2026-05-06: в карточке проекта поля и этапы реализации были read-only, т.к. <code>_role</code> резолвился в <code>guest</code>.',
+      '<b>Корень проблемы</b>: <code>getProject</code> из <code>shared/project-storage.js</code> читает local LS — это данные пользователя, он ИХ владелец. Но прежняя логика проверяла <code>Storage.isCloud</code> (флаг «Firebase авторизован») и при cloud-mode + отсутствующем <code>_role</code> ставила default <code>guest</code> → редактирование заблокировано.',
+      '<b>Fix</b>: для всех LS-загруженных проектов default role = <code>owner</code>. Cloud-only role-checks (visibility, members) работают через <code>window.Storage.*</code> — там Firebase rules сами проверят права.',
+      '<b>Backup: кнопка «👑 Сделать меня владельцем»</b> в табе «Команда» — показывается если <code>!isOwner</code> ИЛИ orphan (нет ownerId) ИЛИ <code>_importedFromCloud:true</code>. По клику: <code>updateProject(pid, { _role:\'owner\', ownerId:\'local\' })</code> + re-render. Для случаев когда <code>_role:\'guest\'</code> сохранён в LS явно (legacy data).',
+      'Files: <code>projects/project.js</code> (default role в <code>_renderImplStagesBlock</code> + team-tab, новая claim-кнопка + handler), <code>js/engine/constants.js</code> (APP_VERSION).',
+    ] },
     { version: '0.60.296', date: '2026-05-06', items: [
       '🛡 <b>Этап 1.5.3 Phase 47: Проверки проекта (валидация в карточке)</b>. По плану архитектуры 2026-05-06 + ROADMAP Phase 47.2.8. Также — Gantt enhancements добавлены в ROADMAP как 47.2.7-followup.',
       '<b>Новый таб «🛡 Проверки»</b> в карточке проекта (между «Оборудование» и «Модули»).',

@@ -40,6 +40,7 @@
       <button type="button" class="pr-tab" data-tab="summary" title="Cross-discipline сводка: метаданные проекта и обзор по дисциплинам (Этап 1.5.1)">🧐 Сводка ГИП</button>
       <button type="button" class="pr-tab" data-tab="equipment" title="Перечень всего оборудования проекта (Этап 1.5.2): объединение Конструктора схем и Технолога объекта">📦 Оборудование</button>
       <button type="button" class="pr-tab" data-tab="validation" title="Проверка корректности схем и cross-discipline согласованности (Этап 1.5.3+1.5.4)">🛡 Проверки</button>
+      <button type="button" class="pr-tab" data-tab="approvals" title="Согласование разделов проекта ГИПом: подпись, timestamp, история ревизий (Этап 1.5.5)">✓ Согласование</button>
       <button type="button" class="pr-tab" data-tab="modules"  title="Модули проекта (Конструктор, Технолог, СКС, BOM) и sketch'и проекта">🔗 Модули и связи</button>
       <button type="button" class="pr-tab" data-tab="economics" title="Тариф, валюта, дата курса">💰 Экономика</button>
       <button type="button" class="pr-tab" data-tab="plan"     title="Этапы реализации + План-график задач (Phase 38)">📅 План</button>
@@ -63,6 +64,12 @@
     <section class="pr-card pr-tab-panel" data-tab-panel="validation" hidden>
       <h3 style="margin:0 0 12px">🛡 Проверки проекта</h3>
       <div id="pr-detail-validation"></div>
+    </section>
+
+    <!-- v0.60.302 (Этап 1.5.5 Phase 47): Согласование разделов ГИПом. -->
+    <section class="pr-card pr-tab-panel" data-tab-panel="approvals" hidden>
+      <h3 style="margin:0 0 12px">✓ Согласование разделов</h3>
+      <div id="pr-detail-approvals"></div>
     </section>
 
     <section class="pr-card pr-tab-panel" data-tab-panel="general">

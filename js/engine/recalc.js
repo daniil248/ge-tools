@@ -212,17 +212,32 @@ function _computeUpsWeightedLoad(upsNode) {
 // Возвращает { valid, reason } — если valid=false, reason описывает почему.
 // При невалидной параллели каждый ИБП должен видеть ПОЛНУЮ downstream-нагрузку,
 // а не 1/N (иначе расчёт перегруза будет занижен и автомат подобран неверно).
+// v0.60.303 (по уточнению Пользователя 2026-05-06: «Kehua заверили что одного
+// дополнительного модуля для параллельной системы достаточно для резервирования…
+// сами ИБП одинаковые (фреймы) но по модулям могут быть в любой комбинации»):
+// Идентичность параллельных ИБП — на уровне FRAME (физическое шасси,
+// производитель, модель, тип силового модуля), но НЕ на уровне moduleInstalled.
+// Это позволяет иметь UPS1 с 6 модулями + UPS2 с 6 модулями (12 итого, 11 для
+// нагрузки, 1 в резерве на всю систему). Раньше требовалось equal capacityKw
+// → каждый UPS должен был иметь свой полный комплект модулей (2N по сути,
+// а не N+1 на систему).
 function _isIdenticalUpsPair(a, b) {
   if (!a || !b) return false;
-  if ((Number(a.capacityKw) || 0) !== (Number(b.capacityKw) || 0)) return false;
   const _eq = (x, y) => (x || '') === (y || '');
   if (!_eq(a.manufacturer, b.manufacturer)) return false;
   if (!_eq(a.model, b.model)) return false;
   if (!_eq(a.upsType, b.upsType)) return false;
   if (!_eq(a.kind, b.kind)) return false;
-  // для модульных — рамка тоже должна совпадать
-  if ((a.upsType === 'modular') &&
-      ((Number(a.frameKw) || 0) !== (Number(b.frameKw) || 0))) return false;
+  // Модульные: одинаковый корпус (frame) и одинаковый тип модуля.
+  // moduleInstalled может отличаться — это допустимая комбинация по
+  // подтверждению производителя (Kehua MR series).
+  if (a.upsType === 'modular') {
+    if ((Number(a.frameKw) || 0) !== (Number(b.frameKw) || 0)) return false;
+    if ((Number(a.moduleKwRated || a.moduleKw) || 0) !== (Number(b.moduleKwRated || b.moduleKw) || 0)) return false;
+  } else {
+    // Моноблоки: capacityKw обязан совпадать (не имеют переменного состава).
+    if ((Number(a.capacityKw) || 0) !== (Number(b.capacityKw) || 0)) return false;
+  }
   return true;
 }
 function _classifyUpsPeers(panelId) {
@@ -245,13 +260,31 @@ function _classifyUpsPeers(panelId) {
       reason: `ИБП «${noParallel.name || noParallel.tag || noParallel.id}» помечен как «не поддерживает параллельный режим»`,
     };
   }
-  // Проверка идентичности (попарно с первым)
+  // Проверка идентичности frame (модель, корпус, тип модуля)
   for (let i = 1; i < peers.length; i++) {
     if (!_isIdenticalUpsPair(peers[0], peers[i])) {
       return {
         peers, valid: false, share: 1,
-        reason: `Параллельные ИБП должны быть идентичны: «${peers[0].name || peers[0].tag}» ≠ «${peers[i].name || peers[i].tag}»`,
+        reason: `Параллельные ИБП должны иметь идентичный фрейм (модель, корпус, тип модуля): «${peers[0].name || peers[0].tag}» ≠ «${peers[i].name || peers[i].tag}»`,
       };
+    }
+  }
+  // v0.60.303: для модульных ИБП share проп. кол-ву установленных модулей.
+  // UPS1=6 модулей + UPS2=4 модуля → share UPS1 = 6/10 = 60%, UPS2 = 4/10 = 40%.
+  // Нагрузка на каждом модуле одинакова, но кол-во модулей разное.
+  if (peers[0].upsType === 'modular') {
+    const totalModules = peers.reduce((s, p) => s + (Number(p.moduleInstalled) || 0), 0);
+    if (totalModules > 0) {
+      // share для текущего узла рассчитывается per-peer (см. вызов в recalc),
+      // но _classifyUpsPeers возвращает один общий share — для совместимости.
+      // Возвращаем avg = 1/N для общего случая, плюс отдельный массив shares
+      // proportional-to-modules, чтобы вызывающие могли использовать per-peer.
+      const sharesByPeer = new Map();
+      for (const p of peers) {
+        const mod = Number(p.moduleInstalled) || 0;
+        sharesByPeer.set(p.id, totalModules > 0 ? mod / totalModules : 1 / peers.length);
+      }
+      return { peers, valid: true, share: 1 / peers.length, sharesByPeer, totalModules, reason: '' };
     }
   }
   return { peers, valid: true, share: 1 / peers.length, reason: '' };
@@ -424,6 +457,11 @@ function _bfsDownstreamWithActiveTies(startId, activeTieKeys) {
 
   const queue = [{ id: startId, throughUps: false }];
   visited.add(startId);
+  // v0.60.299: type стартового узла нужен в проверке "генератор-leaf":
+  // если walk СТАРТУЕТ от ДГУ — это запрос его собственного downstream,
+  // и leaf-блок (counting только auxDemandKw) НЕ должен срабатывать.
+  const _startNode = state.nodes.get(startId);
+  const _startIsGenerator = _startNode && _startNode.type === 'generator';
 
   while (queue.length) {
     const { id: curId, throughUps } = queue.shift();
@@ -486,7 +524,14 @@ function _bfsDownstreamWithActiveTies(startId, activeTieKeys) {
     // её ДГУ сам генерирует из топлива.
     //
     // Учитываем auxDemandKw как consumer от этого ДГУ.
-    if (cur.type === 'generator' && cur.auxInput) {
+    //
+    // v0.60.299 (по репорту Пользователя 2026-05-06: «теперь с дизелем
+    // проблема, нагрузка не передается корректно на параметры» — ДГУ
+    // показывал Макс=50.2 кВт при том что downstream-сборка JB→UPS→IT
+    // имеет 114.2 кВт). Гард `curId !== startId`: leaf-логика срабатывает
+    // ТОЛЬКО когда мы дошли до ДГУ ИЗВНЕ (например при walk от ЩСН-aux),
+    // а не когда walk СТАРТУЕТ от самого ДГУ (нам нужен его downstream).
+    if (cur.type === 'generator' && cur.auxInput && curId !== startId) {
       if (!visitedConsumers.has(curId)) {
         visitedConsumers.add(curId);
         const auxKw = Number(cur.auxDemandKw) || 0;
@@ -2044,6 +2089,8 @@ function recalc() {
       const chKw = upsChargeKw(toN);
       // Downstream за UPS. Учитываем share только если параллель ВАЛИДНА
       // (одинаковые модели + canParallel). Иначе каждый ИБП — full load.
+      // v0.60.303: для модульных параллельных групп с разным moduleInstalled
+      // share берём per-peer (proportional-to-modules), не среднее 1/N.
       const fullDown = simpleDownstream(toN.id);
       let upsShare = 1;
       for (const c2 of state.conns.values()) {
@@ -2051,7 +2098,11 @@ function recalc() {
         const dest = state.nodes.get(c2.to.nodeId);
         if (!dest || dest.type !== 'panel') continue;
         const grp = _classifyUpsPeers(dest.id);
-        upsShare = grp.share; // 1 если invalid, 1/N если valid parallel
+        if (grp.valid && grp.sharesByPeer && grp.sharesByPeer.has(toN.id)) {
+          upsShare = grp.sharesByPeer.get(toN.id);
+        } else {
+          upsShare = grp.share;
+        }
         break;
       }
       const myLoad = fullDown * upsShare;
@@ -3515,6 +3566,33 @@ function recalc() {
         // складывать сверху НЕ нужно.
         n._maxLoadKw = maxDownstreamLoad(n.id);
       }
+      // v0.60.300 (по репорту Пользователя 2026-05-06: «не согласованность
+      // данных Макс» — скриншот трансформатора с Текущая=107 kW, Макс=47.9 kW;
+      // ДГУ с Макс=41.1 kW при downstream JB2 Макс=107 kW): sanity-clamp
+      // «Макс ≥ Текущая ≥ Макс_downstream-children». Аналог панели (3265).
+      // walkUp может прокачать всю реальную нагрузку через source/generator
+      // (например, через UPS-байпас или AVR-cross-feed), и эта прокачка по
+      // определению ≤ Макс. Если BFS-расчёт даёт меньшую цифру (sibling-clamp
+      // на дочерних panel применился ПОСЛЕ source-расчёта, или path-restrict
+      // не учёл реальный feed-в-через-другую-секцию) — поднимаем Макс до
+      // фактической _loadKw + до максимума dispatch-аемых детей.
+      const _loadKwNum = Number(n._loadKw) || 0;
+      let _maxFromChildren = 0;
+      for (const c of state.conns.values()) {
+        if (c.from.nodeId !== n.id) continue;
+        if (c.lineMode === 'damaged' || c.lineMode === 'disabled') continue;
+        const child = state.nodes.get(c.to.nodeId);
+        if (!child) continue;
+        // child._maxLoadKw — sibling-clamped значение (у panel и junction-box-как-panel).
+        const cm = Number(child._maxLoadKw) || 0;
+        if (cm > _maxFromChildren) _maxFromChildren = cm;
+      }
+      const _expectedMax = Math.max(_loadKwNum, _maxFromChildren);
+      if (_expectedMax > Number(n._maxLoadKw)) {
+        n._maxLoadKwOwn = Number(n._maxLoadKw);
+        n._maxLoadKw = _expectedMax;
+        n._maxLoadKwClampedToChildren = true;
+      }
       n._maxLoadA = n._maxLoadKw > 0 ? computeCurrentA(n._maxLoadKw, nodeCalcVoltage(n), n._cosPhi, isThreePhase(n)) : 0;
       // Ток КЗ на шинах источника: Ik = c × U / (√3 × Zs), c=1.1 (IEC 60909)
       const Uph = nodeVoltageLN(n);
@@ -3822,6 +3900,34 @@ function recalc() {
           }
         }
       }
+    }
+  }
+
+  // v0.60.300 (post-clamp propagation): после sibling-clamp у panels могли
+  // вырасти _maxLoadKw — значит upstream source/generator/transformer должен
+  // увидеть это и поднять свой Макс. Без этого появляется неконсистентность:
+  // PNL1 показывает Макс=107 кВт (sibling-clamped), а T1 выше — Макс=47.9 кВт
+  // (BFS-расчёт ДО clamp). По определению Макс_source ≥ max(Макс_всех_child).
+  for (const n of state.nodes.values()) {
+    if (n.type !== 'source' && n.type !== 'generator') continue;
+    let maxFromChildren = 0;
+    for (const c of state.conns.values()) {
+      if (c.from.nodeId !== n.id) continue;
+      if (c.lineMode === 'damaged' || c.lineMode === 'disabled') continue;
+      const child = state.nodes.get(c.to.nodeId);
+      if (!child) continue;
+      const cm = Number(child._maxLoadKw) || 0;
+      if (cm > maxFromChildren) maxFromChildren = cm;
+    }
+    const _loadKwNum = Number(n._loadKw) || 0;
+    const expected = Math.max(_loadKwNum, maxFromChildren);
+    if (expected > (Number(n._maxLoadKw) || 0)) {
+      if (n._maxLoadKwOwn == null) n._maxLoadKwOwn = Number(n._maxLoadKw) || 0;
+      n._maxLoadKw = expected;
+      n._maxLoadKwClampedToChildren = true;
+      n._maxLoadA = n._maxLoadKw > 0
+        ? computeCurrentA(n._maxLoadKw, nodeCalcVoltage(n), n._cosPhi || GLOBAL.defaultCosPhi, isThreePhase(n))
+        : 0;
     }
   }
 

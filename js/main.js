@@ -1134,9 +1134,21 @@ function renderCurrentTab() {
   const ctxProjectsAll = (() => { try { return _listProjectCtx() || []; } catch { return []; } })();
   const ctxProjects = ctxProjectsAll.filter(p => p.kind !== 'sketch');
   const ctxMap = new Map(ctxProjects.map(p => [p.id, p]));
+  // v0.60.298: cloud-id → local-id mapping (когда dedup перенаправил
+  // импорт на существующий local context). Схема, у которой projectId =
+  // cloud-id, всё равно должна группироваться под местным контекстом.
+  const cloudIdToLocal = new Map();
+  for (const cp of ctxProjects) {
+    if (Array.isArray(cp._cloudIds)) {
+      for (const cid of cp._cloudIds) cloudIdToLocal.set(cid, cp.id);
+    }
+  }
   const groups = new Map();
   for (const p of data) {
-    const pid = p.projectId && ctxMap.has(p.projectId) ? p.projectId : '';
+    let pid = p.projectId && ctxMap.has(p.projectId) ? p.projectId : '';
+    if (!pid && p.projectId && cloudIdToLocal.has(p.projectId)) {
+      pid = cloudIdToLocal.get(p.projectId);
+    }
     if (!groups.has(pid)) groups.set(pid, []);
     groups.get(pid).push(p);
   }
@@ -1423,29 +1435,53 @@ async function openProject(id) {
           //   • module data писалось в правильный namespace
           //     raschet.project.<pid>.<module>.<key>
           if (prevActive !== porPid) {
+            // v0.60.298 (по репорту Пользователя 2026-05-06: «куча проектов
+            // после синхронизации с облаком, так не пойдет»): прежде чем
+            // создавать новый local stub, ищем существующий local-контекст
+            // с тем же именем И без схем. Если найден — reuse его id вместо
+            // создания дубля. Это предотвращает «25006-... · пусто» рядом
+            // с «25006-... · 1 схема» после каждой синхронизации.
+            let activePid = porPid;
             if (!matchedLocal) {
-              // Импортируем cloud-проект как local stub (id сохраняется!).
-              // Прямой write в LS-массив, минуя createProject (который
-              // генерирует свой id).
               try {
                 const arr = ps.listProjects() || [];
-                arr.push({
-                  id: porPid,
-                  name: data.name || '(импорт из облака)',
-                  description: data.description || '',
-                  status: 'draft',
-                  kind: 'full',
-                  ownerModule: null,
-                  parentProjectId: null,
-                  designation: '',
-                  createdAt: Date.now(),
-                  updatedAt: Date.now(),
-                  _importedFromCloud: true,
-                });
-                localStorage.setItem('raschet.projects.v1', JSON.stringify(arr));
+                const cloudName = (data.name || '').trim().toLowerCase();
+                // ищем такой же локальный контекст без схем (kind='full')
+                const dupLocal = cloudName ? arr.find(p =>
+                  p && p.kind === 'full' &&
+                  !p._importedFromCloud &&
+                  (p.name || '').trim().toLowerCase() === cloudName
+                ) : null;
+                if (dupLocal) {
+                  // Reuse local id — НЕ создаём stub. Помечаем его как
+                  // привязанный к cloud porPid, чтобы при повторном
+                  // открытии той же cloud-схемы матч сразу нашёлся.
+                  dupLocal._cloudIds = Array.isArray(dupLocal._cloudIds) ? dupLocal._cloudIds : [];
+                  if (!dupLocal._cloudIds.includes(porPid)) dupLocal._cloudIds.push(porPid);
+                  dupLocal.updatedAt = Date.now();
+                  localStorage.setItem('raschet.projects.v1', JSON.stringify(arr));
+                  activePid = dupLocal.id;
+                  console.info('[main] dedup: reusing local ctx', dupLocal.id, 'for cloud', porPid);
+                } else {
+                  // нет дубля — обычный импорт stub'ом с cloud-id
+                  arr.push({
+                    id: porPid,
+                    name: data.name || '(импорт из облака)',
+                    description: data.description || '',
+                    status: 'draft',
+                    kind: 'full',
+                    ownerModule: null,
+                    parentProjectId: null,
+                    designation: '',
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                    _importedFromCloud: true,
+                  });
+                  localStorage.setItem('raschet.projects.v1', JSON.stringify(arr));
+                }
               } catch (e) { console.warn('[main] cloud-project import to local failed:', e); }
             }
-            ps.setActiveProjectId(porPid);
+            ps.setActiveProjectId(activePid);
             const prev = localProjects.find(p => p.id === prevActive);
             const prevName = prev?.name || (prevActive ? prevActive.slice(0, 8) : '— нет —');
             const newName = matchedLocal?.name || data.name || porPid.slice(0, 8);

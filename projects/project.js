@@ -1001,12 +1001,13 @@ function _saveImplStages(pid, stages) {
 }
 function _renderImplStagesBlock(p) {
   const stages = _getImplStages(p);
-  // v0.60.293: editable если owner / editor ИЛИ local-mode (нет Firebase).
-  // p._role может быть undefined если getProject не выставил — для local-mode
-  // считаем 'owner' (single user). Для cloud-mode default 'guest' если
-  // ownerId не совпадает.
-  const isCloud = !!(window.Storage && window.Storage.isCloud);
-  const role = p._role || (isCloud ? 'guest' : 'owner');
+  // v0.60.297 (по репорту Пользователя 2026-05-06: «сделай меня владельцем мне
+  // нужно менять параметры»): getProject из shared/project-storage.js читает
+  // local LS — это данные Пользователя, он ИХ владелец. Storage.isCloud
+  // означает «Firebase авторизация активна», но не «этот проект — облачный».
+  // Поэтому default 'owner' для всех LS-загруженных проектов. Cloud-only
+  // role-checks применяются ТОЛЬКО для Firebase-операций (visibility, members).
+  const role = p._role || 'owner';
   const canEdit = role === 'owner' || role === 'editor';
   const ro = !canEdit;
   // Visual timeline: dots с горизонтальной линией.
@@ -1040,7 +1041,7 @@ function _renderImplStagesBlock(p) {
     <div style="display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding:8px 4px;background:#fff;border:1px solid #e5e7eb;border-radius:6px">
       ${dotsHtml}
     </div>
-    ${ro ? '<p class="muted" style="font-size:11px;margin:6px 0 0">⚠ Только owner / editor проекта может менять этапы. Текущая роль: <b>' + esc(p._role || 'guest') + '</b>. Для редактирования откройте проект как владелец.</p>' : ''}
+    ${ro ? '<p class="muted" style="font-size:11px;margin:6px 0 0">⚠ Только owner / editor проекта может менять этапы. Текущая роль: <b>' + esc(p._role || 'owner') + '</b>. Для редактирования откройте проект как владелец.</p>' : ''}
   </div>`;
 }
 function _wireImplStagesBlock(p, host) {
@@ -1743,6 +1744,7 @@ function render() {
   const summaryHost = document.getElementById('pr-detail-summary'); // v0.60.292
   const equipmentHost = document.getElementById('pr-detail-equipment'); // v0.60.293
   const validationHost = document.getElementById('pr-detail-validation'); // v0.60.296
+  const approvalsHost = document.getElementById('pr-detail-approvals'); // v0.60.302
 
   if (!p) {
     if (headHost) headHost.innerHTML = `
@@ -2534,12 +2536,11 @@ function render() {
   // Members management (invite/remove/roles) пока через стандартный «Поделиться»
   // в Конструкторе схем (Этап 1.4 интегрирует здесь).
   if (teamHost) {
-    // v0.60.293 (по репорту Пользователя 2026-05-06: «как мне сменить роль?» —
-    // _role был 'guest' даже в local-mode т.к. getProject не выставляет
-    // _role explicitly): для local-mode default = 'owner' (single user без
-    // Firebase коллабораций).
+    // v0.60.297: getProject из shared/project-storage.js читает local LS —
+    // данные Пользователя, он ИХ владелец. См. комментарий в _renderImplStagesBlock.
+    // Storage.isCloud показывается отдельно (для UI cloud-only фич — visibility, invites).
     const isCloud = !!(window.Storage && window.Storage.isCloud);
-    const role = p._role || (isCloud ? 'guest' : 'owner');
+    const role = p._role || 'owner';
     const isOwner = role === 'owner';
     const vis = p.visibility || 'private';
     const VIS_OPTS = [
@@ -2569,8 +2570,27 @@ function render() {
     const memberRows = Object.entries(members);
     const ownerUid = p.ownerId;
     const accessRequests = Array.isArray(p._accessRequests) ? p._accessRequests : [];
+    // v0.60.297: «Claim ownership» — для случая когда у проекта _role≠owner
+    // (orphan, импорт из cloud, потеря metadata). Локально пользователь ВСЕГДА
+    // владеет своим LS, так что claim делаем без подтверждений.
+    const showClaim = !isOwner || (isCloud && !ownerUid) || p._importedFromCloud;
 
     teamHost.innerHTML = `
+      ${showClaim ? `
+        <div style="margin-bottom:18px;padding:12px 14px;background:#fef3c7;border:1px solid #f59e0b;border-radius:5px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:18px">👑</span>
+            <div style="flex:1">
+              <div style="font-weight:600;color:#78350f;margin-bottom:3px">Стать владельцем проекта</div>
+              <div style="font-size:12px;color:#78350f;line-height:1.5;margin-bottom:8px">
+                Текущая роль: <b>${esc(role)}</b>${ownerUid ? ` · ownerId: <code>${esc(String(ownerUid).slice(0, 12))}</code>` : ' · ownerId не задан'}.
+                ${p._importedFromCloud ? 'Проект восстановлен из облака без metadata; вернуть владение можно нажав кнопку.' : 'Если вы основной пользователь этого проекта — назначьте себя владельцем.'}
+              </div>
+              <button type="button" id="pr-team-claim-btn" style="padding:6px 14px;background:#d97706;color:#fff;border:0;border-radius:3px;cursor:pointer;font:inherit;font-size:13px;font-weight:500">👑 Сделать меня владельцем</button>
+            </div>
+          </div>
+        </div>
+      ` : ''}
       <div style="margin-bottom:22px">
         <h4 style="margin:0 0 10px;font-size:14px;color:#0f172a">🔐 Видимость проекта</h4>
         ${!isCloud
@@ -2680,6 +2700,26 @@ function render() {
         }
       </div>
     `;
+    // v0.60.297: «Claim ownership» button.
+    const claimBtn = teamHost.querySelector('#pr-team-claim-btn');
+    if (claimBtn) {
+      claimBtn.addEventListener('click', async () => {
+        // В local LS просто выставляем _role:'owner' и ownerId:'local' (если пусто).
+        // Для cloud orphan-проектов меняем только локальную копию (Firebase rules
+        // не позволят писать чужой проект, но локально пользователь работает
+        // с LS-копией через shared/project-storage.js).
+        const patch = { _role: 'owner' };
+        if (!p.ownerId) patch.ownerId = 'local';
+        try {
+          updateProject(p.id, patch);
+          prToast('✔ Вы теперь владелец проекта', 'ok');
+          render();
+        } catch (e) {
+          prToast('Ошибка: ' + (e.message || e), 'err');
+        }
+      });
+    }
+
     // Wire visibility radio change handler.
     if (isOwner && isCloud) {
       teamHost.querySelectorAll('input[name="pr-vis"]').forEach(radio => {
@@ -3149,6 +3189,104 @@ function render() {
       }
     }
 
+    // ── 4. Cross-discipline баланс мощностей (Этап 1.5.4) ──
+    // По плану архитектуры 2026-05-06 + ROADMAP Phase 47.2.9.
+    // Проверки: TW vs Конструктор IT-нагрузка, общая капасити источника,
+    // PUE consistency, тепловой баланс (cooling ≥ IT + UPS losses).
+    if (schemeNodes.length > 0 && twActive?.concept) {
+      const c = twActive.concept;
+      // Constructor IT load — суммируем consumer demandKw с system='it' или
+      // подключённые downstream от UPS-узлов.
+      let constrItKw = 0;
+      let constrTotalKw = 0;
+      for (const n of schemeNodes) {
+        if (n.type !== 'consumer') continue;
+        const kw = (Number(n.demandKw) || 0) * (Number(n.count) || 1);
+        constrTotalKw += kw;
+        const sys = Array.isArray(n.systems) ? n.systems : [];
+        if (sys.includes('it') || n.consumerSubtype === 'rack' || n.consumerSubtype === 'it_load') {
+          constrItKw += kw;
+        }
+      }
+      // TW IT-нагрузка
+      const twItKw = (c.rackGroups || []).reduce((s, rg) => s + (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0), 0);
+      // TW UPS / cooling
+      const twUpsKwAvail = (c.upsSystems || [])
+        .filter(u => u.purpose === 'it' || u.purpose === 'mixed')
+        .reduce((s, u) => s + (Number(u.count) || 0) * (Number(u.ratedKva) || 0) * 0.95, 0);
+      const twCoolKw = (c.coolingUnits || []).reduce((s, cu) => s + (Number(cu.count) || 0) * (Number(cu.kwPerUnit) || 0), 0);
+
+      // 4.1 IT-нагрузка: TW vs Constructor
+      if (twItKw > 0 && constrItKw > 0) {
+        const diff = Math.abs(twItKw - constrItKw);
+        const pctDiff = (diff / Math.max(twItKw, constrItKw)) * 100;
+        if (pctDiff > 20) {
+          issues.push({ level: 'warn', area: '⚖ Баланс IT', msg: `IT-нагрузки расходятся: TW ${twItKw.toFixed(1)} кВт ≠ Конструктор ${constrItKw.toFixed(1)} кВт (Δ ${pctDiff.toFixed(0)}%)`, hint: 'Технолог и Конструктор должны быть согласованы по IT-нагрузке. Проверьте rackGroups vs consumer-узлы.' });
+        }
+      } else if (twItKw > 0 && constrItKw === 0 && schemeNodes.some(n => n.type === 'consumer')) {
+        issues.push({ level: 'info', area: '⚖ Баланс IT', msg: `Конструктор не содержит IT-потребителей (system='it' / subtype='rack'), хотя в TW заявлено ${twItKw.toFixed(1)} кВт`, hint: 'Пометьте IT-стойки в Конструкторе через systems: ["it"] или consumerSubtype: "rack".' });
+      }
+
+      // 4.2 Тепловой баланс cooling ≥ IT + UPS_losses + 5% освещение/auxes
+      if (twItKw > 0) {
+        const upsLosses = (c.upsSystems || [])
+          .filter(u => u.purpose === 'it' || u.purpose === 'mixed')
+          .reduce((s, u) => {
+            const eff = (Number(u.efficiency) || 95) / 100;
+            const load = (Number(u.count) || 0) * (Number(u.ratedKva) || 0) * 0.95;
+            return s + load * (1 - eff);
+          }, 0);
+        const auxKw = twItKw * 0.05;
+        const totalHeatKw = twItKw + upsLosses + auxKw;
+        if (twCoolKw > 0 && twCoolKw < totalHeatKw) {
+          issues.push({ level: 'warn', area: '⚖ Тепло', msg: `Cooling ${twCoolKw.toFixed(1)} кВт < тепло ${totalHeatKw.toFixed(1)} кВт (IT ${twItKw.toFixed(1)} + UPS-потери ${upsLosses.toFixed(1)} + aux ${auxKw.toFixed(1)})`, hint: 'Холодопроизводительность должна покрывать IT-нагрузку плюс потери ИБП и вспомогательное оборудование. Добавьте кондиционеры или увеличьте мощность.' });
+        }
+      }
+
+      // 4.3 PUE consistency: TW PUE × IT_load = total facility load
+      const twPueTarget = Number(c.pueTarget) || 0;
+      if (twPueTarget > 1.0 && twItKw > 0 && constrTotalKw > 0) {
+        const expectedTotal = twItKw * twPueTarget;
+        const actualTotal = constrTotalKw;
+        const pctDiff = Math.abs(actualTotal - expectedTotal) / expectedTotal * 100;
+        if (pctDiff > 25) {
+          issues.push({ level: 'info', area: '⚖ PUE', msg: `PUE расходится: target ${twPueTarget.toFixed(2)} → ожидаемая total ${expectedTotal.toFixed(1)} кВт, в Конструкторе ${actualTotal.toFixed(1)} кВт`, hint: `Total = IT × PUE. Если Конструктор показывает другую сумму — обновите PUE в TW или проверьте полноту учёта потребителей.` });
+        }
+      }
+
+      // 4.4 Источник питания vs суммарная нагрузка
+      const sources = schemeNodes.filter(n => n.type === 'source' || n.type === 'generator');
+      let sourceKwAvail = 0;
+      for (const s of sources) {
+        if (s.sourceSubtype === 'transformer' || s.type === 'source') {
+          const sn = (Number(s.snomKva) || 0) * (Number(s.cosPhi) || 0.92);
+          sourceKwAvail += sn;
+        } else if (s.type === 'generator') {
+          const sn = (Number(s.snomKva) || 0) * (Number(s.cosPhi) || 0.8);
+          sourceKwAvail += sn;
+        }
+      }
+      if (sourceKwAvail > 0 && constrTotalKw > sourceKwAvail) {
+        issues.push({ level: 'error', area: '⚖ Источник', msg: `Нагрузка ${constrTotalKw.toFixed(1)} кВт > источник ${sourceKwAvail.toFixed(1)} кВт`, hint: 'Суммарная установленная мощность потребителей превышает мощность источников (трансформаторов / генераторов). Увеличьте Snom или уменьшите load.' });
+      } else if (sourceKwAvail > 0 && constrTotalKw > sourceKwAvail * 0.85) {
+        issues.push({ level: 'warn', area: '⚖ Источник', msg: `Загрузка источника ${(constrTotalKw / sourceKwAvail * 100).toFixed(0)}% (нагрузка ${constrTotalKw.toFixed(1)} / ${sourceKwAvail.toFixed(1)} кВт)`, hint: 'Загрузка источника > 85% — рекомендуется резерв 15-20% для пиков и расширения.' });
+      }
+
+      // 4.5 ИБП Технолога vs ИБП Конструктора (по узлам type='ups')
+      const constrUpsKw = schemeNodes
+        .filter(n => n.type === 'ups')
+        .reduce((s, u) => s + (Number(u.capacityKw) || 0) * (Number(u.count) || 1), 0);
+      if (twUpsKwAvail > 0 && constrUpsKw > 0) {
+        const diff = Math.abs(twUpsKwAvail - constrUpsKw);
+        const pctDiff = (diff / Math.max(twUpsKwAvail, constrUpsKw)) * 100;
+        if (pctDiff > 25) {
+          issues.push({ level: 'warn', area: '⚖ ИБП', msg: `ИБП-мощности расходятся: TW ${twUpsKwAvail.toFixed(1)} кВт ≠ Конструктор ${constrUpsKw.toFixed(1)} кВт (Δ ${pctDiff.toFixed(0)}%)`, hint: 'Технолог и Конструктор должны иметь одинаковую заявленную мощность ИБП.' });
+        }
+      } else if (twUpsKwAvail > 0 && constrUpsKw === 0) {
+        issues.push({ level: 'info', area: '⚖ ИБП', msg: `В Технологе заявлены ИБП на ${twUpsKwAvail.toFixed(1)} кВт, в Конструкторе нет узлов type='ups'`, hint: 'Добавьте ИБП-узлы в Конструктор для электрической схемы (без них кабельный расчёт не учтёт UPS-байпас и резервирование).' });
+      }
+    }
+
     // Метаданные проекта — пустые поля
     if (!p.location?.city && !p.location?.lat) {
       issues.push({ level: 'info', area: '🏷 Проект', msg: 'Локация не задана', hint: 'Закладка «Общее» → задайте город / координаты. Используется в meteo / cooling расчётах.' });
@@ -3199,12 +3337,191 @@ function render() {
           </div>`
       }
 
-      <div style="margin-top:18px;padding:14px 16px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;color:#78350f;font-size:12.5px;line-height:1.7">
-        🚧 <b>В разработке (Phase 47.2.9-10)</b>: проверка расчётов (ΔU из источника в leaves,
-        cross-discipline баланс мощностей, селективность по графику TCC), согласование разделов
-        с подписью / timestamp / историей ревизий.
+      <div style="margin-top:18px;padding:14px 16px;background:#dbeafe;border-left:3px solid #1e40af;border-radius:4px;color:#1e3a8a;font-size:12.5px;line-height:1.7">
+        ℹ Согласование разделов (signature + revision history) — в табе <b>«✓ Согласование»</b>.
+        Глубокие проверки (ΔU, селективность, TCC) — в Конструкторе через <b>Ctrl+Shift+I</b>.
       </div>
     `;
+  }
+
+  // v0.60.302 (Этап 1.5.5 Phase 47): Согласование разделов ГИПом.
+  // По плану архитектуры 2026-05-06 + ROADMAP Phase 47.2.10.
+  // Storage: project.approvals = { sectionId: { status, signedByUid,
+  // signedByEmail, timestamp, revision, comment, history: [...] } }
+  // Status: 'pending' | 'approved' | 'rejected' | 'needs-revision'.
+  if (approvalsHost) {
+    const isCloud = !!(window.Storage && window.Storage.isCloud);
+    const role = p._role || 'owner';
+    const canApprove = role === 'owner' || role === 'gip' || role === 'admin';
+    const SECTIONS = [
+      { id: 'electrical',     icon: '⚡', label: 'Электрическая часть',  desc: 'Схемы, кабели, защиты, ИБП, ДГУ — Конструктор схем' },
+      { id: 'technological',  icon: '🏗', label: 'Технологическая часть', desc: 'Концепция, варианты, помещения, стойки — Технолог объекта' },
+      { id: 'scs',            icon: '🔗', label: 'СКС / слаботочка',      desc: 'СКС-design, патч-панели, кабель-журнал' },
+      { id: 'cooling',        icon: '❄', label: 'Холодоснабжение',        desc: 'Кондиционеры, теплоотвод, баланс холода' },
+      { id: 'economics',      icon: '💰', label: 'Экономика',              desc: 'BOM, КП, ведомость, сметы' },
+      { id: 'plan',           icon: '📅', label: 'План-график',            desc: 'Календарный план, milestones, Гантт' },
+      { id: 'validation',     icon: '🛡', label: 'Проверки',                desc: 'Статические + cross-discipline проверки' },
+    ];
+    const approvals = (p.approvals && typeof p.approvals === 'object') ? p.approvals : {};
+    const STATUS_META = {
+      pending:         { icon: '⏳', label: 'Не согласовано', color: '#475569', bg: '#f1f5f9' },
+      approved:        { icon: '✓',  label: 'Согласовано',    color: '#15803d', bg: '#dcfce7' },
+      rejected:        { icon: '✕',  label: 'Отклонено',      color: '#b91c1c', bg: '#fee2e2' },
+      'needs-revision': { icon: '🔄', label: 'На доработку',   color: '#b45309', bg: '#fef3c7' },
+    };
+    const fmtTime = (ts) => {
+      if (!ts) return '';
+      try { return new Date(ts).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }); }
+      catch { return String(ts); }
+    };
+    const totalSections = SECTIONS.length;
+    const approvedCount = SECTIONS.filter(s => approvals[s.id]?.status === 'approved').length;
+    const pendingCount = SECTIONS.filter(s => !approvals[s.id] || approvals[s.id].status === 'pending').length;
+    const rejectedCount = SECTIONS.filter(s => approvals[s.id]?.status === 'rejected' || approvals[s.id]?.status === 'needs-revision').length;
+    const renderSectionCard = (sec) => {
+      const a = approvals[sec.id] || { status: 'pending' };
+      const sm = STATUS_META[a.status] || STATUS_META.pending;
+      const rev = Number(a.revision) || 0;
+      const history = Array.isArray(a.history) ? a.history : [];
+      return `<div style="padding:14px 16px;background:#fff;border:1px solid #e5e7eb;border-left:4px solid ${sm.color};border-radius:5px;margin-bottom:10px">
+        <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:240px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:18px">${sec.icon}</span>
+              <h5 style="margin:0;font-size:14px;color:#0f172a">${esc(sec.label)}</h5>
+              <span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:${sm.bg};color:${sm.color};border-radius:10px;font-size:11px;font-weight:600">${sm.icon} ${esc(sm.label)}</span>
+              ${rev > 0 ? `<span class="muted" style="font-size:11px;color:#64748b">rev ${rev}</span>` : ''}
+            </div>
+            <div class="muted" style="font-size:11.5px;color:#64748b;margin-bottom:6px">${esc(sec.desc)}</div>
+            ${a.signedByEmail || a.timestamp ? `
+              <div style="font-size:11.5px;color:#475569">
+                ${a.signedByEmail ? `<b>Подписал:</b> ${esc(a.signedByEmail)}` : ''}
+                ${a.timestamp ? ` · <b>${fmtTime(a.timestamp)}</b>` : ''}
+              </div>
+            ` : ''}
+            ${a.comment ? `<div style="margin-top:6px;padding:6px 10px;background:#f8fafc;border-radius:3px;font-size:12px;color:#334155;font-style:italic">«${esc(a.comment)}»</div>` : ''}
+          </div>
+          ${canApprove ? `
+            <div style="display:flex;gap:4px;flex-wrap:wrap;align-self:center">
+              <button type="button" data-approve="${esc(sec.id)}" title="Подписать раздел: статус → ✓ Согласовано, revision++"
+                      style="padding:5px 12px;font-size:12px;border:1px solid #15803d;background:${a.status === 'approved' ? '#dcfce7' : '#fff'};color:#15803d;border-radius:3px;cursor:pointer;font-weight:500">✓ Согласовать</button>
+              <button type="button" data-reject="${esc(sec.id)}" title="Отклонить: статус → ✕ Отклонено"
+                      style="padding:5px 12px;font-size:12px;border:1px solid #fecaca;background:${a.status === 'rejected' ? '#fee2e2' : '#fff'};color:#b91c1c;border-radius:3px;cursor:pointer">✕ Отклонить</button>
+              <button type="button" data-revise="${esc(sec.id)}" title="Отправить на доработку: статус → 🔄 На доработку"
+                      style="padding:5px 12px;font-size:12px;border:1px solid #fde68a;background:${a.status === 'needs-revision' ? '#fef3c7' : '#fff'};color:#b45309;border-radius:3px;cursor:pointer">🔄 Доработка</button>
+              ${a.status && a.status !== 'pending' ? `
+                <button type="button" data-reset="${esc(sec.id)}" title="Сбросить статус (revision сохраняется в history)"
+                        style="padding:5px 10px;font-size:11px;border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:3px;cursor:pointer">↺</button>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+        ${history.length > 0 ? `
+          <details style="margin-top:10px">
+            <summary style="cursor:pointer;font-size:11.5px;color:#64748b;font-weight:500">📋 История изменений (${history.length})</summary>
+            <div style="margin-top:6px;padding:8px 12px;background:#f8fafc;border-radius:3px;font-size:11.5px;color:#475569;line-height:1.7">
+              ${history.slice().reverse().map(h => `
+                <div style="padding:3px 0;border-bottom:1px dotted #e5e7eb">
+                  ${(STATUS_META[h.status] || STATUS_META.pending).icon} <b>${esc((STATUS_META[h.status] || STATUS_META.pending).label)}</b>
+                  ${h.signedByEmail ? ` · ${esc(h.signedByEmail)}` : ''}
+                  ${h.timestamp ? ` · ${fmtTime(h.timestamp)}` : ''}
+                  ${h.comment ? `<div style="font-style:italic;color:#64748b;margin-left:18px">«${esc(h.comment)}»</div>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </details>
+        ` : ''}
+      </div>`;
+    };
+    approvalsHost.innerHTML = `
+      <p class="muted" style="font-size:12.5px;margin:0 0 14px;line-height:1.6">
+        ГИП / владелец проекта согласовывает разделы пакета. Каждый раздел имеет статус
+        (⏳ не согласовано / ✓ согласовано / ✕ отклонено / 🔄 на доработку), подпись
+        (uid + email), timestamp, revision-номер и историю всех изменений (append-only).
+      </p>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:13px">
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#dcfce7;color:#15803d;border-radius:4px;font-weight:600">✓ Согласовано: ${approvedCount} / ${totalSections}</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#f1f5f9;color:#475569;border-radius:4px;font-weight:600">⏳ Ожидают: ${pendingCount}</span>
+        ${rejectedCount > 0 ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:#fee2e2;color:#b91c1c;border-radius:4px;font-weight:600">✕ Возвращено: ${rejectedCount}</span>` : ''}
+        ${approvedCount === totalSections
+          ? `<span style="margin-left:auto;padding:5px 14px;background:#15803d;color:#fff;border-radius:4px;font-weight:600;font-size:13px">🎉 Все разделы согласованы</span>`
+          : ''
+        }
+      </div>
+      ${!canApprove ? `
+        <div style="padding:10px 12px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;font-size:12.5px;color:#78350f;margin-bottom:12px">
+          ⚠ Только владелец / ГИП / admin может менять статус разделов. Текущая роль: <b>${esc(role)}</b>.
+        </div>
+      ` : ''}
+      <div>
+        ${SECTIONS.map(renderSectionCard).join('')}
+      </div>
+    `;
+    if (canApprove) {
+      const _signApply = async (sectionId, newStatus, label) => {
+        const cur = approvals[sectionId] || { status: 'pending', revision: 0, history: [] };
+        const comment = (newStatus === 'rejected' || newStatus === 'needs-revision')
+          ? await prPrompt(`${label}: причина (комментарий)`, '')
+          : await prPrompt(`${label}: комментарий (опционально)`, '');
+        if (comment === null) return; // cancel
+        const u = (window.Auth && window.Auth.currentUser) || null;
+        const signedByUid = u?.uid || 'local';
+        const signedByEmail = u?.email || (isCloud ? 'unknown' : 'локальный пользователь');
+        const now = Date.now();
+        const newRev = (Number(cur.revision) || 0) + (newStatus === 'approved' ? 1 : 0);
+        const entry = {
+          status: newStatus,
+          signedByUid,
+          signedByEmail,
+          timestamp: now,
+          revision: newRev,
+          comment: comment || '',
+        };
+        const history = Array.isArray(cur.history) ? cur.history.slice() : [];
+        history.push(entry);
+        const updatedApprovals = {
+          ...approvals,
+          [sectionId]: { ...entry, history },
+        };
+        try {
+          updateProject(p.id, { approvals: updatedApprovals });
+          prToast(`${label}: ${SECTIONS.find(s => s.id === sectionId)?.label || sectionId}`, 'ok');
+          render();
+        } catch (e) { prToast('Ошибка: ' + (e.message || e), 'err'); }
+      };
+      approvalsHost.querySelectorAll('[data-approve]').forEach(btn => {
+        btn.addEventListener('click', () => _signApply(btn.getAttribute('data-approve'), 'approved', '✓ Согласовано'));
+      });
+      approvalsHost.querySelectorAll('[data-reject]').forEach(btn => {
+        btn.addEventListener('click', () => _signApply(btn.getAttribute('data-reject'), 'rejected', '✕ Отклонено'));
+      });
+      approvalsHost.querySelectorAll('[data-revise]').forEach(btn => {
+        btn.addEventListener('click', () => _signApply(btn.getAttribute('data-revise'), 'needs-revision', '🔄 На доработку'));
+      });
+      approvalsHost.querySelectorAll('[data-reset]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const sectionId = btn.getAttribute('data-reset');
+          const cur = approvals[sectionId];
+          if (!cur) return;
+          if (!await prConfirm('Сбросить статус раздела?', 'История ревизий сохранится. Раздел вернётся к статусу «не согласовано».')) return;
+          const history = Array.isArray(cur.history) ? cur.history.slice() : [];
+          history.push({
+            status: 'pending',
+            signedByUid: (window.Auth?.currentUser?.uid) || 'local',
+            signedByEmail: (window.Auth?.currentUser?.email) || 'локальный пользователь',
+            timestamp: Date.now(),
+            revision: cur.revision || 0,
+            comment: '(статус сброшен)',
+          });
+          const updatedApprovals = { ...approvals, [sectionId]: { status: 'pending', revision: cur.revision || 0, history } };
+          try {
+            updateProject(p.id, { approvals: updatedApprovals });
+            prToast('↺ Статус сброшен', 'ok');
+            render();
+          } catch (e) { prToast('Ошибка: ' + (e.message || e), 'err'); }
+        });
+      });
+    }
   }
 
   // v0.60.110: восстановить focused input после re-render. Делаем синхронно
