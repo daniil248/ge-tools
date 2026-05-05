@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.269', date: '2026-05-06', items: [
+      '🧹 <b>Auto-cleanup данных utility-источника</b>. Завершение трилогии фиксов v0.60.267/268 — теперь чистим stale-поля в данных, чтобы баг не вернулся в будущем.',
+      '• В save-handler\'е <code>imp-apply</code> для utility (sourceSubtype=\'utility\') чистим: <code>snomKva</code>, <code>ukPct</code>, <code>pkW</code>, <code>p0W</code>, <code>vectorGroup</code>. Эти поля для ЛЭП бессмысленны и могли остаться от subtype-switching (transformer→utility).',
+      '• На next save (любая правка в инспекторе) данные «починятся» автоматически — без миграции.',
+      '• Snom для utility выводится в render-time из <code>capacityKw / cos φ</code> (см. v0.60.268).',
+      'File: <code>js/engine/inspector/source.js</code>.',
+    ] },
     { version: '0.60.268', date: '2026-05-06', items: [
       '🐛 <b>Hotfix продолжение: SnomNameplate на карточке utility-source</b>. Парный фикс к v0.60.267 — та же проблема была в render.js для отображения карточки на канвасе.',
       '• Корень: <code>SnomNameplate = (Number(n.snomKva) > 0) ? n.snomKva : capacityKw/cos</code>. Для utility snomKva всегда 400 (дефолт, поле не показывается) → fallback на capacityKw/cos НЕ срабатывает → карточка показывала 400 кВА вместо 2632 кВА (= 2500/0.95).',

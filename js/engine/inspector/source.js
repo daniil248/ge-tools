@@ -352,6 +352,17 @@ export function openImpedanceModal(n) {
         const v = Number(pmaxEl.value);
         if (Number.isFinite(v)) n.capacityKw = Math.max(0, v);
       }
+      // v0.60.269 (продолжение фиксов v0.60.267/268): чистим stale snomKva
+      // в данных utility — поле для ЛЭП не показывается, дефолт-значение 400
+      // (от transformer DEFAULTS) могло остаться при subtype-switching и
+      // приводило к багу «P=380 kW». Теперь в данных utility-источника
+      // snomKva не хранится — Snom выводится из capacityKw/cos в render'е.
+      delete n.snomKva;
+      // Также чистим параметры трансформатора, нерелевантные для utility.
+      delete n.ukPct;
+      delete n.pkW;
+      delete n.p0W;
+      delete n.vectorGroup;
       // v0.59.605 (Phase 18): целевой cos φ для расчёта компенсации Q.
       const targetEl = document.getElementById('imp-utility-targetCos');
       if (targetEl && String(targetEl.value ?? '').trim() !== '') {
