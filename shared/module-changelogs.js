@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.317', date: '2026-05-06', items: [
+      '🐛 <b>CRITICAL: deletePage не сохранял удаление страниц</b>. По репорту Пользователя 2026-05-06: «эти страницы я уже удалил раз 10??? после Ctrl+R все опять на своих местах».',
+      '<b>Корень</b>: <code>deletePage</code> в <code>js/engine/export.js</code> мутировал <code>state.pages</code> и rendering, но НЕ вызывал <code>snapshot()</code> и <code>notifyChange()</code>. Изменение оставалось только в памяти. После reload state восстанавливался из LS/cloud в исходном виде.',
+      '<b>Fix</b>: добавлены <code>snapshot()</code> в начале (для undo) и <code>notifyChange()</code> в конце (триггер autosave + cloud sync). Теперь удаление страницы persist\'ится через стандартный pipeline.',
+      '🔧 <b>Fix: footer Конструктора показывал legacy «schematic» changelog</b>. По репорту Пользователя 2026-05-06: «и футер не стандартный???».',
+      '<b>Корень</b>: <code>index.html</code> mount\'ил footer с <code>entries: CHANGELOGS[\'schematic\']</code>, где последняя запись — v0.59.336 (2026-04-23). Все новые changelog\'и записываются в <code>CHANGELOGS[\'engine\']</code>. Пользователь видел только legacy записи.',
+      '<b>Fix</b>: <code>entries: CHANGELOGS[\'engine\']</code> — аналогично fix\'у для projects/project.html в v0.60.293.',
+      'Files: <code>js/engine/export.js</code> (snapshot+notifyChange в deletePage), <code>index.html</code> (entries source).',
+    ] },
     { version: '0.60.316', date: '2026-05-06', items: [
       '🔧 <b>Fix: header chip vs banner на hub</b>. По репорту Пользователя 2026-05-06: «чему верить? без проекта или Qarmet???» — header chip показывал «📂 Без проекта» при banner с именем проекта.',
       '<b>Корень</b>: app-header treated <code>isHub</code> как «всегда без проекта» (<code>inProjectMode = !!ctx.projectId && !isHub</code>). Из-за этого на <code>hub.html?project=X</code> banner показывал проект (новая логика 47.3.1), а chip — «Без проекта» (старая логика).',

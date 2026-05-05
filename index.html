@@ -1208,7 +1208,10 @@
     // v0.59.89: в главном Конструкторе (SPA с overflow:hidden) обычный
     // app-footer не вмещается — поэтому ссылки «Все программы / Каталог /
     // GitHub» переехали в левую часть фиксированного module-footer.
-    mountModuleFooter({ appVersion: APP_VERSION, moduleId: 'schematic', moduleTitle: 'Конструктор', entries: CHANGELOGS['schematic'] || [] });
+    // v0.60.317: footer entries из 'engine' (а не 'schematic') — все новые
+    // changelog'и записываются туда. 'schematic' остался legacy с last
+    // v0.59.336 — Пользователь видел только старые записи.
+    mountModuleFooter({ appVersion: APP_VERSION, moduleId: 'schematic', moduleTitle: 'Конструктор', entries: CHANGELOGS['engine'] || [] });
   </script>
 </body>
 </html>

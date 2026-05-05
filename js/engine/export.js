@@ -910,6 +910,12 @@ export function initToolbar() {
       `Удалить страницу «${p.name || p.id}»?`,
       msg,
       { okLabel: 'Удалить', cancelLabel: 'Отмена' }))) return;
+    // v0.60.317 (по репорту Пользователя 2026-05-06: «эти страницы я уже
+    // удалил раз 10??? после Ctrl+R все опять на своих местах»):
+    // deletePage не делал snapshot() / notifyChange() — изменение было
+    // только в памяти, не сохранялось. После reload state восстанавливался
+    // из LS/cloud в исходном виде. Добавлены оба вызова.
+    snapshot();
     // v0.59.77: сохраняем позиции ТЕКУЩЕЙ страницы (если она не удаляемая)
     // ДО каких-либо мутаций, чтобы n.x/n.y других страниц не потерялись.
     const deletedIsCurrent = (state.currentPageId === pageId);
@@ -949,6 +955,7 @@ export function initToolbar() {
     }
     renderPageTabs();
     render();
+    notifyChange();  // v0.60.317: persist deletion (autosave + cloud sync)
   };
 
   // Inline-переименование по двойному клику
