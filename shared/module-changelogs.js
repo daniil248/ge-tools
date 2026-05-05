@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.368', date: '2026-05-06', items: [
+      '🏷 <b>Группы возвращены к собственным тегам (GR1, GR2…)</b>. По запросу Пользователя 2026-05-06: «давай для групп вернем их базовое обозначение. GR1».',
+      '<b>Корень</b>: c v0.59.811 <code>_baseTag(container)</code> возвращал тег ПЕРВОГО (по натуральной сортировке) linked-члена — не собственный тег контейнера. Это давало визуальную путаницу: контейнер «GR1» с членами ACU01, ACU02 показывался на карточке как «Z1.ACU01», а cond ACU01 внутри группы тоже отображался как «Z1.ACU01» — два разных объекта с одинаковым именем.',
+      '<b>Fix</b>: <code>_baseTag</code> для <code>type === \'consumer-container\'</code> возвращает <code>n.tag</code> напрямую (GR1, GR2…). Legacy shell-consumer (с <code>linkedAliases</code>) оставлен как был — продолжает использовать первый alias.',
+      'Files: <code>js/engine/zones.js</code> (_baseTag branch для consumer-container).',
+    ] },
     { version: '0.60.367', date: '2026-05-06', items: [
       '🔌 <b>Outdoor parent display в Перечне потребителей</b>. По репорту Пользователя 2026-05-06: «для конденсаторов укажи что они подключены к кондиционеру, номер кондиционера ты знаешь».',
       '<b>Корень</b>: <code>parentPanelById0</code> в <code>js/main.js</code> (Перечень потребителей) собирал родительские панели/ИБП через incoming-conn. Outdoor имеет conn от cond (consumer→consumer), не от panel — fallback на container не помогал, поскольку outdoor не в container\'е → парент = «orphan».',

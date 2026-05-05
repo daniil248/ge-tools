@@ -110,6 +110,15 @@ export function isAliasOfShell(n) { return !!_shellOf(n); }
 // потребителей принимает обозначение объекта с самым младшим обозначением
 // (по сортировке)».
 function _baseTag(n) {
+  // v0.60.368 (по запросу Пользователя 2026-05-06: «давай для групп вернем
+  // их базовое обозначение. GR1»): consumer-container использует СВОЙ
+  // собственный тег (GR1, GR2…), не наследует от первого члена. Раньше
+  // (v0.59.811) показывалось имя младшего члена «Z1.ACU01» вместо «GR1»
+  // — это путало в UI потому что cond с тем же тегом был внутри группы.
+  if (n && n.type === 'consumer-container') {
+    return n.tag || '';
+  }
+  // Legacy shell-consumer (linkedAliases) — оставляем старое поведение.
   const first = _firstSortedAlias(n);
   if (first && first.tag) return first.tag;
   return (n && n.tag) || '';
