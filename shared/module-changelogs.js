@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.273', date: '2026-05-06', items: [
+      '📚 <b>Обновление статьи help/articles/feature-file-storage.html</b>. Статья была написана на этапе v0.60.258 — устарела за 14 версий улучшений file-storage.',
+      '• Добавлены секции: <b>Persistent file handle</b> (auto-restore через IndexedDB), <b>Обнаружение внешних изменений</b> (mtime polling 30с + visibility hook), <b>Кнопки внутри file-mode badge</b> (↻ Перечитать / ✕ Закрыть), <b>File-mode и Cloud-mode — взаимоисключающие</b>, <b>Хоткеи</b> (Ctrl+O / Ctrl+Shift+S), <b>Через страницу /projects/</b> (зелёная кнопка discovery).',
+      '• Обновлены AUTO_SAVE_DELAY значения в сценариях (1.5с → 3с после v0.60.260 quota-фикса).',
+      '• Обновлена таблица browser support: добавлен столбец «Persistent handle» и «External-change detect».',
+      '• Обновлена секция «Конфликты при совместной работе» — упоминание external-change detection как mitigation.',
+      'File: <code>help/articles/feature-file-storage.html</code>.',
+    ] },
     { version: '0.60.272', date: '2026-05-06', items: [
       '🔍 <b>Discoverability file-storage с projects-страницы</b>. После добавления drawio-style file-storage (v0.60.258) функция была спрятана в sidebar Конструктора — Пользователь должен был сначала открыть какой-то проект, чтобы её увидеть.',
       '• Кнопка «📁 Открыть файл (drawio)» добавлена в toolbar страницы /projects/index.html (рядом с «📤 Импортировать проект»). Зелёный outline — same color-cue что и file-mode badge в editor\'е.',
