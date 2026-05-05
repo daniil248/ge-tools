@@ -2275,6 +2275,13 @@ export function openConsumerParamsModal(n) {
           cosPhi: n.outdoorCosPhi,
           linkedIndoorId: n.id,
           inputs: 1, outputs: 0, count: n.count || 1,
+          // v0.60.252 (по репорту Пользователя 2026-05-06 «авторазмещенный
+          // наружный блок отображается как неразмещенный и только при
+          // повторном перетаскивании на холст он считается как
+          // размещенный»): наследуем pageIds от parent-кондиционера, чтобы
+          // outdoor сразу был «размещён» на той же странице. Без этого
+          // pageIds=undefined → попадал в «Неразмещённые».
+          pageIds: Array.isArray(n.pageIds) ? n.pageIds.slice() : (state.currentPageId ? [state.currentPageId] : []),
         };
         outdoor.tag = nextFreeTag('consumer');
         state.nodes.set(outId, outdoor);

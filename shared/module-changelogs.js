@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.252', date: '2026-05-06', items: [
+      '🔌 <b>Auto-created outdoor block: pageIds наследуются от cond</b>. По репорту Пользователя 2026-05-06 «авторазмещенный наружный блок отображается как неразмещенный и только при повторном перетаскивании на холст он считается как размещенный».',
+      '• Корень: при auto-create outdoor (consumer.consumerSubtype=outdoor_unit) у нового узла не выставлялись <code>pageIds</code> → он считался «не на текущей странице» → попадал в палитру «Неразмещённые».',
+      '• Фикс: outdoor наследует <code>pageIds</code> от parent-кондиционера (или <code>state.currentPageId</code> если у parent нет). Теперь auto-created outdoor сразу размещён на той же странице.',
+      'Файл: <code>js/engine/inspector/consumer.js</code>.',
+    ] },
     { version: '0.60.251', date: '2026-05-05', items: [
       '🩹 <b>Kit-container Phase 1 revert: BFS НЕ skipает kit-internal</b>. По уточнению Пользователя 2026-05-05 «и все это нужно правильно учитывать по потреблению на схеме щита» (с учётом что auto-creation делает chain panel→cond→outdoor через один conn).',
       '• Если skipать kit-internal в BFS, outdoor downstream от cond не считался бы (его demand терялся).',
