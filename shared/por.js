@@ -228,6 +228,35 @@ export function addObject(pid, partial) {
   if (prev) {
     obj.createdBy = prev.createdBy || obj.createdBy;
     obj.createdAt = prev.createdAt || obj.createdAt;
+    // v0.60.335 (fix v0.60.330 регрессии): при tag-dedup существующий
+    // объект (например, TW-rack с domain.mechanical) перезаписывался
+    // partial'ом от Конструктора (с domain.electrical) — теряли данные TW.
+    // Теперь — мерджим domains: пустые поля у нового заполняем из prev,
+    // непустые — overwrite (новые данные приоритетнее). Это ГАРАНТИРУЕТ
+    // что cross-discipline данные обоих модулей сохраняются.
+    if (partial._dedupedFromTag && prev.domains) {
+      for (const [d, prevData] of Object.entries(prev.domains)) {
+        if (!obj.domains[d]) obj.domains[d] = {};
+        for (const [k, v] of Object.entries(prevData || {})) {
+          // Если у нового partial поле пустое/null — берём из prev.
+          const nv = obj.domains[d][k];
+          const isEmpty = nv == null || nv === '' || nv === 0 || (Array.isArray(nv) && nv.length === 0);
+          if (isEmpty && v != null && v !== '' && v !== 0) {
+            obj.domains[d][k] = v;
+          }
+        }
+      }
+      // Также сохраняем prev.name/manufacturer/model если у нового пусто.
+      for (const f of ['name', 'manufacturer', 'model', 'serialNo', 'assetId']) {
+        if (!obj[f] && prev[f]) obj[f] = prev[f];
+      }
+      // Owner-tracking: добавляем нового uid как co-owner соответствующих доменов.
+      for (const d of Object.keys(obj.domains)) {
+        if (!obj.ownerByDomain[d]) {
+          obj.ownerByDomain[d] = prev.ownerByDomain?.[d] || uid;
+        }
+      }
+    }
   }
   store[oid] = obj;
   _saveStore(pid, store);

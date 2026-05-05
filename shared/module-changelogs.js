@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.335', date: '2026-05-06', items: [
+      '🔧 <b>Fix регрессии v0.60.330 — POR tag-dedup перезаписывал prev данные</b>.',
+      '<b>Регрессия</b>: при tag-dedup в <code>addObject</code> существующий объект (например, TW-rack с <code>domain.mechanical</code>) перезаписывался partial\'ом от Конструктора (с <code>domain.electrical</code>) — данные TW терялись.',
+      '<b>Fix</b>: при <code>partial._dedupedFromTag === true</code> мерджим domains:',
+      '• Пустые поля у нового partial → заполняем из prev',
+      '• Непустые поля нового partial → overwrite (новые данные приоритетнее)',
+      '• name/manufacturer/model/serialNo/assetId сохраняем prev если у нового пусто',
+      '• ownerByDomain тоже мерджится — оба uid\'а становятся co-owner\'ами',
+      '<b>Эффект</b>: cross-discipline данные обоих модулей (Технолог + Конструктор) сохраняются в одном POR-объекте, ничего не теряется.',
+      'Files: <code>shared/por.js</code> (addObject — domain merge при dedup).',
+    ] },
     { version: '0.60.334', date: '2026-05-06', items: [
       '📚 <b>Method-specific метки в breakdown инспектора панели</b>. Дополнение к v0.60.333 — теперь и в синем поле панели методика видима.',
       '<b>Заголовок blue field</b>: «📊 Как получены значения (<code>methodLabel</code>):» — IEC 60364 / ПУЭ / РТМ 36.18.32.4-92 / NEC (NFPA 70).',
