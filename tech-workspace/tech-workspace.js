@@ -1629,11 +1629,16 @@ function renderListRail(c, ro) {
 
     <div class="tw-rail-section">
       <div class="tw-rail-head">
-        <span class="tw-rail-title">📦 BOM</span>
+        <span class="tw-rail-title">📦 Сводки</span>
       </div>
       <div class="tw-rail-list">
+        <button type="button" class="tw-rail-item${_selCls('equipment', null)}" data-bk="equipment" data-bid="" title="Развёрнутый перечень всего оборудования проекта: каждая единица отдельной строкой со всеми возможными портами, характеристиками, моделью (если выбрана). Это комплексный взгляд для Технолога ЦОД / ГИП / Администратора.">
+          <span class="tw-rail-name">📋 Перечень оборудования</span>
+          <span class="tw-rail-sub">Все единицы проекта со всеми характеристиками</span>
+          <span class="tw-rail-chip">→</span>
+        </button>
         <button type="button" class="tw-rail-item${_selCls('bom', null)}" data-bk="bom" data-bid="">
-          <span class="tw-rail-name">Спецификация</span>
+          <span class="tw-rail-name">📦 BOM (спецификация)</span>
           <span class="tw-rail-sub">Цены из каталога по дате</span>
           <span class="tw-rail-chip">→</span>
         </button>
@@ -2101,6 +2106,16 @@ function renderDetails(c, ro) {
   if (sel.kind === 'bom') {
     return _renderBomDetails(c, ro);
   }
+  // v0.60.281: «📋 Перечень оборудования» — развёрнутый список всех единиц
+  // проекта со всеми возможными характеристиками, портами, моделью.
+  // Запрос Пользователя 2026-05-06: «все оборудование проекта точно должно
+  // отображаться у технолога ЦОД (технолога объекта, если это не ЦОД) и у
+  // администратора и ГИПа проекта, со всеми возможными портами,
+  // характеристиками, выбранной моделью или список без выбранных конкретных
+  // артикулов».
+  if (sel.kind === 'equipment') {
+    return _renderEquipmentList(c, ro);
+  }
   if (sel.kind === 'areas') {
     const areas = calcAreas(c);
     const sumM2 = areas.reduce((s, a) => s + a.m2, 0);
@@ -2215,6 +2230,294 @@ function _renderBomDetails(c, ro) {
 // v0.59.896: собирает позиции для BOM из концепции.
 //   key — стабильный id (для overrides), elementId — id из catalog (для price lookup),
 //   label — отображение, qty — количество, subLabel — детали.
+// v0.60.281: «📋 Перечень оборудования» — развёрнутый список ВСЕХ единиц
+// проекта (каждая считается отдельно), со всеми характеристиками, портами,
+// моделью. Project-bound view для Технолога ЦОД / ГИП / Администратора.
+//
+// Отличие от BOM:
+//   • BOM — агрегированная сводка позиций с количествами и ценами для КП.
+//   • Перечень — развёрнутый список (count=8 → 8 строк), все характеристики,
+//     все порты (электрические + иные), модель/артикул (если привязана).
+//
+// Группировка: rackGroups → стойки + PDU; upsSystems → ИБП-блоки;
+// coolingUnits → кондиционеры; feed.tp/dgu → ТП/ДГУ; mdcBuildings → МЦОД.
+function _renderEquipmentList(c, ro) {
+  const items = []; // плоский список: { tag, type, model, specs[], ports[] }
+
+  // Helper для генерации тегов SR01..SRNN, U01..UNN и т.п.
+  const _expandTags = (prefix, count, nameOverride) => {
+    const out = [];
+    const N = Math.max(0, Number(count) || 0);
+    if (!N) return out;
+    const padTo = String(N).length >= 2 ? 2 : 1;
+    for (let i = 1; i <= N; i++) {
+      const n = String(i).padStart(padTo, '0');
+      out.push((nameOverride ? `${nameOverride}-` : `${prefix}`) + n);
+    }
+    return out;
+  };
+
+  // ── 1. Стойки (rackGroups) ──
+  for (const rg of (c.rackGroups || [])) {
+    const cnt = Number(rg.count) || 0;
+    if (!cnt) continue;
+    const profile = ({ 'it': 'IT', 'blade': 'Blade', 'gpu': 'GPU', 'network': 'Net', 'storage': 'Stor' }[rg.profile]) || rg.profile || '';
+    const tags = _expandTags('SR', cnt, rg.tagPrefix || rg.name);
+    tags.forEach((tag, idx) => {
+      const specs = [
+        { k: 'Профиль', v: profile },
+        { k: 'IT-нагрузка/стойку', v: `${rg.kwPerRack || 0} кВт` },
+      ];
+      if (rg.unitsU) specs.push({ k: 'Высота, U', v: rg.unitsU });
+      if (rg.modelRef) specs.push({ k: 'Модель', v: `${rg.modelRef.manufacturer || ''} ${rg.modelRef.model || ''}`.trim() });
+      else specs.push({ k: 'Модель', v: '<i>не привязана</i>', isHtml: true });
+      // Порты для стойки: PDU-входы (электрика).
+      const ports = [];
+      if (rg.pdu) {
+        ports.push({
+          system: 'electrical',
+          name: 'PDU-входы',
+          count: rg.pdu.inputsPerRack || 1,
+          spec: `${rg.pdu.kind || ''} ${rg.pdu.phases || '?'} ${rg.pdu.ratingA || '?'}А`,
+        });
+      }
+      // Стойки могут также относиться к: data (Ethernet uplinks), trays (cable)
+      items.push({
+        tag,
+        type: 'Стойка',
+        groupName: rg.name || '',
+        roomId: rg.roomId,
+        specs,
+        ports,
+      });
+    });
+  }
+
+  // ── 2. PDU (отдельные единицы внутри стоек) ──
+  for (const rg of (c.rackGroups || [])) {
+    if (!rg.pdu || !rg.count) continue;
+    const totalPdus = (rg.count) * (rg.pdu.inputsPerRack || 1);
+    const tags = _expandTags('PDU', totalPdus, `${rg.tagPrefix || rg.name || 'SR'}-PDU`);
+    tags.forEach((tag) => {
+      const specs = [
+        { k: 'Тип', v: rg.pdu.kind || '' },
+        { k: 'Фазность', v: rg.pdu.phases || '' },
+        { k: 'Номинал', v: `${rg.pdu.ratingA || '?'} А` },
+      ];
+      if (rg.pdu.modelRef) specs.push({ k: 'Модель', v: `${rg.pdu.modelRef.manufacturer || ''} ${rg.pdu.modelRef.model || ''}`.trim() });
+      else specs.push({ k: 'Модель', v: '<i>не привязана</i>', isHtml: true });
+      items.push({
+        tag,
+        type: 'PDU',
+        groupName: `Стойки «${rg.name || ''}»`,
+        roomId: rg.roomId,
+        specs,
+        ports: [
+          { system: 'electrical', name: 'Вход', count: 1, spec: `${rg.pdu.phases || '?'} ${rg.pdu.ratingA || '?'}А` },
+          { system: 'electrical', name: 'Выход (розетки)', count: rg.pdu.outletsCount || '?', spec: `${rg.pdu.outletType || '—'}` },
+        ],
+      });
+    });
+  }
+
+  // ── 3. ИБП-блоки ──
+  for (const us of (c.upsSystems || [])) {
+    const cnt = Number(us.count) || 0;
+    if (!cnt) continue;
+    const tags = _expandTags('UPS', cnt, us.tagPrefix || us.name);
+    tags.forEach(tag => {
+      const specs = [
+        { k: 'Назначение', v: ({ 'it': 'IT', 'cooling': 'Холод', 'mixed': 'Mixed' }[us.purpose]) || us.purpose || '' },
+        { k: 'Номинал', v: `${us.ratedKva || 0} кВА` },
+        { k: 'Резервирование', v: us.redundancy || '' },
+      ];
+      if (us.modelRef) specs.push({ k: 'Модель', v: `${us.modelRef.manufacturer || ''} ${us.modelRef.model || ''}`.trim() });
+      else specs.push({ k: 'Модель', v: '<i>не привязана</i>', isHtml: true });
+      items.push({
+        tag,
+        type: 'ИБП',
+        groupName: us.name || '',
+        roomId: us.roomId,
+        specs,
+        ports: [
+          { system: 'electrical', name: 'Вход', count: us.inputs || 1, spec: `${us.ratedKva} кВА` },
+          { system: 'electrical', name: 'Выход', count: us.outputs || 1, spec: `${us.ratedKva} кВА` },
+          { system: 'electrical', name: 'АКБ-цепь (DC)', count: 1, spec: `${us.batteryVdcMin || '?'}–${us.batteryVdcMax || '?'} В` },
+        ],
+      });
+    });
+  }
+
+  // ── 4. Кондиционеры ──
+  for (const cu of (c.coolingUnits || [])) {
+    const cnt = Number(cu.count) || 0;
+    if (!cnt) continue;
+    const tps = ({ 'crac': 'CRAC', 'inrow': 'In-Row', 'fancoil': 'Fan-coil', 'freecool': 'FreeCool' }[cu.type]) || cu.type || '';
+    const tags = _expandTags('AC', cnt, cu.tagPrefix || cu.name);
+    tags.forEach(tag => {
+      const specs = [
+        { k: 'Тип', v: tps },
+        { k: 'Холод/блок', v: `${cu.kwPerUnit || 0} кВт` },
+        { k: 'Резервирование', v: cu.redundancy || '' },
+      ];
+      if (cu.modelRef) specs.push({ k: 'Модель', v: `${cu.modelRef.manufacturer || ''} ${cu.modelRef.model || ''}`.trim() });
+      else specs.push({ k: 'Модель', v: '<i>не привязана</i>', isHtml: true });
+      const ports = [
+        { system: 'electrical', name: 'Электропитание', count: 1, spec: `~${(cu.kwPerUnit * 0.35).toFixed(1)} кВт компрессор` },
+      ];
+      // Кондиционеры — multi-discipline: trubы (water-cooled) + воздуховоды.
+      if (cu.type === 'crac' || cu.type === 'fancoil' || cu.type === 'freecool') {
+        ports.push({ system: 'plumbing', name: 'Хладопровод (вход/выход)', count: 2, spec: '—' });
+      }
+      if (cu.type === 'crac' || cu.type === 'fancoil') {
+        ports.push({ system: 'hvac', name: 'Воздуховод', count: 2, spec: 'приток/обратка' });
+      }
+      items.push({
+        tag,
+        type: 'Кондиционер',
+        groupName: cu.name || '',
+        roomId: cu.roomId,
+        specs,
+        ports,
+      });
+    });
+  }
+
+  // ── 5. ТП ──
+  if (c.feed?.tp?.needed) {
+    const cnt = c.feed.tp.redundancy === '2' || c.feed.tp.redundancy === '2-avr' ? 2 : 1;
+    const tags = _expandTags('TR', cnt, 'TP-TR');
+    tags.forEach(tag => {
+      const specs = [
+        { k: 'Snom', v: `${c.feed.tp.kva || 0} кВА` },
+        { k: 'Резервирование', v: c.feed.tp.redundancy || '' },
+      ];
+      if (c.feed.tp.modelRef) specs.push({ k: 'Модель', v: `${c.feed.tp.modelRef.manufacturer || ''} ${c.feed.tp.modelRef.model || ''}`.trim() });
+      else specs.push({ k: 'Модель', v: '<i>не привязана</i>', isHtml: true });
+      items.push({
+        tag,
+        type: 'Трансформатор',
+        groupName: 'ТП',
+        roomId: null,
+        specs,
+        ports: [
+          { system: 'electrical', name: 'HV вход', count: 1, spec: '6/10 кВ' },
+          { system: 'electrical', name: 'LV выход', count: 1, spec: '0.4 кВ' },
+        ],
+      });
+    });
+  }
+
+  // ── 6. ДГУ ──
+  if (c.feed?.dgu?.needed) {
+    const cnt = c.feed.dgu.redundancy === '2N' ? 2 : (c.feed.dgu.redundancy === 'N+1' ? 2 : 1);
+    const tags = _expandTags('GE', cnt, 'GE');
+    tags.forEach(tag => {
+      const specs = [
+        { k: 'Pном', v: `${c.feed.dgu.kw || 0} кВт` },
+        { k: 'Режим', v: ({ 'esp': 'ESP', 'prp': 'PRP', 'cop': 'COP', 'ltp': 'LTP' }[c.feed.dgu.mode]) || c.feed.dgu.mode || '' },
+        { k: 'Резервирование', v: c.feed.dgu.redundancy || '' },
+      ];
+      if (c.feed.dgu.modelRef) specs.push({ k: 'Модель', v: `${c.feed.dgu.modelRef.manufacturer || ''} ${c.feed.dgu.modelRef.model || ''}`.trim() });
+      else specs.push({ k: 'Модель', v: '<i>не привязана</i>', isHtml: true });
+      items.push({
+        tag,
+        type: 'ДГУ',
+        groupName: 'ДГУ',
+        roomId: null,
+        specs,
+        ports: [
+          { system: 'electrical', name: 'AC выход', count: 1, spec: `${c.feed.dgu.kw} кВт` },
+          { system: 'plumbing', name: 'Топливная магистраль', count: 1, spec: '—' },
+          { system: 'plumbing', name: 'Выхлоп', count: 1, spec: '—' },
+        ],
+      });
+    });
+  }
+
+  // ── 7. МЦОД-здания ──
+  for (const b of (c.mdcBuildings || [])) {
+    const cnt = Number(b.count) || 1;
+    const tags = _expandTags('MDC', cnt, b.tagPrefix || b.name);
+    tags.forEach(tag => {
+      items.push({
+        tag,
+        type: 'МЦОД-здание',
+        groupName: b.name || '',
+        roomId: null,
+        specs: [
+          { k: 'Конфигуратор', v: (b.configurator || '').toUpperCase() },
+        ],
+        ports: [
+          { system: 'electrical', name: 'Внешний ввод', count: 1, spec: '0.4 кВ' },
+          { system: 'plumbing', name: 'Хладопровод', count: 2, spec: 'если охлаждение жидкостное' },
+        ],
+      });
+    });
+  }
+
+  // Группировка по типу для удобства просмотра
+  const byType = {};
+  for (const it of items) {
+    if (!byType[it.type]) byType[it.type] = [];
+    byType[it.type].push(it);
+  }
+
+  // System icon helper.
+  const SYS_ICON = { electrical: '⚡', data: '📊', plumbing: '🌊', hvac: '💨', fire: '🔥', security: '🔐', cctv: '📹', gas: '⛽' };
+
+  const renderRow = (it) => {
+    const specsHtml = it.specs.map(s => `<span class="tw-eq-spec"><span class="tw-eq-spec-k">${escHtml(s.k)}:</span> ${s.isHtml ? s.v : escHtml(String(s.v))}</span>`).join('');
+    const portsHtml = it.ports.length
+      ? it.ports.map(p => `<span class="tw-eq-port" title="${escAttr(p.spec || '')}">${SYS_ICON[p.system] || '·'} ${escHtml(p.name)}${p.count > 1 ? ` ×${p.count}` : ''}</span>`).join(' ')
+      : '<span class="muted">—</span>';
+    return `<tr>
+      <td><b>${escHtml(it.tag)}</b></td>
+      <td><span class="muted">${escHtml(it.groupName)}</span></td>
+      <td>${specsHtml}</td>
+      <td>${portsHtml}</td>
+    </tr>`;
+  };
+
+  const sectionsHtml = Object.entries(byType).map(([type, rows]) => `
+    <h4 class="tw-eq-section">${escHtml(type)} <span class="muted">×${rows.length}</span></h4>
+    <table class="tw-eq-table">
+      <thead><tr>
+        <th>Tag</th>
+        <th>Группа</th>
+        <th>Характеристики</th>
+        <th>Порты по системам</th>
+      </tr></thead>
+      <tbody>${rows.map(renderRow).join('')}</tbody>
+    </table>
+  `).join('') || '<p class="muted">Нет оборудования. Добавьте группы стоек / ИБП / климат / ТП / ДГУ в карточках слева.</p>';
+
+  const total = items.length;
+  return `<div class="tw-details-head">
+      <h3>📋 Перечень оборудования проекта</h3>
+      <span class="muted tw-details-sub">Σ <b>${total}</b> единиц · ${Object.keys(byType).length} типов</span>
+    </div>
+    <div class="tw-details-body">
+      <p class="muted" style="font-size:11px;line-height:1.5;margin:0 0 12px">
+        Развёрнутый список ВСЕХ единиц оборудования проекта со всеми возможными характеристиками,
+        портами и моделью. Каждая единица — отдельная строка (count=8 → 8 строк). Для Технолога ЦОД
+        / ГИП / Администратора — view с полной картиной. Multi-discipline: <b>порты</b> показываются
+        по всем системам (⚡ электрика, 🌊 трубы, 💨 ОВК, 📊 данные, 🔥 пожарка, ...).
+        ${total === 0 ? '' : `BOM (агрегированная сводка с ценами) — соседняя кнопка в этом разделе rail.`}
+      </p>
+      <style>
+        .tw-eq-section { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: #334155; }
+        .tw-eq-table { width:100%; border-collapse: collapse; font-size: 12px; }
+        .tw-eq-table th { text-align:left; padding:6px 8px; border-bottom:1px solid #cbd5e1; background:#f8fafc; font-weight:600; color:#475569; }
+        .tw-eq-table td { padding:6px 8px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+        .tw-eq-spec { display:inline-block; margin-right:8px; padding:1px 4px; background:#f1f5f9; border-radius:3px; font-size:11px; }
+        .tw-eq-spec-k { color:#64748b; font-weight:500; }
+        .tw-eq-port { display:inline-block; margin-right:6px; padding:1px 5px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:3px; font-size:11px; color:#1e40af; }
+      </style>
+      ${sectionsHtml}
+    </div>`;
+}
+
 function _collectBomItems(c) {
   const out = [];
   for (const rg of (c.rackGroups || [])) {
