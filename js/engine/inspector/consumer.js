@@ -135,8 +135,15 @@ export function openConsumerParamsModal(n) {
     h.push(`<div class="muted" style="font-size:11px;margin-bottom:8px">Наружный блок кондиционера</div>`);
   }
 
-  h.push(field('Количество в группе', `<input type="number" id="cp-count" min="1" max="999" step="1" value="${n.count || 1}">`));
-  const _cpCount = Math.max(1, Number(n.count) || 1);
+  // v0.60.351 (по репорту Пользователя 2026-05-06: «Для наружного блока
+  // (внедренного в кондиционер) нельзя выбирать больше 1 ввода питания
+  // и количество в группе»): outdoor — всегда 1, поле readonly.
+  if (isOutdoor) {
+    h.push(field('Количество в группе', `<input type="number" id="cp-count" min="1" max="1" step="1" value="1" disabled title="Наружный блок кондиционера — всегда 1 экземпляр. Если нужны несколько блоков — добавьте их в карточке родительского кондиционера через «+ Добавить наружный блок».">`));
+  } else {
+    h.push(field('Количество в группе', `<input type="number" id="cp-count" min="1" max="999" step="1" value="${n.count || 1}">`));
+  }
+  const _cpCount = isOutdoor ? 1 : Math.max(1, Number(n.count) || 1);
   // v0.59.764: IDENTIFY-AS (ROADMAP 1.28.10 сценарий B) — связь 1:1 для
   // одиночных потребителей. Юзер: «как связать размещенную стойку с
   // стойкой из СКС CR1 и CR01 именно не соединить а заменить по факту».
@@ -623,10 +630,18 @@ export function openConsumerParamsModal(n) {
       <input type="number" id="cp-crfOverride" min="0.30" max="1.00" step="0.01" value="${ovVal}" placeholder="например 0.85"${_lk}>
     </div>`);
   }
-  h.push(`<div class="field">
-    <label>Входов${helpIcon('Количество вводов питания у этого потребителя. 1 — обычное одиночное подключение. 2 — две независимые линии (например, СКС-стойка с двойным вводом A/B для резервирования). При 2 портах в схеме — оба должны быть подключены к разным фидерам.')}</label>
-    <input type="number" id="cp-inputs" min="1" max="2" step="1" value="${Math.min(n.inputs || 1, 2)}">
-  </div>`);
+  // v0.60.351: outdoor блокируется на 1 ввод (всегда от родительского cond).
+  if (isOutdoor) {
+    h.push(`<div class="field">
+      <label>Входов${helpIcon('Наружный блок кондиционера всегда имеет 1 ввод питания — от родительского кондиционера. Многовводное резервирование для outdoor нет смысла (это часть одного агрегата).')}</label>
+      <input type="number" id="cp-inputs" min="1" max="1" step="1" value="1" disabled title="Наружный блок — всегда 1 ввод (от родительского cond).">
+    </div>`);
+  } else {
+    h.push(`<div class="field">
+      <label>Входов${helpIcon('Количество вводов питания у этого потребителя. 1 — обычное одиночное подключение. 2 — две независимые линии (например, СКС-стойка с двойным вводом A/B для резервирования). При 2 портах в схеме — оба должны быть подключены к разным фидерам.')}</label>
+      <input type="number" id="cp-inputs" min="1" max="2" step="1" value="${Math.min(n.inputs || 1, 2)}">
+    </div>`);
+  }
   // Наличие нейтрали (N) и защитного проводника (PE) у этого
   // потребителя. Если флаги не заданы (undefined) — берутся дефолты
   // по системе заземления питающего щита или GLOBAL.earthingSystem.
@@ -675,24 +690,14 @@ export function openConsumerParamsModal(n) {
     // которая открывает модалку consumer-form для outdoor.
     h.push('<details class="inspector-section" open>');
     h.push('<summary style="cursor:pointer;font-size:12px;font-weight:600;padding:4px 0">Наружные блоки</summary>');
-    // v0.60.345: outdoorCount — 1 или 2 (для двухконтурных VRF / dual-circuit DX)
-    const _ouCount = Math.max(1, Math.min(2, Number(n.outdoorCount) || 1));
-    h.push(field('Количество наружных блоков', `<select id="cp-outdoorCount" title="Количество выносных наружных блоков. 1 — стандарт; 2 — двухконтурная схема (резервирование контуров или dual-circuit DX).">
-      <option value="1"${_ouCount === 1 ? ' selected' : ''}>1 (один блок)</option>
-      <option value="2"${_ouCount === 2 ? ' selected' : ''}>2 (двухконтурный)</option>
-    </select>`));
-    // v0.60.350 (по репорту Пользователя 2026-05-06: «сплит это когда
-    // компрессор снаружи, а у нас обычно с наружи только конденсатор,
-    // так что можно добавить типы»):
-    //   - condenser: только конденсатор снаружи (компрессор в indoor —
-    //     характерно для прецизионных DC-кондиционеров) — DEFAULT
-    //   - split: классический сплит (компрессор + конденсатор снаружи)
-    //   - dry-cooler: драй-кулер (free-cooling, glycol-loop)
-    //   - cooling-tower: градирня (water-cooled chillers)
-    //   - vrf: VRF-блок (компрессор + конденсатор + EEV для multi-zone)
-    //   - heat-exchanger: теплообменник (для glycol-loop, без активного охлаждения)
+    // v0.60.351 (по репорту Пользователя 2026-05-06: «нет, просто добавь
+    // возможность через кнопку добавить, добавлять несколько отдельных
+    // независимых экземпляров»): селектор «Количество (1/2)» удалён,
+    // вместо него — кнопка «+ Добавить» с произвольным числом outdoor.
+    // outdoorType остаётся как дефолт для НОВЫХ блоков (per-block override
+    // через карточку самого outdoor).
     const _ouType = String(n.outdoorType || 'condenser');
-    h.push(field('Тип наружного блока', `<select id="cp-outdoorType" title="Тип выносного оборудования. От типа зависит мощность, потребление и BOM-позиция: конденсатор потребляет только вентиляторы, сплит/VRF — компрессор + вентиляторы.">
+    h.push(field('Тип нового блока (по умолчанию)', `<select id="cp-outdoorType" title="Тип, который будет применён при создании нового наружного блока. Каждый существующий блок имеет свой собственный тип в его карточке.">
       <option value="condenser"${_ouType === 'condenser' ? ' selected' : ''}>🌀 Конденсатор (компрессор внутри)</option>
       <option value="split"${_ouType === 'split' ? ' selected' : ''}>❄ Сплит-блок (компрессор снаружи)</option>
       <option value="dry-cooler"${_ouType === 'dry-cooler' ? ' selected' : ''}>🔁 Драй-кулер (free-cooling)</option>
@@ -700,26 +705,47 @@ export function openConsumerParamsModal(n) {
       <option value="vrf"${_ouType === 'vrf' ? ' selected' : ''}>🏭 VRF-блок (multi-zone)</option>
       <option value="heat-exchanger"${_ouType === 'heat-exchanger' ? ' selected' : ''}>🌡 Теплообменник (glycol)</option>
     </select>`));
-    // Список существующих outdoor-узлов, привязанных через linkedOutdoorIds[].
+    // Список существующих outdoor-узлов с информацией по кабелю.
     const _ouIds = Array.isArray(n.linkedOutdoorIds) ? n.linkedOutdoorIds
       : (n.linkedOutdoorId ? [n.linkedOutdoorId] : []);
     h.push('<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">');
-    for (let i = 0; i < _ouCount; i++) {
+    if (_ouIds.length === 0) {
+      h.push('<div class="muted" style="font-size:11px;color:#64748b;font-style:italic;padding:6px 0">Наружные блоки ещё не добавлены. Нажмите «+ Добавить наружный блок» ниже.</div>');
+    }
+    for (let i = 0; i < _ouIds.length; i++) {
       const _ouId = _ouIds[i];
-      const _ouNode = _ouId ? state.nodes.get(_ouId) : null;
-      const _ouTag = _ouNode ? effectiveTag(_ouNode) : `${effectiveTag(n)}.OU${i + 1}`;
-      const _ouKw = _ouNode ? (Number(_ouNode.demandKw) || 0) : (Number(n.outdoorKw) || 0.3);
-      h.push(`<button type="button" class="cp-outdoor-open-btn" data-ou-idx="${i}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f0f9ff;border:1px solid #0ea5e9;border-radius:5px;cursor:pointer;font:inherit;font-size:12px;text-align:left;color:#0c4a6e">
-        <span style="font-size:16px">🔧</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600">${escHtml(_ouTag)}</div>
-          <div style="font-size:10.5px;color:#075985;margin-top:1px">${_ouNode ? `${_ouKw} кВт · ${_ouNode.name || 'Наруж. блок'}` : 'Создать карточку'}</div>
+      const _ouNode = state.nodes.get(_ouId);
+      if (!_ouNode) continue;
+      const _ouTag = effectiveTag(_ouNode);
+      const _ouKw = Number(_ouNode.demandKw) || 0;
+      // v0.60.351: ищем conn cond→outdoor для отображения cable-info.
+      let _condConn = null;
+      for (const c of state.conns.values()) {
+        if (c.from?.nodeId === n.id && c.to?.nodeId === _ouId) { _condConn = c; break; }
+        if (c.to?.nodeId === n.id && c.from?.nodeId === _ouId) { _condConn = c; break; }
+      }
+      const _cableLen = _condConn ? (Number(_condConn.lengthM) || 0) : 0;
+      const _cableMark = _condConn ? (_condConn.cableMark || '—') : '—';
+      const _cableSection = _condConn && _condConn._sectionMm2 ? `${_condConn._sectionMm2} мм²` : '';
+      h.push(`<div class="cp-outdoor-row" data-ou-idx="${i}" style="display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#f0f9ff;border:1px solid #0ea5e9;border-radius:5px;font-size:12px;color:#0c4a6e">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:14px">🔧</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600">${escHtml(_ouTag)} · ${_ouKw} кВт · ${escHtml(_ouNode.name || 'Наруж. блок')}</div>
+          </div>
+          <button type="button" class="cp-outdoor-open-btn" data-ou-idx="${i}" style="background:#0ea5e9;color:#fff;border:0;border-radius:4px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px" title="Открыть карточку наружного блока (мощность, тип, cos φ, фазы)">📋 Карточка</button>
+          <button type="button" class="cp-outdoor-del-btn" data-ou-idx="${i}" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:4px;padding:3px 7px;cursor:pointer;font:inherit;font-size:11px" title="Удалить этот наружный блок">✕</button>
         </div>
-        <span style="color:#0ea5e9">→</span>
-      </button>`);
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:#075985;padding-left:22px">
+          <span title="Тип кабеля cond→outdoor (марка). Меняется через кнопку 🔌 кабель.">🔌</span>
+          <span style="flex:1;min-width:0">${escHtml(_cableMark)}${_cableSection ? ' · ' + _cableSection : ''} · <b>${_cableLen} м</b></span>
+          <button type="button" class="cp-outdoor-cable-btn" data-ou-idx="${i}" style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:3px;padding:2px 7px;cursor:pointer;font:inherit;font-size:10.5px" title="Изменить параметры кабеля cond→outdoor (длина, марка, сечение)">⚙ Кабель</button>
+        </div>
+      </div>`);
     }
     h.push('</div>');
-    h.push('<div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.5">Карточка наружного блока — полная consumer-форма (мощность, К<sub>и</sub>, cos φ, фазы, ATS) + кабель cond→outdoor (длина, сечение). На схеме не отображается отдельным узлом, но появляется в плане, реестре и BOM.</div>');
+    h.push(`<button type="button" id="cp-outdoor-add-btn" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:6px;padding:7px 12px;background:#dcfce7;color:#15803d;border:1px dashed #86efac;border-radius:5px;cursor:pointer;font:inherit;font-size:12px;font-weight:600" title="Добавить ещё один независимый наружный блок. Тег = ${escAttr(effectiveTag(n))}.OU<номер>. Тип берётся из селектора выше (можно изменить в карточке блока).">+ Добавить наружный блок</button>`);
+    h.push('<div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.5">Каждый блок — полноценный consumer-узел (мощность, К<sub>и</sub>, cos φ, фазы) + виртуальный кабель cond→outdoor (попадает в общую спецификацию). Длина кабеля автоматически пересчитывается при перемещении блока на плане. На схеме не отображается отдельным узлом, но виден в плане, реестре и BOM.</div>');
     h.push('</details>');
   }
 
@@ -1112,57 +1138,145 @@ export function openConsumerParamsModal(n) {
     });
   }
 
-  // v0.60.345: button-handler для outdoor-блоков. Открывает consumer-modal
-  // для существующего outdoor-узла или создаёт новый.
+  // v0.60.351: helper для создания нового outdoor-узла с conn cond→outdoor.
+  // Возвращает { ouNode, ouId, conn }.
+  function _createOutdoorForCond(condN, idx) {
+    const acTag = (condN.tag || '').trim() || effectiveTag(condN);
+    const ouTag = `${acTag}.OU${idx + 1}`;
+    const newId = uid();
+    const _ouType = String(condN.outdoorType || 'condenser');
+    const _typeMeta = {
+      'condenser':      { name: 'Конденсатор',   kw: 0.3 },
+      'split':          { name: 'Сплит-блок',    kw: 1.5 },
+      'dry-cooler':     { name: 'Драй-кулер',    kw: 2.0 },
+      'cooling-tower':  { name: 'Градирня',      kw: 3.0 },
+      'vrf':            { name: 'VRF-блок',      kw: 4.0 },
+      'heat-exchanger': { name: 'Теплообменник', kw: 0.05 },
+    }[_ouType] || { name: 'Наруж. блок', kw: 0.6 };
+    const ouNode = {
+      id: newId, type: 'consumer',
+      x: condN.x, y: condN.y + NODE_H + 80 + idx * 40,
+      ...(window.DEFAULTS && window.DEFAULTS.consumer ? window.DEFAULTS.consumer() : {}),
+      tag: ouTag,
+      name: _typeMeta.name,
+      consumerSubtype: 'outdoor_unit',
+      outdoorType: _ouType,
+      demandKw: _typeMeta.kw,
+      cosPhi: 0.85,
+      linkedIndoorId: condN.id,
+      // v0.60.351: outdoor — всегда 1 ввод, count=1. Запрет на изменение
+      // в его карточке (см. inputs/count rendering).
+      inputs: 1, outputs: 0, count: 1,
+      embedAsOutdoor: true,
+      pageIds: Array.isArray(condN.pageIds) ? condN.pageIds.slice() : (state.currentPageId ? [state.currentPageId] : []),
+    };
+    state.nodes.set(newId, ouNode);
+    // v0.60.351: auto-create conn cond→outdoor (виртуальный кабель).
+    // Попадает в общую спецификацию (BOM iterates state.conns).
+    const connId = uid('c');
+    const conn = {
+      id: connId,
+      from: { nodeId: condN.id, port: 0 },
+      to:   { nodeId: newId,    port: 0 },
+      material:      window.GLOBAL?.defaultMaterial      || 'Cu',
+      insulation:    window.GLOBAL?.defaultInsulation    || 'PVC',
+      installMethod: window.GLOBAL?.defaultInstallMethod || 'tray',
+      ambientC:      window.GLOBAL?.defaultAmbient       || 30,
+      grouping:      window.GLOBAL?.defaultGrouping      || 1,
+      bundling: 'touching',
+      lengthM: 5,
+      cableMark: window.GLOBAL?.projectMainCableLv || null,
+      // Флаг для render.js — НЕ рисовать линию на схеме (но в BOM/plan
+      // считается).
+      isOutdoorLink: true,
+    };
+    state.conns.set(connId, conn);
+    return { ouNode, ouId: newId, conn };
+  }
+
+  // v0.60.345 + v0.60.351: button-handler «📋 Карточка» — открыть consumer-modal
+  // для существующего outdoor-узла.
   document.querySelectorAll('.cp-outdoor-open-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const idx = Number(btn.getAttribute('data-ou-idx')) || 0;
-      const ouIds = Array.isArray(n.linkedOutdoorIds) ? n.linkedOutdoorIds.slice()
-        : (n.linkedOutdoorId ? [n.linkedOutdoorId] : []);
-      let ouNode = ouIds[idx] ? state.nodes.get(ouIds[idx]) : null;
-      if (!ouNode) {
-        // Создаём новый outdoor-узел с тегом AC.tag.OUx.
-        const acTag = (n.tag || '').trim() || effectiveTag(n);
-        const ouTag = `${acTag}.OU${idx + 1}`;
-        const newId = uid();
-        // v0.60.350: тип наружного блока определяет дефолтное имя
-        // и потребление. Конденсатор — только вентилятор (~0.3 кВт);
-        // сплит/VRF — компрессор + вентилятор (несколько кВт);
-        // драй-кулер — массив вентиляторов (несколько кВт);
-        // градирня — насос + вентилятор; теплообменник — пассивный (0).
-        const _ouType = String(n.outdoorType || 'condenser');
-        const _typeMeta = {
-          'condenser':      { name: 'Конденсатор',   kw: 0.3 },
-          'split':          { name: 'Сплит-блок',    kw: 1.5 },
-          'dry-cooler':     { name: 'Драй-кулер',    kw: 2.0 },
-          'cooling-tower':  { name: 'Градирня',      kw: 3.0 },
-          'vrf':            { name: 'VRF-блок',      kw: 4.0 },
-          'heat-exchanger': { name: 'Теплообменник', kw: 0.05 },
-        }[_ouType] || { name: 'Наруж. блок', kw: 0.6 };
-        ouNode = {
-          id: newId, type: 'consumer',
-          x: n.x, y: n.y + NODE_H + 80 + idx * 40,
-          ...(window.DEFAULTS && window.DEFAULTS.consumer ? window.DEFAULTS.consumer() : {}),
-          tag: ouTag,
-          name: _typeMeta.name,
-          consumerSubtype: 'outdoor_unit',
-          outdoorType: _ouType,
-          demandKw: Number(n.outdoorKw) || _typeMeta.kw,
-          cosPhi: Number(n.outdoorCosPhi) || 0.85,
-          linkedIndoorId: n.id,
-          inputs: 1, outputs: 0, count: 1,
-          // v0.60.345: флаг embed — не отображать на схеме как отдельный узел.
-          embedAsOutdoor: true,
-          pageIds: Array.isArray(n.pageIds) ? n.pageIds.slice() : (state.currentPageId ? [state.currentPageId] : []),
-        };
-        state.nodes.set(newId, ouNode);
-        ouIds[idx] = newId;
-        n.linkedOutdoorIds = ouIds;
-        n.linkedOutdoorId = ouIds[0]; // legacy alias for first outdoor
-        snapshot('outdoor-create:' + n.id + ':OU' + (idx + 1));
-        notifyChange();
-      }
+      const ouIds = Array.isArray(n.linkedOutdoorIds) ? n.linkedOutdoorIds.slice() : [];
+      const ouNode = ouIds[idx] ? state.nodes.get(ouIds[idx]) : null;
+      if (!ouNode) return;
       openConsumerParamsModal(ouNode);
+    });
+  });
+
+  // v0.60.351: «+ Добавить наружный блок» — добавляет новый OU независимо.
+  document.getElementById('cp-outdoor-add-btn')?.addEventListener('click', () => {
+    const ouIds = Array.isArray(n.linkedOutdoorIds) ? n.linkedOutdoorIds.slice()
+      : (n.linkedOutdoorId ? [n.linkedOutdoorId] : []);
+    const idx = ouIds.length;
+    const { ouId } = _createOutdoorForCond(n, idx);
+    ouIds.push(ouId);
+    n.linkedOutdoorIds = ouIds;
+    n.linkedOutdoorId = ouIds[0];
+    snapshot('outdoor-add:' + n.id + ':OU' + (idx + 1));
+    notifyChange();
+    // Перерендериваем модалку, чтобы появилась новая строка.
+    openConsumerParamsModal(n);
+  });
+
+  // v0.60.351: «✕» — удалить outdoor-блок (и его conn).
+  document.querySelectorAll('.cp-outdoor-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = Number(btn.getAttribute('data-ou-idx')) || 0;
+      const ouIds = Array.isArray(n.linkedOutdoorIds) ? n.linkedOutdoorIds.slice() : [];
+      const ouId = ouIds[idx];
+      if (!ouId) return;
+      const ok = await rsConfirm(`Удалить наружный блок ${effectiveTag(state.nodes.get(ouId) || {})}?`);
+      if (!ok) return;
+      // Удалить conn'ы cond↔outdoor
+      for (const c of Array.from(state.conns.values())) {
+        if (c.from?.nodeId === ouId || c.to?.nodeId === ouId) state.conns.delete(c.id);
+      }
+      state.nodes.delete(ouId);
+      ouIds.splice(idx, 1);
+      n.linkedOutdoorIds = ouIds;
+      n.linkedOutdoorId = ouIds[0] || null;
+      // Пере-нумерация тегов оставшихся outdoor'ов по новой позиции.
+      for (let i = 0; i < ouIds.length; i++) {
+        const ou = state.nodes.get(ouIds[i]);
+        if (ou) ou.tag = `${n.tag || ''}.OU${i + 1}`;
+      }
+      snapshot('outdoor-del:' + n.id);
+      notifyChange();
+      openConsumerParamsModal(n);
+    });
+  });
+
+  // v0.60.351: «⚙ Кабель» — мини-промпт для длины и марки кабеля cond→outdoor.
+  document.querySelectorAll('.cp-outdoor-cable-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = Number(btn.getAttribute('data-ou-idx')) || 0;
+      const ouIds = Array.isArray(n.linkedOutdoorIds) ? n.linkedOutdoorIds.slice() : [];
+      const ouId = ouIds[idx];
+      if (!ouId) return;
+      let conn = null;
+      for (const c of state.conns.values()) {
+        if ((c.from?.nodeId === n.id && c.to?.nodeId === ouId) ||
+            (c.to?.nodeId === n.id && c.from?.nodeId === ouId)) { conn = c; break; }
+      }
+      if (!conn) {
+        flash('Связь cond→outdoor не найдена. Удалите и создайте outdoor заново.', 'warn');
+        return;
+      }
+      const newLen = await rsPrompt('Длина кабеля cond→outdoor (м)', String(conn.lengthM ?? 5));
+      if (newLen == null) return;
+      const num = Number(newLen);
+      if (Number.isFinite(num) && num >= 0) {
+        conn.lengthM = num;
+        // Сбрасываем флаг lengthFrozen=false → авто-пересчёт по плану
+        // снова работает (см. plan-bridge для cable-length).
+        conn.lengthFrozen = true; // ручной ввод заморозит auto-recalc
+        snapshot('outdoor-cable-edit:' + n.id);
+        notifyChange();
+        openConsumerParamsModal(n);
+      }
     });
   });
 
