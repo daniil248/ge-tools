@@ -1303,11 +1303,33 @@ async function openProject(id) {
       }
     } catch (e) { console.warn('[main] bootstrapProject failed:', e); }
 
-    // Схему даём редактору
-    if (data.scheme) {
-      window.Raschet.loadScheme(data.scheme);
+    // Схему даём редактору.
+    // v0.60.257: проверяем LS-backup от неудавшегося cloud-save (Firestore
+    // quota / timeout). Если backup новее чем cloud-данные — предлагаем
+    // восстановить, чтобы Пользователь не потерял работу.
+    let _useScheme = data.scheme || null;
+    try {
+      const backupKey = `raschet.savePending.${id}`;
+      const rawBackup = localStorage.getItem(backupKey);
+      if (rawBackup) {
+        const backup = JSON.parse(rawBackup);
+        const cloudUpdatedMs = (data.updatedAt && data.updatedAt.toMillis)
+          ? data.updatedAt.toMillis() : (Number(data.updatedAt) || 0);
+        if (backup && backup.scheme && Number(backup.savedAtMs) > cloudUpdatedMs) {
+          const ageMin = Math.round((Date.now() - backup.savedAtMs) / 60000);
+          flash(`📦 Найдена локальная резервная копия (после ошибки облачного сохранения, ${ageMin} мин назад). Восстановлена автоматически — нажмите «Сохранить» когда квота Firestore сбросится.`, 'success');
+          _useScheme = backup.scheme;
+          state.dirty = true; // отметим как dirty, чтобы кнопка «Сохранить» показывалась
+        } else {
+          // Backup устарел или меньше чем в облаке — удаляем.
+          localStorage.removeItem(backupKey);
+        }
+      }
+    } catch (lsErr) { console.warn('[openProject] LS-backup check failed:', lsErr); }
+    if (_useScheme) {
+      window.Raschet.loadScheme(_useScheme);
       // Если в проекте нет сохранённых настроек — применить из localStorage
-      if (!data.scheme.globalSettings) loadGlobalSettings();
+      if (!_useScheme.globalSettings) loadGlobalSettings();
     } else {
       window.Raschet.loadScheme(null);
       loadGlobalSettings();
@@ -1495,6 +1517,9 @@ async function saveCurrent(isAuto) {
     state.saving = false;
     state.lastLocalWriteAtMs = Date.now();  // v0.59.76: окно защиты от echo считается ПОСЛЕ save-а
     updateSaveButton();
+    // v0.60.257: успешный cloud-save → чистим LS-backup (если был от
+    // предыдущей ошибки quota/timeout).
+    try { localStorage.removeItem(`raschet.savePending.${p.id}`); } catch {}
     if (!isAuto) flash('Сохранено');
     // v0.57.79 (Collaboration C.8): авто-снапшот версии, не чаще 1 раз в 5 мин.
     // Только для облачных проектов и авторизованного пользователя.
@@ -1510,16 +1535,47 @@ async function saveCurrent(isAuto) {
     const code = (e && (e.code || e.name)) || '';
     const raw = (e && (e.message || String(e))) || 'Ошибка сохранения';
     let hint = '';
+    let isQuotaOrTimeout = false;
     if (/permission-denied/i.test(code) || /permission-denied/i.test(raw)) {
       hint = ' — нет прав на запись (возможно, роль «просмотр», или владелец отозвал доступ).';
     } else if (/not-found/i.test(code) || /No document to update/i.test(raw)) {
       hint = ' — проект не найден на сервере (возможно, удалён).';
     } else if (/INVALID_ARGUMENT|maximum.*size|exceeds.*maximum|1048487|1 MiB/i.test(raw)) {
       hint = ' — превышен лимит Firestore на документ (1 MiB). Разбейте проект или удалите лишнее.';
+    } else if (/resource-exhausted|quota.exceeded/i.test(code + ' ' + raw)) {
+      // v0.60.257 (по репорту Пользователя 2026-05-06 «все еще не могу
+      // сохранить» + скриншот FirebaseError [code=resource-exhausted]):
+      // суточный лимит Firestore Spark plan исчерпан.
+      hint = ' — суточный лимит Firestore исчерпан (Quota exceeded). Это ограничение Spark/free плана Firebase. Локальная резервная копия сделана автоматически — изменения не потеряются. Сохранение в облако возобновится после сброса квоты (UTC midnight) или апгрейда плана Firebase.';
+      isQuotaOrTimeout = true;
+    } else if (/timeout.*(сохранен|saving|save)/i.test(raw) || /timeout/i.test(code)) {
+      hint = ' — таймаут (>30 с). Чаще всего означает, что Firestore не отвечает (квота / нет связи). Локальная резервная копия сделана автоматически.';
+      isQuotaOrTimeout = true;
     } else if (/unavailable|deadline|network|offline/i.test(code + ' ' + raw)) {
-      hint = ' — нет связи с сервером. Попробуйте ещё раз через минуту.';
+      hint = ' — нет связи с сервером. Попробуйте ещё раз через минуту. Локальная резервная копия сделана автоматически.';
+      isQuotaOrTimeout = true;
     } else if (/aborted|failed-precondition/i.test(code)) {
       hint = ' — конфликт параллельной записи (другой пользователь сохранил раньше). Обновите страницу — ваши локальные изменения сохранятся в следующем автосейве.';
+    }
+    // v0.60.257: LS-backup чтобы Пользователь не терял работу при quota/timeout/network.
+    // Ключ: raschet.savePending.<projectId>. На следующем save (после восстановления
+    // связи / квоты) этот backup будет затерт успешным cloud-save.
+    if (isQuotaOrTimeout) {
+      try {
+        const scheme = window.Raschet.getScheme();
+        const backup = {
+          projectId: p.id,
+          projectName: p.name || '',
+          savedAtMs: Date.now(),
+          scheme,
+        };
+        const key = `raschet.savePending.${p.id}`;
+        localStorage.setItem(key, JSON.stringify(backup));
+        console.warn('[saveCurrent] LS-backup written to', key, 'size=', JSON.stringify(backup).length, 'bytes');
+      } catch (lsErr) {
+        console.warn('[saveCurrent] LS-backup failed:', lsErr.message);
+        hint += ' ⚠ LS-backup тоже не удался (' + (lsErr.message || lsErr) + ').';
+      }
     }
     flash(raw + hint + (code ? ` [${code}]` : ''), 'error');
     // Через 3 сек вернёмся к «● Сохранить», если ещё dirty

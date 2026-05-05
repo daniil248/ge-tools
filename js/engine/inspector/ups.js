@@ -558,9 +558,49 @@ export function openUpsParamsModal(n) {
           if (st.modelId && st.ups && st.modelId !== n.upsCatalogId) {
             // v0.59.395: блокируем смену модели, если к ИБП (или его композиту)
             // уже подключены кабели — пользователь должен сперва их отключить.
+            // v0.60.257 (по репорту Пользователя 2026-05-06 «я не могу выбрать
+            // другую модель ИБП, говорит что сперва нужно отключить линии, но
+            // у меня точно такой же и мне нужно просто поднять номинал ИБП с
+            // 200 кВт до 300 кВт»):
+            // Послабление — apply-в-серии и порт-совместимость:
+            //   • Не-integrated ИБП: applyUpsModel НЕ трогает inputs/outputs
+            //     (см. shared/ups-picker.js). Кабели остаются на тех же портах.
+            //     Разрешаем без проверок — нужно только обновить мощность.
+            //   • Integrated → integrated той же supplier+series: считаем
+            //     upgrade-в-серии. PDM-компоновка обычно совместима, но
+            //     проверим pdmModules.length ≥ кол-во занятых выходов.
+            //   • Иначе блокируем (как раньше).
             const ext = getIntegratedUpsExternalConns(n);
+            let blockMsg = null;
             if (ext.length > 0) {
-              flash(`Нельзя сменить модель ИБП: подключено ${ext.length} ${ext.length === 1 ? 'кабель' : 'кабел' + (ext.length < 5 ? 'я' : 'ей')}. Сперва отключите линии от ИБП и распред. панелей.`, 'warn');
+              const oldKind = n.kind;
+              const newKind = st.ups.kind;
+              const oldIntegrated = oldKind === 'ups-integrated';
+              const newIntegrated = newKind === 'ups-integrated';
+              if (!oldIntegrated && !newIntegrated) {
+                // Apply-в-серии: для не-integrated моделей applyUpsModel
+                // НЕ трогает inputs/outputs. Топология сохраняется.
+              } else if (oldIntegrated && newIntegrated) {
+                // Integrated → integrated. Проверяем что PDM-выходов хватит.
+                const sameSeries = (st.ups.supplier === n._upsSelSupplier && st.ups.series === n._upsSelSeries);
+                const newOutputs = Array.isArray(st.ups.pdmModules) ? st.ups.pdmModules.length : 0;
+                let maxOutPort = -1;
+                for (const c of state.conns.values()) {
+                  if (c.from.nodeId === n.id && c.from.port > maxOutPort) maxOutPort = c.from.port;
+                }
+                if (!sameSeries) {
+                  blockMsg = `смена серии ИБП (${n._upsSelSeries || '?'} → ${st.ups.series || '?'}) при подключённых ${ext.length} линиях недопустима — PDM-конфигурация может отличаться.`;
+                } else if (newOutputs > 0 && (maxOutPort + 1) > newOutputs) {
+                  blockMsg = `новая модель имеет ${newOutputs} PDM-выходов, но используется ${maxOutPort + 1}.`;
+                }
+              } else {
+                // Смена типа (integrated ↔ моноблок) — топология меняется,
+                // блокируем как раньше.
+                blockMsg = `смена типа ИБП (${oldIntegrated ? 'integrated → моноблок' : 'моноблок → integrated'}) с подключёнными ${ext.length} линиями.`;
+              }
+            }
+            if (blockMsg) {
+              flash(`Нельзя сменить модель ИБП: ${blockMsg} Сперва отключите линии от ИБП и распред. панелей.`, 'warn');
               openUpsParamsModal(n); // re-render чтобы откатить selected в picker
               return;
             }

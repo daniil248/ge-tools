@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.257', date: '2026-05-06', items: [
+      '💾 <b>LS-backup при quota / timeout / network ошибках сохранения</b>. По репорту Пользователя 2026-05-06 «все еще не могу сохранить» (скриншот: <code>Firestore Quota exceeded [code=resource-exhausted]</code> + <code>timeout: сохранение заняло больше 30 с</code>).',
+      '• Корень: бесплатный (Spark) план Firestore имеет суточный лимит на writes; при исчерпании все save-и падают, пока квота не сбросится в UTC midnight.',
+      '• Фикс: в catch-блоке saveCurrent добавлены hint-ы для <code>resource-exhausted/quota-exceeded</code> и <code>timeout</code>; в этих случаях scheme автоматически записывается в LocalStorage (<code>raschet.savePending.&lt;projectId&gt;</code>) — Пользователь не теряет работу.',
+      '• При следующем openProject: если backup новее cloud-данных — авто-восстановление, тост «📦 Найдена локальная резервная копия». При успешном cloud-save backup чистится.',
+      '🔄 <b>UPS model swap relaxation: разрешить upgrade-в-серии</b>. По репорту Пользователя 2026-05-06 «я не могу выбрать другую модель ИБП, говорит что сперва нужно отключить линии, но у меня точно такой же и мне нужно просто поднять номинал ИБП с 200 кВт до 300 кВт».',
+      '• Корень: блокировка <code>getIntegratedUpsExternalConns(n).length > 0</code> срабатывала на ЛЮБУЮ смену модели, даже когда новая модель совместима с подключёнными кабелями.',
+      '• Фикс: послабление по сценариям:',
+      '   ▸ <b>Не-integrated → не-integrated</b>: разрешено всегда (<code>applyUpsModel</code> для моноблоков НЕ трогает inputs/outputs — кабели остаются на тех же портах).',
+      '   ▸ <b>Integrated → integrated той же supplier+series</b>: разрешено если новая <code>pdmModules.length</code> ≥ кол-во занятых выходов (PDM-конфигурация совместима в пределах серии).',
+      '   ▸ Иначе (смена типа integrated ↔ моноблок, или integrated → integrated другой серии) — блокируется как раньше с понятным reason\'ом в тосте.',
+      'Файлы: <code>js/main.js</code> (saveCurrent + openProject LS-backup), <code>js/engine/inspector/ups.js</code> (UPS swap relaxation).',
+    ] },
     { version: '0.60.256', date: '2026-05-06', items: [
       '🔇 <b>Margin warning: nothing-better suppression</b>. По запросу Пользователя 2026-05-06 «давай добавим на предупреждение о низком запасе или переразмере еще условие, что если следующий шаг вниз или вверх выходит за указанные пользователем пределы, то предупреждение не выводим».',
       '• Корень: если щит 630 А с нагрузкой 430.9 А (margin 46% > 30%), а ближайший шаг вниз — 400 А (недостаточен), Пользователь физически не может выбрать лучший вариант → сообщение «избыточный запас» бесполезно и засоряет UI.',
