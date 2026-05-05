@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.271', date: '2026-05-06', items: [
+      '👀 <b>File-mode: instant external-change check on tab focus</b>. После v0.60.262 (mtime polling 30с) добавлен мгновенный check при возврате на вкладку.',
+      '• Раньше: Пользователь свернул вкладку → коллега-писатель сохранил файл на сетевом ресурсе → Пользователь возвращается, но badge не обновляется до 30 секунд (следующий tick interval).',
+      '• Фикс: на <code>visibilitychange</code> (когда <code>document.hidden=false</code>) немедленно вызываем <code>_checkExternalChangeOnce()</code> — функция вынесена из interval\'а в отдельный helper.',
+      '• Listener регистрируется в <code>_startExternalChangeWatcher()</code> и снимается в <code>_stopExternalChangeWatcher()</code>. Чисто и без leaks.',
+      '• Не нагружает Firestore (это локальный <code>handle.getFile()</code>).',
+      'File: <code>js/engine/export.js</code>.',
+    ] },
     { version: '0.60.270', date: '2026-05-06', items: [
       '🔄 <b>File-mode и Cloud-mode — взаимоисключающие транзишены</b>. Найденный edge-case без репорта: file-mode и cloud-проект могли быть «активными одновременно» — следующий save мог записать НЕ туда.',
       '<b>Сценарий 1 (file → cloud)</b>: Пользователь работает с файлом → открывает cloud-проект через список → ',

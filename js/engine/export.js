@@ -238,40 +238,52 @@ export function initToolbar() {
   let _externalWatchTimer = null;
   function _stopExternalChangeWatcher() {
     if (_externalWatchTimer) { clearInterval(_externalWatchTimer); _externalWatchTimer = null; }
+    // v0.60.271: снять visibilitychange listener.
+    if (_externalWatchVisibilityHandler) {
+      try { document.removeEventListener('visibilitychange', _externalWatchVisibilityHandler); } catch {}
+      _externalWatchVisibilityHandler = null;
+    }
   }
+  // v0.60.271: один tick проверки mtime — выделен в отдельную функцию,
+  // чтобы можно было вызвать вручную (при возврате на вкладку через
+  // visibilitychange — не ждать 30-сек интервал).
+  async function _checkExternalChangeOnce() {
+    try {
+      const fm = window.Raschet?._fileMode;
+      if (!fm || !fm.handle) return;
+      const perm = await ensurePermission(fm.handle, 'read');
+      if (perm !== 'granted') return;
+      const file = await fm.handle.getFile();
+      const mtime = file.lastModified;
+      const ownWriteTolerance = 1500;
+      const lastOwn = fm.lastSavedAtMs || 0;
+      const isOwnWrite = Math.abs(mtime - lastOwn) < ownWriteTolerance;
+      if (mtime > (fm.lastSeenMtime || 0) + 1000 && !isOwnWrite) {
+        fm.lastSeenMtime = mtime;
+        fm.externalChangeDetected = true;
+        if (fm.readOnly) {
+          flash(`⚠ Файл «${fm.fileName}» изменён извне. Нажмите «↻ Перечитать» в badge'е чтобы загрузить свежее содержимое.`, 'info');
+        } else {
+          flash(`⚠ Файл «${fm.fileName}» изменён ИЗВНЕ во время вашей работы. Следующее автосохранение перезапишет внешние правки! Используйте «↻ Перечитать» (вы потеряете локальные изменения) или явный save.`, 'error');
+        }
+        _updateFileModeBadge();
+      }
+    } catch (e) {
+      // File мог быть удалён, диск отключён — затаскать в console, не толкать тосты.
+      console.warn('[file-watch]', e.message);
+    }
+  }
+  let _externalWatchVisibilityHandler = null;
   function _startExternalChangeWatcher() {
     _stopExternalChangeWatcher();
-    _externalWatchTimer = setInterval(async () => {
-      try {
-        const fm = window.Raschet?._fileMode;
-        if (!fm || !fm.handle) { _stopExternalChangeWatcher(); return; }
-        // Проверка permission — если отозвано, остановим watcher.
-        const perm = await ensurePermission(fm.handle, 'read');
-        if (perm !== 'granted') { _stopExternalChangeWatcher(); return; }
-        const file = await fm.handle.getFile();
-        const mtime = file.lastModified;
-        // Сравниваем с lastSeenMtime, накидываем 1.5s tolerance чтобы не
-        // ловить наш собственный write (writer-mode записывает файл и mtime
-        // меняется — это НЕ внешнее изменение).
-        const ownWriteTolerance = 1500;
-        const lastOwn = fm.lastSavedAtMs || 0;
-        const isOwnWrite = Math.abs(mtime - lastOwn) < ownWriteTolerance;
-        if (mtime > (fm.lastSeenMtime || 0) + 1000 && !isOwnWrite) {
-          fm.lastSeenMtime = mtime;
-          fm.externalChangeDetected = true;
-          // Уведомляем Пользователя — toast + bg-цвет в badge.
-          if (fm.readOnly) {
-            flash(`⚠ Файл «${fm.fileName}» изменён извне. Нажмите «↻ Перечитать» в badge'е чтобы загрузить свежее содержимое.`, 'info');
-          } else {
-            flash(`⚠ Файл «${fm.fileName}» изменён ИЗВНЕ во время вашей работы. Следующее автосохранение перезапишет внешние правки! Используйте «↻ Перечитать» (вы потеряете локальные изменения) или явный save.`, 'error');
-          }
-          _updateFileModeBadge();
-        }
-      } catch (e) {
-        // File мог быть удалён, диск отключён — затаскать в console, не толкать тосты.
-        console.warn('[file-watch]', e.message);
-      }
-    }, 30000);
+    _externalWatchTimer = setInterval(_checkExternalChangeOnce, 30000);
+    // v0.60.271: на visibilitychange — немедленно проверить mtime (не ждать
+    // 30с). Сценарий: Пользователь свернул вкладку, коллега-писатель сохранил
+    // файл, Пользователь возвращается → сразу видит warning «изменён извне».
+    _externalWatchVisibilityHandler = () => {
+      if (!document.hidden) _checkExternalChangeOnce();
+    };
+    document.addEventListener('visibilitychange', _externalWatchVisibilityHandler);
   }
 
   bind('btn-file-open', async () => {
