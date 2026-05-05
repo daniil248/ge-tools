@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.282', date: '2026-05-06', items: [
+      '📥 <b>CSV / TSV экспорт Перечня оборудования</b>. Дополнение к v0.60.281: чтобы Технолог ЦОД / ГИП мог пересылать список subcontractor\'ам и заказчику.',
+      '• Кнопка <b>📥 Экспорт в CSV</b> — скачивает <code>equipment-list_YYYY-MM-DD.csv</code>. UTF-8 BOM, разделитель «;» — открывается в Excel / Google Sheets / LibreOffice без дополнительных настроек.',
+      '• Кнопка <b>📋 Копировать (TSV)</b> — Tab-separated values в clipboard. Вставка через Ctrl+V в любую таблицу.',
+      '• Колонки: Tag, Тип, Группа, Характеристики (chips объединены), Порты (system+name+count+spec).',
+      '• Кэш через <code>window.__twEquipmentExport</code> — рендерится в _renderEquipmentList и читается в click-handler.',
+      '✅ <b>О стандартном footer\'е в Tech-workspace</b> по сообщению Пользователя 2026-05-06: проверил — код подключён в <code>tech-workspace/index.html</code> ещё с v0.59.903. mountFooter вызывается, body класс rs-with-mfoot должен применяться. Если footer не виден — это вероятно browser cache (<b>Ctrl+Shift+R</b> для hard-reload) или JS-ошибка в console (открыть DevTools F12 — там должна быть ошибка с указанием конкретного файла).',
+      'Files: <code>tech-workspace/tech-workspace.js</code> (CSV/TSV handler).',
+    ] },
     { version: '0.60.281', date: '2026-05-06', items: [
       '📋 <b>«Перечень оборудования проекта» в Tech-workspace</b>. По запросу Пользователя 2026-05-06 (вариант 3 из uplink): «всё оборудование проекта со всеми возможными портами, характеристиками, выбранной моделью».',
       '<b>Где:</b> в split-layout sidebar появилась секция «📦 Сводки» с двумя кнопками — «📋 Перечень оборудования» (новая) и «📦 BOM (спецификация)» (была).',

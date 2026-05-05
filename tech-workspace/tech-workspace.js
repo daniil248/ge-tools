@@ -2492,6 +2492,10 @@ function _renderEquipmentList(c, ro) {
     </table>
   `).join('') || '<p class="muted">Нет оборудования. Добавьте группы стоек / ИБП / климат / ТП / ДГУ в карточках слева.</p>';
 
+  // v0.60.282: подготовка плоских CSV-данных для экспорта.
+  // Кэшируем в window-scope, чтобы button-handler нашёл их.
+  try { window.__twEquipmentExport = { items, byType }; } catch {}
+
   const total = items.length;
   return `<div class="tw-details-head">
       <h3>📋 Перечень оборудования проекта</h3>
@@ -2505,6 +2509,10 @@ function _renderEquipmentList(c, ro) {
         по всем системам (⚡ электрика, 🌊 трубы, 💨 ОВК, 📊 данные, 🔥 пожарка, ...).
         ${total === 0 ? '' : `BOM (агрегированная сводка с ценами) — соседняя кнопка в этом разделе rail.`}
       </p>
+      ${total > 0 ? `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button type="button" id="tw-eq-export-csv" style="padding:5px 12px;border:1px solid #15803d;background:#dcfce7;color:#15803d;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500" title="Скачать как CSV — открывается в Excel / Google Sheets / LibreOffice. Кодировка UTF-8 BOM, разделитель ;">📥 Экспорт в CSV</button>
+        <button type="button" id="tw-eq-export-tsv" style="padding:5px 12px;border:1px solid #2563eb;background:#dbeafe;color:#1e40af;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500" title="Скопировать TSV в буфер обмена — вставьте в Excel/Google Sheets через Ctrl+V (Tab-separated values).">📋 Копировать (TSV)</button>
+      </div>` : ''}
       <style>
         .tw-eq-section { margin: 16px 0 6px; font-size: 13px; font-weight: 600; color: #334155; }
         .tw-eq-table { width:100%; border-collapse: collapse; font-size: 12px; }
@@ -3007,6 +3015,52 @@ function bindListEvents() {
   root.addEventListener('click', async (e) => {
     const cur = _variants.find(x => x.id === _activeId);
     if (!cur) return;
+
+    // v0.60.282: CSV / TSV экспорт Перечня оборудования.
+    if (e.target.id === 'tw-eq-export-csv' || e.target.id === 'tw-eq-export-tsv') {
+      const data = window.__twEquipmentExport;
+      if (!data || !Array.isArray(data.items) || !data.items.length) {
+        twToast('Нет позиций для экспорта.', 'warn');
+        return;
+      }
+      const sep = e.target.id === 'tw-eq-export-csv' ? ';' : '\t';
+      const eol = '\r\n';
+      const _esc = (s) => {
+        const v = String(s ?? '');
+        if (v.includes(sep) || v.includes('"') || v.includes('\n') || v.includes('\r')) {
+          return '"' + v.replace(/"/g, '""') + '"';
+        }
+        return v;
+      };
+      const headers = ['Tag', 'Тип', 'Группа', 'Характеристики', 'Порты'];
+      const lines = [headers.map(_esc).join(sep)];
+      for (const it of data.items) {
+        const specsStr = it.specs.map(s => `${s.k}: ${(s.isHtml ? s.v.replace(/<[^>]+>/g, '') : s.v)}`).join(' · ');
+        const portsStr = it.ports.map(p => `${p.system}: ${p.name}${p.count > 1 ? ' x' + p.count : ''}${p.spec ? ' (' + p.spec + ')' : ''}`).join(' · ');
+        lines.push([_esc(it.tag), _esc(it.type), _esc(it.groupName || ''), _esc(specsStr), _esc(portsStr)].join(sep));
+      }
+      const text = lines.join(eol);
+      if (e.target.id === 'tw-eq-export-csv') {
+        // CSV download с UTF-8 BOM (для совместимости с Excel под Windows).
+        const blob = new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0, 10);
+        a.href = url; a.download = `equipment-list_${stamp}.csv`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        twToast(`📥 Скачан: equipment-list_${stamp}.csv (${data.items.length} строк)`, 'ok');
+      } else {
+        // TSV в clipboard.
+        try {
+          await navigator.clipboard.writeText(text);
+          twToast(`📋 Скопировано в буфер: ${data.items.length} строк (TSV — вставьте в Excel/Google Sheets через Ctrl+V).`, 'ok');
+        } catch (err) {
+          twToast('Не удалось скопировать (возможно, нет permission). Используйте CSV.', 'warn');
+        }
+      }
+      return;
+    }
 
     // v0.59.901: layout-mode buttons
     const layoutBtn = e.target.closest('.tw-layout-btn[data-layout]');
