@@ -675,7 +675,19 @@ export function renderInspectorNode(n) {
   // v0.58.38: tabs Электрика/Габариты/Системы + по одной вкладке для
   // каждой включённой (не-electrical) системы с параметрами.
   // v0.58.47: новая вкладка «📋 Общее» — tag/name/id + product/configure.
-  const _extraTabs = renderExtraSystemTabs(n);
+  // v0.60.277 (по запросу Пользователя 2026-05-06 «в текущей парадигме как
+  // нам быть с этим блоком (Системы), мы в конструкторе схем оставили
+  // только электрику. И электрику не нужно знать, какие еще системы есть
+  // в оборудовании. ... При этом все оборудование проекта точно должно
+  // отображаться у технолога ЦОД и у администратора и ГИПа со всеми
+  // возможными портами»): Конструктор схем = ДИСЦИПЛИНА ЭЛЕКТРИКА.
+  //   • Скрываем таб «🧩 Системы» (multi-discipline matter — Tech-workspace).
+  //   • Скрываем extra-tabs не-электрических систем (data, plumbing, ...).
+  //   • n.systems данные сохраняются — Tech-workspace и др. дисциплинарные
+  //     модули продолжают читать/писать.
+  //   • Read-only chip-info про другие дисциплины — в renderGeneralPanel.
+  const _extraTabsAll = renderExtraSystemTabs(n);
+  const _extraTabs = { tabsHtml: '', panelsHtml: '' }; // suppress in electrical-discipline
   // v0.59.886: для контейнера скрываем «Габариты» и «Системы» — их параметры
   // относятся к конкретному физическому экземпляру; контейнер — только
   // организационная обёртка. Пользователь: «габариты и системы не нужно,
@@ -685,7 +697,6 @@ export function renderInspectorNode(n) {
     <button type="button" class="tp-tab active" data-tab="general" role="tab">📋 Общее</button>
     <button type="button" class="tp-tab" data-tab="electrical" role="tab">⚡ Электрика</button>
     ${_isContainer ? '' : `<button type="button" class="tp-tab" data-tab="geometry" role="tab">📐 Габариты</button>`}
-    ${_isContainer ? '' : `<button type="button" class="tp-tab" data-tab="systems" role="tab">🧩 Системы${(function(){const c=(Array.isArray(n.systems)?n.systems.length:1);return c>1?` <span class="muted" style="font-size:10px">(${c})</span>`:'';})()}</button>`}
     ${_extraTabs.tabsHtml}
   </div>`);
   // Вкладка «Общее»
@@ -1118,15 +1129,10 @@ export function renderInspectorNode(n) {
   }
   h.push(`</div>`); // /panel geometry
 
-  // v0.58.15: вкладка «Системы» — какие инженерные системы поддерживает
-  // элемент (electrical / data / pipes / hvac ...). На странице нужного вида
-  // элемент видим и фильтруется только если его системы пересекаются с
-  // системами этой страницы.
-  h.push(`<div class="tp-panel" data-panel="systems" hidden>`);
-  h.push(renderSystemsBlock(n));
-  h.push(`</div>`);
-  // v0.58.38: панели систем (каждая — отдельная вкладка)
-  h.push(_extraTabs.panelsHtml);
+  // v0.58.15 / v0.60.277: вкладка «Системы» удалена из Конструктора схем.
+  // Конструктор = дисциплина «электрика»; multi-discipline systems
+  // редактируются в Tech-workspace. n.systems данные сохраняются.
+  // Панели extra-tabs (data/plumbing/...) тоже скрыты.
 
   inspectorBody.innerHTML = h.join('');
   wireSystemsBlock(n, inspectorBody);
@@ -2883,6 +2889,29 @@ function _configuratorForNode(n) {
 // только свои тематические поля; Общее собирает общий фундамент.
 export function renderGeneralPanel(n) {
   const h = [];
+  // v0.60.277: read-only info-block про другие дисциплины (n.systems).
+  // Конструктор схем = дисциплина электрика, но узел может быть в нескольких
+  // системах одновременно (Tech-workspace их редактирует). Электрик видит
+  // эти metadata только для контекста — без возможности менять.
+  try {
+    const sys = Array.isArray(n.systems) ? n.systems : [];
+    const others = sys.filter(s => s && s !== 'electrical');
+    if (others.length) {
+      const allSystems = getAllSystems();
+      const chips = others.map(sid => {
+        const m = allSystems.find(s => s.id === sid);
+        if (!m) return '';
+        return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;background:${m.color}15;border:1px solid ${m.color};border-radius:3px;font-size:10px;color:${m.color};font-weight:600">${m.icon} ${escHtml(m.label)}</span>`;
+      }).filter(Boolean).join(' ');
+      if (chips) {
+        h.push(`<div class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">
+          <div class="muted" style="font-size:11px;margin-bottom:4px" title="Этот элемент относится также к другим инженерным системам. Параметры этих дисциплин редактируются в Технологе ЦОД (или в дисциплинарном модуле). Конструктор схем работает только с электрической частью.">🧩 <b>Также в системах:</b></div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">${chips}</div>
+          <div class="muted" style="font-size:10px;margin-top:4px">Редактируется в Технологе ЦОД / дисциплинарном модуле.</div>
+        </div>`);
+      }
+    }
+  } catch {}
   // v0.58.49: «В работе» — общий переключатель эксплуатационного состояния.
   // Применим к source/generator/ups (остальные не имеют бинарного on/off).
   // Выключенный узел пропадает из расчёта всех систем, а не только электрики.
@@ -3674,21 +3703,22 @@ export function wrapModalWithSystemTabs(bodyEl, n) {
   // обёрнутом контейнере).
   if (bodyEl.querySelector(':scope > .tp-tabs')) return;
   const originalHtml = bodyEl.innerHTML;
-  // v0.58.38: каждая включённая (не-electrical) система — отдельная вкладка
-  const extra = renderExtraSystemTabs(n);
+  // v0.60.277: Конструктор схем = дисциплина электрика. Скрываем таб
+  // «🧩 Системы» (multi-discipline) и extra-tabs (data/plumbing/...).
+  // n.systems данные не теряются — Tech-workspace и др. модули читают/пишут.
+  const extra = { tabsHtml: '', panelsHtml: '' };
   // v0.58.50: добавлен таб «Общее» (roadmap 1.22.2), активный по умолчанию
   const tabsHtml = `<div class="tp-tabs" role="tablist" style="margin-bottom:12px">
     <button type="button" class="tp-tab active" data-tab="general" role="tab">📋 Общее</button>
     <button type="button" class="tp-tab" data-tab="electrical" role="tab">⚡ Электрика</button>
     <button type="button" class="tp-tab" data-tab="geometry" role="tab">📐 Габариты</button>
-    <button type="button" class="tp-tab" data-tab="systems" role="tab">🧩 Системы${(function(){const c=(Array.isArray(n.systems)?n.systems.length:1);return c>1?` <span class="muted" style="font-size:10px">(${c})</span>`:'';})()}</button>
     ${extra.tabsHtml}
   </div>`;
   bodyEl.innerHTML = tabsHtml
     + `<div class="tp-panel" data-panel="general">${renderGeneralPanel(n)}</div>`
     + `<div class="tp-panel" data-panel="electrical" hidden>${originalHtml}</div>`
     + `<div class="tp-panel" data-panel="geometry" hidden>${renderGeometryMmBlock(n)}</div>`
-    + `<div class="tp-panel" data-panel="systems" hidden>${renderSystemsBlock(n)}</div>`
+    /* v0.60.277: Системы и extra-tabs скрыты — Конструктор = дисциплина электрика. */
     + extra.panelsHtml;
   bodyEl.querySelectorAll(':scope > .tp-tabs .tp-tab').forEach(btn => {
     btn.addEventListener('click', () => {
