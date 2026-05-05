@@ -4,6 +4,24 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.364', date: '2026-05-06', items: [
+      '🔄 <b>Режимы резервирования N / N+1 / N+2 / 2N / Custom</b> в карточке consumer + <b>extra-wide табличные модалки</b>.',
+      '<b>1. Redundancy modes</b> (по запросу Пользователя 2026-05-06: «режим работы N, N+1, N+2, 2N влияющий на коэффициент загрузки. Только не тупо разделить на N+1 и умножить на N а нормально, согласно норм и правил расчета»).',
+      'Селектор «Режим резервирования» в general-tab cards consumer (виден когда count ≥ 1):',
+      '• <b>N</b> — без резерва, все count активны',
+      '• <b>N+1</b> — 1 в резерве, активны count-1 (lead-lag cycling)',
+      '• <b>N+2</b> — 2 в резерве (требует count ≥ 3)',
+      '• <b>2N</b> — полный дублёр, count/2 активны (требует count чётное ≥ 2)',
+      '• <b>Custom</b> — R задаётся вручную',
+      '<b>Правила расчёта</b> (по практике HVAC/MEP, ASHRAE 90.1, TIA-942 Tier I-IV, ANSI/IEEE 446):',
+      '• Total active load = N × demand × Ku (только активные единицы)',
+      '• BOM = count × demand (вся группа, включая R резервных) — для спецификации',
+      '• Per-unit cable рассчитан на demand одной единицы (на случай отказа основной — резерв подхватывает полную нагрузку)',
+      'Mode → <code>n.consumerReserveR</code> (R=резерв, N=count-R активные). Уже работает в <code>electrical.js consumerTotalDemandKw</code> (per × (cnt - R)).',
+      'Сводка под селектором (синее поле): <code>Активные: N · Резерв: R · Всего: count</code> + <code>P_уст_активная = N × demand</code> + опц. строка про BOM.',
+      '<b>2. Модалки шире</b> (по репорту: «нужно сделать пошире, чтобы тексты нормально вмещались»). Новый CSS-класс <code>.modal-box.modal-xwide</code> = max-width 1200px (было wide=760px). Применён к <code>modal-container-members</code> и <code>modal-debug-all-nodes</code> — табличные данные теперь не уезжают в горизонтальный скролл.',
+      'Files: <code>js/engine/inspector/consumer.js</code> (UI selector + apply-handler), <code>app.css</code> (.modal-xwide), <code>index.html</code> (modal-xwide на двух modal\'ках).',
+    ] },
     { version: '0.60.363', date: '2026-05-06', items: [
       '🔧 <b>Auto-fix stale outdoor tags при рендере</b>. По репорту Пользователя 2026-05-06: «это как? родитель Z1.ACU01 а ребенок Z1.ACU02.OU1???».',
       '<b>Корень</b>: rename outdoor-блока (sync <code>ou.tag = cond.tag + ".OU" + (i+1)</code>) делался ТОЛЬКО в apply-handler карточки cond. Если parent.tag менялся через другие пути (LS-импорт, копирование, миграция, переименование cond без apply), outdoor оставался со старым тегом.',

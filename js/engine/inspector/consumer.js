@@ -240,6 +240,59 @@ export function openConsumerParamsModal(n) {
     h.push(field('Количество в группе', `<input type="number" id="cp-count" min="1" max="999" step="1" value="${n.count || 1}">`));
   }
   const _cpCount = isOutdoor ? 1 : Math.max(1, Number(n.count) || 1);
+
+  // v0.60.364 (по запросу Пользователя 2026-05-06: «режим работы N, N+1,
+  // N+2, 2N влияющий на коэффициент загрузки... согласно норм и правил
+  // расчета»): селектор режима резервирования. Влияет на consumerReserveR
+  // (R = резерв; N = count - R активны). Total active load = N × demand,
+  // что уже реализовано в electrical.js consumerTotalDemandKw (cnt - R).
+  //
+  // Правила (по практике HVAC/MEP, ASHRAE/TIA-942/ANSI/IEEE 446):
+  //   N: R=0, все count активны (нет резервирования)
+  //   N+1: R=1, активны count-1, 1 в резерве (lead-lag cycling)
+  //   N+2: R=2, активны count-2 (требует count ≥ 3)
+  //   2N: R=count/2, активны count/2 (полный дублёр; требует count чётное ≥ 2)
+  //   custom: R задаётся вручную (0 ≤ R ≤ count-1)
+  //
+  // BOM включает все count единиц; load (для cable/breaker сайзинга
+  // активной нагрузки) — только N единиц. Per-unit cable рассчитан на
+  // demand одной единицы (на случай отказа основной — резерв подхватывает
+  // полную нагрузку).
+  if (!isOutdoor && _cpCount >= 1) {
+    const _curR = Math.max(0, Math.min(_cpCount - 1, Number(n.consumerReserveR) || 0));
+    let _curMode = 'N';
+    if (_curR === 0) _curMode = 'N';
+    else if (_curR === 1 && _cpCount >= 2) _curMode = 'N+1';
+    else if (_curR === 2 && _cpCount >= 3) _curMode = 'N+2';
+    else if (_curR * 2 === _cpCount && _cpCount >= 2) _curMode = '2N';
+    else _curMode = 'custom';
+    const _N = _cpCount - _curR;
+    h.push(`<div class="field">
+      <label>Режим резервирования${helpIcon('Режим работы группы. Влияет на расчёт нагрузки: только N активных единиц учитываются в Pуст и токе линии. Резервные R единиц — стоят в standby (lead-lag cycling), включаются при отказе основной. BOM (спецификация) включает все count = N+R единиц.\\n\\n• N — нет резерва, все активны. Pуст = count × P_демонд.\\n• N+1 — 1 в резерве. Активны count-1.\\n• N+2 — 2 в резерве. Требует count ≥ 3.\\n• 2N — полный дублёр (50% активны / 50% резерв). Требует count чётное.\\n• Custom — R задаётся вручную.\\n\\nИспользуется в HVAC/MEP/датацентрах: ASHRAE 90.1, TIA-942 (Tier I-IV), ANSI/IEEE 446.')}</label>
+      <select id="cp-redundancyMode" style="width:100%">
+        <option value="N"${_curMode === 'N' ? ' selected' : ''}>N — без резерва (все ${_cpCount} активны)</option>
+        <option value="N+1"${_curMode === 'N+1' ? ' selected' : ''}${_cpCount < 2 ? ' disabled' : ''}>N+1 — 1 в резерве${_cpCount >= 2 ? ` (активны ${_cpCount - 1})` : ' (нужно count ≥ 2)'}</option>
+        <option value="N+2"${_curMode === 'N+2' ? ' selected' : ''}${_cpCount < 3 ? ' disabled' : ''}>N+2 — 2 в резерве${_cpCount >= 3 ? ` (активны ${_cpCount - 2})` : ' (нужно count ≥ 3)'}</option>
+        <option value="2N"${_curMode === '2N' ? ' selected' : ''}${(_cpCount % 2 !== 0 || _cpCount < 2) ? ' disabled' : ''}>2N — полный дублёр${_cpCount >= 2 && _cpCount % 2 === 0 ? ` (${_cpCount / 2} акт. + ${_cpCount / 2} рез.)` : ' (нужно count чётное)'}</option>
+        <option value="custom"${_curMode === 'custom' ? ' selected' : ''}>Custom — R задаётся вручную</option>
+      </select>
+    </div>`);
+    if (_curMode === 'custom') {
+      h.push(`<div class="field">
+        <label>Резерв R (единиц в standby)${helpIcon('Количество резервных единиц. 0 ≤ R ≤ count-1. Активные = count - R.')}</label>
+        <input type="number" id="cp-reserveR" min="0" max="${Math.max(0, _cpCount - 1)}" step="1" value="${_curR}">
+      </div>`);
+    }
+    // Сводка активного / резерва / Pуст
+    const _Punit = Number(n.demandKw) || 0;
+    const _PustActive = _N * _Punit;
+    const _PustTotal = _cpCount * _Punit;
+    h.push(`<div class="muted" style="font-size:11px;color:#475569;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;padding:6px 8px;margin-top:-4px;line-height:1.5">
+      <b style="color:#0c4a6e">Активные:</b> N=<b>${_N}</b> · <b>Резерв:</b> R=<b>${_curR}</b> · <b>Всего:</b> ${_cpCount}<br>
+      <b style="color:#0c4a6e">P<sub>уст</sub> активная</b> (для расчёта токов и подбора кабеля/автомата) = ${_N} × ${_Punit} = <b>${_PustActive.toFixed(2)} кВт</b>
+      ${_curR > 0 ? `<br><span style="color:#64748b">BOM/спецификация = ${_cpCount} × ${_Punit} = ${_PustTotal.toFixed(2)} кВт (вся группа, включая ${_curR} резервн.)</span>` : ''}
+    </div>`);
+  }
   // v0.59.764: IDENTIFY-AS (ROADMAP 1.28.10 сценарий B) — связь 1:1 для
   // одиночных потребителей. Юзер: «как связать размещенную стойку с
   // стойкой из СКС CR1 и CR01 именно не соединить а заменить по факту».
@@ -2523,6 +2576,23 @@ export function openConsumerParamsModal(n) {
     const nameInput = document.getElementById('cp-name')?.value?.trim();
     n.name = nameInput || (cat ? cat.label : n.name || 'Потребитель');
     n.count = readNum('cp-count', n.count ?? 1);
+    // v0.60.364: redundancy mode → consumerReserveR
+    const _rmEl = document.getElementById('cp-redundancyMode');
+    if (_rmEl) {
+      const mode = _rmEl.value;
+      const cnt = Math.max(1, Number(n.count) || 1);
+      let r = 0;
+      if (mode === 'N') r = 0;
+      else if (mode === 'N+1' && cnt >= 2) r = 1;
+      else if (mode === 'N+2' && cnt >= 3) r = 2;
+      else if (mode === '2N' && cnt >= 2 && cnt % 2 === 0) r = cnt / 2;
+      else if (mode === 'custom') {
+        const _crEl = document.getElementById('cp-reserveR');
+        r = Math.max(0, Math.min(cnt - 1, Number(_crEl?.value) || 0));
+      }
+      if (r > 0) n.consumerReserveR = r;
+      else delete n.consumerReserveR;
+    }
     n.serialMode = !!document.getElementById('cp-serialMode')?.checked;
     n.loadSpec = (document.getElementById('cp-loadSpec')?.value === 'total') ? 'total' : 'per-unit';
     // v0.57.81: режим группы и items для индивидуальной
