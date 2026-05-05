@@ -4,6 +4,14 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.251', date: '2026-05-05', items: [
+      '🩹 <b>Kit-container Phase 1 revert: BFS НЕ skipает kit-internal</b>. По уточнению Пользователя 2026-05-05 «и все это нужно правильно учитывать по потреблению на схеме щита» (с учётом что auto-creation делает chain panel→cond→outdoor через один conn).',
+      '• Если skipать kit-internal в BFS, outdoor downstream от cond не считался бы (его demand терялся).',
+      '• Решение: <code>_markKitInternalConns</code> остаётся (флаг для визуала), но BFS-walks НЕ skipают эти conns. visitedConsumers/visitedC предотвращает двойной счёт. Каждый slot-узел (cond / outdoor / outdoor2) считается через свой <code>consumerMaxDemandKw</code>.',
+      '• Topology поддержана: cond без outdoor (water-cooled), cond+1 outdoor (split DX), cond+2 outdoor (двухконтурные) — все варианты корректно сложатся в _maxLoadKw панели.',
+      '• Флаг <code>_isKitInternal</code> позже будет использоваться в Phase 3 (cable journal — отдельная группировка «kit-internal cables»).',
+      'Файл: <code>js/engine/recalc.js</code> (3 walk-функции).',
+    ] },
     { version: '0.60.250', date: '2026-05-05', items: [
       '🧩 <b>Kit-container Phase 1: schema + auto-mark internal conns + BFS skip</b>. По запросу Пользователя 2026-05-05 «нужно сделать тоже самое только с потребителем типа кондиционер + наружный блок».',
       '• На <code>consumer-container</code> добавлен флаг <code>kitMode: boolean</code> — режим «сборка» вместо «группа».',

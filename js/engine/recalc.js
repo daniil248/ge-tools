@@ -447,9 +447,11 @@ function _bfsDownstreamWithActiveTies(startId, activeTieKeys) {
       for (const c of state.conns.values()) {
         if (c.from.nodeId !== curId) continue;
         if (c.lineMode === 'damaged' || c.lineMode === 'disabled') continue;
-        // v0.60.250: skip kit-internal (cond↔outdoor внутри сборки —
-        // sub-loads уже учтены через consumerCalcDemandKw kit-контейнера).
-        if (c._isKitInternal) continue;
+        // v0.60.250 revert: kit-internal conns НЕ skipаются — они
+        // могут быть частью chain (panel→cond→outdoor через auto-created
+        // conn), и outdoor нужно посчитать через walk. visitedConsumers
+        // предотвращает двойной счёт. Флаг _isKitInternal используется
+        // только для визуала (cable journal grouping).
         const to = state.nodes.get(c.to.nodeId);
         if (!to) continue;
         if (to.type !== 'consumer' && to.type !== 'consumer-container') continue;
@@ -3190,8 +3192,8 @@ function recalc() {
             const _curIsConsumer = _curNode && _curNode.type === 'consumer';
             for (const c2 of state.conns.values()) {
               if (c2.from.nodeId !== cur || c2.lineMode === 'damaged' || c2.lineMode === 'disabled') continue;
-              // v0.60.250: skip kit-internal conns.
-              if (c2._isKitInternal) continue;
+              // v0.60.250 revert: kit-internal не skipаем — outdoor через
+              // chain panel→cond→outdoor должен учесться. visitedC дедупит.
               const to = state.nodes.get(c2.to.nodeId);
               if (!to) continue;
               // v0.60.247: restrict для consumer-исходящих.
@@ -3569,8 +3571,7 @@ function recalc() {
           // v0.60.236: пропускаем internal integrated conns (фабричные
           // шины внутри ИБП Kehua MR33 между PDM-IT/PDM-AC/UPS-core).
           if (c._isInternalIntegrated) continue;
-          // v0.60.250: skip kit-internal (cond↔outdoor внутри сборки).
-          if (c._isKitInternal) continue;
+          // v0.60.250 revert: kit-internal не skipаем (chain learning).
           const to = state.nodes.get(c.to.nodeId);
           if (!to) continue;
           // v0.60.247: restrict для consumer-исходящих.
