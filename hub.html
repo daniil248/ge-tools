@@ -219,6 +219,58 @@
     }
   </script>
 
+  <!-- v0.60.306 (Phase 47.3.1): project-mode hub. При наличии ?project=X в URL
+       (или активном проекте в LS) — все ссылки на модули несут ?project=X,
+       сверху страницы появляется banner с именем проекта и быстрыми action'ами.
+       Это значит что Пользователь, открывший проект в /projects/, попадает
+       в «контекстный hub» где все модули работают в рамках этого проекта,
+       а не общий generic-hub. -->
+  <script type="module">
+    import { getProject, getActiveProjectId } from './shared/project-storage.js';
+    document.addEventListener('DOMContentLoaded', () => {
+      let pid = null;
+      try {
+        const url = new URL(location.href);
+        pid = url.searchParams.get('project') || (typeof getActiveProjectId === 'function' ? getActiveProjectId() : null);
+      } catch (e) { /* noop */ }
+      if (!pid) return;
+      let proj = null;
+      try { proj = typeof getProject === 'function' ? getProject(pid) : null; } catch (e) { /* noop */ }
+      if (!proj) return;
+      const KIND_LABEL = { datacenter: '🏢 ЦОД', factory: '🏭 Завод', 'pump-station': '💧 Насосная', office: '🏢 Офис', custom: '✏ Свой' };
+      const kindLabel = KIND_LABEL[proj.objectKind || 'datacenter'] || '🏢 ЦОД';
+      const banner = document.createElement('div');
+      banner.id = 'rs-project-banner';
+      banner.style.cssText = 'background:linear-gradient(180deg,#dbeafe 0%,#eff6ff 100%);border-bottom:2px solid #1e40af;padding:10px 24px;display:flex;align-items:center;gap:14px;font-size:13px;flex-wrap:wrap';
+      const nameSafe = String(proj.name || '(без имени)').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      const pidSafe = encodeURIComponent(pid);
+      banner.innerHTML = `
+        <span style="font-size:20px" title="Активный проект">📁</span>
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:600;color:#1e3a8a;font-size:14px">${nameSafe}</div>
+          <div style="color:#475569;font-size:11.5px;margin-top:2px">${kindLabel} · все модули открываются в контексте этого проекта</div>
+        </div>
+        <a href="projects/project.html?project=${pidSafe}" style="padding:6px 12px;background:#1e40af;color:#fff;border-radius:4px;text-decoration:none;font-size:12px;font-weight:500" title="Открыть карточку проекта (общее, команда, экономика, проверки, согласование)">📋 Карточка проекта</a>
+        <a href="hub.html" style="padding:6px 12px;background:#fff;border:1px solid #cbd5e1;color:#475569;border-radius:4px;text-decoration:none;font-size:12px" title="Выйти из контекста проекта (показать все модули как generic hub)">✕ Без проекта</a>
+      `;
+      const headerMount = document.getElementById('rs-header-mount');
+      if (headerMount && headerMount.parentNode) {
+        headerMount.parentNode.insertBefore(banner, headerMount.nextSibling);
+      } else {
+        document.body.insertBefore(banner, document.body.firstChild.nextSibling);
+      }
+      // Rewrite all hub-card hrefs to include ?project=X.
+      // Skip external links (http/https) и уже несущие ?project=.
+      document.querySelectorAll('.hub-card').forEach(card => {
+        const href = card.getAttribute('href');
+        if (!href || href.startsWith('#') || /^https?:/i.test(href)) return;
+        if (/[?&]project=/.test(href)) return;
+        const sep = href.includes('?') ? '&' : '?';
+        card.setAttribute('href', href + sep + 'project=' + pidSafe + '&from=hub');
+      });
+    });
+  </script>
+
   <!-- v0.60.137 (Phase 44.2 final): subscription locks на hub.html.
        Раньше locks были только в /modules/index.html — но hub это
        основной entry point для большинства Пользователей. Без локов на
