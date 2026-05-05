@@ -1,6 +1,6 @@
 # Raschet — Roadmap архитектурного развития платформы
 
-> **Статус:** v0.60.18 (2026-05-02). Phase 23.1 (line-items для CAPEX) ✅. Запланированы фазы 23.2–23.6 (rollout pattern на весь проект), 24 (модуль Сервис: монтаж/ТО), 25 (Импорт даташитов климат-оборудования), 26 (SharePoint integration), 27 (MS365 auth — deferred). Фаза 1.27 — «Проекты» полностью закрыта. Фаза 1.28 — POR-registry, cross-discipline reconciliation, 1.28.20 (consumer-container) — Phase 1+2. Фаза 19 (пресеты карточек) полностью закрыта. 1.24.18 закрыто. **Фаза 20 (Технолог ЦОД)**: 20.1 ✅ (двухпанельный layout v0.59.892), 20.2–20.6 ✅ (rackGroups/upsSystems/coolingUnits/feed/PDU per-group), 20.8 ✅ (блок МЦОД через sub-проект v0.59.893), 20.9 ✅ (HTML-ПЗ — будет переработана через модуль отчётов), 20.10 ✅ (compare), 20.11 ✅ (handoff MVP), 20.12 ✅ (PUE авто/ручной v0.59.895), 20.13 ✅ (BOM с ценами по дате v0.59.896). Открыто 20.7 (план зала). **Фаза 21 (Метеоданные)**: stand-alone модуль `meteo/` с plugin-архитектурой источников (Open-Meteo REST + rp5 CSV) — 21.1 ✅ v0.59.894. Local/Online switcher. Центр помощи с 21 статьёй + кнопка ❓ в общей шапке.
+> **Статус:** v0.60.273 (2026-05-06). Phase 23.1 (line-items для CAPEX) ✅. Запланированы фазы 23.2–23.6 (rollout pattern на весь проект), 24 (модуль Сервис: монтаж/ТО), 25 (Импорт даташитов климат-оборудования), 26 (SharePoint integration), 27 (MS365 auth — deferred). Фаза 1.27 — «Проекты» полностью закрыта. Фаза 1.28 — POR-registry, cross-discipline reconciliation, 1.28.20 (consumer-container) — Phase 1+2+3 ✅ (включая kit-container для cond+outdoor v0.60.250-259). **Фаза 45 (File-storage drawio-style)** ✅ v0.60.258-273 — File System Access API + IndexedDB persistent handle + external-change detection + ↻ Перечитать + ✕ Закрыть + Ctrl+O/Ctrl+Shift+S + discoverability с /projects/. **Фаза 46 (Firestore quota optimization)** ✅ v0.60.260-263 — solo-skip коллаборации (-95% writes), heartbeat 60с/45с, lock debounce 800мс, autosave 3с, persistence + TTL cache (-90% reads). Фаза 19 (пресеты карточек) полностью закрыта. 1.24.18 закрыто. **Фаза 20 (Технолог ЦОД)**: 20.1 ✅ (двухпанельный layout v0.59.892), 20.2–20.6 ✅ (rackGroups/upsSystems/coolingUnits/feed/PDU per-group), 20.8 ✅ (блок МЦОД через sub-проект v0.59.893), 20.9 ✅ (HTML-ПЗ — будет переработана через модуль отчётов), 20.10 ✅ (compare), 20.11 ✅ (handoff MVP), 20.12 ✅ (PUE авто/ручной v0.59.895), 20.13 ✅ (BOM с ценами по дате v0.59.896). Открыто 20.7 (план зала). **Фаза 21 (Метеоданные)**: stand-alone модуль `meteo/` с plugin-архитектурой источников (Open-Meteo REST + rp5 CSV) — 21.1 ✅ v0.59.894. Local/Online switcher. Центр помощи с 23 статьями + кнопка ❓ в общей шапке.
 
 > **Правило ведения:** roadmap обновляется ПОСТОЯННО — при появлении новой фичи / задачи и при закрытии любого этапа. Hotfix'ы (regressions, мелкие правки UX) НЕ попадают в roadmap, только содержательная функциональность. Это правило зафиксировано пользователем 2026-04-29.
 
@@ -11,6 +11,81 @@
 Эти крупные блоки функциональности влиты в master после последнего обновления
 roadmap (v0.59.601 → v0.59.755, 154 коммита). Сгруппированы по темам, без
 hotfix'ов и косметики.
+
+### ✅ Фаза 45 — File-storage drawio-style (v0.60.258–273)
+Файловое хранилище проектов как в drawio: проект сохраняется в локальный
+файл `.raschet.json`, который можно положить на сетевой ресурс для совместной
+работы (1 писатель + N читателей). Без облака, без квот.
+- **Phase 1** (v0.60.258): новый модуль `shared/file-sync.js` с обёрткой над
+  File System Access API (Chromium) + graceful fallback на download/upload
+  для Firefox/Safari. 3 кнопки в sidebar: 📁 Открыть / 👁 Только чтение /
+  💾 Сохранить в файл. Auto-save в file-mode пишется через handle (in-place),
+  без диалога.
+- **Phase 2** (v0.60.260): persistent handle через IndexedDB
+  (`raschet-file-sync` DB) — после reload страницы handle переживает сессию,
+  badge предлагает «↻ Открыть снова». Кнопки в badge'е: ↻ Перечитать,
+  ✕ Закрыть файл. Timestamp последнего save.
+- **Phase 3** (v0.60.262): external-change detection через mtime polling 30с.
+  Toast «⚠ Файл изменён извне» для read-only / красный warning для writer.
+  Badge подсвечивается красным.
+- **Phase 4** (v0.60.270): file-mode и cloud-mode взаимоисключающие —
+  открытие файла в cloud-проекте автоматически выходит из cloud-mode
+  (`exitCloudMode`); открытие cloud-проекта в file-mode авто-выключает
+  file-mode + forgetHandle. Закрывает edge-case data corruption.
+- **Phase 5** (v0.60.271): instant external-change check на visibilitychange —
+  при возврате на вкладку немедленно проверяем mtime, не ждём 30с tick.
+- **Phase 6** (v0.60.272–273): discoverability — зелёная кнопка
+  «📁 Открыть файл (drawio)» прямо на /projects/ toolbar. Хоткеи Ctrl+O /
+  Ctrl+Shift+S. Sidebar реорганизован: file-mode секция первой, legacy LS/Cloud
+  ниже. Полное обновление статьи `feature-file-storage.html` (23-я статья
+  справки).
+Файлы: `shared/file-sync.js`, `js/engine/export.js`, `js/main.js`,
+`projects/index.html`, `projects/projects.js`, `index.html`,
+`help/articles/feature-file-storage.html`.
+
+### ✅ Фаза 46 — Firestore quota optimization (v0.60.260–263)
+Бесплатный Spark plan имеет лимит 20K writes/day. Анализ показал что один
+активный user сжигал ~48K/day (lock acquire/release на каждый клик +
+heartbeat'ы). Запрос Пользователя 2026-05-06 «квота стала уходить очень
+быстро» → 4 фазы оптимизации:
+- **v0.60.260**: heartbeat-интервалы 2-3× длиннее (presence 25→60с,
+  lock 20→45с, autosave 1.5→3с, revision 5→15мин). Pause-on-hidden:
+  presence/lock heartbeat'ы skipят при `document.hidden=true`.
+  Visibilitychange тригерит немедленный beat при возврате.
+- **v0.60.261**: <b>solo-skip</b> — для проектов БЕЗ shared members
+  `_startCollab` вообще не вызывается. Lock acquire debounce 800мс при
+  rapid-clicking. Inline-solo проверка на каждом selection.
+- **v0.60.263**: Firestore offline persistence
+  (`enablePersistence({synchronizeTabs:true})`) — кэшируется reads в IDB,
+  server-reads только за дельтой. refreshProjects TTL-cache 30с с
+  force-bypass на mutations.
+- **v0.60.264**: collab-on-share — после addShare() в solo-проекте
+  автоматически стартуем collab. **v0.60.266**: shared→solo auto-stop —
+  после unshare последнего member'а останавливаем collab.
+Итог: writes 48K → 800/day (соло), reads 5K → 500/day. Spark plan теперь
+выдерживает месяцы обычной работы.
+Файлы: `js/main.js` (heartbeat constants + solo-detection + lock debounce),
+`shared/auth.js` (enablePersistence).
+
+### ✅ Фаза 1.28.21 — Kit-container (cond + outdoor): Phase 1-3 (v0.60.250–259)
+Новый режим `kitMode: true` для consumer-container — композитные сборки
+разнотипных приборов (кондиционер + 1-2 наружных блока) с внутренними
+kit-internal cables. Топология переменная (cond-only / cond+1 / cond+2).
+- **Phase 1** (v0.60.250–251): schema (`kitMode` flag) +
+  `_markKitInternalConns()` в recalc + verification что BFS не skipает
+  kit-internal (visitedConsumers предотвращает двойной счёт).
+- **Phase 2** (v0.60.255): UI toggle «📦 Группа / 🧩 Сборка» в
+  «Состав контейнера» modal. 3 пресета добавления: «+ cond (water)»,
+  «+ cond + outdoor», «+ cond + 2× outdoor». ATS info banner. Декомпозиция
+  «19 (15+4)» в строке Расчёт на карточке cond — суммарное на кабель +
+  составляющие в скобках.
+- **Phase 3** (v0.60.259): cable journal бейджи 🧩 kit / 🔌 int + новый
+  filter «Все соединения / Внешние / Kit-internal / Integrated UPS».
+  Help-статья `feature-kit-container.html`.
+Файлы: `js/engine/constants.js` (DEFAULTS.kitMode), `js/engine/recalc.js`
+(_markKitInternalConns), `js/engine/inspector.js` (modal UI),
+`js/engine/render.js` (decomposition), `js/main.js` (cable journal filter),
+`help/articles/feature-kit-container.html`.
 
 ### ✅ HVAC-derate ИБП (v0.59.605–611)
 Авто-детекция HVAC-нагрузок downstream и применение per-subtype derate-коэф.

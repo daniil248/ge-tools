@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.274', date: '2026-05-06', items: [
+      '📋 <b>ROADMAP.md обновлён согласно правилу [Roadmap maintenance rule]</b>. Содержательная функциональность за v0.60.254-273 (20 версий) занесена в раздел «Завершено».',
+      '• Header: версия v0.60.273, упоминание Phase 45 (file-storage), Phase 46 (quota optimization), 1.28.20 Phase 3 (kit-container).',
+      '• Новый раздел <b>«✅ Фаза 45 — File-storage drawio-style (v0.60.258-273)»</b>: 6 phase\'ов с детализацией (Phase 1 — FSA API, Phase 2 — persistent handle через IDB, Phase 3 — external-change detection, Phase 4 — file/cloud mutual exclusion, Phase 5 — visibility hook, Phase 6 — discoverability).',
+      '• Новый раздел <b>«✅ Фаза 46 — Firestore quota optimization (v0.60.260-263)»</b>: 4 phase\'а (heartbeat tuning, solo-skip, persistence/cache, transitions). Цифры: writes 48K→800/day соло, reads 5K→500/day.',
+      '• Новый раздел <b>«✅ Фаза 1.28.21 — Kit-container Phase 1-3 (v0.60.250-259)»</b>: schema, UI с пресетами, декомпозиция «19 (15+4)», cable journal бейджи.',
+      '• Hotfix\'ы (380kW utility, dgu.js shim, sidebar reorg) согласно правилу в ROADMAP НЕ попадают.',
+      'File: <code>ROADMAP.md</code>.',
+    ] },
     { version: '0.60.273', date: '2026-05-06', items: [
       '📚 <b>Обновление статьи help/articles/feature-file-storage.html</b>. Статья была написана на этапе v0.60.258 — устарела за 14 версий улучшений file-storage.',
       '• Добавлены секции: <b>Persistent file handle</b> (auto-restore через IndexedDB), <b>Обнаружение внешних изменений</b> (mtime polling 30с + visibility hook), <b>Кнопки внутри file-mode badge</b> (↻ Перечитать / ✕ Закрыть), <b>File-mode и Cloud-mode — взаимоисключающие</b>, <b>Хоткеи</b> (Ctrl+O / Ctrl+Shift+S), <b>Через страницу /projects/</b> (зелёная кнопка discovery).',
