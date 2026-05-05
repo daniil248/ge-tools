@@ -3285,7 +3285,14 @@ export function renderNodes() {
           g.appendChild(t);
         }
       }
-      // Лампочки — показывают состояние автомата
+      // Лампочки — показывают состояние автомата + наличие напряжения.
+      // v0.60.304 (по репорту Пользователя 2026-05-06: «при отключении питания на
+      // приоритетном вводе АВР не могут переключаться, а у тебя сразу
+      // активировались оба порта» — оказалось маркеры всегда зелёные при
+      // closed-автомате, не отражая реальное наличие напряжения):
+      //   • closed + cable active   → зелёный (питание есть)
+      //   • closed + cable dead     → серый (автомат включён, но напряжения нет)
+      //   • open                    → красный (автомат выключен)
       const conn = portConns.get(i);
       if (conn) {
         const inBrk = Array.isArray(n.inputBreakerStates) ? n.inputBreakerStates : [];
@@ -3296,12 +3303,16 @@ export function renderNodes() {
         } else {
           breakerClosed = inBrk[i] !== false;
         }
-        if (breakerClosed) {
+        if (!breakerClosed) {
+          g.appendChild(el('circle', { class: 'port-lamp red', cx, cy, r: 4.5 }));
+          g.appendChild(el('circle', { class: 'port-lamp-core red', cx, cy, r: 2 }));
+        } else if (conn._state === 'active') {
           g.appendChild(el('circle', { class: 'port-lamp green', cx, cy, r: 4.5 }));
           g.appendChild(el('circle', { class: 'port-lamp-core green', cx, cy, r: 2 }));
         } else {
-          g.appendChild(el('circle', { class: 'port-lamp red', cx, cy, r: 4.5 }));
-          g.appendChild(el('circle', { class: 'port-lamp-core red', cx, cy, r: 2 }));
+          // closed но напряжения нет — серая лампочка
+          g.appendChild(el('circle', { class: 'port-lamp gray', cx, cy, r: 4.5, fill: '#cbd5e1', stroke: '#94a3b8', 'stroke-width': 1 }));
+          g.appendChild(el('circle', { class: 'port-lamp-core gray', cx, cy, r: 2, fill: '#94a3b8' }));
         }
       }
     }
