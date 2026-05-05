@@ -939,7 +939,28 @@ function renderAuthUI() {
 }
 
 // ================= Список проектов =================
-async function refreshProjects() {
+// v0.60.263: TTL-cache для refreshProjects (вызывается ~12 раз/session,
+// каждый = 3 Firestore reads × N документов). С TTL 30с типичная сессия
+// с 5 кликами по табам режется до 1 фактического refresh + 4 cache-hit.
+// Force=true bypass для actions, после которых данные точно изменились
+// (создание/удаление/share). Persistence (v0.60.263) уже снижает cost
+// каждого read в 10×, кэш — поверх для совсем безподписочной экономии.
+const PROJECTS_CACHE_TTL_MS = 30_000;
+let _projectsCache = null;
+let _projectsCacheTime = 0;
+function _invalidateProjectsCache() {
+  _projectsCache = null;
+  _projectsCacheTime = 0;
+}
+async function refreshProjects(opts = {}) {
+  const force = !!(opts && opts.force);
+  // Cache-hit
+  if (!force && _projectsCache && (Date.now() - _projectsCacheTime) < PROJECTS_CACHE_TTL_MS) {
+    state.tabData = _projectsCache;
+    updateNotificationBadge((_projectsCache.requests || []).length);
+    renderCurrentTab();
+    return;
+  }
   try {
     // v0.59.507: автоматическая миграция orphan-схем перед рендером списка.
     // Schemes без projectId → привязываем к контейнеру с тем же именем
@@ -1012,6 +1033,9 @@ async function refreshProjects() {
       window.Storage.listAccessRequests().catch(handleErr('requests')),
     ]);
     state.tabData = { mine, shared, requests };
+    // v0.60.263: cache.
+    _projectsCache = { mine, shared, requests };
+    _projectsCacheTime = Date.now();
     updateNotificationBadge(requests.length);
     renderCurrentTab();
   } catch (e) {
@@ -1085,13 +1109,15 @@ function renderCurrentTab() {
         try {
           await window.Storage.approveRequest(r.id, b.dataset.role);
           flash('Доступ выдан');
-          refreshProjects();
+          _invalidateProjectsCache(); // v0.60.263
+          refreshProjects({ force: true });
         } catch (e) { flash(e.message || 'Ошибка', 'error'); }
       });
       card.querySelector('.btn-deny').onclick = async () => {
         try {
           await window.Storage.denyRequest(r.id);
-          refreshProjects();
+          _invalidateProjectsCache(); // v0.60.263
+          refreshProjects({ force: true });
         } catch (e) { flash(e.message || 'Ошибка', 'error'); }
       };
       els.projectsList.appendChild(card);
@@ -1154,7 +1180,8 @@ function renderCurrentTab() {
       try {
         const created = await window.Storage.createProject(nm, null);
         await window.Storage.saveProject(created.id, { projectId: pid });
-        await refreshProjects();
+        _invalidateProjectsCache(); // v0.60.263
+        await refreshProjects({ force: true });
         openProject(created.id);
       } catch (e) { flash(e.message || 'Ошибка', 'error'); }
     };
@@ -1165,7 +1192,8 @@ function renderCurrentTab() {
       try {
         const { updateProject } = await import('../shared/project-storage.js');
         updateProject(pid, { name: nm });
-        refreshProjects();
+        _invalidateProjectsCache(); // v0.60.263
+        refreshProjects({ force: true });
       } catch (e) { flash(e.message || 'Ошибка', 'error'); }
     };
     const delBtn = header.querySelector('[data-act="del-ctx"]');
@@ -1182,7 +1210,8 @@ function renderCurrentTab() {
         }
         const { deleteProject } = await import('../shared/project-storage.js');
         deleteProject(pid);
-        refreshProjects();
+        _invalidateProjectsCache(); // v0.60.263
+        refreshProjects({ force: true });
       } catch (e) { flash(e.message || 'Ошибка', 'error'); }
     };
     for (const p of list) _renderSchemeCard(p, ctxProjects);
@@ -1239,7 +1268,8 @@ function _renderSchemeCard(p, ctxProjects) {
     if (!name || name === p.name) return;
     try {
       await window.Storage.renameProject(p.id, name);
-      refreshProjects();
+      _invalidateProjectsCache(); // v0.60.263
+      refreshProjects({ force: true });
     } catch (e) { flash(e.message || 'Ошибка', 'error'); }
   };
   const del = card.querySelector('.pc-delete');
@@ -1247,7 +1277,8 @@ function _renderSchemeCard(p, ctxProjects) {
     if (!(await rsConfirm(`Удалить проект «${p.name}»?`, 'Это действие необратимо.', { okLabel: 'Удалить', cancelLabel: 'Отмена' }))) return;
     try {
       await window.Storage.deleteProject(p.id);
-      refreshProjects();
+      _invalidateProjectsCache(); // v0.60.263
+      refreshProjects({ force: true });
     } catch (e) { flash(e.message || 'Ошибка', 'error'); }
   };
   // v0.59.541: явный «Переместить» с модалкой выбора + подтверждением.
@@ -1799,8 +1830,9 @@ async function createNewProject() {
     }
     const p = await window.Storage.createProject(name, scheme);
     await window.Storage.saveProject(p.id, { projectId: ctx.id });
+    _invalidateProjectsCache(); // v0.60.263
     closeModal('modal-new');
-    await refreshProjects();
+    await refreshProjects({ force: true });
     openProject(p.id);
   } catch (e) {
     flash(e.message || 'Ошибка создания', 'error');

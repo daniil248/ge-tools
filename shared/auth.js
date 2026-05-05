@@ -101,6 +101,26 @@ async function init() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(window.FIREBASE_CONFIG);
     firebaseReady = true;
+    // v0.60.263 (по продолжению квота-оптимизации после v0.60.260/261):
+    // Firestore offline persistence — кэширует reads в IndexedDB. Последующие
+    // .get() и onSnapshot отдают данные из cache мгновенно, и server-reads
+    // считаются только за дельтой, а не за полный документ. Снижает read-
+    // нагрузку Spark plan'а (50K reads/day) дополнительно ~5-10× для активной
+    // работы. ВАЖНО: должно быть до первого firestore() call (userIndex.set
+    // ниже — первый call). Игнорируем ошибки — без persistence app работает.
+    if (firebase.firestore) {
+      try {
+        firebase.firestore().enablePersistence({ synchronizeTabs: true })
+          .catch(err => {
+            // failed-precondition = другая вкладка уже захватила, unimplemented = браузер не поддерживает.
+            if (err.code !== 'failed-precondition' && err.code !== 'unimplemented') {
+              console.warn('[auth] Firestore persistence failed:', err.code, err.message);
+            }
+          });
+      } catch (e) {
+        console.warn('[auth] enablePersistence sync threw:', e.message);
+      }
+    }
     // Страховка: если Firebase не вызовет onAuthStateChanged за 2 секунды
     // (нет сессии, пустой кеш) — рендерим «не вошли», НО не перетираем
     // кеш currentUserId на 'anonymous' — это лишь таймаут, реальный state

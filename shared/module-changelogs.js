@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.263', date: '2026-05-06', items: [
+      '🔋🔋🔋 <b>Firestore reads -10×: offline persistence + refreshProjects cache</b>. Продолжение оптимизации после v0.60.260/261.',
+      '<b>Firestore offline persistence</b>: <code>firebase.firestore().enablePersistence({ synchronizeTabs: true })</code> вызвается сразу после <code>initializeApp()</code> в shared/auth.js. Кэширует reads в IndexedDB. Последующие .get() и onSnapshot отдают данные из кэша мгновенно, server-reads считаются ТОЛЬКО за дельтой документа (а не за полный документ). Снижает read-cost в 5-10× для повторных reads.',
+      '• Multi-tab support через <code>synchronizeTabs: true</code>. Если в другой вкладке persistence уже захвачен — silent fallback (failed-precondition).',
+      '• В Firefox/Safari без поддержки IDB persistence (unimplemented) — silent fallback. App работает без кэша, как раньше.',
+      '<b>refreshProjects TTL-cache</b>: список проектов вызывался ~12 раз/session × 3 reads = 36 reads + N документов на каждом вызове. С TTL 30с типичная сессия с 5-кликами по табам схлопывается до 1 фактического refresh + 4 cache-hit\'а (≈80% economy).',
+      '• Force=true bypass для actions, после которых данные точно изменились: создание/удаление/переименование проекта, approve/deny request.',
+      '• <code>_invalidateProjectsCache()</code> вызывается перед force-refresh, чтобы все вкладки на одной session-state увидели свежие данные.',
+      'Files: <code>shared/auth.js</code> (enablePersistence), <code>js/main.js</code> (TTL cache + invalidate в 7 местах), <code>js/engine/constants.js</code> (APP_VERSION).',
+    ] },
     { version: '0.60.262', date: '2026-05-06', items: [
       '⚠ <b>File-storage Phase 5: external change detection</b>. По смежной задаче «совместная работа на сетевом ресурсе»: writer мог перезаписать правки коллеги, который тоже временно открыл файл — теперь детектируется.',
       '• Каждые 30с в file-mode опрашиваем mtime файла через <code>handle.getFile().lastModified</code>.',
