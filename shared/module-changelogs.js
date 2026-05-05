@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.367', date: '2026-05-06', items: [
+      '🔌 <b>Outdoor parent display в Перечне потребителей</b>. По репорту Пользователя 2026-05-06: «для конденсаторов укажи что они подключены к кондиционеру, номер кондиционера ты знаешь».',
+      '<b>Корень</b>: <code>parentPanelById0</code> в <code>js/main.js</code> (Перечень потребителей) собирал родительские панели/ИБП через incoming-conn. Outdoor имеет conn от cond (consumer→consumer), не от panel — fallback на container не помогал, поскольку outdoor не в container\'е → парент = «orphan».',
+      '<b>Fix</b>: новый fallback — для <code>consumerSubtype === \'outdoor_unit\'</code> с <code>linkedIndoorId</code>, parent = parent indoor cond. В таблице теперь отображается «Z1.ACU03» вместо «orphan» для ACU03.OU1.',
+      'Files: <code>js/main.js</code> (parentPanelById0 fallback for outdoor).',
+    ] },
     { version: '0.60.366', date: '2026-05-06', items: [
       '🔌 <b>Outdoor блоки наследуют _powered от parent cond</b> + <b>декомпозиция Номинала cond (indoor+outdoor)</b>.',
       '<b>1. Outdoor _powered fix</b> (по репорту Пользователя 2026-05-06: «почему у меня внутренни блок [outdoor], входящий в стосав кондиционера, числится не подключенным»).',

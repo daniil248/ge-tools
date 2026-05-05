@@ -7002,6 +7002,19 @@ function renderConsumersTable() {
       const container = _containerByMember.get(n.id);
       if (container) parents = _collectParents(container.id);
     }
+    // v0.60.367 (по репорту Пользователя 2026-05-06: «для конденсаторов
+    // укажи что они подключены к кондиционеру, номер кондиционера ты
+    // знаешь»): outdoor-блоки питаются от parent indoor cond (через
+    // linkedIndoorId), не от panel/ups напрямую. Показываем cond как
+    // парент. Если cond сам в контейнере — рекурсивно используем его
+    // parents.
+    if (!parents.length && n.consumerSubtype === 'outdoor_unit' && n.linkedIndoorId) {
+      const _parentCond = S.nodes.get(n.linkedIndoorId);
+      if (_parentCond) {
+        // Сначала показываем cond как parent (логически).
+        parents = [_parentCond];
+      }
+    }
     parentPanelById0.set(n.id, parents);
   }
 
