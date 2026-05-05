@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.259', date: '2026-05-06', items: [
+      '🧩 <b>Cable journal Phase 3: badge для kit-internal / int conn</b>. Завершение полной реализации kit-container по плану Пользователя 2026-05-05/06.',
+      '• В колонке «Обозначение» кабельного журнала теперь показываются цветные бейджи: <b>🧩 kit</b> (зелёный) для kit-internal соединений (cond → outdoor в сборке) и <b>🔌 int</b> (синий) для внутренней проводки интегрированного ИБП. Tooltip объясняет назначение.',
+      '• Новый dropdown-фильтр «Все соединения / Только внешние / Только kit-internal / Только integrated UPS» рядом с категорией. Позволяет быстро найти все kit-internal cables проекта или, наоборот, скрыть их при работе с внешней разводкой.',
+      '• Filter включён в reset-button и сохраняется в live-state таблицы.',
+      '📚 <b>Справка для kit-container и file-storage</b>. Две новые статьи в Центре помощи:',
+      '• <code>feature-kit-container.html</code> — что такое сборка, отличия от группы, пошаговая инструкция создания (1-6 шагов), декомпозиция мощности на карточке (15+4=19 kW), отображение в кабельном журнале, ATS per-member, когда НЕ использовать.',
+      '• <code>feature-file-storage.html</code> — drawio-style файловое хранилище: 3 кнопки sidebar, сценарии одиночной работы и командной на сетевом ресурсе, поддержка браузеров (Chrome/Edge full vs Firefox/Safari fallback), формат файла, сравнение с другими режимами (Local/Cloud/File).',
+      '• Cross-references: feature-shell-container ↔ feature-kit-container, feature-storage-mode ↔ feature-file-storage.',
+      'Файлы: <code>js/main.js</code> (badges + cableKind filter), <code>index.html</code> (filter dropdown), <code>help/articles/feature-kit-container.html</code>, <code>help/articles/feature-file-storage.html</code>, <code>help/articles.json</code>.',
+    ] },
     { version: '0.60.258', date: '2026-05-06', items: [
       '📁 <b>File-based storage (drawio-style)</b>. По запросу Пользователя 2026-05-06 «предлагаю пользовательские данные хранить не в браузере а в локальных файлах пользователя, как drawio например хранит библиотеки пользователя просто в файле. Такой файл можно выложить на сетевом ресурсе и использовать совместно».',
       '• Новый модуль <code>shared/file-sync.js</code> — обёртка над File System Access API (Chromium-браузеры) с graceful fallback на download/upload через input[type=file] для Firefox/Safari.',

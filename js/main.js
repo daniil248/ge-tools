@@ -3353,6 +3353,9 @@ let _cableTableFilters = {
   status: '',
   // v0.59.636: фильтры по материалу / изоляции / bundling.
   material: '', insulation: '', bundling: '',
+  // v0.60.259: фильтр по «kind» соединения — '' (все) / 'kit' (только kit-internal) /
+  // 'int' (только integrated UPS) / 'external' (только внешние, без kit и int).
+  cableKind: '',
 };
 // Phase 1.20.18: оценка статуса линии по её флагам
 function _ctConnStatus(c) {
@@ -3409,6 +3412,12 @@ function openCableTableModal(opts) {
     catEl.value = _cableTableFilters.category || '';
     catEl.onchange = (e) => { _cableTableFilters.category = e.target.value; renderCableTable(); };
   }
+  // v0.60.259: фильтр по cableKind (external / kit / int).
+  const ckEl = document.getElementById('cable-table-filter-cablekind');
+  if (ckEl) {
+    ckEl.value = _cableTableFilters.cableKind || '';
+    ckEl.onchange = (e) => { _cableTableFilters.cableKind = e.target.value; renderCableTable(); };
+  }
   const csvBtn = document.getElementById('cable-table-export-csv');
   if (csvBtn) csvBtn.onclick = exportCableTableCsv;
   // Phase 1.20.36: кнопка «✕ Сброс» в header — сброс всех фильтров и сортировки
@@ -3423,11 +3432,13 @@ function openCableTableModal(opts) {
       label: '', fromTo: '',
       category: '', breaker: null, curve: '', status: '',
       material: '', insulation: '', bundling: '',
+      cableKind: '', // v0.60.259
     };
     _cableTableSort = { col: 'label', dir: 'asc' };
     const s = document.getElementById('cable-table-search'); if (s) s.value = '';
     const cls = document.getElementById('cable-table-filter-class'); if (cls) cls.value = '';
     const cat = document.getElementById('cable-table-filter-category'); if (cat) cat.value = '';
+    const ck = document.getElementById('cable-table-filter-cablekind'); if (ck) ck.value = '';
     renderCableTable();
   };
 }
@@ -3745,6 +3756,14 @@ function renderCableTable() {
     if (exceptKey !== 'material' && F.material && (c.material || '') !== F.material) return false;
     if (exceptKey !== 'insulation' && F.insulation && (c.insulation || '') !== F.insulation) return false;
     if (exceptKey !== 'bundling' && F.bundling && (c.bundling || '') !== F.bundling) return false;
+    // v0.60.259: фильтр по виду соединения.
+    if (exceptKey !== 'cableKind' && F.cableKind) {
+      const isKit = !!c._isKitInternal;
+      const isInt = !!c._isInternalIntegrated;
+      if (F.cableKind === 'kit' && !isKit) return false;
+      if (F.cableKind === 'int' && !isInt) return false;
+      if (F.cableKind === 'external' && (isKit || isInt)) return false;
+    }
     return true;
   };
   const filtered = conns.filter(c => _cablePasses(c, ''));
@@ -4050,6 +4069,8 @@ function renderCableTable() {
           <input type="checkbox" class="ct-row-sel" data-id="${esc(c.id)}" ${checked ? 'checked' : ''}>
         </td>
         ${ifShow('label', `<td style="padding:5px 8px;font-weight:600">
+          ${c._isKitInternal ? '<span title="Внутренний кабель сборки (kit-internal): соединение между slot-членами одного kit-container, например cond → outdoor блок. Учитывается в кабельном журнале как отдельная позиция, но не передаёт нагрузку дважды." style="display:inline-block;padding:1px 5px;font-size:9px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:3px;margin-right:4px;font-weight:600">🧩 kit</span>' : ''}
+          ${c._isInternalIntegrated ? '<span title="Внутренняя проводка интегрированного ИБП (заводская шинка между PDM-секциями)." style="display:inline-block;padding:1px 5px;font-size:9px;background:#e0e7ff;color:#3730a3;border:1px solid #a5b4fc;border-radius:3px;margin-right:4px;font-weight:600">🔌 int</span>' : ''}
           <a href="#" class="ct-jump" data-id="${esc(c.id)}" title="Перейти к линии на схеме" style="color:#1976d2;text-decoration:none;display:inline-flex;align-items:center;gap:4px">${esc(lineLabel)}<span style="font-size:10px;opacity:0.7">↗</span></a>
           <button type="button" class="ct-tcc" data-id="${esc(c.id)}" title="Показать карту защиты (TCC)" style="margin-left:6px;padding:1px 6px;border:1px solid #bbdefb;background:#f0f4ff;color:#1565c0;border-radius:3px;cursor:pointer;font-size:10px">TCC</button>
         </td>`)}

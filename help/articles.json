@@ -270,7 +270,23 @@
       "category": "features",
       "summary": "Связь экземпляров стоек: shell — оболочка с младшим обозначением, остальные внутри. Свойства наследуются.",
       "file": "feature-shell-container.html",
-      "related": ["module-schematic", "module-scs-config"]
+      "related": ["module-schematic", "module-scs-config", "feature-kit-container"]
+    },
+    {
+      "id": "feature-kit-container",
+      "title": "🧩 Сборки потребителей (kit-container): кондиционер + outdoor",
+      "category": "features",
+      "summary": "Композитный набор разнотипных приборов: cond + 1-2 outdoor блока с kit-internal-кабелями. 3 пресета добавления, декомпозиция мощности 19 (15+4) на карточке.",
+      "file": "feature-kit-container.html",
+      "related": ["feature-shell-container", "module-schematic"]
+    },
+    {
+      "id": "feature-file-storage",
+      "title": "📁 Файловое хранилище (drawio-style): локальный файл / сетевой ресурс",
+      "category": "features",
+      "summary": "Хранение проекта в локальном файле .raschet.json с автосохранением (File System Access API). Сетевой ресурс: 1 писатель + N читателей. Без квот Firestore.",
+      "file": "feature-file-storage.html",
+      "related": ["feature-storage-mode", "feature-backup", "arch-storage-keys"]
     },
     {
       "id": "feature-status-filter",
