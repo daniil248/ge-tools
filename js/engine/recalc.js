@@ -2108,7 +2108,13 @@ function recalc() {
       const myLoad = fullDown * upsShare;
       const actualLoad = Math.min(capKw, myLoad);
       maxKwDownstream = actualLoad / eff + chKw;
-    } else if (toN.type === 'panel') {
+    } else if (toN.type === 'panel' || toN.type === 'junction-box' || toN.type === 'channel') {
+      // v0.60.329 (по репорту Пользователя 2026-05-06: «кабель до ДГУ не
+      // просчитался, текущий ток 0, по текущему току рассчитывать не стоит»):
+      // junction-box и channel — passthrough-узлы. Если target — passthrough,
+      // считаем maxKwDownstream через BFS, как для panel. Иначе для DGU
+      // (off, _loadKw=0) и downstream-junction-box maxKwDownstream падал
+      // до 0 → cable выбирался по минимальному сечению.
       maxKwDownstream = maxDownstreamLoad(toN.id);
     } else {
       maxKwDownstream = c._loadKw;
