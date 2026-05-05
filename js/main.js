@@ -8892,8 +8892,28 @@ async function init() {
   // — но в большинстве случаев navigation сразу за click-ом считается
   // user-gesture chain. Очищаем параметр после обработки.
   const openFile = url.searchParams.get('openFile');
+  // v0.60.343 (по репорту Пользователя 2026-05-06: «по ссылке на первом
+  // скрине открывается как бы схема, но не та» — hub передаёт project-context-id
+  // в URL ?project=X, а Constructor по умолчанию интерпретирует это как
+  // SCHEME id (cloud Firestore «projects» collection). Открывается openProject
+  // с context-id вместо scheme-id → пустой редактор.
+  // Distinguish: если id есть в LS как project-CONTEXT (kind='full'/'sketch'),
+  // показываем список схем этого контекста, не пытаемся openProject(scheme).
+  let _isProjectCtxId = false;
   if (projectId) {
+    try {
+      const ps = await import('../shared/project-storage.js');
+      const ctxList = ps.listProjects() || [];
+      _isProjectCtxId = ctxList.some(p => p && p.id === projectId);
+    } catch (e) { /* noop */ }
+  }
+  if (projectId && !_isProjectCtxId) {
     openProject(projectId);
+  } else if (projectId && _isProjectCtxId) {
+    // Project-mode list — показать схемы этого проекта (v0.60.307 фильтр в
+    // renderCurrentTab уже работает с URL ?project=X).
+    showScreen('projects');
+    await refreshProjects();
   } else if (openFile === '1') {
     showScreen('editor');
     url.searchParams.delete('openFile');

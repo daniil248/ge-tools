@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.343', date: '2026-05-06', items: [
+      '🐛 <b>CRITICAL: hub-link на Конструктор открывал пустой редактор</b>. По репорту Пользователя 2026-05-06: «по ссылке на первом скрине открывается как бы схема, но не та».',
+      '<b>Корень</b>: Constructor (<code>index.html</code>) интерпретирует <code>?project=X</code> как SCHEME id (Firestore «projects» collection — это схемы, не контексты). Hub-link rewrite (v0.60.306) передаёт project-CONTEXT id (из shared/project-storage.js). При клике «Конструктор схем» из hub в project-mode → <code>openProject(\'p_tyux2vnmz4\')</code> с context-id → не находится в schemes → пустой редактор.',
+      '<b>Fix</b>: на init проверяем <code>shared/project-storage.js listProjects()</code> — если URL <code>?project=X</code> совпадает с context-id, показываем список схем этого контекста (project-mode v0.60.307), не пытаемся <code>openProject</code>. Если URL — scheme id, работает как раньше.',
+      '<b>Эффект</b>: «Конструктор схем» из hub в project-mode теперь открывает СПИСОК схем этого проекта (как ожидается). Прямые ссылки на схему по scheme-id продолжают работать.',
+      'Files: <code>js/main.js</code> (init: distinguish scheme-id vs project-ctx-id перед openProject).',
+    ] },
     { version: '0.60.342', date: '2026-05-06', items: [
       '🔧 <b>3 UX-фикса по репорту Пользователя 2026-05-06</b>: «2 раза карточка проекта зачем??? минипроекты в проектах зачем??? Без проекта и проект ... зачем???»',
       '<b>1) «Карточка проекта» дважды в шапке</b> (back-button + breadcrumb-title с тем же лейблом). Fix в <code>shared/app-header.js</code>: back-button не показывается если <code>prev.moduleId === moduleId</code> (циклический возврат на ту же страницу).',
