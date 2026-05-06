@@ -4259,6 +4259,34 @@ function recalc() {
           } catch (e) { /* fallback: старое значение остаётся */ }
         }
       }
+      // v0.60.372 (по репорту Пользователя 2026-05-06: «автомат должен быть
+      // больше расчетной» — после v0.60.371 кабель пересчитывается, но
+      // breaker остаётся старым (50А для линии 169.3А)): аналогичный
+      // re-select breaker'а в post-pass. selectBreaker вызывался в conn-loop
+      // с _maxA до post-clamp.
+      if (!c.manualBreakerIn && c._maxA > 0 && Number.isFinite(Number(c._breakerIn))) {
+        const _curBrk = Number(c._breakerIn) || 0;
+        // Если In < Iрасч — перевыбираем (правило In ≥ Iрасч).
+        if (_curBrk > 0 && c._maxA > _curBrk) {
+          try {
+            const _toN2 = state.nodes.get(c.to.nodeId);
+            const _consInrush2 = (_toN2 && _toN2.type === 'consumer') ? (Number(_toN2.inrushFactor) || 1) : 1;
+            const _effMargin2 = Math.max(
+              Number(GLOBAL.breakerMinMarginPct) || 0,
+              autoBreakerMargin(_consInrush2)
+            );
+            const _marginK2 = 1 + _effMargin2 / 100;
+            const _newBrk = selectBreaker(c._maxA * _marginK2);
+            if (_newBrk > _curBrk) {
+              c._breakerIn = _newBrk;
+              c._breakerPerLine = _newBrk;
+              c._breakerReselectedAfterClamp = true;
+              c._breakerAgainstCable = !!(c._cableIz > 0 && _newBrk > c._cableIz * (Number(c._cableParallel) || 1));
+              c._breakerUndersize = !!(_newBrk < c._maxA);
+            }
+          } catch (e) { /* leave old */ }
+        }
+      }
     }
   }
 

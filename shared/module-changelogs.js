@@ -4,6 +4,15 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.372', date: '2026-05-06', items: [
+      '🔧 <b>Breaker re-select после post-clamp _maxKw</b>. По репорту Пользователя 2026-05-06: «автомат должен быть больше расчетной» — после v0.60.371 кабель пересчитывается (150мм² для Iрасч=169.3А ✓), но breaker остаётся 50А (правило In ≥ Iрасч нарушено).',
+      '<b>Корень</b>: <code>selectBreaker</code> вызывался в conn-loop с <code>_maxA</code> до post-clamp (тот же баг что v0.60.371 для cable, но для breaker отдельный код-путь).',
+      '<b>Fix</b>: в post-pass после clamp\'а <code>_maxA</code>, если <code>c._breakerIn < c._maxA</code> и нет manual-флага → re-run <code>selectBreaker(_maxA × marginK)</code>. Margin берётся по inrush consumer\'а или из GLOBAL.breakerMinMarginPct.',
+      'Также пересчитываются <code>_breakerAgainstCable</code> / <code>_breakerUndersize</code> для корректной индикации в инспекторе.',
+      'Маркер <code>c._breakerReselectedAfterClamp = true</code> для отладки.',
+      '<b>Эффект</b>: для 169.3А auto-выберется In=200А (selectBreaker(169.3 × 1.25) = 200), что согласует с правилом IEC 60364-4-43: Iрасч ≤ In ≤ Iz. Manual-флаги остаются неприкосновенными.',
+      'Files: <code>js/engine/recalc.js</code> (post-pass breaker re-select).',
+    ] },
     { version: '0.60.371', date: '2026-05-06', items: [
       '🔧 <b>CRITICAL: cable re-selection после post-clamp _maxKw</b>. По репорту Пользователя 2026-05-06: «у этой линии (проблемной) ручные флаги не установлены не для кабеля не для автомата, а подбора автоматического нет» — auto-mode выбрал 10мм² + 50A для линии Iрасч=169.3А (грубо в 4 раза меньше нужного).',
       '<b>Корень</b>: <code>selectCable</code> в conn-loop работает с <code>maxKwDownstream</code> из <code>maxDownstreamLoad(toN.id)</code> BFS. Для DGU-off / cross-feed сценариев BFS мог давать заниженное значение (например 25 кВт вместо 111.9 кВт). Затем <b>в post-pass</b> (строка 4170+) <code>c._maxKw</code> клампился UP до <code>toN._maxLoadKw</code> (post-clamp v0.60.184) — обновлял отображение «Макс: 111.9 kW / 169.3 А», но cable._cableSize ОСТАВАЛСЯ под старый ток.',
