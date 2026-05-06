@@ -102,6 +102,8 @@ export const SYSTEM_PRESETS = [
                         'breakerIn', 'cableSpec', 'deltaUPct',
                         'voltage', 'phase', 'cosPhi', 'count',
                         'nominalKw', 'capacityA', 'marginPct',
+                        // v0.60.404: Pуст / Pрасч downstream — для panel.
+                        'pUstKw', 'pUstA', 'pCalcKw', 'pCalcA',
                         'snomKva', 'sscMva', 'ukPct',
                         'kva', 'kw', 'autonomyMin', 'redundancy',
                         'sourceSubtype', 'switchMode',

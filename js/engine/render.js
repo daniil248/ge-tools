@@ -2171,6 +2171,8 @@ export function renderNodes() {
       const _ELECTRICAL = ['demandKw', 'kvAOrVA', 'currentKw', 'currentA', 'maxKw', 'maxA',
         'nominalKw', 'cosPhi', 'phase', 'voltage', 'breakerIn', 'cableSpec',
         'deltaUPct', 'capacityA', 'snomKva', 'sscMva', 'ukPct', 'kva', 'kw',
+        // v0.60.404: Pуст / Pрасч downstream — для panel.
+        'pUstKw', 'pUstA', 'pCalcKw', 'pCalcA',
         'autonomyMin', 'marginPct'];
       _presetShowLoadInfo = _ELECTRICAL.some(id => _presetVisible.has(id));
       _presetShowSubtitle = _presetVisible.has('subtitle') ||
@@ -2904,6 +2906,24 @@ export function renderNodes() {
           }
           if (upMax > 0) effectiveCapA = upMax;
         }
+        // v0.60.404 (по запросу Пользователя 2026-05-06: «а где 208,2 А в
+        // карточке шита??? там ограничение 158,9 А и как соотносится
+        // максимальная мощность 105,1 кВт и расчетная 94,7 кВт и
+        // Установочная 137,7 кВт»): добавлены поля pUstKw/pUstA/pCalcKw/
+        // pCalcA для отображения на карточке.
+        // Семантика:
+        //   capacityA = номинал шкафа (бус-rating, e.g. 200 А)
+        //   pUstKw / pUstA = Σ P_ном downstream (паспорт, без К_и) —
+        //     полная установленная мощность за щитом
+        //   pCalcKw / pCalcA = Σ P_ном × К_и (расчётная по ПУЭ 1.3.13)
+        //   maxKw / maxA = worst-case по сценариям АВР/секций (для
+        //     подбора кабеля/автомата). Может отличаться от Pуст если есть
+        //     АВР, секции с разными tie-конфигурациями, или активная
+        //     загрузка (clamp Up при _loadKw > _maxLoadKw).
+        const _maxANome = (Ucalc > 0 && n._maxLoadKwNameplate > 0)
+          ? computeCurrentA(n._maxLoadKwNameplate, Ucalc, cos, isThreePhase(n)) : 0;
+        const _maxACalc = (Ucalc > 0 && n._maxLoadKwCalculated > 0)
+          ? computeCurrentA(n._maxLoadKwCalculated, Ucalc, cos, isThreePhase(n)) : 0;
         valueMap = {
           capacityA:   { v: Number.isFinite(effectiveCapA) && effectiveCapA > 0 ? String(effectiveCapA) : null },
           // v0.60.243: currentKw для пары «Текущая X kW / Y A».
@@ -2911,6 +2931,11 @@ export function renderNodes() {
           currentA:    { v: fmtDigits(n._loadA) },
           maxKw:       { v: fmtDigits(n._maxLoadKw) },
           maxA:        { v: fmtDigits(n._maxLoadA)  },
+          // v0.60.404: Pуст / Pрасч downstream.
+          pUstKw:      { v: fmtDigits(n._maxLoadKwNameplate) },
+          pUstA:       { v: fmtDigits(_maxANome) },
+          pCalcKw:     { v: fmtDigits(n._maxLoadKwCalculated) },
+          pCalcA:      { v: fmtDigits(_maxACalc) },
           freeKw:      { v: fmtDigits(n._freeKw) },
           freeA:       { v: fmtDigits(n._freeA)  },
           marginPct:   { v: margin != null ? margin.toFixed(1) : null },
@@ -3033,6 +3058,9 @@ export function renderNodes() {
       const PAIRS = [
         // Cross-unit pairs (kW + A одного metric — приоритетные)
         { primary: 'maxKw',     secondary: 'maxA',      label: 'Макс',     unit: '' },
+        // v0.60.404: Pуст / Pрасч downstream — для panel.
+        { primary: 'pUstKw',    secondary: 'pUstA',     label: 'P_уст',    unit: '' },
+        { primary: 'pCalcKw',   secondary: 'pCalcA',    label: 'P_расч',   unit: '' },
         { primary: 'nominalKw', secondary: 'capacityA', label: 'Номинал',  unit: '' },
         { primary: 'demandKw',  secondary: 'currentA',  label: 'Расчёт',   unit: '' },
         // v0.60.243 (по запросу Пользователя 2026-05-05 «ты еще не добавил

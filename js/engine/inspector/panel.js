@@ -2379,7 +2379,10 @@ export function panelStatusBlock(n) {
   if (n._maxLoadKw) {
     const _basis = (typeof GLOBAL.panelMaxBasis === 'string') ? GLOBAL.panelMaxBasis : 'nameplate';
     const _basisLbl = _basis === 'calculated' ? 'P<sub>расч</sub>' : 'P<sub>уст</sub>';
-    parts.push(`<b>Максимум (${_basisLbl}):</b> ${fmt(n._maxLoadKw)} kW · ${fmt(n._maxLoadA || 0)} A`);
+    // v0.60.404: tooltip объясняет почему «Максимум» может отличаться от
+    // Pуст / Pрасч ниже (АВР / секции / clamp по текущей нагрузке).
+    const _maxTip = `«Максимум» — фактическая worst-case нагрузка для подбора кабеля и автомата питающей линии. Считается с учётом всех АВР-сценариев (какой ввод/секция активна) и зажимается «снизу» текущей загрузкой (Max ≥ Текущая). Может отличаться от P<sub>уст</sub> downstream, если: 1) панель секционирована — учитывается worst-case bus-tie конфигурация, а не сумма всех секций; 2) есть АВР — counts только активный путь; 3) текущая загрузка превышает scenario-max (тогда clamp вверх).`;
+    parts.push(`<b>Максимум (${_basisLbl}):</b> ${fmt(n._maxLoadKw)} kW · ${fmt(n._maxLoadA || 0)} A ${helpIcon(_maxTip)}`);
     // v0.60.308 (по запросу Пользователя 2026-05-06: «почему только максимум в
     // кВт, давай добавь расчётные мощности и токи»): кроме активного «Максимум»
     // показываем ОБЕ метрики (P_уст и P_расч) с парой kW + A для каждой.

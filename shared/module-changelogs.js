@@ -4,6 +4,19 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.404', date: '2026-05-06', items: [
+      '🏷 <b>Pуст / Pрасч downstream на карточке щита + tooltip объяснение «Максимум»</b>. По репорту Пользователя 2026-05-06: «а где 208,2 А в карточке шита??? там ограничение 158,9 А и как соотносится максимальная мощность 105,1 кВт и расчетная 94,7 кВт и Установочная 137,7 кВт?».',
+      '<b>Часть A: новые поля для карточки</b>',
+      '• <code>pUstKw</code> + <code>pUstA</code> — Σ P_ном downstream (паспорт). Пара «P_уст: 137.7 кВт · 208.2 А».',
+      '• <code>pCalcKw</code> + <code>pCalcA</code> — Σ P_ном × К_и (расчёт по ПУЭ 1.3.13). Пара «P_расч: 94.7 кВт · 143.2 А».',
+      'Зарегистрированы в <code>card-fields-registry.js</code>, добавлены в preset «Электрик», маппинг в <code>render.js</code> panel valueMap.',
+      '<b>Часть B: tooltip объяснение «Максимум»</b>',
+      'Добавлен helpIcon на «Максимум» в panel sidebar — поясняет, что это worst-case по сценариям АВР/секций (с clamp по текущей загрузке) и почему может отличаться от P_уст / P_расч (простая сумма):',
+      '• Секционирование: учитывается worst-case bus-tie, не сумма всех секций',
+      '• АВР: counts только активный путь',
+      '• Clamp: Max ≥ Текущая (если текущая загрузка превышает scenario-max)',
+      'Files: <code>shared/card-fields-registry.js</code> (новые fields), <code>shared/card-presets.js</code> (preset «Электрик»), <code>js/engine/render.js</code> (panel valueMap + PAIRS), <code>js/engine/inspector/panel.js</code> (tooltip).',
+    ] },
     { version: '0.60.403', date: '2026-05-06', items: [
       '⚙ <b>Recalc после смены GLOBAL-настроек (panelMaxBasis и др.)</b>. По репорту Пользователя 2026-05-06: «при переключении на режим расчета по номинальной мощности, в карточках щитов мощность и потребления не пересчитывается».',
       '<b>Корень</b>: <code>setGlobal(patch)</code> в engine/index.js вызывал только <code>render()</code> + <code>renderInspector()</code>, но не <code>recalc()</code>. После смены настройки (panelMaxBasis nameplate↔calculated, calcMethod IEC↔ПУЭ, calcVoltageMode real↔nominal и т.п.) карточки рендерились из закэшированных <code>_loadKw</code> / <code>_maxLoadKw</code>, посчитанных под старую настройку. Только при изменении проекта (drag/edit) вызывался <code>recalc()</code> и значения обновлялись.',

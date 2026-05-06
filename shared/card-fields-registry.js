@@ -62,6 +62,12 @@ const SCHEMATIC_FIELDS = {
     { id: 'currentA',     label: 'Текущий ток (А)',         shortLabel: 'Ток',        unit: 'A',     group: 'electrical' },
     { id: 'maxKw',        label: 'Макс. (кВт)',             shortLabel: 'Макс.',      unit: 'kW',   group: 'electrical' },
     { id: 'maxA',         label: 'Макс. ток (А)',           shortLabel: 'Макс. ток',  unit: 'A',     group: 'electrical' },
+    // v0.60.404: Pуст / Pрасч downstream — суммарные паспорт/расчёт всех
+    // потребителей за щитом. Отдельно от Макс (worst-case по сценариям).
+    { id: 'pUstKw',       label: 'P уст downstream (кВт)',  shortLabel: 'Pуст',       unit: 'kW',    group: 'electrical' },
+    { id: 'pUstA',        label: 'P уст ток (А)',           shortLabel: 'Iуст',       unit: 'A',     group: 'electrical' },
+    { id: 'pCalcKw',      label: 'P расч downstream (кВт)', shortLabel: 'Pрасч',      unit: 'kW',    group: 'electrical' },
+    { id: 'pCalcA',       label: 'P расч ток (А)',          shortLabel: 'Iрасч',      unit: 'A',     group: 'electrical' },
     { id: 'freeKw',       label: 'Свободно (кВт)',          shortLabel: 'Свободно',   unit: 'kW',   group: 'electrical' },
     { id: 'freeA',        label: 'Свободно (А)',            shortLabel: 'Своб. ток',  unit: 'A',     group: 'electrical' },
     { id: 'marginPct',    label: 'Запас (%)',               shortLabel: 'Запас',      unit: '%',     group: 'electrical' },
