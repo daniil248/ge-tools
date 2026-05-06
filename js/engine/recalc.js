@@ -2365,7 +2365,14 @@ function recalc() {
         c._cableAutoParallel = false;
         c._cableParallel = 1;
       } else if (c.manualCableSize) {
-        // Ручной кабель: используем заданное сечение, рассчитываем Iz
+        // Ручной кабель: используем заданное сечение, рассчитываем Iz.
+        // v0.60.370 reverted (по уточнению Пользователя 2026-05-06: «ручные
+        // флаги пользователя снимать не нужно, на то они и ручные, только
+        // если они не остались от предыдущего состояния и были удалены, а
+        // флаг остался»): auto-clear НЕ применяется к user-set manual.
+        // 1-клик «Применить авто-подбор» из v0.60.362 даёт пользователю
+        // выбор. Stale-flag (от удалённого upstream'а) — отдельный кейс,
+        // обрабатывается ниже через _maxA / отсутствующий fromN check.
         const table = cableTable(material, insulation, method);
         const kT = kTempLookup(ambient, insulation);
         const effGrouping = kBundlingIgnoresGrouping(bundling) ? 1 : grouping;

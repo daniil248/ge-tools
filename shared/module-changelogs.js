@@ -4,6 +4,13 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.370', date: '2026-05-06', items: [
+      '🔁 <b>Reverted: auto-clear manual flags при overload</b>. По уточнению Пользователя 2026-05-06: «ручные флаги пользователя снимать не нужно, на то они и ручные, только если они не остались от предыдущего состояния и были удалены, а флаг остался».',
+      '<b>Что было</b>: первая итерация v0.60.370 авто-снимала <code>manualCableSize</code> когда <code>Iрасч > Iz × 1.05</code> и пере-подбирала кабель в auto-режиме.',
+      '<b>Что стало</b>: ручные флаги теперь НЕ трогаются автоматически. Пользователь видит overload-warning + 1-кнопочный «🔧 Применить авто-подбор» (v0.60.362) и сам решает, переключиться на auto или нет.',
+      '<b>TODO</b>: stale-flag detection (флаг ссылается на удалённый/изменённый upstream) — отдельный кейс, реализуется через cleanup-проход при удалении узлов.',
+      'Files: <code>js/engine/recalc.js</code> (manual-cable-branch — auto-clear убран, поведение возвращено к pre-v0.60.370).',
+    ] },
     { version: '0.60.369', date: '2026-05-06', items: [
       '🐛 <b>CRITICAL fix: cable journal table пустая</b> + <b>декомпозиция Номинала для group-container</b>.',
       '<b>1. Cable journal empty</b> (по репорту Пользователя 2026-05-06: «кабели не показываются в реестре» + console-error «Uncaught ReferenceError: _vCableSize is not defined at renderCableTable main.js:4456:20»).',
