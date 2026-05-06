@@ -4,6 +4,21 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.394', date: '2026-05-06', items: [
+      '🔄 <b>Cross-consumer sync параметров резервирования + on/off toggle для потребителя + auto-activate резерва в группе</b>. По 2 запросам Пользователя 2026-05-06: «Пользователь может изменить данные в любом экземпляре группы, но все экземпляры виртуальной группы должны получить те же параметры» + «Нужно добавить селектор включено/отключено для всех потребителей как и для источников энергии».',
+      '<b>Часть A: cross-consumer sync</b>',
+      'В apply-handler консьюмера: после сохранения <code>consumerReserveR</code> и <code>redundancyStandbyType</code> — find siblings по <code>logicalGroupId</code> или <code>vrfGroupId</code> и применить те же значения. Проверка однородности (demandKw, phase, voltageLevelIdx, cosPhi, kUse) — flash warn при расхождении.',
+      'Теперь редактирование режима в любом экземпляре группы синхронизирует значение на всех её членах.',
+      '<b>Часть B: on/off toggle для потребителя</b>',
+      'Добавлен чекбокс «✓ В работе / ⊘ Отключён» в верх вкладки «Общее» консьюмер-модалки. Использует <code>effectiveOn</code> / <code>setEffectiveOn</code> из modes.js — то же per-mode-override инфраструктура, что у source/generator/ups. Положение запоминается per-mode (если активен режим работы схемы) или базово (n.on).',
+      '<b>Часть C: auto-activate резерва в группе</b>',
+      'Добавлен <code>_computeLogicalGroupFactor(n)</code> в electrical.js — для одиночного consumer\'а в логической / VRF-группе считает per-unit factor с учётом effectiveOn ВСЕХ членов:',
+      '• <b>Cold standby</b>: первые min(N_target, E) включённых (по сортировке id) — 100%, остальные — 0%. Если кто-то отключён — резервы автоматически активируются (rank переходит).',
+      '• <b>Hot standby</b>: per-unit = N_target / E (cap 1.0) — оставшиеся включённые работают сильнее, чтобы суммарно дать N_target × Pном.',
+      '• <b>Disabled member</b>: возвращает 0 (не вкладывается в активную нагрузку).',
+      'Интегрировано в <code>consumerCalcDemandKw</code>. <code>consumerTotalDemandKw</code> (P_уст INSTALLED) — НЕ применяет редукцию: P_уст = полная установленная мощность для подбора кабеля.',
+      'Files: <code>js/engine/inspector/consumer.js</code> (UI on/off, cross-sync), <code>js/engine/electrical.js</code> (_computeLogicalGroupFactor + integration в consumerCalcDemandKw).',
+    ] },
     { version: '0.60.393', date: '2026-05-06', items: [
       '🔁 <b>Режим резервирования для одиночного потребителя в логической группе</b>. По репорту Пользователя 2026-05-06: «добавил 2 потребителя в одну логическую группу, но выбрать режим резервирования не могу».',
       '<b>Корень</b>: селектор режима использовал <code>_cpCount = n.count</code> для проверки доступности опций. Для одиночного потребителя (count=1) в логической группе все опции, кроме «N», были <code>disabled</code> (N+1 требует ≥2, N+2 ≥3, 2N — чётное ≥2).',

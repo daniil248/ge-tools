@@ -6,7 +6,7 @@ import { escHtml, escAttr, fmt, field, flash, helpIcon } from '../utils.js';
 import { effectiveTag } from '../zones.js';
 import { nextFreeTag, hideAliasSourceFromCanvas } from '../graph.js';
 import { snapshot, notifyChange } from '../history.js';
-import { setEffectiveLoadFactor } from '../modes.js';
+import { setEffectiveLoadFactor, effectiveOn, setEffectiveOn } from '../modes.js';
 import { render } from '../render.js';
 import { formatVoltageLevelLabel } from '../electrical.js';
 import { rsPrompt, rsConfirm } from '../../../shared/dialog.js';
@@ -149,6 +149,30 @@ export function openConsumerParamsModal(n) {
   </div>`);
   // === Вкладка «Общее» (идентификация + топология) ===
   h.push(`<div class="tp-panel" data-panel="general" hidden>`);
+  // v0.60.394 (по запросу Пользователя 2026-05-06: «Нужно добавить селектор
+  // включено / отключено для всех потребителей как и для источников энергии
+  // положение которого будет запоминаться для выбранного режима работы
+  // схемы»): чекбокс «В работе» с per-mode override через setEffectiveOn.
+  // Когда выбран activeMode — изменение пишется в m.overrides[n.id].on,
+  // иначе в n.on. effectiveOn(n) учитывает оба источника (см. modes.js).
+  // Применяется к ВСЕМ типам потребителей (consumer, conditioner, outdoor),
+  // включая консьюмер-контейнер (group). Отключённый узел исключается из
+  // расчёта токов в recalc.js (loop по nodes использует effectiveOn).
+  // outdoor — допустим выключение (например для maintenance), это нормальный
+  // эксплуатационный сценарий; outdoor.on хранится отдельно от parent indoor.
+  {
+    const _curOn = effectiveOn(n);
+    const _modeName = state.activeModeId
+      ? (state.modes.find(x => x.id === state.activeModeId)?.name || '')
+      : '';
+    h.push(`<div class="field check" style="margin-bottom:8px;padding:6px 10px;background:${_curOn ? '#f0fdf4' : '#fef2f2'};border:1px solid ${_curOn ? '#bbf7d0' : '#fecaca'};border-radius:4px">
+      <input type="checkbox" id="cp-on"${_curOn ? ' checked' : ''}>
+      <label style="font-weight:600;color:${_curOn ? '#166534' : '#991b1b'}">${_curOn ? '✓ В работе' : '⊘ Отключён'}</label>
+      ${_modeName
+        ? `<div class="muted" style="font-size:11px;margin-top:2px;color:#475569">Сохраняется в режиме <b>${escHtml(_modeName)}</b>. Влияет на расчёт во всех системах.</div>`
+        : `<div class="muted" style="font-size:11px;margin-top:2px;color:#475569">Базовое состояние (без режима). Активный режим может переопределить.</div>`}
+    </div>`);
+  }
   // v0.59.841: возвращено редактирование обозначения (tag) в модалке.
   // Пользователь: «верни возможность менять обозначение». Раньше tag
   // был только в sidebar, в модалке только read-only заголовок.
@@ -2739,6 +2763,71 @@ export function openConsumerParamsModal(n) {
       const lg = String(_lgEl.value || '').trim();
       if (lg) n.logicalGroupId = lg;
       else delete n.logicalGroupId;
+    }
+    // v0.60.394 (по запросу Пользователя 2026-05-06: «Пользователь может
+    // изменить данные в любом экземпляре группы, но все экземпляры виртуальной
+    // группы должны получить те же параметры»): cross-consumer sync параметров
+    // резервирования (consumerReserveR, redundancyStandbyType) для siblings
+    // по logicalGroupId / vrfGroupId. Также проверка однородности ключевых
+    // параметров (demandKw, phase, voltageLevelIdx, cosPhi) — flash warn при
+    // расхождении.
+    {
+      const _siblings = [];
+      const _lgKey = String(n.logicalGroupId || '').trim();
+      const _vgKey = String(n.vrfGroupId || '').trim();
+      if (_lgKey || _vgKey) {
+        for (const _m of state.nodes.values()) {
+          if (_m.id === n.id) continue;
+          if (_m.type !== 'consumer') continue;
+          if (_lgKey && String(_m.logicalGroupId || '').trim() === _lgKey) {
+            _siblings.push(_m);
+          } else if (_vgKey && _m.consumerSubtype === 'conditioner'
+                     && String(_m.vrfGroupId || '').trim() === _vgKey) {
+            _siblings.push(_m);
+          }
+        }
+      }
+      if (_siblings.length > 0) {
+        // 1) Sync redundancy params на всех siblings
+        for (const _s of _siblings) {
+          if (typeof n.consumerReserveR === 'number' && n.consumerReserveR > 0) {
+            _s.consumerReserveR = n.consumerReserveR;
+          } else {
+            delete _s.consumerReserveR;
+          }
+          if (n.redundancyStandbyType === 'hot') {
+            _s.redundancyStandbyType = 'hot';
+          } else {
+            delete _s.redundancyStandbyType;
+          }
+        }
+        // 2) Проверка однородности ключевых параметров. Если у siblings'ов
+        //    разные demandKw/phase/voltageLevelIdx/cosPhi — выводим warn.
+        //    Параметры сами не синхронизируем (разные экземпляры могут
+        //    легитимно отличаться по факту, например резерв с другой моделью).
+        const _checkKeys = ['demandKw', 'phase', 'voltageLevelIdx', 'cosPhi', 'kUse'];
+        const _diff = [];
+        for (const _s of _siblings) {
+          for (const _k of _checkKeys) {
+            const _vN = n[_k];
+            const _vS = _s[_k];
+            if (_vN !== _vS && !(_vN == null && _vS == null)) {
+              if (!_diff.includes(_k)) _diff.push(_k);
+            }
+          }
+        }
+        if (_diff.length > 0) {
+          flash(`⚠ В группе разнородные параметры: ${_diff.join(', ')}. Для согласованного расчёта резервирования экземпляры должны быть одинаковы.`, 'warn');
+        } else {
+          flash(`✓ Параметры резервирования синхронизированы с ${_siblings.length} члену(ами) группы.`, 'ok');
+        }
+      }
+    }
+    // v0.60.394: «В работе» — per-mode override через setEffectiveOn.
+    // Если активен режим — пишется в m.overrides[n.id].on, иначе в n.on.
+    const _onEl = document.getElementById('cp-on');
+    if (_onEl) {
+      setEffectiveOn(n, !!_onEl.checked);
     }
     n.serialMode = !!document.getElementById('cp-serialMode')?.checked;
     n.loadSpec = (document.getElementById('cp-loadSpec')?.value === 'total') ? 'total' : 'per-unit';

@@ -1,7 +1,7 @@
 // ================= Электротехнические расчёты =================
 
 import { GLOBAL } from './constants.js';
-import { effectiveLoadFactor } from './modes.js';
+import { effectiveLoadFactor, effectiveOn } from './modes.js';
 import { state } from './state.js';
 // v0.60.320: для резолвера R-резерва из TW.
 import { getActiveProjectId, projectKey } from '../../shared/project-storage.js';
@@ -504,6 +504,78 @@ export function resolveConsumerReserveR(n) {
   return 0;
 }
 
+/**
+ * v0.60.394 (по запросу Пользователя 2026-05-06: «отключение одного из
+ * экземпляров группы должно автоматически активировать номинальные
+ * параметры на всех остальных экземплярах группы»): расчёт коэффициента
+ * активной нагрузки для consumer'а в логической / VRF-группе.
+ *
+ * Контекст: для одиночного consumer'а (count=1) с logicalGroupId/vrfGroupId
+ * standard formula `per × (cnt - r) × kUse` даёт неверный результат —
+ * R хранится как групповой резерв, но cnt=1 даёт 1-1=0 (нагрузка обнуляется).
+ * resolveConsumerReserveR() клампит R до 0 для cnt=1, поэтому стандартная
+ * формула даёт 100% — игнорирует резервирование группы.
+ *
+ * Корректный расчёт: на уровне ГРУППЫ (siblings + self):
+ *   M = размер группы (число членов)
+ *   R = групповой резерв (consumerReserveR на любом члене, синхронизирован)
+ *   N_target = M - R (целевое число активных)
+ *   E = enabled count (effectiveOn для каждого члена)
+ *
+ * Cold standby:
+ *   - Первые min(N_target, E) включённых членов (по сортировке id) — активны на 100%.
+ *   - Остальные (резерв) — 0%.
+ *   - Если E < N_target — резервы автоматически активируются (rank < N_target).
+ *
+ * Hot standby (load-sharing):
+ *   - Все включённые делят нагрузку: per-unit factor = N_target / E (cap 1.0).
+ *   - Если E уменьшилось — оставшиеся работают сильнее (auto-activate резерва).
+ *
+ * @returns {number|null} factor 0..1 для активной нагрузки этого consumer'а,
+ *                        либо null если consumer не в группе (использовать
+ *                        стандартную формулу).
+ */
+export function _computeLogicalGroupFactor(n) {
+  if (!n) return null;
+  if (n.type !== 'consumer') return null;
+  if ((Number(n.count) || 1) > 1) return null; // только для single (count=1)
+  const lgKey = String(n.logicalGroupId || '').trim();
+  const vgKey = String(n.vrfGroupId || '').trim();
+  if (!lgKey && !vgKey) return null;
+  if (!state || !state.nodes) return null;
+  // Сбор членов группы
+  const members = [n];
+  for (const m of state.nodes.values()) {
+    if (m.id === n.id) continue;
+    if (m.type !== 'consumer') continue;
+    if ((Number(m.count) || 1) > 1) continue;
+    if (lgKey && String(m.logicalGroupId || '').trim() === lgKey) members.push(m);
+    else if (vgKey && m.consumerSubtype === 'conditioner'
+             && String(m.vrfGroupId || '').trim() === vgKey) members.push(m);
+  }
+  const M = members.length;
+  if (M < 2) return null; // одиночный — не группа
+  const R = Math.max(0, Math.min(M - 1, Number(n.consumerReserveR) || 0));
+  if (R === 0) return null; // R=0 — стандартная формула даст 100%, ничего менять
+  const Ntarget = M - R;
+  // Если этот узел отключён — всегда 0
+  if (!effectiveOn(n)) return 0;
+  // Сколько включено
+  let enabledCount = 0;
+  for (const m of members) if (effectiveOn(m)) enabledCount++;
+  const standby = String(n.redundancyStandbyType || 'cold');
+  if (standby === 'hot') {
+    if (enabledCount <= 0) return 0;
+    return Math.min(1, Ntarget / enabledCount);
+  }
+  // Cold standby: rank по id среди enabled
+  const enabled = members.filter(m => effectiveOn(m));
+  enabled.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  const rank = enabled.findIndex(m => m.id === n.id);
+  const Neff = Math.min(Ntarget, enabled.length);
+  return rank >= 0 && rank < Neff ? 1 : 0;
+}
+
 /** Парс строки 'N+1' / '2N' / 'N+2' в количество резервных единиц. */
 function _parseRedundancyR(scheme, totalCount) {
   if (!scheme) return 0;
@@ -559,6 +631,15 @@ export function consumerCalcDemandKw(n) {
   }
   const per = Number(n?.demandKw) || 0;
   const cnt = Math.max(1, Number(n?.count) || 1);
+  // v0.60.394: для одиночного consumer'а в логической / VRF-группе — group factor.
+  // _computeLogicalGroupFactor учитывает effectiveOn всех членов и
+  // авто-активирует резерв при отключении (cold) или перераспределяет
+  // нагрузку (hot). Для consumer'ов вне группы или count>1 возвращает null —
+  // используем стандартную формулу.
+  const _gf = _computeLogicalGroupFactor(n);
+  if (_gf !== null) {
+    return per * _gf * kuSafe;
+  }
   // v0.60.380: применяем consumer's own R (для группового consumer'а с count>1).
   const r = resolveConsumerReserveR(n);
   return per * (cnt - r) * kuSafe;
