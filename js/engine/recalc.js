@@ -1696,6 +1696,17 @@ function recalc() {
     const ai = activeInputs(n.id);
     n._powered = ai !== null;
     if (!n._powered) continue;
+    // v0.60.396 (по запросу Пользователя 2026-05-06: «если режим отключен,
+    // то и текущая нагрузка в кабеле и соответственно на щите должна быть
+    // равна нулю»): при выключенном тумблере «В работе» (effectiveOn=false)
+    // потребитель НЕ вкладывается в walkUp → ноль на cable/panel/source.
+    // _powered оставляем true (топологически запитан, нет «orphan»-state),
+    // но _loadKw = 0. Ранее n._loadKw считался от consumerCalcDemandKw,
+    // даже для disabled-узла — это давало ненулевую нагрузку на кабеле.
+    if (!effectiveOn(n)) {
+      n._loadKw = 0;
+      continue;
+    }
     // v0.59.866: для контейнера — per-slot Ки aggregation (consumerCalcDemandKw).
     // У самого контейнера kUse не задан — раньше получали Pрасч=Σ×1×1=Pуст
     // (расчётная нагрузка не отличалась от установленной). Теперь
@@ -1729,9 +1740,26 @@ function recalc() {
   for (const n of state.nodes.values()) {
     if (n.type !== 'consumer') continue;
     if (n._powered) continue; // уже запитан через свои подключения
+    // v0.60.396: отключённый Пользователем потребитель — _loadKw=0 даже
+    // если топологически наследует _powered от container/master/parent.
+    // continue, чтобы код ниже не перезаписал _loadKw расчётным значением.
+    // _powered также НЕ выставляем (карточка визуально «disabled» через знак
+    // запрета и серый body-цвет; orphan-state не нужен — оставляем _powered
+    // как было после initial init=false).
+    if (!effectiveOn(n)) {
+      n._loadKw = 0;
+      continue;
+    }
     // Дочерний потребитель в consumer-container
     if (n.containerId) {
       const c = state.nodes.get(n.containerId);
+      // v0.60.396: если сам контейнер отключён Пользователем — все его
+      // children тоже не вкладываются в нагрузку (логически: контейнер OFF
+      // = группа OFF). _powered не выставляем, _loadKw=0.
+      if (c && c.type === 'consumer-container' && !effectiveOn(c)) {
+        n._loadKw = 0;
+        continue;
+      }
       if (c && c.type === 'consumer-container') {
         // v0.60.381 (по репорту Пользователя 2026-05-06: «не увидал чтобы
         // селектор режимов резервирования хоть как то влиял на текущую

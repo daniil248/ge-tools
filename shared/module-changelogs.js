@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.396', date: '2026-05-06', items: [
+      '🔌 <b>Отключённый потребитель → 0 на кабеле и щите</b>. По репорту Пользователя 2026-05-06: «если режим отключен, то и текущая нагрузка в кабеле и соответственно на щите должна быть равна нулю».',
+      '<b>Корень</b>: тумблер «В работе» (effectiveOn) только менял визуал карточки и group factor для логических групп. recalc.js НЕ исключал disabled-узел из walkUp → cable/panel получали полную долю нагрузки.',
+      '<b>Fix recalc.js</b>:',
+      '• Main loop (consumer/container processing): после <code>n._powered = ai !== null</code> добавлен <code>if (!effectiveOn(n)) { n._loadKw = 0; continue; }</code>. walkUp НЕ вызывается → cable._loadKw и upstream panel._loadKw не получают вклад.',
+      '• Inheritance loop (container children): <code>if (!effectiveOn(n)) { n._loadKw = 0; continue; }</code> на верху + проверка <code>if (!effectiveOn(c))</code> для родительского контейнера (если контейнер OFF — все children тоже не вкладываются).',
+      '<b>Fix electrical.js</b>:',
+      '• <code>consumerCalcDemandKw(n)</code>: на верху <code>if (!effectiveOn(n)) return 0</code> для consumer/container. Контейнер с disabled child\'ом теперь корректно суммирует только активных.',
+      '<b>Сохраняем</b>: <code>consumerTotalDemandKw</code> (Pуст INSTALLED) — без изменений. Кабель сайзится по полной мощности (на случай включения disabled узла).',
+      'Files: <code>js/engine/recalc.js</code> (main loop + inheritance), <code>js/engine/electrical.js</code> (consumerCalcDemandKw guard).',
+    ] },
     { version: '0.60.395', date: '2026-05-06', items: [
       '🎚 <b>Тумблер «В работе» в sidebar потребителя + visual «знак запрета» на отключённой карточке</b>. По 2 запросам Пользователя 2026-05-06: «вынеси так же селектор работы в правый сайдбар в группу общие» + «Добавь изменение цвета карточки отключенного потребителя ... серый с перечеркнутым кругом (знак запрета) поверх изображения иконки».',
       '<b>Часть A: тумблер в sidebar</b>',

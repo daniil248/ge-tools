@@ -598,6 +598,15 @@ function _parseRedundancyR(scheme, totalCount) {
 // Group individual: Σ item.demandKw × (item.kUse || n.kUse).
 // Uniform group / single: P × count × kUse.
 export function consumerCalcDemandKw(n) {
+  // v0.60.396 (по запросу Пользователя 2026-05-06: «если режим отключен,
+  // то и текущая нагрузка в кабеле и соответственно на щите должна быть
+  // равна нулю»): отключённый потребитель / контейнер вкладывает 0 в
+  // расчётную нагрузку. Pуст (consumerTotalDemandKw) НЕ затрагиваем —
+  // INSTALLED capacity для сайзинга кабеля остаётся полной.
+  if (n && (n.type === 'consumer' || n.type === 'consumer-container')
+      && typeof effectiveOn === 'function' && !effectiveOn(n)) {
+    return 0;
+  }
   if (n && n.type === 'consumer-container' && Array.isArray(n.slots)) {
     let sum = 0;
     let slotCount = 0;
