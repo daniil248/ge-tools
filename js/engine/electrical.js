@@ -608,6 +608,35 @@ export function consumerCalcDemandKw(n) {
     return 0;
   }
   if (n && n.type === 'consumer-container' && Array.isArray(n.slots)) {
+    // v0.60.398: используем precomputed n._activeSlotIds (если recalc уже
+    // прошёл) для учёта cold/hot mode + effectiveOn + topology. Если pre-pass
+    // не сделал свою работу (recalc ещё не вызывался) — fallback на старую
+    // proportional formula.
+    const containerR0 = Math.max(0, Math.min(n.slots.length - 1, Number(n.consumerReserveR) || 0));
+    if (n._activeSlotIds instanceof Set && containerR0 > 0) {
+      let sum = 0;
+      const standby = String(n.redundancyStandbyType || 'cold');
+      const hotF = Number(n._redundancyHotFactorComputed) || 1;
+      for (const s of n.slots) {
+        if (!s) continue;
+        if (s.kind === 'linked' && s.nodeId) {
+          if (!n._activeSlotIds.has(s.nodeId)) continue;
+          const a = state.nodes && state.nodes.get && state.nodes.get(s.nodeId);
+          if (a) {
+            const childCalc = consumerCalcDemandKw(a);
+            sum += childCalc * (standby === 'hot' ? hotF : 1);
+          }
+        } else if (s.kind === 'placeholder') {
+          // Placeholder slot не имеет separate node — учитываем как часть
+          // первых Ntarget слотов (positional).
+          const ku = (s.kUse != null) ? Number(s.kUse) : 1;
+          const phKw = (Number(s.demandKw) || 0) * (Number.isFinite(ku) ? ku : 1);
+          sum += phKw * (standby === 'hot' ? hotF : 1);
+        }
+      }
+      return sum;
+    }
+    // Fallback / R=0 path
     let sum = 0;
     let slotCount = 0;
     for (const s of n.slots) {

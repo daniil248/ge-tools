@@ -2026,6 +2026,12 @@ export function renderNodes() {
       // заливка отличается от 'unpowered' (без питания) — у неё немного
       // насыщеннее border, плюс иконка-запрет рисуется поверх (см. ниже).
       ((n.type === 'consumer' || n.type === 'consumer-container') && !effectiveOn(n)) ? 'disabled-by-user' : '',
+      // v0.60.398: контейнер с недостатком резервирования — оранжевая обводка
+      // + warning-overlay в углу. Member-узел в standby reserve — пунктирная
+      // обводка (faded) на консьюмере.
+      (n.type === 'consumer-container' && n._redundancyShortage) ? 'redundancy-shortage' : '',
+      (n.type === 'consumer' && n._isStandbyReserve) ? 'standby-reserve' : '',
+      (n.type === 'consumer' && n._isShortage) ? 'redundancy-shortage' : '',
     ].filter(Boolean).join(' ');
 
     const g = el('g', { class: cls, transform: `translate(${n.x},${n.y})` });

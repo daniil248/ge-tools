@@ -1411,6 +1411,20 @@ export function openContainerMembersModal(container) {
           </select>` : ''}
         <span style="font-size:10.5px;color:#64748b">Активные N=<b>${_N}</b> · Резерв R=<b>${_curR}</b> · Всего ${_slotCount}</span>
       </div>`);
+      // v0.60.398 (по запросу Пользователя 2026-05-06: «Если отключено
+      // более чем N то на карточке группы нужно сделать указание о
+      // недостатке резервирования»): warning-баннер если c._redundancyShortage
+      // (recalc.js вычислил, что available < Ntarget).
+      const _shortage = container._redundancyShortage;
+      if (_shortage) {
+        const _availableEff = _shortage.available;
+        const _targetEff = _shortage.target;
+        const _missing = _shortage.missing;
+        h.push(`<div style="padding:8px 12px;border-bottom:1px solid #fecaca;background:#fef2f2;font-size:12px;color:#991b1b;line-height:1.5">
+          <b>⛔ Недостаток резервирования:</b> в работе только <b>${_availableEff}</b> из требуемых <b>${_targetEff}</b> (не хватает <b>${_missing}</b>). Группа работает с пониженной надёжностью — резерв исчерпан.
+          <div style="font-size:10.5px;color:#7f1d1d;margin-top:4px">Включите дополнительные потребители (тумблер «В работе») или восстановите питание для тех, кто значится «без питания».</div>
+        </div>`);
+      }
     }
     // v0.60.380 (по запросу Пользователя 2026-05-06: «не плохо было бы
     // выводить справочные данные по балансировке и распределению нагрузки
@@ -1784,13 +1798,25 @@ export function openContainerMembersModal(container) {
         const Pcalc = Pnom * ku;
         const Icalc = (Pcalc > 0 && Uc > 0 && cos > 0) ? (Pcalc * 1000) / (k * Uc * cos) : 0;
         // Статус питания.
+        // v0.60.398: дополнительные badge'и — disabled / standby reserve /
+        // shortage. Приоритет: disabled (тумблер OFF) > overload > reserve >
+        // shortage > powered > unpowered.
         const powered = !!a._powered;
         const overload = !!a._overload;
-        const statusBadge = overload
-          ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px">⚠ перегруз</span>`
-          : (powered
-              ? `<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px">⚡ запитан</span>`
-              : `<span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px">○ без питания</span>`);
+        const _isOff = !effectiveOn(a);
+        const _isReserve = !!a._isStandbyReserve;
+        const _isShortage = !!a._isShortage;
+        const statusBadge = _isOff
+          ? `<span style="background:#e5e7eb;color:#475569;padding:1px 6px;border-radius:3px;font-size:10px" title="Тумблер «В работе» выключен — потребитель не вкладывается в нагрузку. Включите в карточке потребителя.">⊘ отключён</span>`
+          : (overload
+              ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px">⚠ перегруз</span>`
+              : (_isReserve
+                  ? `<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px" title="Резервный экземпляр в холодном standby. Активируется автоматически при отказе одного из активных.">💤 резерв</span>`
+                  : (_isShortage
+                      ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px" title="Не хватает резерва: этот экземпляр должен был бы работать, но не получает питания (топология) или отключён.">⚠ нет резерва</span>`
+                      : (powered
+                          ? `<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px">⚡ запитан</span>`
+                          : `<span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px">○ без питания</span>`))));
         h.push(`<div style="padding:10px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #f1f5f9;padding-bottom:5px">
             <span style="flex:1;font-weight:600;font-size:14px" title="Полный путь с зоной/контейнером для уникальной идентификации потребителя.">${escHtml(tag)}</span>

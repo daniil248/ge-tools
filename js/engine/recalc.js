@@ -1690,6 +1690,115 @@ function recalc() {
     visit(nid, kw);
   }
 
+  // v0.60.398 (по запросу Пользователя 2026-05-06: «если в группе есть
+  // холодное резервирование, то отключение любого рабочего экземпляра,
+  // должно включать резервный компонент. Если отключено более чем N то на
+  // карточке группы нужно сделать указание о недостатке резервирования»):
+  // pre-pass для contaier'ов — определяет, какие slot-children АКТИВНЫ
+  // (с учётом cold/hot mode + effectiveOn + topology).
+  //
+  // Алгоритм для каждого container'а:
+  //   1. Собрать linked-children в порядке slot[].
+  //   2. Для каждого определить isAvailable = effectiveOn(child) AND
+  //      isPowerable(child) (есть alive port у container, который child
+  //      может использовать через priorities / assignedGroupPort).
+  //   3. Cold mode: первые Ntarget available children → активны (по slot order).
+  //      Остальные available → reserve (_isStandbyReserve=true).
+  //      Disabled / unpowerable → off.
+  //   4. Hot mode: все available children активны, factor = Ntarget / availCount.
+  //   5. Если availCount < Ntarget → c._redundancyShortage = info.
+  //
+  // Сохраняет на container:
+  //   c._activeSlotIds        — Set<childId> активных
+  //   c._reserveSlotIds       — Set<childId> в standby (cold)
+  //   c._redundancyHotFactorComputed — фактор для hot
+  //   c._redundancyShortage   — { available, target, missing, mode } | null
+  for (const c of state.nodes.values()) {
+    if (c.type !== 'consumer-container') continue;
+    if (!Array.isArray(c.slots)) continue;
+    // Сброс предыдущих значений
+    c._activeSlotIds = new Set();
+    c._reserveSlotIds = new Set();
+    c._redundancyHotFactorComputed = 1;
+    delete c._redundancyShortage;
+    if (!effectiveOn(c)) continue;
+
+    const slotCount = c.slots.length;
+    if (slotCount === 0) continue;
+    const containerR = Math.max(0, Math.min(slotCount - 1, Number(c.consumerReserveR) || 0));
+    const Ntarget = slotCount - containerR;
+    const standby = String(c.redundancyStandbyType || 'cold');
+    const containerInputs = Math.max(1, Number(c.inputs) || 1);
+
+    // Alive container input ports
+    const alivePorts = new Set();
+    for (const inConn of (edgesIn.get(c.id) || [])) {
+      if (isConnLive(inConn)) alivePorts.add(inConn.to.port);
+    }
+
+    const isPowerable = (child) => {
+      if (alivePorts.size === 0) return false;
+      const childInputs = Math.max(1, Number(child.inputs) || 1);
+      const childPrios = Array.isArray(child.priorities) ? child.priorities : [];
+      if (childInputs > 1 && containerInputs > 1 && childPrios.length > 0) {
+        const limit = Math.min(childPrios.length, containerInputs);
+        for (let pi = 0; pi < limit; pi++) {
+          if (alivePorts.has(pi)) return true;
+        }
+        return false;
+      }
+      const agp = Number(child.assignedGroupPort);
+      if (Number.isFinite(agp) && agp >= 0 && agp < containerInputs) {
+        return alivePorts.has(agp);
+      }
+      // Default: child uses port 0 if any alive
+      return alivePorts.has(0) || alivePorts.size > 0;
+    };
+
+    // Linked children в slot order
+    const linkedChildren = [];
+    for (const s of c.slots) {
+      if (!s || s.kind !== 'linked' || !s.nodeId) continue;
+      const a = state.nodes.get(s.nodeId);
+      if (!a) continue;
+      linkedChildren.push(a);
+    }
+    // Доступные = включены + могут получить питание
+    const available = linkedChildren.filter(a => effectiveOn(a) && isPowerable(a));
+    const availCount = available.length;
+
+    if (containerR === 0) {
+      // Резерва нет — все available активны
+      for (const a of available) c._activeSlotIds.add(a.id);
+    } else if (standby === 'cold') {
+      // Cold: первые Ntarget available активны, остальные — reserve
+      let activated = 0;
+      for (const a of available) {
+        if (activated < Ntarget) {
+          c._activeSlotIds.add(a.id);
+          activated++;
+        } else {
+          c._reserveSlotIds.add(a.id);
+        }
+      }
+    } else {
+      // Hot: все available активны, factor = Ntarget / availCount
+      for (const a of available) c._activeSlotIds.add(a.id);
+      c._redundancyHotFactorComputed = availCount > 0
+        ? Math.min(1, Ntarget / availCount)
+        : 1;
+    }
+
+    if (availCount < Ntarget) {
+      c._redundancyShortage = {
+        available: availCount,
+        target: Ntarget,
+        missing: Ntarget - availCount,
+        mode: standby,
+      };
+    }
+  }
+
   for (const n of state.nodes.values()) {
     // v0.59.863: consumer-container тоже участвует в walkUp.
     if (n.type !== 'consumer' && n.type !== 'consumer-container') continue;
@@ -1761,39 +1870,35 @@ function recalc() {
         continue;
       }
       if (c && c.type === 'consumer-container') {
-        // v0.60.381 (по репорту Пользователя 2026-05-06: «не увидал чтобы
-        // селектор режимов резервирования хоть как то влиял на текущую
-        // и/или расчетную нагрузку» + «все еще не работает с стойками»):
-        // Применяем R container'а к children:
-        //   Cold: первые N children активны (100%), последние R — НЕ активны
-        //   Hot: все count children активны, каждый на (N/(N+R)) × demand
+        // v0.60.398: используем precomputed c._activeSlotIds (cold + hot
+        // mode + topology + effectiveOn handled в pre-pass выше). Если этот
+        // child НЕ в active set — он либо в reserve (cold standby), либо
+        // disabled / unpowerable. _loadKw=0, _powered=false.
         const _contR = Math.max(0, Math.min(
           (Array.isArray(c.slots) ? c.slots.length : 1) - 1,
           Number(c.consumerReserveR) || 0
         ));
         const _contStandbyType = String(c.redundancyStandbyType || 'cold');
-        const _slotCnt2 = Array.isArray(c.slots) ? c.slots.length : 1;
-        const _N2 = _slotCnt2 - _contR;
-        if (_contR > 0 && _contStandbyType === 'cold') {
-          // Cold: только первые N children активны (по порядку slots[]).
-          // Найдём позицию текущего child в slots[].
-          let _slotIdx = -1;
-          for (let i = 0; i < c.slots.length; i++) {
-            const _ss = c.slots[i];
-            if (_ss && _ss.kind === 'linked' && _ss.nodeId === n.id) { _slotIdx = i; break; }
-          }
-          if (_slotIdx >= _N2) {
-            // Этот child — резервный, в standby. _powered = false, _loadKw = 0.
-            n._powered = false;
-            n._loadKw = 0;
+        if (_contR > 0 && c._activeSlotIds && !c._activeSlotIds.has(n.id)) {
+          n._powered = false;
+          n._loadKw = 0;
+          // Различаем reserve (cold) vs unavailable (disabled/unpowerable).
+          if (c._reserveSlotIds && c._reserveSlotIds.has(n.id)) {
             n._isStandbyReserve = true;
-            continue; // skip остальную обработку для этого child
+            n._isShortage = false;
+          } else {
+            n._isStandbyReserve = false;
+            n._isShortage = true; // не вкладывается в работу группы
           }
+          continue;
         }
-        // Для hot mode — продолжаем обычную обработку, но per-unit factor
-        // применяется ниже при вычислении n._loadKw.
-        n._redundancyHotFactor = (_contR > 0 && _contStandbyType === 'hot' && _slotCnt2 > 0)
-          ? (_N2 / _slotCnt2)
+        // Active child — флаги для UI.
+        n._isStandbyReserve = false;
+        n._isShortage = false;
+        // Hot factor — из precomputed (учитывает реальное availCount, а не
+        // плановое slotCount).
+        n._redundancyHotFactor = (_contR > 0 && _contStandbyType === 'hot')
+          ? (Number(c._redundancyHotFactorComputed) || 1)
           : 1;
         // v0.60.361 (по репорту Пользователя 2026-05-06: «А у меня было
         // что кондиционер один с приоритетом от входа 1 а кондиционер 2 с

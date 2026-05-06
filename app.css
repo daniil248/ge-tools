@@ -930,6 +930,15 @@ input, select { font: inherit; }
 .node.disabled-by-user .node-load { opacity: 0.55; }
 .node-icon-banned { pointer-events: none; }
 .node-icon-banned circle, .node-icon-banned line { vector-effect: non-scaling-stroke; }
+/* v0.60.398: визуал «недостаток резервирования» — оранжевая обводка
+   контейнера + жирный warning-stroke. Member в стoby reserve — серый
+   пунктир. Member, который должен был работать но не работает (shortage)
+   — оранжевая обводка как у контейнера. */
+.node.redundancy-shortage .node-body { stroke: #ea580c !important; stroke-width: 2.5; stroke-dasharray: 6 3; }
+.node.standby-reserve .node-body { fill: #fef3c7; stroke: #d97706 !important; stroke-dasharray: 4 2; }
+.node.standby-reserve .node-title,
+.node.standby-reserve .node-sub,
+.node.standby-reserve .node-load { opacity: 0.7; }
 
 .node-tag   { font: 700 10px -apple-system, "Segoe UI", sans-serif; fill: #8a93a7; letter-spacing: 0.4px; pointer-events: none; text-transform: uppercase; }
 .node-title { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #1f2430; pointer-events: none; }

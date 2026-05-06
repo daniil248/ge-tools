@@ -4,6 +4,28 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.398', date: '2026-05-06', items: [
+      '🔁 <b>Auto-activate резерва в container + warning «недостаток резервирования»</b>. По запросу Пользователя 2026-05-06: «если в группе есть холодное резервирование, то отключение любого рабочего экземпляра, должно включать резервный компонент. Если отключено более чем N то на карточке группы нужно сделать указание о недостатке резервирования и изменить свет компонентов».',
+      '<b>Часть A: pre-pass активации в recalc.js</b>',
+      'Перед main consumer-loop добавлен pre-pass для каждого consumer-container. Алгоритм:',
+      '• Собираем linked-children в slot order, проверяем effectiveOn(child) AND isPowerable(child) (для multi-input учитываются child.priorities; container input port должен быть alive).',
+      '• <b>Cold mode</b>: первые Ntarget «available» (по slot order) → активны, остальные available → standby reserve. Если «нерабочий» (disabled или unpowerable) child был на slot позиции активного, следующий available автоматически занимает его место (auto-activation резерва).',
+      '• <b>Hot mode</b>: все available активны, factor = Ntarget / availableCount (cap 1.0).',
+      '• Если availableCount &lt; Ntarget → <code>c._redundancyShortage = { available, target, missing }</code> (для UI warning).',
+      'Сохраняет на container: <code>_activeSlotIds</code> (Set<id>), <code>_reserveSlotIds</code>, <code>_redundancyHotFactorComputed</code>, <code>_redundancyShortage</code>.',
+      '<b>Часть B: inheritance loop использует precomputed</b>',
+      'Заменили старую логику «slotIdx >= N» на <code>!c._activeSlotIds.has(n.id)</code>. Member помечается <code>_isStandbyReserve</code> (если в reserve set) или <code>_isShortage</code> (если должен был работать но недоступен).',
+      '<b>Часть C: consumerCalcDemandKw использует _activeSlotIds</b>',
+      'electrical.js — для container с R&gt;0 суммирует только members в _activeSlotIds, применяет hotFactor для hot mode. Если pre-pass не сделал работу (recalc не вызывался) — fallback на старую proportional formula.',
+      '<b>Часть D: UI warning + per-member badges</b>',
+      '• inspector.js (container modal) — banner ⛔ «Недостаток резервирования: в работе только X из Y» при <code>_redundancyShortage</code>.',
+      '• Per-member badges: ⊘ отключён / ⚠ перегруз / 💤 резерв / ⚠ нет резерва / ⚡ запитан / ○ без питания.',
+      '<b>Часть E: visual marker на карточке</b>',
+      'render.js + app.css — CSS-классы:',
+      '• <code>.node.redundancy-shortage</code> — оранжевая жирная dashed обводка (для container и для shortage-member)',
+      '• <code>.node.standby-reserve</code> — желтоватая заливка #fef3c7 + пунктирная обводка #d97706 + opacity 0.7 на тексте',
+      'Files: <code>js/engine/recalc.js</code> (pre-pass + inheritance), <code>js/engine/electrical.js</code> (consumerCalcDemandKw), <code>js/engine/inspector.js</code> (warning + badges), <code>js/engine/render.js</code> (cls), <code>app.css</code> (стили).',
+    ] },
     { version: '0.60.397', date: '2026-05-06', items: [
       '👻 <b>Drag-overlap игнорирует скрытые узлы</b>. По репорту Пользователя 2026-05-06: «при переносе карточки Z1.MR1 на это место появляется это сообщение [Параметры разные], что наводит меня на мысль что в этом месте уже есть скрытый объект».',
       '<b>Корень</b>: <code>_findConsumerOverlapAt(dragged)</code> в interaction.js iterate по ВСЕМ <code>state.nodes.values()</code> — попадали скрытые узлы:',
