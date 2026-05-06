@@ -1227,6 +1227,82 @@ function _buildComposition() {
   };
 }
 
+// v0.60.410 (по запросу Пользователя 2026-05-06: «состав комплекта АКБ
+// нужно расписать так же как и состав комплекта ИБП (BOM)»): build
+// battery composition (BOM-items) для одного и для всех комплектов.
+// Возвращает array of { elementId, qty, role, label } — формат идентичен
+// UPS composition. wizState.battery содержит данные расчёта АКБ из
+// battery-calc (totalBlocks, strings, blocksPerString, ...).
+function _buildBatteryComposition() {
+  if (!wizState.battery || wizState.batteryChoice !== 'pick') return null;
+  const b = wizState.battery;
+  const comp = wizState.composition;
+  if (!comp) return null;
+  const units = _getUpsUnits(comp);
+  const topology = wizState.batteryTopology || (units.unitCount > 1 ? 'per-unit' : 'shared');
+  const setsQty = (topology === 'per-unit') ? units.unitCount : 1;
+  const items = [];
+  // 1) Блоки АКБ — главная позиция (per-unit qty × setsQty = total blocks).
+  const blocksPerSet = Number(b.totalBlocks) || 0;
+  if (blocksPerSet > 0) {
+    items.push({
+      elementId: b.id || null,
+      qty: blocksPerSet * setsQty,
+      role: 'battery-block',
+      label: `АКБ-блок: ${(b.supplier || '')} ${(b.model || b.id || '')}`.trim()
+        + (b.blockVoltage ? ` · ${b.blockVoltage}V` : '')
+        + (b.capacityAh ? ` · ${b.capacityAh}Ah` : ''),
+      groupKey: 'battery',
+      perSet: blocksPerSet,
+      sets: setsQty,
+    });
+  }
+  // 2) String layout — справочно (не отдельный элемент BOM, но описание).
+  if (b.strings && b.blocksPerString) {
+    items.push({
+      elementId: null,
+      inline: true,
+      qty: setsQty,
+      role: 'battery-string-layout',
+      label: `Конфигурация на комплект: ${b.strings} × ${b.blocksPerString} блоков (V_DC ${b.dcVoltage || '—'} В)`,
+      groupKey: 'battery',
+    });
+  }
+  // 3) Battery breaker / disconnect (стандарт, если задано в записи).
+  if (b.breakerIn) {
+    items.push({
+      elementId: null,
+      inline: true,
+      qty: setsQty,
+      role: 'battery-breaker',
+      label: `Автомат АКБ: ${b.breakerIn} A (DC)`,
+      groupKey: 'battery',
+    });
+  }
+  // 4) Кабель межблочный (если задан).
+  if (b.cableMark || b.cableSizeMm2) {
+    items.push({
+      elementId: null,
+      inline: true,
+      qty: setsQty,
+      role: 'battery-cable',
+      label: `Межблочные кабели: ${b.cableMark || ''} ${b.cableSizeMm2 || ''} мм²`.trim(),
+      groupKey: 'battery',
+    });
+  }
+  // 5) Sets summary (вершинный элемент).
+  items.unshift({
+    elementId: null,
+    inline: true,
+    qty: setsQty,
+    role: 'battery-set',
+    label: `Комплект АКБ${setsQty > 1 ? ` (${topology === 'per-unit' ? 'per-unit, на каждый ИБП' : 'shared, общая шина'})` : ''}`,
+    groupKey: 'battery',
+    topology,
+  });
+  return items;
+}
+
 // v0.59.400: шаг 3 — выбор АКБ или пропустить.
 function _goStep3() {
   _readStep2();
@@ -1582,6 +1658,36 @@ function _goStep4() {
       </table>
     </div>
     <div class="wiz-summary-box">
+      <h5>Состав комплекта ИБП (BOM)</h5>
+      <table class="wiz-summary-table">
+        ${(comp.composition || []).map(it => `
+          <tr>
+            <td>${esc(it.label || it.role || '—')}</td>
+            <td><b>${it.qty} ${it.role === 'frame' ? 'шт.' : (it.role === 'module' ? 'шт. модулей' : 'шт.')}</b>${it.elementId ? ` <span class="muted" style="font-size:10.5px">· ${esc(it.elementId)}</span>` : ''}</td>
+          </tr>`).join('')}
+      </table>
+    </div>
+    ${(function() {
+      // v0.60.410: состав комплекта АКБ (BOM) — отдельный блок.
+      const battComp = _buildBatteryComposition();
+      if (!battComp || !battComp.length) return '';
+      const totalBlocksAll = (battComp.find(it => it.role === 'battery-block') || {}).qty || 0;
+      return `
+    <div class="wiz-summary-box" style="background:#f0fdf4;border-left:3px solid #16a34a">
+      <h5>Состав комплекта АКБ (BOM)</h5>
+      <div class="muted" style="font-size:11px;margin-bottom:8px">
+        Топология: <b>${battTopology === 'per-unit' ? 'на каждый ИБП' : 'общая шина'}</b> · Комплектов: <b>${battSetsQty}</b>${totalBlocksAll > 0 ? ` · <b>${totalBlocksAll}</b> блок(ов) всего` : ''}
+      </div>
+      <table class="wiz-summary-table">
+        ${battComp.map(it => `
+          <tr>
+            <td>${esc(it.label || it.role || '—')}</td>
+            <td><b>${it.qty}</b>${it.perSet ? ` <span class="muted" style="font-size:10.5px">(${it.perSet}/комплект × ${it.sets} компл.)</span>` : ''}${it.elementId ? ` <span class="muted" style="font-size:10.5px">· ${esc(it.elementId)}</span>` : ''}</td>
+          </tr>`).join('')}
+      </table>
+    </div>`;
+    })()}
+    <div class="wiz-summary-box">
       <h5>Стоимость (оборудование ИБП)</h5>
       <table class="wiz-summary-table">
         <tr><td>Цена за ед.</td><td>${comp.unitPrice != null ? Number(comp.unitPrice).toLocaleString('ru-RU') + ' ' + comp.currency : 'нет в каталоге'}</td></tr>
@@ -1589,8 +1695,7 @@ function _goStep4() {
         <tr><td><b>Итого ИБП</b></td><td><b>${priceStr}</b></td></tr>
       </table>
       <p class="muted" style="font-size:11px;margin:8px 0 0">
-        АКБ подбирается отдельно в «Калькуляторе АКБ» (кнопка в инспекторе батарей).
-        Цены добавляются в модуле <a href="../catalog/" target="_blank">«Каталог и цены»</a>.
+        Цены АКБ добавляются в модуле <a href="../catalog/" target="_blank">«Каталог и цены»</a> (по элементу батареи).
       </p>
     </div>
   `;
@@ -1636,6 +1741,8 @@ function _applyConfiguration() {
         ? 1
         : _getUpsUnits(comp).unitCount),
       composition: comp.composition,
+      // v0.60.410: состав АКБ (BOM) — для отчёта и BOM-агрегации в Конструкторе.
+      batteryComposition: _buildBatteryComposition() || [],
       totalPrice: comp.totalPrice,
       currency: comp.currency,
       // v0.59.640: round-trip полей из/в Конструктор схем.
@@ -1821,6 +1928,21 @@ function _printUpsReport() {
       ]);
     }
     html += `<p class="muted">Расчёт выполнен в подпрограмме «Расчёт АКБ»; полный отчёт с графиком разряда доступен там же.</p>`;
+    // v0.60.410: состав комплекта АКБ (BOM-таблица) — как для ИБП.
+    const battComp = _buildBatteryComposition();
+    if (battComp && battComp.length) {
+      const totalBlocksAll = (battComp.find(it => it.role === 'battery-block') || {}).qty || 0;
+      const battTopologyR = wizState.batteryTopology
+        || (_getUpsUnits(wizState.composition).unitCount > 1 ? 'per-unit' : 'shared');
+      const battSetsQtyR = (battTopologyR === 'shared') ? 1 : _getUpsUnits(wizState.composition).unitCount;
+      html += `<h2 style="margin-top:14px">Состав комплекта АКБ (BOM)</h2>`;
+      html += `<p class="muted">Топология: <b>${battTopologyR === 'per-unit' ? 'на каждый ИБП (per-unit)' : 'общая шина (shared)'}</b> · Комплектов: <b>${battSetsQtyR}</b>${totalBlocksAll > 0 ? ` · <b>${totalBlocksAll}</b> блок(ов) всего` : ''}</p>`;
+      html += `<table class="rep"><thead><tr><th>Поз.</th><th>Наименование</th><th style="text-align:right">Кол-во</th><th style="text-align:right">На комплект</th></tr></thead><tbody>`;
+      battComp.forEach((it, idx) => {
+        html += `<tr><td>${idx + 1}</td><td>${esc(it.label || it.role || '—')}${it.elementId ? ` <span style="color:#9ca3af;font-size:11px">(${esc(it.elementId)})</span>` : ''}</td><td style="text-align:right">${it.qty}</td><td style="text-align:right">${it.perSet ? it.perSet : (it.role === 'battery-set' ? '—' : (it.qty / battSetsQtyR).toFixed(0))}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
     html += `</div>`;
   }
 
