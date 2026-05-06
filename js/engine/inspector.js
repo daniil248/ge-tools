@@ -1674,11 +1674,17 @@ export function openContainerMembersModal(container) {
           }
           const _isPow = !!a._powered;
           const _isOver = !!a._overload;
+          // v0.60.400: clickable status badge для toggle on/off (как в card-view).
+          const _isOffT = !effectiveOn(a);
+          const _hintT = _isOffT ? 'Кликните, чтобы включить' : 'Кликните, чтобы отключить';
+          const _toggleT = `data-cm-toggle-on="${escAttr(a.id)}" style="cursor:pointer;user-select:none"`;
           const _statusBadge = _isOver
-            ? '<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px" title="Перегрузка">⚠</span>'
-            : (_isPow
-                ? '<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px" title="Запитан">⚡</span>'
-                : '<span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px" title="Без питания">○</span>');
+            ? '<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px" title="Перегрузка (не управляется тумблером)">⚠</span>'
+            : _isOffT
+              ? `<span ${_toggleT} title="Отключён. ${_hintT}"><span style="background:#e5e7eb;color:#475569;padding:1px 6px;border-radius:3px;font-size:10px">⊘</span></span>`
+              : (_isPow
+                  ? `<span ${_toggleT} title="Запитан. ${_hintT}"><span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px">⚡</span></span>`
+                  : `<span ${_toggleT} title="Без питания. ${_hintT}"><span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px">○</span></span>`);
           h.push(`<tr data-mid="${escAttr(a.id)}" style="${isSel ? 'background:#eff6ff' : ''}">
             <td style="padding:4px 8px;border-bottom:1px solid #f1f5f9"><input type="checkbox" class="cm-row-sel" data-mid="${escAttr(a.id)}" ${isSel ? 'checked' : ''}></td>
             ${_ifCol('tag',        `<td style="padding:4px 8px;border-bottom:1px solid #f1f5f9;font-weight:600">${escHtml(tagFull)}</td>`)}
@@ -1809,22 +1815,28 @@ export function openContainerMembersModal(container) {
         // v0.60.398: дополнительные badge'и — disabled / standby reserve /
         // shortage. Приоритет: disabled (тумблер OFF) > overload > reserve >
         // shortage > powered > unpowered.
+        // v0.60.400 (по запросу Пользователя 2026-05-06: «добавь включение
+        // отключение элементов группы прям на статус-надписи»): badge кликабелен,
+        // toggle effectiveOn(a). Hover-состояние через :hover в inline-style
+        // не работает — используем title с подсказкой и cursor:pointer.
         const powered = !!a._powered;
         const overload = !!a._overload;
         const _isOff = !effectiveOn(a);
         const _isReserve = !!a._isStandbyReserve;
         const _isShortage = !!a._isShortage;
+        const _toggleAttr = `data-cm-toggle-on="${escAttr(a.id)}" style="cursor:pointer;user-select:none"`;
+        const _hint = _isOff ? '\n\n👆 Кликните, чтобы включить' : '\n\n👆 Кликните, чтобы отключить';
         const statusBadge = _isOff
-          ? `<span style="background:#e5e7eb;color:#475569;padding:1px 6px;border-radius:3px;font-size:10px" title="Тумблер «В работе» выключен — потребитель не вкладывается в нагрузку. Включите в карточке потребителя.">⊘ отключён</span>`
+          ? `<span ${_toggleAttr} title="Тумблер «В работе» выключен — потребитель не вкладывается в нагрузку.${_hint}"><span style="background:#e5e7eb;color:#475569;padding:1px 6px;border-radius:3px;font-size:10px">⊘ отключён</span></span>`
           : (overload
-              ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px">⚠ перегруз</span>`
+              ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px" title="Перегрузка по току. Не управляется тумблером — связано с расчётом.">⚠ перегруз</span>`
               : (_isReserve
-                  ? `<span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px" title="Резервный экземпляр в холодном standby. Активируется автоматически при отказе одного из активных.">💤 резерв</span>`
+                  ? `<span ${_toggleAttr} title="Резервный экземпляр в холодном standby. Активируется автоматически при отказе одного из активных.${_hint}"><span style="background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px">💤 резерв</span></span>`
                   : (_isShortage
-                      ? `<span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px" title="Не хватает резерва: этот экземпляр должен был бы работать, но не получает питания (топология) или отключён.">⚠ нет резерва</span>`
+                      ? `<span ${_toggleAttr} title="Не хватает резерва: этот экземпляр должен был бы работать, но не получает питания (топология) или отключён.${_hint}"><span style="background:#fee2e2;color:#991b1b;padding:1px 6px;border-radius:3px;font-size:10px">⚠ нет резерва</span></span>`
                       : (powered
-                          ? `<span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px">⚡ запитан</span>`
-                          : `<span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px">○ без питания</span>`))));
+                          ? `<span ${_toggleAttr} title="В работе.${_hint}"><span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:3px;font-size:10px">⚡ запитан</span></span>`
+                          : `<span ${_toggleAttr} title="Без питания (топология) — но тумблер «В работе» включён.${_hint}"><span style="background:#f1f5f9;color:#64748b;padding:1px 6px;border-radius:3px;font-size:10px">○ без питания</span></span>`))));
         h.push(`<div style="padding:10px 12px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;display:flex;flex-direction:column;gap:4px">
           <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #f1f5f9;padding-bottom:5px">
             <span style="flex:1;font-weight:600;font-size:14px" title="Полный путь с зоной/контейнером для уникальной идентификации потребителя.">${escHtml(tag)}</span>
@@ -2115,6 +2127,27 @@ function _wireContainerMembersModal(n, body, modal) {
       try { window.Raschet?.recalc?.(); } catch {}
       try { window.Raschet?.render?.(); } catch {}
       openContainerMembersModal(n);
+    });
+  });
+
+  // v0.60.400 (по запросу Пользователя 2026-05-06: «добавь включение
+  // отключение элементов группы прям на статус-надписи Запитан / Отключен,
+  // чтобы сократить время на вход в каждую карточку»): toggle effectiveOn
+  // прямо по клику на badge статуса. Работает для card-view и table-view.
+  body.querySelectorAll('[data-cm-toggle-on]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const aid = el.getAttribute('data-cm-toggle-on');
+      const a = state.nodes.get(aid);
+      if (!a) return;
+      try { snapshot('cm-toggle:' + aid); } catch {}
+      const newOn = !effectiveOn(a);
+      setEffectiveOn(a, newOn);
+      notifyChange();
+      try { _render && _render(); } catch {}
+      // Re-open modal с актуальным состоянием.
+      try { openContainerMembersModal(n); } catch {}
     });
   });
 
