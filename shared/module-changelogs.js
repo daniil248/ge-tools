@@ -4,6 +4,18 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.389', date: '2026-05-06', items: [
+      '🔌 <b>Per-port grouping (Kg) для group container conn</b>. По уточнению Пользователя 2026-05-06: «сечение в групповой линии не зависит от количества в группе, только на количество в условиях прокладки. (это как одиночные линии и они не в параллели). А вот параллельные линии должны влиять на сечение кабеля)».',
+      '<b>Контекст</b>: cables в группе — это N <b>независимых</b> линий (каждая обслуживает одного consumer), не параллельные. Сечение каждой = ток одного consumer. Влияние количества — только через K_grouping (число цепей в conduit/bundle).',
+      '<b>Корень</b>: <code>baseGrouping</code> для container = <code>toN.slots.length</code> (4 для GR1) — одинаково для P1 и P2. Но физически в каждом conduit (на каждом порту) лежит per-port число cables.',
+      '<b>Fix</b>: <code>baseGrouping</code> теперь использует ту же per-port формулу что <code>conductorsInParallel</code> (v0.60.388):',
+      '• Multi-input child → +1 cable если <code>connPort < childInputs</code>',
+      '• Single-input child → +1 cable если <code>connPort === assignedGroupPort</code>',
+      '<b>Эффект</b> для GR1 (2 multi-input + 2 single-input на P2):',
+      '• P1 conduit: 2 cables → K_g для 2 цепей (≈ 0.80) → меньшее сечение каждого',
+      '• P2 conduit: 4 cables → K_g для 4 цепей (≈ 0.65) → большее сечение каждого',
+      'Files: <code>js/engine/recalc.js</code> (baseGrouping per-port для container).',
+    ] },
     { version: '0.60.388', date: '2026-05-06', items: [
       '🔌 <b>Per-port cable count для group container conn</b>. По репорту Пользователя 2026-05-06: «количество линий в групповой линии должно отображаться соответствующим образом. На представленном примере на групповой линии 1 должно быть 2 линии а на групповой линии 2 уже 4 линии».',
       '<b>Корень</b>: <code>conductorsInParallel</code> для container conn = <code>toN.slots.length</code> (4 для GR1 с 4 children) — одинаково для P1 и P2. Не учитывалось что:',

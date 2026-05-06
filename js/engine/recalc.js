@@ -2496,8 +2496,29 @@ function recalc() {
     }
     // v0.59.829 (1.28.20): consumer-container — каждый slot = отдельный
     // кабель в том же лотке. baseGrouping = кол-во slots.
+    // v0.60.389 (по уточнению Пользователя 2026-05-06: «сечение в групповой
+    // линии не зависит от количества в группе только на количество в
+    // условиях прокладки»): для container conn — grouping = per-port cable
+    // count (не общее slots.length). Каждый порт container'а — отдельный
+    // bundle/conduit, в нём только cables этого порта.
     if (toN.type === 'consumer-container' && Array.isArray(toN.slots) && toN.slots.length > 1) {
-      baseGrouping = Math.max(baseGrouping, toN.slots.length);
+      const _connPortG = c.to.port | 0;
+      let _portCableCountG = 0;
+      for (const _s of toN.slots) {
+        if (!_s) continue;
+        if (_s.kind === 'placeholder') { _portCableCountG++; continue; }
+        if (_s.kind !== 'linked' || !_s.nodeId) continue;
+        const _ch = state.nodes.get(_s.nodeId);
+        if (!_ch) continue;
+        const _chInputs = Math.max(1, Number(_ch.inputs) || 1);
+        if (_chInputs > 1) {
+          if (_connPortG < _chInputs) _portCableCountG++;
+        } else {
+          const _agp = Number(_ch.assignedGroupPort) || 0;
+          if (_agp === _connPortG) _portCableCountG++;
+        }
+      }
+      baseGrouping = Math.max(baseGrouping, _portCableCountG || 1);
     }
     let grouping = baseGrouping;
 
