@@ -306,14 +306,47 @@ export function openConsumerParamsModal(n) {
   const _isInLogicalGroup = !!(n.logicalGroupId && String(n.logicalGroupId).trim());
   const _showRedundancy = !isOutdoor && (_cpCount > 1 || _isInContainerCtx || _isInVrfGroup || _isInLogicalGroup);
   if (_showRedundancy) {
-    const _curR = Math.max(0, Math.min(_cpCount - 1, Number(n.consumerReserveR) || 0));
+    // v0.60.393 (по репорту Пользователя 2026-05-06: «добавил 2 потребителя
+    // в одну логическую группу, но выбрать режим резервирования не могу»):
+    // _effRedundancyCount — эффективный размер группы, по которому считаются
+    // допустимые опции (N+1 нужно ≥2, N+2 ≥3, 2N — чётное ≥2). Раньше
+    // использовался _cpCount (= n.count для one consumer), но для одиночного
+    // потребителя в логической группе это всегда 1 → все опции, кроме «N»,
+    // были disabled. Теперь:
+    //   - container: размер = container.slots.length (физический контейнер)
+    //   - logical group / VRF group: count siblings + 1 (включая этот)
+    //   - иначе: _cpCount (= n.count)
+    let _effRedundancyCount = _cpCount;
+    if (_isInContainerCtx) {
+      const _cont = state.nodes.get(n.containerId);
+      _effRedundancyCount = Math.max(1, Array.isArray(_cont?.slots) ? _cont.slots.length : _cpCount);
+    } else if (_isInLogicalGroup) {
+      const _curLg = String(n.logicalGroupId).trim();
+      let _siblingsCount = 0;
+      for (const _m of state.nodes.values()) {
+        if (_m.id === n.id) continue;
+        if (_m.type !== 'consumer') continue;
+        if (String(_m.logicalGroupId || '').trim() === _curLg) _siblingsCount++;
+      }
+      _effRedundancyCount = Math.max(1, _siblingsCount + 1);
+    } else if (_isInVrfGroup) {
+      const _curVrf = String(n.vrfGroupId).trim();
+      let _siblingsCount = 0;
+      for (const _m of state.nodes.values()) {
+        if (_m.id === n.id) continue;
+        if (_m.consumerSubtype !== 'conditioner') continue;
+        if (String(_m.vrfGroupId || '').trim() === _curVrf) _siblingsCount++;
+      }
+      _effRedundancyCount = Math.max(1, _siblingsCount + 1);
+    }
+    const _curR = Math.max(0, Math.min(_effRedundancyCount - 1, Number(n.consumerReserveR) || 0));
     let _curMode = 'N';
     if (_curR === 0) _curMode = 'N';
-    else if (_curR === 1 && _cpCount >= 2) _curMode = 'N+1';
-    else if (_curR === 2 && _cpCount >= 3) _curMode = 'N+2';
-    else if (_curR * 2 === _cpCount && _cpCount >= 2) _curMode = '2N';
+    else if (_curR === 1 && _effRedundancyCount >= 2) _curMode = 'N+1';
+    else if (_curR === 2 && _effRedundancyCount >= 3) _curMode = 'N+2';
+    else if (_curR * 2 === _effRedundancyCount && _effRedundancyCount >= 2) _curMode = '2N';
     else _curMode = 'custom';
-    const _N = _cpCount - _curR;
+    const _N = _effRedundancyCount - _curR;
     // v0.60.375: тип резерва — холодный (cold standby) или горячий (hot
     // load-sharing). Default 'cold' = классический АВР, рез. отключён.
     // 'hot' = все count работают одновременно, нагрузка делится поровну
@@ -323,17 +356,17 @@ export function openConsumerParamsModal(n) {
     h.push(`<div class="field">
       <label>Режим резервирования${helpIcon('Режим работы группы. Влияет на расчёт нагрузки: только N активных единиц учитываются в Pуст и токе линии. BOM (спецификация) включает все count = N+R единиц.\\n\\n• N — нет резерва, все активны. Pуст = count × P_демонд.\\n• N+1 — 1 в резерве. Активны count-1.\\n• N+2 — 2 в резерве. Требует count ≥ 3.\\n• 2N — полный дублёр (50% активны / 50% резерв). Требует count чётное.\\n• Custom — R задаётся вручную.\\n\\nИспользуется в HVAC/MEP/датацентрах: ASHRAE 90.1, TIA-942 (Tier I-IV), ANSI/IEEE 446.')}</label>
       <select id="cp-redundancyMode" style="width:100%">
-        <option value="N"${_curMode === 'N' ? ' selected' : ''}>N — без резерва (все ${_cpCount} активны)</option>
-        <option value="N+1"${_curMode === 'N+1' ? ' selected' : ''}${_cpCount < 2 ? ' disabled' : ''}>N+1 — 1 в резерве${_cpCount >= 2 ? ` (активны ${_cpCount - 1})` : ' (нужно count ≥ 2)'}</option>
-        <option value="N+2"${_curMode === 'N+2' ? ' selected' : ''}${_cpCount < 3 ? ' disabled' : ''}>N+2 — 2 в резерве${_cpCount >= 3 ? ` (активны ${_cpCount - 2})` : ' (нужно count ≥ 3)'}</option>
-        <option value="2N"${_curMode === '2N' ? ' selected' : ''}${(_cpCount % 2 !== 0 || _cpCount < 2) ? ' disabled' : ''}>2N — полный дублёр${_cpCount >= 2 && _cpCount % 2 === 0 ? ` (${_cpCount / 2} акт. + ${_cpCount / 2} рез.)` : ' (нужно count чётное)'}</option>
+        <option value="N"${_curMode === 'N' ? ' selected' : ''}>N — без резерва (все ${_effRedundancyCount} активны)</option>
+        <option value="N+1"${_curMode === 'N+1' ? ' selected' : ''}${_effRedundancyCount < 2 ? ' disabled' : ''}>N+1 — 1 в резерве${_effRedundancyCount >= 2 ? ` (активны ${_effRedundancyCount - 1})` : ' (нужно ≥ 2 в группе)'}</option>
+        <option value="N+2"${_curMode === 'N+2' ? ' selected' : ''}${_effRedundancyCount < 3 ? ' disabled' : ''}>N+2 — 2 в резерве${_effRedundancyCount >= 3 ? ` (активны ${_effRedundancyCount - 2})` : ' (нужно ≥ 3 в группе)'}</option>
+        <option value="2N"${_curMode === '2N' ? ' selected' : ''}${(_effRedundancyCount % 2 !== 0 || _effRedundancyCount < 2) ? ' disabled' : ''}>2N — полный дублёр${_effRedundancyCount >= 2 && _effRedundancyCount % 2 === 0 ? ` (${_effRedundancyCount / 2} акт. + ${_effRedundancyCount / 2} рез.)` : ' (нужно чётное число в группе)'}</option>
         <option value="custom"${_curMode === 'custom' ? ' selected' : ''}>Custom — R задаётся вручную</option>
       </select>
     </div>`);
     if (_curMode === 'custom') {
       h.push(`<div class="field">
-        <label>Резерв R (единиц в standby)${helpIcon('Количество резервных единиц. 0 ≤ R ≤ count-1. Активные = count - R.')}</label>
-        <input type="number" id="cp-reserveR" min="0" max="${Math.max(0, _cpCount - 1)}" step="1" value="${_curR}">
+        <label>Резерв R (единиц в standby)${helpIcon('Количество резервных единиц. 0 ≤ R ≤ N_group-1. Активные = N_group - R.')}</label>
+        <input type="number" id="cp-reserveR" min="0" max="${Math.max(0, _effRedundancyCount - 1)}" step="1" value="${_curR}">
       </div>`);
     }
     // v0.60.375: тип резерва (cold / hot) — виден только если R > 0.
@@ -342,21 +375,27 @@ export function openConsumerParamsModal(n) {
         <label>Тип резерва${helpIcon('Холодный резерв (cold standby): резервные R единиц ВЫКЛЮЧЕНЫ, при отказе основной включаются. Каждая активная единица = 100% Pном.\\n\\nГорячий резерв (hot/load-sharing): ВСЕ count единиц работают одновременно, нагрузка делится поровну. Каждая = (N/(N+R)) × Pном. Часто эффективнее: 5 чиллеров на 80% > 4 чиллеров на 100% — меньше КПД-потери, ровный wear, smooth transition при отказе.\\n\\nTotal active load НЕ меняется (= N × Pном) — для расчёта токов кабеля/автомата режим не важен. Влияет только на per-unit current и energy efficiency расчёт.')}</label>
         <select id="cp-redundancyStandbyType" style="width:100%">
           <option value="cold"${_standbyType === 'cold' ? ' selected' : ''}>❄ Холодный (резерв ОТКЛЮЧЁН, активна 100% × ${_N})</option>
-          <option value="hot"${_standbyType === 'hot' ? ' selected' : ''}>🔥 Горячий (все ${_cpCount} работают на ${(_N / _cpCount * 100).toFixed(0)}%, load-sharing)</option>
+          <option value="hot"${_standbyType === 'hot' ? ' selected' : ''}>🔥 Горячий (все ${_effRedundancyCount} работают на ${(_N / _effRedundancyCount * 100).toFixed(0)}%, load-sharing)</option>
         </select>
       </div>`);
     }
     // Сводка активного / резерва / Pуст
     const _Punit = Number(n.demandKw) || 0;
     const _PustActive = _N * _Punit;
-    const _PustTotal = _cpCount * _Punit;
+    const _PustTotal = _effRedundancyCount * _Punit;
     const _isHot = (_curR > 0 && _standbyType === 'hot');
-    const _PperUnitNow = _isHot ? (_PustActive / _cpCount) : _Punit;
+    const _PperUnitNow = _isHot ? (_PustActive / _effRedundancyCount) : _Punit;
+    // v0.60.393: scope-метка для прозрачности — какой источник «всего».
+    const _scopeLabel = _isInContainerCtx ? 'слотов в контейнере'
+      : _isInLogicalGroup ? `в логической группе «${escHtml(String(n.logicalGroupId).trim())}»`
+      : _isInVrfGroup ? `indoor-блоков в VRF-системе «${escHtml(String(n.vrfGroupId).trim())}»`
+      : 'в группе';
     h.push(`<div class="muted" style="font-size:11px;color:#475569;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;padding:6px 8px;margin-top:-4px;line-height:1.5">
-      <b style="color:#0c4a6e">Активные:</b> N=<b>${_N}</b> · <b>Резерв:</b> R=<b>${_curR}</b> · <b>Всего:</b> ${_cpCount}${_curR > 0 ? ` · <b>Тип:</b> ${_isHot ? '🔥 горячий' : '❄ холодный'}` : ''}<br>
+      <b style="color:#0c4a6e">Активные:</b> N=<b>${_N}</b> · <b>Резерв:</b> R=<b>${_curR}</b> · <b>Всего:</b> ${_effRedundancyCount} <span style="color:#64748b">(${_scopeLabel})</span>${_curR > 0 ? ` · <b>Тип:</b> ${_isHot ? '🔥 горячий' : '❄ холодный'}` : ''}<br>
       <b style="color:#0c4a6e">P<sub>уст</sub> активная</b> (для расчёта токов и подбора кабеля/автомата) = ${_N} × ${_Punit} = <b>${_PustActive.toFixed(2)} кВт</b>
-      ${_isHot ? `<br><span style="color:#b45309">🔥 В горячем режиме каждая из ${_cpCount} единиц нагружена на ${_PperUnitNow.toFixed(2)} кВт (${(_N / _cpCount * 100).toFixed(0)}% от Pном).</span>` : ''}
-      ${_curR > 0 ? `<br><span style="color:#64748b">BOM/спецификация = ${_cpCount} × ${_Punit} = ${_PustTotal.toFixed(2)} кВт (вся группа, включая ${_curR} резервн.)</span>` : ''}
+      ${_isHot ? `<br><span style="color:#b45309">🔥 В горячем режиме каждая из ${_effRedundancyCount} единиц нагружена на ${_PperUnitNow.toFixed(2)} кВт (${(_N / _effRedundancyCount * 100).toFixed(0)}% от Pном).</span>` : ''}
+      ${_curR > 0 ? `<br><span style="color:#64748b">BOM/спецификация = ${_effRedundancyCount} × ${_Punit} = ${_PustTotal.toFixed(2)} кВт (вся группа, включая ${_curR} резервн.)</span>` : ''}
+      ${(_isInLogicalGroup || _isInVrfGroup) ? `<br><span style="color:#92400e;font-size:10.5px">ℹ Параметр резервирования сохраняется на каждом потребителе индивидуально. Для согласованной работы установите одинаковое значение на всех членах группы (TODO: автосинхронизация cross-consumer).</span>` : ''}
     </div>`);
   }
   // v0.59.764: IDENTIFY-AS (ROADMAP 1.28.10 сценарий B) — связь 1:1 для
@@ -2643,18 +2682,46 @@ export function openConsumerParamsModal(n) {
     n.name = nameInput || (cat ? cat.label : n.name || 'Потребитель');
     n.count = readNum('cp-count', n.count ?? 1);
     // v0.60.364: redundancy mode → consumerReserveR
+    // v0.60.393: эффективный размер группы — count для одиночного потребителя,
+    // или размер контейнера / логической группы / VRF-группы (sibling-count
+    // + 1) для контекстных групп. Иначе для consumer'а с count=1 в логической
+    // группе все опции кроме N были бы недоступны (R clamped to 0).
     const _rmEl = document.getElementById('cp-redundancyMode');
     if (_rmEl) {
       const mode = _rmEl.value;
       const cnt = Math.max(1, Number(n.count) || 1);
+      let effCnt = cnt;
+      const _appCont = (n.containerId && state.nodes.get(n.containerId)?.type === 'consumer-container')
+        ? state.nodes.get(n.containerId) : null;
+      if (_appCont) {
+        effCnt = Math.max(1, Array.isArray(_appCont.slots) ? _appCont.slots.length : cnt);
+      } else if (n.logicalGroupId && String(n.logicalGroupId).trim()) {
+        const _lg = String(n.logicalGroupId).trim();
+        let _sc = 0;
+        for (const _m of state.nodes.values()) {
+          if (_m.id === n.id) continue;
+          if (_m.type !== 'consumer') continue;
+          if (String(_m.logicalGroupId || '').trim() === _lg) _sc++;
+        }
+        effCnt = Math.max(1, _sc + 1);
+      } else if (n.vrfGroupId && String(n.vrfGroupId).trim()) {
+        const _vg = String(n.vrfGroupId).trim();
+        let _sc = 0;
+        for (const _m of state.nodes.values()) {
+          if (_m.id === n.id) continue;
+          if (_m.consumerSubtype !== 'conditioner') continue;
+          if (String(_m.vrfGroupId || '').trim() === _vg) _sc++;
+        }
+        effCnt = Math.max(1, _sc + 1);
+      }
       let r = 0;
       if (mode === 'N') r = 0;
-      else if (mode === 'N+1' && cnt >= 2) r = 1;
-      else if (mode === 'N+2' && cnt >= 3) r = 2;
-      else if (mode === '2N' && cnt >= 2 && cnt % 2 === 0) r = cnt / 2;
+      else if (mode === 'N+1' && effCnt >= 2) r = 1;
+      else if (mode === 'N+2' && effCnt >= 3) r = 2;
+      else if (mode === '2N' && effCnt >= 2 && effCnt % 2 === 0) r = effCnt / 2;
       else if (mode === 'custom') {
         const _crEl = document.getElementById('cp-reserveR');
-        r = Math.max(0, Math.min(cnt - 1, Number(_crEl?.value) || 0));
+        r = Math.max(0, Math.min(effCnt - 1, Number(_crEl?.value) || 0));
       }
       if (r > 0) n.consumerReserveR = r;
       else delete n.consumerReserveR;
