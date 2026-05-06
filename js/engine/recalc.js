@@ -910,6 +910,36 @@ function recalc() {
     normalizeContainers();
   } catch {}
 
+  // v0.60.373 (по репорту Пользователя 2026-05-06: «первый конденсатор не
+  // отображается в перечне потребителей»): auto-heal stale outdoor-блоков
+  // ПРИ КАЖДОМ recalc'е (не только при открытии cond-modal как v0.60.363):
+  //   - tag = parent.tag + '.OU' + (i+1)
+  //   - linkedIndoorId = parent.id (на случай миграций)
+  //   - embedAsOutdoor = true
+  // Также чистим linkedOutdoorIds от мёртвых ссылок (deleted nodes).
+  try {
+    for (const _cond of state.nodes.values()) {
+      if (_cond.consumerSubtype !== 'conditioner') continue;
+      const _ouIds = Array.isArray(_cond.linkedOutdoorIds) ? _cond.linkedOutdoorIds.slice()
+        : (_cond.linkedOutdoorId ? [_cond.linkedOutdoorId] : []);
+      if (!_ouIds.length) continue;
+      const _validIds = [];
+      for (let i = 0; i < _ouIds.length; i++) {
+        const _ou = state.nodes.get(_ouIds[i]);
+        if (!_ou) continue; // dead reference — drop
+        _validIds.push(_ouIds[i]);
+        const _expectedTag = `${_cond.tag || ''}.OU${_validIds.length}`;
+        if (_ou.tag !== _expectedTag) _ou.tag = _expectedTag;
+        if (_ou.linkedIndoorId !== _cond.id) _ou.linkedIndoorId = _cond.id;
+        if (_ou.embedAsOutdoor !== true) _ou.embedAsOutdoor = true;
+      }
+      if (_validIds.length !== _ouIds.length) {
+        _cond.linkedOutdoorIds = _validIds;
+        _cond.linkedOutdoorId = _validIds[0] || null;
+      }
+    }
+  } catch (e) { /* swallow — non-critical */ }
+
   _markInternalIntegratedConns();
   _markKitInternalConns();
 

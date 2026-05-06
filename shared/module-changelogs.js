@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.373', date: '2026-05-06', items: [
+      '🔧 <b>Auto-heal stale outdoor-блоков при каждом recalc</b>. По репорту Пользователя 2026-05-06: «первый конденсатор не отображается в перечне потребителей».',
+      '<b>Корень</b>: outdoor-блок мог иметь stale-состояние — неверный tag (после переименования cond без apply), <code>linkedIndoorId</code> сломан после миграции, или <code>embedAsOutdoor</code> сброшен. v0.60.363 чинил при открытии cond-modal — но если cond-modal не открывался, OU не был «видим» в перечне (тег чужой / не находится).',
+      '<b>Fix</b>: новая helper-логика в начале <code>recalc()</code> (после <code>normalizeContainers</code>) — для каждого <code>conditioner</code> с <code>linkedOutdoorIds[]</code>:',
+      '• Удаляются мёртвые ссылки (deleted node ids)',
+      '• Tag синхронизируется: <code>ou.tag = cond.tag + ".OU" + (i+1)</code>',
+      '• <code>linkedIndoorId</code> = cond.id',
+      '• <code>embedAsOutdoor</code> = true',
+      'Idempotent — выполняется при каждом recalc, не дублирует.',
+      'Files: <code>js/engine/recalc.js</code> (auto-heal loop в начале recalc).',
+    ] },
     { version: '0.60.372', date: '2026-05-06', items: [
       '🔧 <b>Breaker re-select после post-clamp _maxKw</b>. По репорту Пользователя 2026-05-06: «автомат должен быть больше расчетной» — после v0.60.371 кабель пересчитывается (150мм² для Iрасч=169.3А ✓), но breaker остаётся 50А (правило In ≥ Iрасч нарушено).',
       '<b>Корень</b>: <code>selectBreaker</code> вызывался в conn-loop с <code>_maxA</code> до post-clamp (тот же баг что v0.60.371 для cable, но для breaker отдельный код-путь).',
