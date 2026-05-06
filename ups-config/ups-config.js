@@ -1230,14 +1230,41 @@ function _goStep3() {
   _showStep(3);
 }
 
+// v0.60.407 (по уточнению Пользователя 2026-05-06: «здесь не верно определено
+// 50 кВт на модуль, здесь должно быть 1000 нужно 2 ИБП подобрали, значит
+// нужно 500 запрос на ИБП»): для модулярного ИБП с multi-frame parallel
+// «единицы ИБП» = число фреймов (parallelFrames), а НЕ число модулей.
+// Раньше использовался fi.working = total modules → давало loadKw/20=50 kW
+// вместо правильного loadKw/2=500 kW.
+function _getUpsUnits(comp) {
+  if (!comp) return { unitCount: 1, workingUnits: 1, redundantUnits: 0 };
+  const fi = comp.fitInfo;
+  const ups = comp.ups;
+  if (!fi) return { unitCount: 1, workingUnits: 1, redundantUnits: 0 };
+  // Модулярный multi-frame parallel — единицы = фреймы.
+  if (ups && ups.upsType === 'modular' && fi.parallelFrames && fi.parallelFrames > 1) {
+    return {
+      unitCount: fi.parallelFrames,
+      workingUnits: fi.parallelFrames, // нет frame-level редундансии (модуль-level внутри каждого frame)
+      redundantUnits: 0,
+    };
+  }
+  // Моноблок / single-frame — единицы = installed (total UPS).
+  return {
+    unitCount: Math.max(1, fi.installed || 1),
+    workingUnits: Math.max(1, fi.working || 1),
+    redundantUnits: Math.max(0, fi.redundant || 0),
+  };
+}
+
 // v0.60.406: видимость и логика селектора топологии АКБ.
 function _wireBatteryTopologyUi() {
   const wrap = document.getElementById('wiz-battery-topology');
   if (!wrap) return;
   const comp = wizState.composition;
   if (!comp) { wrap.style.display = 'none'; return; }
-  const fi = comp.fitInfo;
-  const isMulti = fi.installed > 1;
+  const units = _getUpsUnits(comp);
+  const isMulti = units.unitCount > 1;
   // Селектор виден только при multi-unit (>=2 ИБП в системе).
   wrap.style.display = isMulti ? '' : 'none';
   if (!isMulti) return;
@@ -1258,18 +1285,15 @@ function _renderBatteryTopologySummary() {
   if (!sum) return;
   const comp = wizState.composition;
   if (!comp) { sum.textContent = ''; return; }
-  const fi = comp.fitInfo;
   const rq = wizState.requirements;
-  const N = Math.max(1, fi.working || 1);
-  const R = Math.max(0, fi.redundant || 0);
-  const installed = N + R;
+  const units = _getUpsUnits(comp);
   const loadKw = Number(rq.loadKw) || 0;
   const topology = wizState.batteryTopology || 'per-unit';
-  const loadPerUnit = loadKw / N;
+  const loadPerUnit = loadKw / Math.max(1, units.workingUnits);
   if (topology === 'per-unit') {
-    sum.innerHTML = `<b>Per-unit</b>: в подбор АКБ передаётся <b>${loadPerUnit.toFixed(1)} kW</b> (= ${loadKw}/${N}). Заказ: <b>${installed}</b> комплектов АКБ (${N} рабочих + ${R} резерв).`;
+    sum.innerHTML = `<b>Per-unit</b>: в подбор АКБ передаётся <b>${loadPerUnit.toFixed(1)} kW</b> (= ${loadKw}/${units.workingUnits}). Заказ: <b>${units.unitCount}</b> комплектов АКБ (${units.workingUnits} рабочих${units.redundantUnits > 0 ? ' + ' + units.redundantUnits + ' резерв' : ''}).`;
   } else {
-    sum.innerHTML = `<b>Shared</b>: в подбор АКБ передаётся <b>${loadKw.toFixed(1)} kW</b> (полная нагрузка). Заказ: <b>1</b> комплект АКБ (увеличенной ёмкости, общая шина для всех ${installed} ИБП).`;
+    sum.innerHTML = `<b>Shared</b>: в подбор АКБ передаётся <b>${loadKw.toFixed(1)} kW</b> (полная нагрузка). Заказ: <b>1</b> комплект АКБ (увеличенной ёмкости, общая шина для всех ${units.unitCount} ИБП).`;
   }
 }
 
@@ -1316,9 +1340,11 @@ function _renderBatteryInfo() {
   if (!comp) { info.textContent = ''; return; }
   const u = comp.ups;
   const fi = comp.fitInfo;
-  // v0.60.406: контекст параллели для индикации в info-блоке.
-  const N = Math.max(1, fi.working || 1);
-  const installed = Math.max(1, fi.installed || 1);
+  // v0.60.407: контекст параллели — для модулярного multi-frame единицы =
+  // фреймы (НЕ модули).
+  const units = _getUpsUnits(comp);
+  const N = units.workingUnits;
+  const installed = units.unitCount;
   const isMulti = installed > 1;
   const topology = wizState.batteryTopology || (isMulti ? 'per-unit' : 'shared');
   const battSetsQty = (topology === 'per-unit') ? installed : 1;
@@ -1326,7 +1352,12 @@ function _renderBatteryInfo() {
     ? (Number(rq.loadKw) || 0) / N
     : (Number(rq.loadKw) || 0);
   const lines = [];
-  lines.push(`Выбран ИБП: <b>${esc(u.supplier || '')} ${esc(u.model || u.id)}</b>${isMulti ? ` × <b>${installed}</b> в параллель (${N} раб + ${fi.redundant} рез)` : ''}`);
+  const parallelDescr = isMulti
+    ? (units.redundantUnits > 0
+        ? ` × <b>${installed}</b> в параллель (${N} раб + ${units.redundantUnits} рез)`
+        : ` × <b>${installed}</b> в параллель`)
+    : '';
+  lines.push(`Выбран ИБП: <b>${esc(u.supplier || '')} ${esc(u.model || u.id)}</b>${parallelDescr}`);
   if (u.vdcMin && u.vdcMax) lines.push(`Диапазон V<sub>DC</sub> по паспорту: <b>${u.vdcMin}…${u.vdcMax} В</b>`);
   if (isMulti) {
     lines.push(`Топология АКБ: <b>${topology === 'per-unit' ? 'на каждый ИБП' : 'общая шина'}</b> → в подбор передаётся <b>${loadKwToPicker.toFixed(1)} kW</b>, заказ <b>${battSetsQty}</b> комплект(ов)`);
@@ -1354,14 +1385,13 @@ function _openBatteryPicker() {
   const u = comp.ups;
   const fi = comp.fitInfo;
   const rq = wizState.requirements;
-  // v0.60.406 (по запросу Пользователя 2026-05-06: «измени подбор АКБ с
-  // учетом подбора для параллельных систем и резерва (N+1, при N=2, в
-  // подбор АКБ нужно передать только половину мощности, но комплектов
-  // АКБ взять 3 шт»): per-unit vs shared topology.
-  // - per-unit: loadKw / N передаётся в подбор; кол-во комплектов = N+R = installed.
+  // v0.60.406 / v0.60.407: per-unit vs shared topology.
+  // - per-unit: loadKw / workingUnits передаётся в подбор; кол-во комплектов = unitCount.
   // - shared: вся нагрузка передаётся; кол-во комплектов = 1.
-  const N = Math.max(1, fi.working || 1);
-  const installed = Math.max(1, fi.installed || 1);
+  // ВАЖНО: для модулярного с multi-frame parallel единицы = фреймы (НЕ модули).
+  const units = _getUpsUnits(comp);
+  const N = units.workingUnits;
+  const installed = units.unitCount;
   const topology = wizState.batteryTopology || (installed > 1 ? 'per-unit' : 'shared');
   const isPerUnit = topology === 'per-unit';
   const loadKwToPicker = isPerUnit ? (Number(rq.loadKw) || 0) / N : Number(rq.loadKw) || 0;
@@ -1474,19 +1504,23 @@ function _goStep4() {
   const priceStr = comp.totalPrice != null
     ? Number(comp.totalPrice).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ' + comp.currency
     : 'не указана';
-  // v0.60.406: контекст параллели для отчёта.
-  const N = Math.max(1, fi.working || 1);
-  const R = Math.max(0, fi.redundant || 0);
-  const installed = Math.max(1, fi.installed || 1);
+  // v0.60.406 / v0.60.407: контекст параллели для отчёта.
+  // ВАЖНО: для модулярного multi-frame parallel единицы = фреймы (НЕ модули).
+  const units = _getUpsUnits(comp);
+  const N = units.workingUnits;
+  const R = units.redundantUnits;
+  const installed = units.unitCount;
   const isMulti = installed > 1;
   const battTopology = wizState.batteryTopology || (isMulti ? 'per-unit' : 'shared');
   const battSetsQty = (battTopology === 'per-unit') ? installed : 1;
-  const loadPerUnit = Number(rq.loadKw) / N;
+  const loadPerUnit = Number(rq.loadKw) / Math.max(1, N);
   const battTopologyLbl = (battTopology === 'per-unit')
     ? `на каждый ИБП (per-unit) — ${battSetsQty} комплект(ов) × ${loadPerUnit.toFixed(1)} kW`
     : `общая шина (shared) — 1 комплект × ${rq.loadKw} kW`;
   const redundancyDetail = isMulti
-    ? `${rq.redundancy} (${N} рабочих + ${R} резерв = ${installed} установлено)`
+    ? (R > 0
+        ? `${rq.redundancy} (${N} рабочих + ${R} резерв = ${installed} ИБП)`
+        : `${rq.redundancy} (${installed} ИБП в параллель, модуль-level редундансия внутри каждого)`)
     : rq.redundancy;
   const summary = document.getElementById('wiz-summary');
   summary.innerHTML = `
@@ -1558,10 +1592,13 @@ function _applyConfiguration() {
       batteryAutonomyMin: rq.autonomyMin,
       batterySelection: wizState.battery || null,
       batteryChoice: wizState.batteryChoice || null,
-      // v0.60.406: топология АКБ (per-unit / shared) + кол-во комплектов.
+      // v0.60.406 / v0.60.407: топология АКБ (per-unit / shared) + кол-во
+      // комплектов. Для модулярного multi-frame parallel — единицы = фреймы.
       batteryTopology: wizState.batteryTopology
-        || (fi.installed > 1 ? 'per-unit' : 'shared'),
-      batterySetsQty: (wizState.batteryTopology === 'shared' ? 1 : (fi.installed || 1)),
+        || (_getUpsUnits(comp).unitCount > 1 ? 'per-unit' : 'shared'),
+      batterySetsQty: ((wizState.batteryTopology || (_getUpsUnits(comp).unitCount > 1 ? 'per-unit' : 'shared')) === 'shared'
+        ? 1
+        : _getUpsUnits(comp).unitCount),
       composition: comp.composition,
       totalPrice: comp.totalPrice,
       currency: comp.currency,

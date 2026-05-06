@@ -4,6 +4,16 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.407', date: '2026-05-06', items: [
+      '🔧 <b>Fix per-unit АКБ для модулярного multi-frame</b>. По уточнению Пользователя 2026-05-06: «здесь не верно определено 50 кВт на модуль, здесь должно быть 1000 нужно 2 ИБП подобрали, значит нужно 500 запрос на ИБП».',
+      '<b>Корень</b>: для модулярного UPS с multi-frame parallel (например MR33 600 × 2 frames для 1000 kW) единицей «ИБП» в смысле батарейной топологии является ФРЕЙМ, а не модуль. Старая формула <code>loadKw / fi.working</code> делила на ВСЕ модули (1000/20=50 kW), а должно быть <code>loadKw / parallelFrames</code> = 1000/2 = 500 kW.',
+      '<b>Fix</b>: добавлен helper <code>_getUpsUnits(comp)</code>, который возвращает <code>{ unitCount, workingUnits, redundantUnits }</code> в правильной семантике:',
+      '• Modular multi-frame parallel: unitCount = parallelFrames, workingUnits = parallelFrames (frame-level, без редундансии — модуль-level редундансия внутри каждого frame).',
+      '• Monoblock / single-frame: unitCount = installed, workingUnits = working (как было).',
+      'Используется в: _wireBatteryTopologyUi, _renderBatteryTopologySummary, _openBatteryPicker, _renderBatteryInfo, summary, applyConfiguration.',
+      '<b>Описание в summary</b> для multi-frame: «N+1 (2 ИБП в параллель, модуль-level редундансия внутри каждого)».',
+      'Files: <code>ups-config/ups-config.js</code>.',
+    ] },
     { version: '0.60.406', date: '2026-05-06', items: [
       '🔋 <b>UPS-конфигуратор: подбор АКБ с учётом параллели + общая/per-UPS АКБ + отчёт</b>. По запросу Пользователя 2026-05-06: «измени подбор АКБ с учетом подбора для параллельных систем и резерва (N+1, при N=2, в подбор АКБ нужно передать только половину мощности, но комплектов АКБ взять 3 шт). Добавить вариант общая АКБ или на ИБП. Все это отразить в отчете».',
       '<b>Часть A: топология АКБ</b>',
