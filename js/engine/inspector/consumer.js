@@ -258,7 +258,19 @@ export function openConsumerParamsModal(n) {
   // активной нагрузки) — только N единиц. Per-unit cable рассчитан на
   // demand одной единицы (на случай отказа основной — резерв подхватывает
   // полную нагрузку).
-  if (!isOutdoor && _cpCount >= 1) {
+  // v0.60.375 (по уточнению Пользователя 2026-05-06: «режим резервирования
+  // актуален только для групповых потребителей и групп, для обычных
+  // потребителей он должен быть вообще не доступен и не виден. Для простых
+  // потребителей актуален только если они входят в логическую группу»):
+  // селектор виден ТОЛЬКО когда:
+  //   (a) count > 1 (групповой потребитель), ИЛИ
+  //   (b) consumer член consumer-container (группа), ИЛИ
+  //   (c) consumer имеет vrfGroupId (логическая группа)
+  // Для одиночных без группы — скрыт.
+  const _isInContainerCtx = !!(n.containerId && state.nodes.get(n.containerId)?.type === 'consumer-container');
+  const _isInVrfGroup = !!(n.vrfGroupId && String(n.vrfGroupId).trim());
+  const _showRedundancy = !isOutdoor && (_cpCount > 1 || _isInContainerCtx || _isInVrfGroup);
+  if (_showRedundancy) {
     const _curR = Math.max(0, Math.min(_cpCount - 1, Number(n.consumerReserveR) || 0));
     let _curMode = 'N';
     if (_curR === 0) _curMode = 'N';
@@ -267,8 +279,14 @@ export function openConsumerParamsModal(n) {
     else if (_curR * 2 === _cpCount && _cpCount >= 2) _curMode = '2N';
     else _curMode = 'custom';
     const _N = _cpCount - _curR;
+    // v0.60.375: тип резерва — холодный (cold standby) или горячий (hot
+    // load-sharing). Default 'cold' = классический АВР, рез. отключён.
+    // 'hot' = все count работают одновременно, нагрузка делится поровну
+    // (часто эффективнее: 5 чиллеров × 80% > 4 чиллеров × 100%). Влияет на
+    // per-unit kUse. Total active load НЕ меняется = N × Pном.
+    const _standbyType = String(n.redundancyStandbyType || 'cold');
     h.push(`<div class="field">
-      <label>Режим резервирования${helpIcon('Режим работы группы. Влияет на расчёт нагрузки: только N активных единиц учитываются в Pуст и токе линии. Резервные R единиц — стоят в standby (lead-lag cycling), включаются при отказе основной. BOM (спецификация) включает все count = N+R единиц.\\n\\n• N — нет резерва, все активны. Pуст = count × P_демонд.\\n• N+1 — 1 в резерве. Активны count-1.\\n• N+2 — 2 в резерве. Требует count ≥ 3.\\n• 2N — полный дублёр (50% активны / 50% резерв). Требует count чётное.\\n• Custom — R задаётся вручную.\\n\\nИспользуется в HVAC/MEP/датацентрах: ASHRAE 90.1, TIA-942 (Tier I-IV), ANSI/IEEE 446.')}</label>
+      <label>Режим резервирования${helpIcon('Режим работы группы. Влияет на расчёт нагрузки: только N активных единиц учитываются в Pуст и токе линии. BOM (спецификация) включает все count = N+R единиц.\\n\\n• N — нет резерва, все активны. Pуст = count × P_демонд.\\n• N+1 — 1 в резерве. Активны count-1.\\n• N+2 — 2 в резерве. Требует count ≥ 3.\\n• 2N — полный дублёр (50% активны / 50% резерв). Требует count чётное.\\n• Custom — R задаётся вручную.\\n\\nИспользуется в HVAC/MEP/датацентрах: ASHRAE 90.1, TIA-942 (Tier I-IV), ANSI/IEEE 446.')}</label>
       <select id="cp-redundancyMode" style="width:100%">
         <option value="N"${_curMode === 'N' ? ' selected' : ''}>N — без резерва (все ${_cpCount} активны)</option>
         <option value="N+1"${_curMode === 'N+1' ? ' selected' : ''}${_cpCount < 2 ? ' disabled' : ''}>N+1 — 1 в резерве${_cpCount >= 2 ? ` (активны ${_cpCount - 1})` : ' (нужно count ≥ 2)'}</option>
@@ -283,13 +301,26 @@ export function openConsumerParamsModal(n) {
         <input type="number" id="cp-reserveR" min="0" max="${Math.max(0, _cpCount - 1)}" step="1" value="${_curR}">
       </div>`);
     }
+    // v0.60.375: тип резерва (cold / hot) — виден только если R > 0.
+    if (_curR > 0) {
+      h.push(`<div class="field">
+        <label>Тип резерва${helpIcon('Холодный резерв (cold standby): резервные R единиц ВЫКЛЮЧЕНЫ, при отказе основной включаются. Каждая активная единица = 100% Pном.\\n\\nГорячий резерв (hot/load-sharing): ВСЕ count единиц работают одновременно, нагрузка делится поровну. Каждая = (N/(N+R)) × Pном. Часто эффективнее: 5 чиллеров на 80% > 4 чиллеров на 100% — меньше КПД-потери, ровный wear, smooth transition при отказе.\\n\\nTotal active load НЕ меняется (= N × Pном) — для расчёта токов кабеля/автомата режим не важен. Влияет только на per-unit current и energy efficiency расчёт.')}</label>
+        <select id="cp-redundancyStandbyType" style="width:100%">
+          <option value="cold"${_standbyType === 'cold' ? ' selected' : ''}>❄ Холодный (резерв ОТКЛЮЧЁН, активна 100% × ${_N})</option>
+          <option value="hot"${_standbyType === 'hot' ? ' selected' : ''}>🔥 Горячий (все ${_cpCount} работают на ${(_N / _cpCount * 100).toFixed(0)}%, load-sharing)</option>
+        </select>
+      </div>`);
+    }
     // Сводка активного / резерва / Pуст
     const _Punit = Number(n.demandKw) || 0;
     const _PustActive = _N * _Punit;
     const _PustTotal = _cpCount * _Punit;
+    const _isHot = (_curR > 0 && _standbyType === 'hot');
+    const _PperUnitNow = _isHot ? (_PustActive / _cpCount) : _Punit;
     h.push(`<div class="muted" style="font-size:11px;color:#475569;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;padding:6px 8px;margin-top:-4px;line-height:1.5">
-      <b style="color:#0c4a6e">Активные:</b> N=<b>${_N}</b> · <b>Резерв:</b> R=<b>${_curR}</b> · <b>Всего:</b> ${_cpCount}<br>
+      <b style="color:#0c4a6e">Активные:</b> N=<b>${_N}</b> · <b>Резерв:</b> R=<b>${_curR}</b> · <b>Всего:</b> ${_cpCount}${_curR > 0 ? ` · <b>Тип:</b> ${_isHot ? '🔥 горячий' : '❄ холодный'}` : ''}<br>
       <b style="color:#0c4a6e">P<sub>уст</sub> активная</b> (для расчёта токов и подбора кабеля/автомата) = ${_N} × ${_Punit} = <b>${_PustActive.toFixed(2)} кВт</b>
+      ${_isHot ? `<br><span style="color:#b45309">🔥 В горячем режиме каждая из ${_cpCount} единиц нагружена на ${_PperUnitNow.toFixed(2)} кВт (${(_N / _cpCount * 100).toFixed(0)}% от Pном).</span>` : ''}
       ${_curR > 0 ? `<br><span style="color:#64748b">BOM/спецификация = ${_cpCount} × ${_Punit} = ${_PustTotal.toFixed(2)} кВт (вся группа, включая ${_curR} резервн.)</span>` : ''}
     </div>`);
   }
@@ -2592,6 +2623,13 @@ export function openConsumerParamsModal(n) {
       }
       if (r > 0) n.consumerReserveR = r;
       else delete n.consumerReserveR;
+    }
+    // v0.60.375: тип резерва (cold/hot)
+    const _stEl = document.getElementById('cp-redundancyStandbyType');
+    if (_stEl) {
+      const st = _stEl.value;
+      if (st === 'hot') n.redundancyStandbyType = 'hot';
+      else delete n.redundancyStandbyType; // 'cold' = default
     }
     n.serialMode = !!document.getElementById('cp-serialMode')?.checked;
     n.loadSpec = (document.getElementById('cp-loadSpec')?.value === 'total') ? 'total' : 'per-unit';

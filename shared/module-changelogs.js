@@ -4,6 +4,21 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.375', date: '2026-05-06', items: [
+      '🔄 <b>Режим резервирования: scope-fix + cold/hot standby</b>. По уточнению Пользователя 2026-05-06: «режим резервирования актуален только для групповых потребителей и групп, для обычных потребителей он должен быть вообще не доступен и не виден. Для простых потребителей актуален только если они входят в логическую группу. Так же стоит учесть что есть холодный резерв... и горячий резерв».',
+      '<b>1. Hide для одиночных consumer\'ов</b>: селектор «Режим резервирования» виден ТОЛЬКО когда:',
+      '• <code>count > 1</code> (групповой потребитель), ИЛИ',
+      '• consumer член consumer-container (группа), ИЛИ',
+      '• consumer имеет <code>vrfGroupId</code> (логическая группа)',
+      'Для одиночных без группы — селектор скрыт целиком.',
+      '<b>2. Cold / Hot standby</b> (новый dropdown появляется когда R > 0):',
+      '• <b>❄ Холодный</b> (cold standby) — резервные R единиц <b>выключены</b>, при отказе включаются. Каждая активная = 100% Pном. Default.',
+      '• <b>🔥 Горячий</b> (hot / load-sharing) — все count единиц работают одновременно, нагрузка делится поровну. Каждая = (N/(N+R)) × Pном. Часто эффективнее энергетически.',
+      '<b>State</b>: <code>n.redundancyStandbyType</code> = \'cold\' (default) | \'hot\'. Total active load НЕ меняется (= N × Pном) — для cable/breaker сайзинга режим не важен. Влияет на per-unit current и energy efficiency.',
+      'Сводка под селектором показывает per-unit нагрузку для горячего: «🔥 каждая из 5 единиц нагружена на 4.0 кВт (80% от Pном)».',
+      '<b>TODO</b>: per-port load aggregation в group container — текущая на P1 = сумма children priority=1, на P2 = сумма children priority=2, max = все. Реализуется в следующей версии (нужны recalc-side changes).',
+      'Files: <code>js/engine/inspector/consumer.js</code> (visibility + cold/hot selector + apply-handler).',
+    ] },
     { version: '0.60.374', date: '2026-05-06', items: [
       '🟢 <b>Группа подключается к 2 вводам визуально (per-child priorities aggregation)</b>. По репорту Пользователя 2026-05-06: «группа как не подключалась к 2 вводам по составу компонентов так и не подключается».',
       '<b>Корень</b>: после v0.60.361 (per-child priorities в recalc) — children с разными priorities действительно используют разные container-порты (cond1 [1,2] → port 1, cond2 [2,1] → port 2). Но <code>container._avrBreakerOverride</code> устанавливался ATS\'ом контейнера для ОДНОГО порта (по своим inherited priorities), визуально подсвечивался только ОДИН порт.',
