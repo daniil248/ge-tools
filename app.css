@@ -920,6 +920,16 @@ input, select { font: inherit; }
 }
 .node.overload .node-body { fill: #ffebee; stroke: #c62828 !important; }
 .node.unpowered .node-body { fill: #f5f5f5; stroke: #bdbdbd; }
+/* v0.60.395: потребитель/контейнер, отключённый Пользователем (тумблер
+   «В работе») — серая заливка чуть насыщеннее, чем у unpowered, чтобы
+   визуально отличаться от «нет питания». Поверх иконки рисуется знак
+   запрета (см. node-icon-banned). */
+.node.disabled-by-user .node-body { fill: #e5e7eb; stroke: #94a3b8 !important; stroke-dasharray: 5 3; }
+.node.disabled-by-user .node-title,
+.node.disabled-by-user .node-sub,
+.node.disabled-by-user .node-load { opacity: 0.55; }
+.node-icon-banned { pointer-events: none; }
+.node-icon-banned circle, .node-icon-banned line { vector-effect: non-scaling-stroke; }
 
 .node-tag   { font: 700 10px -apple-system, "Segoe UI", sans-serif; fill: #8a93a7; letter-spacing: 0.4px; pointer-events: none; text-transform: uppercase; }
 .node-title { font: 600 13px -apple-system, "Segoe UI", sans-serif; fill: #1f2430; pointer-events: none; }

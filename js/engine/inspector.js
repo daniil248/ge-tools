@@ -3081,10 +3081,15 @@ export function renderGeneralPanel(n) {
   // v0.58.49: «В работе» — общий переключатель эксплуатационного состояния.
   // Применим к source/generator/ups (остальные не имеют бинарного on/off).
   // Выключенный узел пропадает из расчёта всех систем, а не только электрики.
-  if (n.type === 'source' || n.type === 'generator' || n.type === 'ups') {
+  // v0.60.395 (по запросу Пользователя 2026-05-06: «вынеси так же селектор
+  // работы в правый сайдбар в группу общие»): расширили на consumer и
+  // consumer-container, чтобы тумблер «В работе» был доступен и в sidebar
+  // (раньше был только в модалке потребителя через cp-on).
+  if (n.type === 'source' || n.type === 'generator' || n.type === 'ups'
+      || n.type === 'consumer' || n.type === 'consumer-container') {
     const on = effectiveOn(n);
     h.push(`<div class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">`);
-    h.push(`<div class="field check" style="margin-bottom:4px"><input type="checkbox" data-prop="on"${on ? ' checked' : ''}><label style="font-weight:600">В работе</label></div>`);
+    h.push(`<div class="field check" style="margin-bottom:4px;padding:6px 10px;background:${on ? '#f0fdf4' : '#f3f4f6'};border:1px solid ${on ? '#bbf7d0' : '#cbd5e1'};border-radius:4px"><input type="checkbox" data-prop="on"${on ? ' checked' : ''}><label style="font-weight:600;color:${on ? '#166534' : '#475569'}">${on ? '✓ В работе' : '⊘ Отключён'}</label></div>`);
     // Подсказка: изменения «В работе» сохраняются в активном режиме
     if (state.activeModeId) {
       const m = state.modes.find(x => x.id === state.activeModeId);
@@ -4085,7 +4090,7 @@ export function wireGeneralPanelInputs(n, root) {
           const renamed = _propagateIntegratedTagChange(n, oldTag, t);
           if (renamed > 0) flash(`Обновлены теги ${renamed} компонентов интегрированного ИБП`, 'ok');
         }
-      } else if (prop === 'on' && (n.type === 'source' || n.type === 'generator' || n.type === 'ups')) {
+      } else if (prop === 'on' && (n.type === 'source' || n.type === 'generator' || n.type === 'ups' || n.type === 'consumer' || n.type === 'consumer-container')) {
         setEffectiveOn(n, v);
       } else if (prop === 'productId') {
         _applyProductBinding(n, v);
@@ -4292,7 +4297,7 @@ export function wireInspectorInputs(n, root) {
           const renamed = _propagateIntegratedTagChange(n, oldTag, t);
           if (renamed > 0) flash(`Обновлены теги ${renamed} компонентов интегрированного ИБП`, 'ok');
         }
-      } else if (prop === 'on' && (n.type === 'source' || n.type === 'generator' || n.type === 'ups')) {
+      } else if (prop === 'on' && (n.type === 'source' || n.type === 'generator' || n.type === 'ups' || n.type === 'consumer' || n.type === 'consumer-container')) {
         setEffectiveOn(n, v);
       } else if (prop === 'manualActiveInput') {
         n.manualActiveInput = Number(v) || 0;

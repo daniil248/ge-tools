@@ -2019,6 +2019,13 @@ export function renderNodes() {
       (n.type === 'panel' && n.switchMode === 'manual') ? 'manual' : '',
       (n.type === 'panel' && n._marginWarn === 'undersize') ? 'undersize' : '',
       (n.type === 'panel' && n._marginWarn === 'oversize') ? 'oversize' : '',
+      // v0.60.395 (по запросу Пользователя 2026-05-06: «Добавь изменение
+      // цвета карточки отключенного потребителя ... серый с перечеркнутым
+      // кругом (знак запрета)»): отдельный CSS-класс для consumer/container,
+      // отключённых пользователем (через тумблер «В работе»). Светло-серая
+      // заливка отличается от 'unpowered' (без питания) — у неё немного
+      // насыщеннее border, плюс иконка-запрет рисуется поверх (см. ниже).
+      ((n.type === 'consumer' || n.type === 'consumer-container') && !effectiveOn(n)) ? 'disabled-by-user' : '',
     ].filter(Boolean).join(' ');
 
     const g = el('g', { class: cls, transform: `translate(${n.x},${n.y})` });
@@ -2230,6 +2237,22 @@ export function renderNodes() {
       const iconG = el('g', { transform: `translate(${w - 22},16)`, class: 'node-icon' });
       drawConsumerIconTo(iconG, _iconSubtype);
       g.appendChild(iconG);
+      // v0.60.395 (по запросу Пользователя 2026-05-06: «знак запрета поверх
+      // изображения иконки» при отключённом потребителе): перечёркнутый круг
+      // (no-symbol / 🚫) поверх иконки. Цвет — серый, чтобы не диссонировать
+      // с серой карточкой (Пользователь: «не красный, лучше серый»).
+      if (!effectiveOn(n)) {
+        const banG = el('g', { transform: `translate(${w - 22},16)`, class: 'node-icon-banned' });
+        // Круг + диагональная черта (top-left → bottom-right, как стандарт ⊘)
+        banG.appendChild(el('circle', {
+          cx: 0, cy: 0, r: 12, fill: 'none', stroke: '#64748b', 'stroke-width': 2.2, opacity: 0.9,
+        }));
+        banG.appendChild(el('line', {
+          x1: -8.5, y1: -8.5, x2: 8.5, y2: 8.5,
+          stroke: '#64748b', 'stroke-width': 2.2, 'stroke-linecap': 'round', opacity: 0.9,
+        }));
+        g.appendChild(banG);
+      }
       // Serial-mode: нарисовать цепочку мелких иконок В ПРАВОМ СТОЛБЦЕ
       // карточки (вертикально), не накладываясь на body-текст.
       // v0.60.196 (по репорту Пользователя 2026-05-04 «давай цепочку
@@ -2608,7 +2631,14 @@ export function renderNodes() {
       const IcalcTotal = Number(n._loadA) || (PcalcTotal > 0 && Ucalc
         ? computeCurrentA(PcalcTotal, Ucalc, cos, isThreePhase(n)) : 0);
       const Icalc = _isUniformGroup ? (IcalcTotal / cnt) : IcalcTotal;
-      if (!n._powered) {
+      // v0.60.395 (по запросу Пользователя 2026-05-06: «Добавь изменение
+      // цвета карточки отключенного потребителя»): тумблер «В работе»
+      // (effectiveOn) применяется к consumer/consumer-container так же,
+      // как к source/generator/ups. При отключённом — карточка серая (off).
+      if (!effectiveOn(n)) {
+        statusLine = '';
+        loadCls += ' off disabled-by-user';
+      } else if (!n._powered) {
         // v0.60.165: distinguish orphan vs idle (источник в standby).
         // v0.60.176: «В резерве» убрана (см. panel/ups branches).
         // v0.60.191: «нет питания»/«В резерве» убраны — просто серая карточка.

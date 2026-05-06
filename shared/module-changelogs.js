@@ -4,6 +4,17 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.395', date: '2026-05-06', items: [
+      '🎚 <b>Тумблер «В работе» в sidebar потребителя + visual «знак запрета» на отключённой карточке</b>. По 2 запросам Пользователя 2026-05-06: «вынеси так же селектор работы в правый сайдбар в группу общие» + «Добавь изменение цвета карточки отключенного потребителя ... серый с перечеркнутым кругом (знак запрета) поверх изображения иконки».',
+      '<b>Часть A: тумблер в sidebar</b>',
+      'inspector.js — расширили условие «В работе»-блока с <code>source/generator/ups</code> на <code>consumer/consumer-container</code>. Теперь тумблер виден и в sidebar (зелёный «✓ В работе» / серый «⊘ Отключён»), не только в модалке cp-on. data-prop="on" change-handler тоже расширен на consumer/container.',
+      '<b>Часть B: visual «знак запрета»</b>',
+      'render.js — для <code>consumer/consumer-container</code> с <code>!effectiveOn(n)</code>:',
+      '• CSS-класс <code>disabled-by-user</code> на &lt;g&gt; узла → серая заливка #e5e7eb с пунктирной обводкой, opacity 0.55 на тексте',
+      '• Поверх иконки потребителя — &lt;g class="node-icon-banned"&gt; (круг ⌀24 + диагональная линия) серого цвета #64748b с opacity 0.9',
+      '• Если узел отключён И не запитан — visual только «disabled» (приоритет user-action над physical)',
+      'Files: <code>js/engine/inspector.js</code> (sidebar block + handler), <code>js/engine/render.js</code> (cls + icon overlay + loadCls), <code>app.css</code> (.node.disabled-by-user стили).',
+    ] },
     { version: '0.60.394', date: '2026-05-06', items: [
       '🔄 <b>Cross-consumer sync параметров резервирования + on/off toggle для потребителя + auto-activate резерва в группе</b>. По 2 запросам Пользователя 2026-05-06: «Пользователь может изменить данные в любом экземпляре группы, но все экземпляры виртуальной группы должны получить те же параметры» + «Нужно добавить селектор включено/отключено для всех потребителей как и для источников энергии».',
       '<b>Часть A: cross-consumer sync</b>',
