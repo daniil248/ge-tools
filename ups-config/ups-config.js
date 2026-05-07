@@ -1187,7 +1187,7 @@ function _goStep2() {
   const rq = wizState.requirements;
   if (rq.loadKw <= 0) { flash('Укажите нагрузку > 0', 'warn'); return; }
   // Подвешиваем live-обновление фильтров (на повторных входах не дублируем).
-  const filterIds = ['wiz-redundancy', 'wiz-filter-supplier', 'wiz-filter-topology', 'wiz-filter-kwMin', 'wiz-filter-kwMax', 'wiz-filter-text'];
+  const filterIds = ['wiz-redundancy', 'wiz-redundancy-modules', 'wiz-redundancy-units', 'wiz-filter-supplier', 'wiz-filter-topology', 'wiz-filter-kwMin', 'wiz-filter-kwMax', 'wiz-filter-text'];
   for (const id of filterIds) {
     const el = document.getElementById(id);
     if (el && !el._wizBound) {
