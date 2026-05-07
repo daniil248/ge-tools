@@ -28,7 +28,7 @@ import '../shared/battery-seed.js';
 // фильтра «Тип» (моноблок/модульный/интегрированный/all-in-one).
 import { listUpsTypes, detectUpsType } from '../shared/ups-types/index.js';
 // v0.59.417: ЕДИНЫЙ источник логики S³ — тот же модуль, что в инспекторе.
-import { isS3Module, computeS3Configuration, findMinimalS3Config } from '../shared/battery-s3-logic.js';
+import { isS3Module, getS3Limits, computeS3Configuration, findMinimalS3Config } from '../shared/battery-s3-logic.js';
 // v0.59.427: плагин типа АКБ S³ — автосборка master/slave/combiner + аксессуары.
 import { s3LiIonType } from '../shared/battery-types/s3-li-ion.js';
 import { renderS3IsoSvg } from '../shared/battery-types/s3-iso-view.js';
@@ -2876,10 +2876,36 @@ function wireCalcForm() {
     const blocksEl = document.getElementById('calc-blocks');
     const hintEl = document.getElementById('calc-blocks-hint');
     if (!blocksEl || !hintEl) return;
-    const vMin = Number(document.getElementById('calc-vdcmin')?.value);
-    const vMax = Number(document.getElementById('calc-vdcmax')?.value);
     const battSel = document.getElementById('calc-battery');
     const battery = battSel?.value ? getBattery(battSel.value) : null;
+
+    // === S3 / модульная система — лимиты из packaging, не из V_DC ===
+    if (battery && isS3Module(battery)) {
+      const lim = getS3Limits(battery);
+      const nMax = lim.maxPerCabinet;  // 20 для 40/50 Ач, 12 для 100 Ач
+      const N = Number(blocksEl.value);
+      blocksEl.min = 1;
+      blocksEl.max = nMax;
+      if (Number.isFinite(N) && N >= 1) {
+        if (N <= nMax) {
+          hintEl.innerHTML = `<span style="color:#2e7d32">✓ N=${N} — в допустимом диапазоне 1…${nMax} модулей на шкаф (${battery.type}).</span>`;
+          blocksEl.style.borderColor = '';
+        } else {
+          hintEl.innerHTML = `<span style="color:#c62828">⚠ N=${N} превышает паспортный максимум ${nMax} модулей на шкаф (${battery.type}). Добавьте шкаф (увеличьте M).</span><br>`
+            + `Допустимо 1…<b>${nMax}</b> модулей на шкаф.`;
+          blocksEl.style.borderColor = '#c62828';
+        }
+      } else {
+        hintEl.innerHTML = `Допустимо 1…<b>${nMax}</b> модулей на шкаф (${battery.type}).`;
+        blocksEl.style.borderColor = '';
+      }
+      return;
+    }
+
+    // === VRLA / обычная АКБ — лимиты из V_DC окна ИБП ===
+    blocksEl.removeAttribute('max');
+    const vMin = Number(document.getElementById('calc-vdcmin')?.value);
+    const vMax = Number(document.getElementById('calc-vdcmax')?.value);
     const blockV = battery ? battery.blockVoltage : (Number(document.getElementById('calc-blockv')?.value) || 12);
     const endV = Number(document.getElementById('calc-endv')?.value) || 1.85;
     const chemEl = document.getElementById('calc-chem');
@@ -2928,10 +2954,22 @@ function wireCalcForm() {
   // v0.59.476: кнопка «↺ авто» — подставить N = N_min (экономически оптимум).
   const blocksAutoBtn = document.getElementById('calc-blocks-auto');
   if (blocksAutoBtn) blocksAutoBtn.addEventListener('click', () => {
-    const vMin = Number(document.getElementById('calc-vdcmin')?.value);
-    const vMax = Number(document.getElementById('calc-vdcmax')?.value);
     const battSel = document.getElementById('calc-battery');
     const battery = battSel?.value ? getBattery(battSel.value) : null;
+    const blocksEl = document.getElementById('calc-blocks');
+    // S3: авто = максимальный допустимый заполненный шкаф (maxPerCabinet)
+    if (battery && isS3Module(battery)) {
+      const lim = getS3Limits(battery);
+      if (blocksEl) {
+        blocksEl.value = lim.maxPerCabinet;
+        blocksEl.dispatchEvent(new Event('input'));
+        rsToast(`Подобрано N=${lim.maxPerCabinet} (макс. модулей на шкаф для ${battery.type})`, 'ok');
+      }
+      return;
+    }
+    // VRLA: авто по V_DC окну ИБП
+    const vMin = Number(document.getElementById('calc-vdcmin')?.value);
+    const vMax = Number(document.getElementById('calc-vdcmax')?.value);
     const blockV = battery ? battery.blockVoltage : (Number(document.getElementById('calc-blockv')?.value) || 12);
     const endV = Number(document.getElementById('calc-endv')?.value) || 1.85;
     const chemEl = document.getElementById('calc-chem');
@@ -2946,7 +2984,6 @@ function wireCalcForm() {
       rsToast('V_DC окно не покрывается — нет валидного N', 'warn');
       return;
     }
-    const blocksEl = document.getElementById('calc-blocks');
     if (blocksEl) {
       blocksEl.value = opt.nLow;
       blocksEl.dispatchEvent(new Event('input'));
