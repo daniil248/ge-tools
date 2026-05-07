@@ -88,10 +88,8 @@ function _injectStyles() {
  */
 export function mountFooter(opts) {
   _injectStyles();
-  const { appVersion, moduleId, moduleTitle, entries = [], links = null } = opts;
+  const { appVersion, moduleId, moduleTitle, entries: _staticEntries = [], links = null } = opts;
 
-  // v0.59.128: футер упрощён по требованию пользователя — только версия
-  // и ссылка на журнал изменений. Никаких дополнительных ссылок.
   const foot = document.createElement('div');
   foot.className = 'rs-mfoot';
   foot.innerHTML = `
@@ -103,13 +101,19 @@ export function mountFooter(opts) {
     </div>
   `;
   document.body.appendChild(foot);
-  // Резервируем 32 px внизу body, чтобы фиксированный футер не
-  // перекрывал контент во всех модулях (вкладки страниц в конструкторе,
-  // формы / таблицы в подпрограммах). Класс, а не inline-стиль — чтобы
-  // модульные CSS могли переопределить при необходимости.
   document.body.classList.add('rs-with-mfoot');
 
-  foot.querySelector('[data-act="log"]').addEventListener('click', () => openLog(moduleTitle, entries));
+  // v0.60.419: загружаем changelogs динамически — footer монтируется всегда,
+  // даже если module-changelogs.js недоступен или имеет ошибку.
+  // Если entries переданы статически (old-style) — используем как fallback.
+  let _entries = _staticEntries;
+  const logBtn = foot.querySelector('[data-act="log"]');
+
+  import('./module-changelogs.js')
+    .then(m => { _entries = (m.CHANGELOGS && m.CHANGELOGS[moduleId]) || _staticEntries; })
+    .catch(() => { /* используем _staticEntries как fallback */ });
+
+  logBtn.addEventListener('click', () => openLog(moduleTitle, _entries));
 }
 
 function openLog(title, entries) {

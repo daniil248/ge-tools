@@ -471,12 +471,10 @@ modules.json верните "enabled": true, в hub.html раскомменти�
   <script type="module">
     import { mountFooter } from '../shared/module-footer.js';
     import { APP_VERSION } from '../js/engine/constants.js';
-    import { CHANGELOGS } from '../shared/module-changelogs.js';
     mountFooter({
       appVersion: APP_VERSION,
       moduleId: 'sketch',
       moduleTitle: 'Скетч (drawio)',
-      entries: CHANGELOGS['sketch'] || [],
     });
   </script>
   <script type="module" src="sketch.js"></script>
