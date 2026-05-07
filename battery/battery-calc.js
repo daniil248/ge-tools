@@ -2891,9 +2891,15 @@ function wireCalcForm() {
     if (battery && isS3Module(battery)) {
       const lim = getS3Limits(battery);
       const nMax = lim.maxPerCabinet;  // 20 для 40/50 Ач, 12 для 100 Ач
-      const N = Number(blocksEl.value);
+      let N = Number(blocksEl.value);
       blocksEl.min = 1;
       blocksEl.max = nMax;
+      // Auto-clamp value к лимиту S3, чтобы input не оставался invalid
+      // (форма не может сфокусировать невалидное поле — блокирует submit).
+      if (Number.isFinite(N) && N > nMax) {
+        N = nMax;
+        blocksEl.value = nMax;
+      }
       if (Number.isFinite(N) && N >= 1) {
         if (N <= nMax) {
           hintEl.innerHTML = `<span style="color:#2e7d32">✓ N=${N} — в допустимом диапазоне 1…${nMax} модулей на шкаф (${battery.type}).</span>`;
