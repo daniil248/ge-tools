@@ -97,7 +97,19 @@ function interpTimeByPower(table, endV, powerW) {
     }
     return { tMin: 0, extrapolated: true };
   }
-  if (powerW < curve[curve.length - 1].powerW) return Infinity;
+  if (powerW < curve[curve.length - 1].powerW) {
+    // Мощность ниже последней точки — экстраполируем ВПРАВО по двум последним
+    // точкам (аналог левой экстраполяции выше). Возврат { tMin, extrapolated:true }.
+    if (curve.length >= 2) {
+      const a = curve[curve.length - 2], b = curve[curve.length - 1];
+      if (a.powerW !== b.powerW) {
+        const k = (a.powerW - powerW) / (a.powerW - b.powerW);
+        const t = a.tMin + (b.tMin - a.tMin) * k;
+        return { tMin: Math.max(0, t), extrapolated: true };
+      }
+    }
+    return { tMin: curve[curve.length - 1].tMin, extrapolated: true };
+  }
   for (let i = 0; i < curve.length - 1; i++) {
     const a = curve[i], b = curve[i + 1];
     if (powerW <= a.powerW && powerW >= b.powerW) {

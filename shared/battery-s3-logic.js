@@ -227,9 +227,11 @@ export function findMinimalS3Config({
       ? r.autonomyMin >= requiredAutonomyMin
       : (r?.autonomyMin === Infinity);
     if (r && r.feasible && okAutonomy) {
+      // Infinity может вернуться только если таблица пустая или состоит из 1 точки
+      // и экстраполяция невозможна — в этом случае берём requiredAutonomyMin как нижнюю оценку.
       const reportedAutonomy = Number.isFinite(r.autonomyMin)
         ? r.autonomyMin
-        : Math.max(requiredAutonomyMin * 2, 60);
+        : requiredAutonomyMin;
       // limitedByPower — если total = ceil(power/moduleRated), то именно
       // паспортная мощность модуля диктует число модулей.
       const moduleRatedKw = lim.cabinetPowerKw / lim.maxPerCabinet;
