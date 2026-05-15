@@ -775,12 +775,30 @@ async function _saveWizardConfiguration() {
   const u = comp.ups;
   const fi = comp.fitInfo;
   const rq = wizState.requirements;
-  // Имя по умолчанию
-  const defLabel = `${u.supplier || ''} ${u.model || u.id} · ${fi.usable} kW · ${rq.redundancy}`.trim();
+  // v0.60.422 (по запросу Пользователя 2026-05-06: «Добавь конфигурации с
+  // вариантами как в модуле подбор холода»): сохранение в Подбор / Вариант.
+  // 1) Подбор (selectionName) — общая группа, может содержать несколько
+  //    альтернативных вариантов (модулярный vs моноблок vs гибрид).
+  //    Default: «Подбор N+R мощностью X кВт» (по требованиям).
+  // 2) Вариант (label) — конкретная модель ИБП в этом подборе.
+  const { listSelectionNames } = await import('../shared/configuration-catalog.js');
+  const existingSelections = listSelectionNames('ups').slice(0, 20);
+  const defSelection = `${rq.loadKw} кВт · ${rq.unitRedundancy || rq.redundancy} ИБП${(rq.moduleRedundancy && rq.moduleRedundancy !== 'N') ? ' · модули ' + rq.moduleRedundancy : ''}`;
+  let selectionName;
+  try {
+    const hint = existingSelections.length
+      ? `\n\nСуществующие подборы (вставьте имя для добавления варианта):\n${existingSelections.map(s => '• ' + s).join('\n')}`
+      : '';
+    const res = await rsPrompt('Название подбора (Подбор)' + hint, defSelection, { okLabel: 'Далее', cancelLabel: 'Отмена' });
+    if (res === null || res === undefined) return;
+    selectionName = String(res || '').trim() || defSelection;
+  } catch { selectionName = defSelection; }
+  // Имя варианта (label) по умолчанию = модель ИБП.
+  const defLabel = `${u.supplier || ''} ${u.model || u.id} · ${fi.usable} kW`.trim();
   let label = defLabel;
   try {
-    const res = await rsPrompt('Название конфигурации', defLabel, { okLabel: 'Сохранить', cancelLabel: 'Отмена' });
-    if (res === null || res === undefined) return; // отмена
+    const res = await rsPrompt('Название варианта в подборе «' + selectionName + '»', defLabel, { okLabel: 'Сохранить', cancelLabel: 'Отмена' });
+    if (res === null || res === undefined) return;
     label = String(res || '').trim() || defLabel;
   } catch { label = defLabel; }
   const description = [
@@ -812,10 +830,12 @@ async function _saveWizardConfiguration() {
     const entry = saveConfig('ups', {
       label,
       description,
+      // v0.60.422: selectionName — группа «Подбор» в сайдбаре.
+      selectionName,
       projectCode: getActiveProjectCode() || null,
       payload,
     });
-    flash(`Конфигурация сохранена: ${entry.id} · ${label}`, 'success');
+    flash(`Сохранено: ${entry.id} · ${label} (подбор «${selectionName}»)`, 'success');
     // Тригернём refresh сайдбара (он подписан на onConfigsChange)
     try { window.dispatchEvent(new CustomEvent('ups-config:configs-changed')); } catch {}
 

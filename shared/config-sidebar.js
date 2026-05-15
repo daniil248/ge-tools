@@ -26,7 +26,8 @@
 // =========================================================================
 
 import {
-  listConfigs, getConfig, saveConfig, removeConfig,
+  listConfigs, listConfigsGrouped, listSelectionNames, setMainVariant,
+  getConfig, saveConfig, removeConfig,
   onConfigsChange, formatConfigLine, isEmbeddedMode, getActiveProjectCode,
 } from './configuration-catalog.js';
 import { rsConfirm, rsPrompt, rsToast } from './dialog.js';
@@ -61,6 +62,16 @@ const SIDEBAR_CSS = `
 .rs-cs-prop dd { margin: 0; color: #0f172a; word-break: break-word; }
 .rs-cs-embed-picker { padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin: 8px 0; }
 .rs-cs-embed-picker h4 { margin: 0 0 8px; font-size: 13px; }
+/* v0.60.422: подборы (selections) с вариантами — сворачиваемые группы. */
+.rs-cs-sel-block { border-bottom: 1px solid #e2e8f0; }
+.rs-cs-sel-block:last-child { border-bottom: 0; }
+.rs-cs-sel-head { padding: 6px 8px; background: #f1f5f9; font-size: 11px; font-weight: 600; color: #1e293b; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.rs-cs-sel-head:hover { background: #e2e8f0; }
+.rs-cs-sel-head.collapsed::before { content: '▶ '; font-size: 9px; color: #64748b; }
+.rs-cs-sel-head:not(.collapsed)::before { content: '▼ '; font-size: 9px; color: #64748b; }
+.rs-cs-sel-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-cs-sel-count { color: #64748b; font-weight: 400; font-size: 10px; }
+.rs-cs-main-badge { background: #fef3c7; color: #92400e; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 600; margin-left: 4px; }
 `;
 
 function injectCss() {
@@ -145,30 +156,61 @@ export function mountConfigSidebar(opts) {
 
   let activeId = null;
   let filter = '';
+  // v0.60.422: коллапс-состояние подборов (Map<selectionName, collapsed:bool>).
+  const collapsedSelections = new Map();
 
   function render() {
     if (!slotList) return;
-    const entries = listConfigs(kind, {
+    const groups = listConfigsGrouped(kind, {
       projectCode: projectCode || undefined,
       search: filter || undefined,
     });
-    if (!entries.length) {
+    if (!groups.size) {
       slotList.innerHTML = `<li class="rs-cs-empty">${filter ? 'Ничего не найдено' : 'Нет записей'}</li>`;
       return;
     }
-    slotList.innerHTML = entries.map(e => `
+    // v0.60.422: рендерим группы (Подборы) с вложенными вариантами.
+    // Если только одна группа «— Без подбора —» — рендерим плоско (как раньше),
+    // чтобы не нагружать UI «пустой» секцией.
+    const onlyDefault = groups.size === 1 && groups.has('— Без подбора —');
+    if (onlyDefault) {
+      const entries = groups.get('— Без подбора —');
+      slotList.innerHTML = entries.map(e => renderEntryItem(e)).join('');
+      return;
+    }
+    const html = [];
+    for (const [selName, entries] of groups) {
+      const collapsed = collapsedSelections.get(selName) === true;
+      const mainEntry = entries.find(e => e.isMainVariant);
+      html.push(`<li class="rs-cs-sel-block">
+        <div class="rs-cs-sel-head${collapsed ? ' collapsed' : ''}" data-act-sel="toggle" data-sel-name="${esc(selName)}">
+          <span class="rs-cs-sel-name">📋 ${esc(selName)}</span>
+          <span class="rs-cs-sel-count">${entries.length} вар.${mainEntry ? ' · ★ ' + esc(mainEntry.label || mainEntry.id) : ''}</span>
+        </div>
+        ${collapsed ? '' : `<ul style="list-style:none;padding:0;margin:0">${entries.map(e => renderEntryItem(e)).join('')}</ul>`}
+      </li>`);
+    }
+    slotList.innerHTML = html.join('');
+  }
+
+  function renderEntryItem(e) {
+    const mainBadge = e.isMainVariant
+      ? '<span class="rs-cs-main-badge" title="Основной вариант подбора">★</span>'
+      : '';
+    return `
       <li class="rs-cs-item ${e.id === activeId ? 'rs-active' : ''}" data-id="${esc(e.id)}">
         <div class="rs-cs-item-main">
-          <span class="rs-cs-item-id">${esc(e.id)}</span>
+          <span class="rs-cs-item-id">${esc(e.id)}</span>${mainBadge}
           ${e.label ? ` · <span class="rs-cs-item-label">${esc(e.label)}</span>` : ''}
           ${e.description ? `<div class="rs-cs-item-desc">${esc(e.description)}</div>` : ''}
         </div>
         <div class="rs-cs-item-actions">
+          ${e.selectionName && !e.isMainVariant ? `<button type="button" class="rs-cs-btn" data-act="setmain" title="Сделать основным вариантом подбора">★</button>` : ''}
           <button type="button" class="rs-cs-btn" data-act="rename" title="Переименовать">✎</button>
           <button type="button" class="rs-cs-btn rs-cs-btn-danger" data-act="del" title="Удалить">✕</button>
         </div>
       </li>
-    `).join('');
+    `;
   }
 
   function renderProps(entry) {
@@ -199,10 +241,27 @@ export function mountConfigSidebar(opts) {
 
   // Делегирование кликов по списку
   if (slotList) slotList.addEventListener('click', async (ev) => {
+    // v0.60.422: клик на header подбора → toggle collapsed.
+    const selHead = ev.target.closest('[data-act-sel="toggle"]');
+    if (selHead) {
+      const name = selHead.getAttribute('data-sel-name');
+      collapsedSelections.set(name, !(collapsedSelections.get(name) === true));
+      render();
+      return;
+    }
     const btn = ev.target.closest('[data-act]');
     const li = ev.target.closest('.rs-cs-item');
     if (!li) return;
     const id = li.getAttribute('data-id');
+    // v0.60.422: «★» — пометить как основной вариант подбора.
+    if (btn && btn.dataset.act === 'setmain') {
+      ev.stopPropagation();
+      const e = getConfig(kind, id);
+      if (!e || !e.selectionName) return;
+      setMainVariant(kind, e.selectionName, id);
+      rsToast('Основной вариант изменён', 'ok');
+      return;
+    }
     if (btn && btn.dataset.act === 'del') {
       ev.stopPropagation();
       const ok = await rsConfirm('Удалить конфигурацию?', id, { okLabel: 'Удалить', cancelLabel: 'Отмена' });

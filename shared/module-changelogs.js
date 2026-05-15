@@ -4,6 +4,24 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.422', date: '2026-05-06', items: [
+      '📋 <b>Подборы → Варианты в UPS-конфигураторе (как в «Подбор холода»)</b>. По запросу Пользователя 2026-05-06: «Добавь конфигурации с вариантами как в модуле подбор холода».',
+      '<b>Часть A: shared/configuration-catalog.js</b>',
+      '• Новое опциональное поле <code>selectionName</code> на ConfigEntry — имя «Подбора» (группы вариантов).',
+      '• Новое поле <code>isMainVariant</code> — пометка ★ основного варианта в группе.',
+      '• Новые API: <code>listConfigsGrouped(kind, opts)</code> — Map<selectionName, entries[]>; <code>listSelectionNames(kind, opts)</code> — для autocomplete; <code>setMainVariant(kind, selectionName, configId)</code> — пометить ★.',
+      'Backward-compat: записи без selectionName попадают в группу «— Без подбора —».',
+      '<b>Часть B: shared/config-sidebar.js</b>',
+      '• Render группами (collapsible). Если только одна группа «без подбора» — рендер плоский (как раньше).',
+      '• Header подбора: «📋 имя · N вар. · ★ имя_main».',
+      '• Кнопка ★ на варианте (когда не main) — установить как основной.',
+      '• Click на header → toggle сворачивания.',
+      '<b>Часть C: ups-config _saveWizardConfiguration</b>',
+      '• 2-шаговый prompt: 1) Подбор (с подсказкой существующих имён), 2) Вариант (model/название).',
+      '• Default «Подбор»: «X кВт · N+R ИБП · модули N+M».',
+      '• Default «Вариант»: «Supplier Model · X kW».',
+      'Files: <code>shared/configuration-catalog.js</code>, <code>shared/config-sidebar.js</code>, <code>ups-config/ups-config.js</code>.',
+    ] },
     { version: '0.60.410', date: '2026-05-06', items: [
       '📦 <b>Состав комплекта АКБ (BOM) — раскрыт как у ИБП</b>. По запросу Пользователя 2026-05-06: «состав комплекта АКБ нужно расписать так же как и состав комплекта ИБП (BOM)».',
       '<b>Helper <code>_buildBatteryComposition()</code></b> формирует структурированный список позиций комплекта АКБ:',

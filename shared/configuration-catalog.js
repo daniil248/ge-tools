@@ -62,16 +62,65 @@ export function listConfigs(kind, opts) {
   const o = opts || {};
   let out = items;
   if (o.projectCode) out = out.filter(x => x.projectCode === o.projectCode);
+  if (o.selectionName) out = out.filter(x => (x.selectionName || '') === o.selectionName);
   if (o.search) {
     const q = String(o.search).toLowerCase();
     out = out.filter(x =>
       (x.id || '').toLowerCase().includes(q) ||
       (x.label || '').toLowerCase().includes(q) ||
-      (x.description || '').toLowerCase().includes(q));
+      (x.description || '').toLowerCase().includes(q) ||
+      (x.selectionName || '').toLowerCase().includes(q));
   }
   // По умолчанию — свежие сверху
   out.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   return out;
+}
+
+// v0.60.422 (по запросу Пользователя 2026-05-06: «Добавь конфигурации с
+// вариантами как в модуле подбор холода»): группировка списка конфигураций
+// по полю `selectionName` (Подбор). Записи без selectionName попадают в
+// группу «— Без подбора —».
+// Возвращает Map<selectionName, ConfigEntry[]>.
+export function listConfigsGrouped(kind, opts) {
+  const items = listConfigs(kind, opts);
+  const groups = new Map();
+  for (const e of items) {
+    const sel = String(e.selectionName || '').trim() || '— Без подбора —';
+    if (!groups.has(sel)) groups.set(sel, []);
+    groups.get(sel).push(e);
+  }
+  return groups;
+}
+
+// v0.60.422: список уникальных selectionName для autocomplete в save-dialog.
+export function listSelectionNames(kind, opts) {
+  const items = listConfigs(kind, opts);
+  const names = new Set();
+  for (const e of items) {
+    const sel = String(e.selectionName || '').trim();
+    if (sel) names.add(sel);
+  }
+  return [...names].sort();
+}
+
+// v0.60.422: пометить вариант как ★ основной в своём подборе.
+// В одном подборе только один вариант может быть ★.
+export function setMainVariant(kind, selectionName, configId) {
+  if (!selectionName || !configId) return false;
+  const all = readAll(kind);
+  let changed = false;
+  for (const e of all) {
+    const matchSel = (e.selectionName || '') === selectionName;
+    if (!matchSel) continue;
+    const shouldBeMain = e.id === configId;
+    if (!!e.isMainVariant !== shouldBeMain) {
+      e.isMainVariant = shouldBeMain;
+      e.updatedAt = Date.now();
+      changed = true;
+    }
+  }
+  if (changed) writeAll(kind, all);
+  return changed;
 }
 
 export function getConfig(kind, id) {
