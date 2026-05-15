@@ -29,6 +29,7 @@ import {
   listConfigs, listConfigsGrouped, listSelectionNames, setMainVariant,
   getConfig, saveConfig, removeConfig,
   onConfigsChange, formatConfigLine, isEmbeddedMode, getActiveProjectCode,
+  ensureSelectionMeta, listSelectionMetas,
 } from './configuration-catalog.js';
 import { rsConfirm, rsPrompt, rsToast } from './dialog.js';
 
@@ -136,7 +137,12 @@ export function mountConfigSidebar(opts) {
     <div class="rs-cs-sect">
       <div class="rs-cs-sect-head">
         <span>${esc(o.title || 'Конфигурации')}${projHint}</span>
-        <button type="button" class="rs-cs-btn rs-cs-btn-primary" data-act="save">+ Сохранить</button>
+        ${o.groupBySelection
+          ? `<span style="display:flex;gap:4px">
+               <button type="button" class="rs-cs-btn rs-cs-btn-primary" data-act="addsel" title="Создать новый ПОДБОР (группа вариантов с общими условиями). Условия и финансы задаются в панели «Свойства подбора».">+ Подбор</button>
+               <button type="button" class="rs-cs-btn" data-act="save" title="Сохранить текущее решение как ВАРИАНТ активного подбора (конкретное решение для сравнения).">+ Вариант</button>
+             </span>`
+          : `<button type="button" class="rs-cs-btn rs-cs-btn-primary" data-act="save">+ Сохранить</button>`}
       </div>
       <div class="rs-cs-sect-body">
         <input class="rs-cs-search" type="text" placeholder="Поиск по id/метке/описанию…">
@@ -155,6 +161,7 @@ export function mountConfigSidebar(opts) {
   }
 
   let activeId = null;
+  let activeSelName = null; // v0.60.432: активный подбор (для «+ Вариант»)
   let filter = '';
   // v0.60.422: коллапс-состояние подборов (Map<selectionName, collapsed:bool>).
   const collapsedSelections = new Map();
@@ -165,10 +172,18 @@ export function mountConfigSidebar(opts) {
       projectCode: projectCode || undefined,
       search: filter || undefined,
     });
+    // v0.60.432: показываем и ПУСТЫЕ подборы (как в «Подбор холода») —
+    // только что созданный «+ Подбор» без вариантов тоже виден в списке.
+    if (o.groupBySelection && !filter) {
+      for (const m of listSelectionMetas(kind, { projectCode: projectCode || undefined })) {
+        const nm = String(m.selectionName || '').trim();
+        if (nm && !groups.has(nm)) groups.set(nm, []);
+      }
+    }
     if (!groups.size) {
       slotList.innerHTML = `<li class="rs-cs-empty">${filter ? 'Ничего не найдено'
         : (o.groupBySelection
-            ? 'Подборов пока нет. «+ Сохранить» создаст подбор и первый вариант. В одном подборе держите альтернативные варианты (моноблок vs модульный vs гибрид) для сравнения.'
+            ? 'Подборов пока нет. Кнопка «+ Подбор» создаст первый. В одном подборе держите альтернативные варианты (моноблок vs модульный vs гибрид) для сравнения.'
             : 'Нет записей')}</li>`;
       return;
     }
@@ -251,6 +266,7 @@ export function mountConfigSidebar(opts) {
   // его просто игнорируют).
   function fireSel(name) {
     const sel = String(name || '').trim() || null;
+    activeSelName = sel;
     try { if (typeof o.onSelectionChange === 'function') o.onSelectionChange(sel); } catch {}
     try { window.dispatchEvent(new CustomEvent('rs-selection-change', { detail: { kind, selectionName: sel } })); } catch {}
   }
@@ -341,13 +357,19 @@ export function mountConfigSidebar(opts) {
     // чтобы новая запись сразу попала в группу.
     let selectionName = data.selectionName;
     if (o.groupBySelection && selectionName == null) {
-      const existing = listSelectionNames(kind, { projectCode: projectCode || undefined }).slice(0, 20);
-      const hint = existing.length
-        ? `\n\nСуществующие подборы (впишите имя, чтобы добавить вариант в этот подбор):\n${existing.map(s => '• ' + s).join('\n')}`
-        : '';
-      const sres = await rsPrompt('Название подбора (группа вариантов)' + hint, existing[0] || 'Подбор 1');
-      if (sres == null) return;
-      selectionName = String(sres || '').trim() || (existing[0] || 'Подбор 1');
+      // v0.60.432: «+ Вариант» добавляет в АКТИВНЫЙ подбор без лишнего
+      // вопроса (как в «Подбор холода»). Если активного нет — спрашиваем.
+      if (activeSelName) {
+        selectionName = activeSelName;
+      } else {
+        const existing = listSelectionNames(kind, { projectCode: projectCode || undefined }).slice(0, 20);
+        const hint = existing.length
+          ? `\n\nСуществующие подборы (впишите имя, чтобы добавить вариант в этот подбор):\n${existing.map(s => '• ' + s).join('\n')}`
+          : '\n\nСначала создайте подбор кнопкой «+ Подбор».';
+        const sres = await rsPrompt('Название подбора (группа вариантов)' + hint, existing[0] || 'Подбор 1');
+        if (sres == null) return;
+        selectionName = String(sres || '').trim() || (existing[0] || 'Подбор 1');
+      }
     }
     const label = data.label != null ? data.label :
       await rsPrompt('Метка варианта (коротко)', '');
@@ -365,6 +387,21 @@ export function mountConfigSidebar(opts) {
     renderProps(saved);
     rsToast('Сохранено: ' + saved.id + (selectionName ? ' → подбор «' + selectionName + '»' : ''), 'ok');
     if (selectionName) fireSel(selectionName);
+  });
+
+  // v0.60.432: «+ Подбор» — создать новый ПОДБОР (как в «Подбор холода»).
+  const addSelBtn = root.querySelector('[data-act="addsel"]');
+  if (addSelBtn) addSelBtn.addEventListener('click', async () => {
+    const existing = listSelectionNames(kind, { projectCode: projectCode || undefined });
+    const def = `Подбор ${existing.length + 1}`;
+    const res = await rsPrompt('Название нового подбора (общие условия + варианты)', def);
+    if (res == null) return;
+    const name = String(res || '').trim() || def;
+    ensureSelectionMeta(kind, { projectCode: projectCode || null, selectionName: name },
+      { requirements: {}, eco: {} });
+    fireSel(name);          // активируем → панель «Свойства подбора» откроется
+    render();
+    rsToast(`Подбор «${name}» создан. Задайте условия в «Свойства подбора», добавляйте решения кнопкой «+ Вариант».`, 'ok');
   });
 
   if (searchInput) searchInput.addEventListener('input', () => {

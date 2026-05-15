@@ -142,6 +142,9 @@
     <div class="rs-sidebar-resizer" title="Потяните, чтобы изменить ширину"></div>
   </aside>
   <main>
+    <!-- v0.60.432: панель ПОДБОРА АКБ — ВВЕРХУ, как в «Подбор холода»
+         (сначала условия подбора, затем расчёт конкретного варианта). -->
+    <div id="bt-selection-panel"></div>
     <div class="tabs">
       <button class="tab-btn active" data-tab="tab-calc">Расчёт разряда</button>
       <button class="tab-btn" data-tab="tab-rack">Компоновка VRLA-шкафа</button>
@@ -571,9 +574,6 @@
       </form>
       <div id="rack-result"></div>
     </section>
-    <!-- v0.60.429: панель ПОДБОРА АКБ (условия + TCO/CAPEX/OPEX/сравнение),
-         как в «Подбор холода». Активный подбор — из сайдбара слева. -->
-    <div id="bt-selection-panel"></div>
   </main>
   </div><!-- /.bt-shell -->
 
