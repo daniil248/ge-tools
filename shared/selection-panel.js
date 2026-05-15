@@ -108,6 +108,21 @@ export function mountSelectionPanel(o) {
     const pe = projEco();
     return pe ? { ...base, ...pe } : base;
   }
+  // v0.60.450: УСЛОВИЯ из проекта (параметры площадки). Если подбор привязан
+  // к проекту и в карточке заданы высота/макс.темп.среды — они идут в
+  // условия подбора как «из проекта» (read-only), иначе задаются вручную.
+  function projReq() {
+    if (!pc) return null;
+    try {
+      const p = getProject(getActiveProjectId());
+      const loc = p && p.location;
+      if (!loc) return null;
+      const out = {};
+      if (Number.isFinite(Number(loc.elevationM))) out.altitudeM = Number(loc.elevationM);
+      if (Number.isFinite(Number(loc.ambientMaxC))) out.ambientMaxC = Number(loc.ambientMaxC);
+      return Object.keys(out).length ? out : null;
+    } catch { return null; }
+  }
 
   function persist(patch) {
     if (!selName) return;
@@ -129,20 +144,25 @@ export function mountSelectionPanel(o) {
     // Требования» — единый источник; в панели они только для просмотра.
     const roCond = !!o.conditionsReadOnly;
     const roAttr = roCond ? ' disabled' : '';
+    const pr = projReq() || {};   // v0.60.450: условия из проекта (площадка)
     const reqHtml = (o.requirementsSchema || []).map(f => {
-      const v = req[f.key];
+      const fromProj = (f.key in pr);
+      const v = fromProj ? pr[f.key] : req[f.key];
+      const lk = (roAttr || (fromProj ? ' disabled' : ''));
+      const projTag = fromProj ? ' <span style="color:#16a34a">🔒 из проекта</span>' : '';
+      const projTitle = fromProj ? ' title="🔒 Значение из проекта (свойства проекта → 🏔 Параметры площадки). Для ручного ввода переключите на «Разовый подбор»."' : '';
       if (f.type === 'select') {
         const opts = (f.options || []).map(op => {
           const val = typeof op === 'string' ? op : op.value;
           const lab = typeof op === 'string' ? op : op.label;
           return `<option value="${escH(val)}"${String(v) === String(val) ? ' selected' : ''}>${escH(lab)}</option>`;
         }).join('');
-        return `<label class="rsp-field" title="${escH(f.tip || '')}">${escH(f.label)}${f.unit ? ', ' + escH(f.unit) : ''}
-          <select data-req="${escH(f.key)}"${roAttr}>${opts}</select></label>`;
+        return `<label class="rsp-field" title="${escH(f.tip || '')}">${escH(f.label)}${f.unit ? ', ' + escH(f.unit) : ''}${projTag}
+          <select data-req="${escH(f.key)}"${lk}${projTitle}>${opts}</select></label>`;
       }
       const type = f.type === 'text' ? 'text' : 'number';
-      return `<label class="rsp-field" title="${escH(f.tip || '')}">${escH(f.label)}${f.unit ? ', ' + escH(f.unit) : ''}
-        <input type="${type}" data-req="${escH(f.key)}" ${f.step ? `step="${f.step}"` : ''} value="${escH(v == null ? '' : v)}"${roAttr}></label>`;
+      return `<label class="rsp-field" title="${escH(f.tip || '')}">${escH(f.label)}${f.unit ? ', ' + escH(f.unit) : ''}${projTag}
+        <input type="${type}" data-req="${escH(f.key)}" ${f.step ? `step="${f.step}"` : ''} value="${escH(v == null ? '' : v)}"${lk}${projTitle}></label>`;
     }).join('');
 
     const curOpts = CURRENCIES.map(c =>

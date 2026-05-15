@@ -22,6 +22,7 @@ import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
 import { wireExportImport } from '../shared/config-io.js';
 import { APP_VERSION } from '../js/engine/constants.js';
 import { getActiveProjectCode, getSelectionMeta } from '../shared/configuration-catalog.js';
+import { getProject as _getProjectD, getActiveProjectId as _getActiveProjectIdD } from '../shared/project-storage.js';
 
 let cascadeHandle = null;
 const cascadeState = { supplier: '', series: '', modelId: '' };
@@ -808,6 +809,19 @@ function _loadReqFromSelection(selName) {
   // (дерейтинг). Из проекта/технолога или вручную в «Свойства подбора».
   if (r.altitudeM != null && r.altitudeM !== '') rq.altitudeM = Number(r.altitudeM) || 0;
   if (r.ambientMaxC != null && r.ambientMaxC !== '') rq.ambientMaxC = Number(r.ambientMaxC) || 0;
+  // v0.60.450: если подбор привязан к проекту — высота/макс.темп.среды
+  // берутся ИЗ ПРОЕКТА (карточка → 🏔 Параметры площадки), перекрывая
+  // значения подбора (единый источник, как тариф/валюта).
+  try {
+    if (getActiveProjectCode()) {
+      const proj = _getProjectD(_getActiveProjectIdD());
+      const loc = proj && proj.location;
+      if (loc) {
+        if (Number.isFinite(Number(loc.elevationM))) rq.altitudeM = Number(loc.elevationM);
+        if (Number.isFinite(Number(loc.ambientMaxC))) rq.ambientMaxC = Number(loc.ambientMaxC);
+      }
+    }
+  } catch {}
   return true;
 }
 

@@ -352,6 +352,19 @@ function renderProjectProperties(p, host) {
       <p class="muted" style="font-size:11px;margin:8px 0 0">
         💡 Эта локация автоматически передаётся во все calc-модули проекта (Метеоданные, Подбор холодильных систем, ID-диаграмма). Менять координаты в модулях нельзя — только здесь.
       </p>
+      <!-- v0.60.450: параметры площадки для дерейтинга — единый источник для
+           подборов (ИБП/АКБ/…). data-loc → автосейв в project.location. -->
+      <div style="margin-top:10px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px">
+        <div style="font-size:11.5px;color:#075985;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px" title="Высота над уровнем моря и максимальная температура среды — для дерейтинга оборудования. Передаются в подборы (ИБП/АКБ) как условия из проекта.">🏔 Параметры площадки (дерейтинг)</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <label style="font-size:12px;color:#475569;display:flex;flex-direction:column;gap:3px" title="Высота над уровнем моря места установки. Выше 1000 м — дерейтинг мощности ИБП (IEC 62040-3, ≈ −1%/100 м). Передаётся в подбор как условие «из проекта».">Высота установки, м
+            <input type="number" step="50" data-loc="elevationM" value="${loc.elevationM ?? ''}" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font-size:12px;width:130px">
+          </label>
+          <label style="font-size:12px;color:#475569;display:flex;flex-direction:column;gap:3px" title="Максимальная температура воздуха в помещении/на площадке. Выше +25…+30 °C — температурный дерейтинг (мощность/ресурс АКБ). Передаётся в подбор как условие «из проекта».">Макс. темп. среды, °C
+            <input type="number" step="1" data-loc="ambientMaxC" value="${loc.ambientMaxC ?? ''}" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font-size:12px;width:130px">
+          </label>
+        </div>
+      </div>
       ${_renderNormBadgesForCountry(loc.country)}
     `;
   } else {
