@@ -418,9 +418,8 @@
         requirementsSchema, variantEconomics,
         variantLabel: (e) => e.label || e.id,
         convertFn: null,
-        // v0.60.438: УСЛОВИЯ подбора задаются в «Шаг 1. Требования к ИБП»
-        // (единый источник) — в панели только просмотр, без дублирования.
-        conditionsReadOnly: true,
+        // v0.60.446: УСЛОВИЯ подбора задаются ЗДЕСЬ (зона подбора —
+        // «Свойства подбора»), Шаг 1 убран из редактора варианта.
       });
       window.addEventListener('rs-selection-change', (ev) => {
         const d = ev.detail || {};

@@ -21,6 +21,7 @@ import { pricesForElement } from '../shared/price-records.js';
 import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
 import { wireExportImport } from '../shared/config-io.js';
 import { APP_VERSION } from '../js/engine/constants.js';
+import { getActiveProjectCode, getSelectionMeta } from '../shared/configuration-catalog.js';
 
 let cascadeHandle = null;
 const cascadeState = { supplier: '', series: '', modelId: '' };
@@ -634,9 +635,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // (setScope по событию rs-cs-focus). Раньше standalone-wizard
   // авто-открывался → панель подбора и wizard были на одной странице.
   initWizard();
+
+  // v0.60.446: Шаг 1 «Требования» = УСЛОВИЯ ПОДБОРА (общие, задаются в
+  // зоне ПОДБОРА «Свойства подбора»), а НЕ в варианте. При входе в зону
+  // ВАРИАНТА (rs-cs-focus scope=variant из сайдбара) — берём условия из
+  // подбора, скрываем Шаг 1 и сразу открываем подбор модели (Шаг 2).
+  window.addEventListener('rs-cs-focus', (ev) => {
+    const d = ev.detail || {};
+    if (d.kind && d.kind !== 'ups') return;
+    if (d.selectionName) _activeSelName = d.selectionName;
+    if (d.scope === 'variant') {
+      try { _enterVariantEditor(_activeSelName); } catch (e) { console.warn('[ups-config] variant editor', e); }
+    }
+  });
+  window.addEventListener('rs-selection-change', (ev) => {
+    const d = ev.detail || {};
+    if (d.kind && d.kind !== 'ups') return;
+    if (d.selectionName) _activeSelName = d.selectionName;
+  });
 });
 
 // ====================== WIZARD конфигуратора ======================
+// v0.60.446: активный подбор (из сайдбара) — источник УСЛОВИЙ для варианта.
+let _activeSelName = null;
 const wizState = {
   nodeId: null,
   requirements: {
@@ -765,6 +786,49 @@ function _openWizard({ standalone }) {
   const printBtn = document.getElementById('wiz-btn-print');
   if (printBtn) printBtn.onclick = _printUpsReport;
   _showStep(1);
+}
+
+// v0.60.446: загрузить УСЛОВИЯ из активного подбора (selection-meta) в
+// wizState.requirements. Условия — общие для всех вариантов, задаются в
+// зоне ПОДБОРА («Свойства подбора»), здесь только читаются.
+function _loadReqFromSelection(selName) {
+  if (!selName) return false;
+  let meta = null;
+  try { meta = getSelectionMeta('ups', { projectCode: getActiveProjectCode() || null, selectionName: selName }); } catch {}
+  const r = meta && meta.requirements;
+  if (!r) return false;
+  const rq = wizState.requirements;
+  if (r.loadKw != null && r.loadKw !== '') rq.loadKw = Number(r.loadKw) || rq.loadKw;
+  if (r.autonomyMin != null && r.autonomyMin !== '') rq.autonomyMin = Number(r.autonomyMin) || rq.autonomyMin;
+  if (r.redundancy) { rq.redundancy = r.redundancy; rq.moduleRedundancy = r.redundancy; }
+  if (r.cosPhi != null && r.cosPhi !== '') rq.cosPhi = Number(r.cosPhi) || rq.cosPhi;
+  if (r.phases != null && r.phases !== '') rq.phases = Number(r.phases) || rq.phases;
+  return true;
+}
+
+// v0.60.446: вход в зону ВАРИАНТА. Шаг 1 (требования) НЕ показываем —
+// условия берём из подбора. Открываем сразу подбор модели (Шаг 2).
+// «← Назад» / «✏ Изменить условия» возвращают в зону ПОДБОРА.
+function _enterVariantEditor(selName) {
+  const wizard = document.getElementById('configurator-wizard');
+  if (!wizard) return;
+  if (!wizard._wizBound) { _openWizard({ standalone: true }); wizard._wizBound = true; }
+  wizard.style.display = '';
+  _loadReqFromSelection(selName);
+  _fillWizStep1Fields();
+  // Назад/изменить условия → зона подбора (а не Шаг 1, которого больше нет).
+  const toPodbor = () => {
+    try { window.dispatchEvent(new CustomEvent('rs-cs-focus', { detail: { kind: 'ups', scope: 'selection', selectionName: selName || _activeSelName } })); } catch {}
+  };
+  const back2 = document.getElementById('wiz-btn-back-2');
+  if (back2) back2.onclick = toPodbor;
+  const editCfg = document.getElementById('wiz-btn-edit-cfg');
+  if (editCfg) editCfg.onclick = toPodbor;
+  // Баннер условий подбора (read-only) в индикаторе шага.
+  const rq = wizState.requirements;
+  const ind = document.getElementById('wiz-step-indicator');
+  if (ind) ind.textContent = `Условия подбора: ${rq.loadKw || 0} кВт · ${rq.moduleRedundancy || rq.redundancy || 'N'} · автономия ${rq.autonomyMin || 0} мин (задаются в «Свойства подбора»)`;
+  try { _goStep2(); } catch (e) { console.warn('[ups-config] goStep2', e); _showStep(2); }
 }
 
 // v0.59.405: сохранение полной конфигурации wizard'а в перечень слева.

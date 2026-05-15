@@ -224,6 +224,59 @@ export function mountSelectionPanel(o) {
     const best = { capex: Math.min(...rows.map(r => r.t.capex)), tco: Math.min(...rows.map(r => r.t.tco)) };
     const lblOf = (entry) => (typeof o.variantLabel === 'function' ? o.variantLabel(entry) : (entry.label || entry.id));
 
+    // v0.60.446: график «TCO по годам — все варианты подбора» (как в
+    // «Подбор холода»). Кумулятивные дисконтированные затраты по годам:
+    // год 0 = CAPEX; год t = cumDiscounted (включает CAPEX, см. computeTco).
+    // Самодостаточный SVG (без Chart.js).
+    const N = (main ? main.t.projectLifetimeYears : eco.projectLifetimeYears) || 10;
+    const PAL = ['#1e40af', '#dc2626', '#16a34a', '#9333ea', '#ea580c', '#0891b2', '#ca8a04', '#be185d'];
+    const series = rows.map((r, i) => {
+      const pts = [{ x: 0, y: r.t.capex }];
+      const yo = r.t.yearlyOpex || [];
+      for (let t = 1; t <= N; t++) {
+        const ye = yo.find(z => z.year === t);
+        pts.push({ x: t, y: ye ? ye.cumDiscounted : (pts[pts.length - 1].y) });
+      }
+      return { name: lblOf(r.v), isMain: r.isMain, color: PAL[i % PAL.length], pts };
+    });
+    const maxY = Math.max(1, ...series.flatMap(s => s.pts.map(p => p.y)));
+    const W = 640, H = 230, padL = 64, padR = 12, padT = 12, padB = 26;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const sx = (x) => padL + (x / N) * plotW;
+    const sy = (y) => padT + plotH - (y / maxY) * plotH;
+    const gridY = 4;
+    let gridSvg = '';
+    for (let g = 0; g <= gridY; g++) {
+      const yy = padT + plotH - (g / gridY) * plotH;
+      const val = (g / gridY) * maxY;
+      gridSvg += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>`
+        + `<text x="${padL - 6}" y="${(yy + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#94a3b8">${escH(fmtMoney(val, cur))}</text>`;
+    }
+    let xticks = '';
+    const xstep = N <= 12 ? 1 : Math.ceil(N / 10);
+    for (let t = 0; t <= N; t += xstep) {
+      xticks += `<text x="${sx(t).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="9" fill="#94a3b8">${t}</text>`;
+    }
+    const lines = series.map(s => {
+      const d = s.pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+      return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMain ? 2.5 : 1.5}"${s.isMain ? '' : ' stroke-dasharray="4 3"'}/>`;
+    }).join('');
+    const legend = series.map(s =>
+      `<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px;font-size:11px;color:#475569">
+        <span style="width:14px;height:0;border-top:3px ${s.isMain ? 'solid' : 'dashed'} ${s.color};display:inline-block"></span>
+        ${s.isMain ? '★ ' : ''}${escH(s.name)}</span>`).join('');
+    const chartSvg = `
+      <div class="rsp-sec-title" title="Кумулятивные дисконтированные затраты владения по годам для каждого варианта. Год 0 = CAPEX. Чем ниже линия — тем дешевле владение.">📈 TCO по годам — все варианты подбора</div>
+      <div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:420px;height:${H}px;background:#fff;border:1px solid var(--sel-bd,#e2e8f0);border-radius:6px">
+        ${gridSvg}
+        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#cbd5e1"/>
+        <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#cbd5e1"/>
+        ${xticks}
+        <text x="${(padL + (W - padR)) / 2}" y="${H - 0}" text-anchor="middle" font-size="9" fill="#64748b">Год проекта</text>
+        ${lines}
+      </svg></div>
+      <div style="margin:6px 0 14px;display:flex;flex-wrap:wrap">${legend}</div>`;
+
     const body = rows.map(r => {
       const pay = (main && r.v.id !== main.v.id) ? discountedPaybackYears(r.t, main.t) : null;
       const op1 = r.t.yearlyOpex && r.t.yearlyOpex[0] ? r.t.yearlyOpex[0].totalRub : 0;
@@ -241,7 +294,8 @@ export function mountSelectionPanel(o) {
     }).join('');
 
     return `
-      <div class="rsp-sec-title" title="Технико-экономическое сравнение вариантов подбора. TCO = CAPEX + Σ дисконтированных OPEX за срок проекта (ISO 15686-5).">⚖ Сравнение вариантов · TCO ${main ? main.t.projectLifetimeYears : eco.projectLifetimeYears} лет</div>
+      ${chartSvg}
+      <div class="rsp-sec-title" title="Технико-экономическое сравнение вариантов подбора. TCO = CAPEX + Σ дисконтированных OPEX за срок проекта (ISO 15686-5).">⚖ Финансовая сводка по вариантам · TCO ${main ? main.t.projectLifetimeYears : eco.projectLifetimeYears} лет</div>
       <table class="rsp-table">
         <thead><tr>
           <th class="rsp-lft" title="Вариант подбора. ★ — основной (база для срока окупаемости).">Вариант</th>
