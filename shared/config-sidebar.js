@@ -29,7 +29,7 @@ import {
   listConfigs, listConfigsGrouped, listSelectionNames, setMainVariant,
   getConfig, saveConfig, removeConfig,
   onConfigsChange, formatConfigLine, isEmbeddedMode, getActiveProjectCode,
-  ensureSelectionMeta, listSelectionMetas,
+  ensureSelectionMeta, listSelectionMetas, renameSelection, deleteSelection,
 } from './configuration-catalog.js';
 import { rsConfirm, rsPrompt, rsToast } from './dialog.js';
 
@@ -93,6 +93,10 @@ const SIDEBAR_CSS = `
 .rs-cs-gbs .rs-cs-item.rs-cs-item-main.rs-active { background:#d1fae5; border-color:#16a34a; }
 .rs-cs-gbs .rs-cs-main-badge { background:transparent; color:#16a34a; padding:0; margin-left:4px; font-size:10px; font-weight:700; }
 .rs-cs-gbs .rs-cs-item-actions { display:flex; }
+.rs-cs-sel-actions { display:none; flex:0 0 auto; gap:2px; }
+.rs-cs-sel-head:hover .rs-cs-sel-actions { display:flex; }
+.rs-cs-sel-actions button { background:transparent; border:none; cursor:pointer; padding:2px 4px; font-size:11px; color:#92400e; }
+.rs-cs-sel-actions button:hover { color:#b91c1c; }
 .rs-cs-addrow { display:flex; gap:6px; padding:10px; }
 .rs-cs-addrow .rs-cs-btn { flex:1; padding:8px 10px; font-size:12.5px; text-align:center; }
 `;
@@ -252,6 +256,10 @@ export function mountConfigSidebar(opts) {
         <div class="rs-cs-sel-head${collapsed ? ' collapsed' : ''}${selActive ? ' rs-cs-sel-active' : ''}" data-act-sel="toggle" data-sel-name="${esc(selName)}" title="Активный подбор — общие условия и финансы задаются в панели «Свойства подбора».">
           <span class="rs-cs-sel-name">📋 ${esc(selName)}</span>
           <span class="rs-cs-sel-count">${entries.length} вар.${mainEntry ? ' · ★ ' + esc(mainEntry.label || mainEntry.id) : ''}</span>
+          <span class="rs-cs-sel-actions">
+            <button type="button" data-act-selop="rename" data-sel-name="${esc(selName)}" title="Переименовать подбор">✎</button>
+            <button type="button" data-act-selop="del" data-sel-name="${esc(selName)}" title="Удалить подбор (с вариантами)">🗑</button>
+          </span>
         </div>
         ${collapsed ? '' : `<ul style="list-style:none;padding:0;margin:0">${entries.map(e => renderEntryItem(e)).join('')}</ul>`}
       </li>`);
@@ -319,6 +327,36 @@ export function mountConfigSidebar(opts) {
 
   // Делегирование кликов по списку
   if (slotList) slotList.addEventListener('click', async (ev) => {
+    // v0.60.437: действия над ПОДБОРОМ (переименовать / удалить) — на
+    // заголовке подбора. Перехватываем ДО toggle, чтобы клик не сворачивал.
+    const selOp = ev.target.closest('[data-act-selop]');
+    if (selOp) {
+      ev.stopPropagation();
+      const name = selOp.getAttribute('data-sel-name');
+      const op = selOp.dataset.actSelop;
+      if (op === 'rename') {
+        const nn = await rsPrompt('Новое название подбора', name);
+        if (nn == null) return;
+        const newName = String(nn || '').trim();
+        if (!newName || newName === name) return;
+        renameSelection(kind, { projectCode: projectCode || null, oldName: name, newName });
+        if (activeSelName === name) activeSelName = newName;
+        render();
+        fireSel(activeSelName);
+        rsToast('Подбор переименован → «' + newName + '»', 'ok');
+      } else if (op === 'del') {
+        const n = listConfigs(kind, { projectCode: projectCode || undefined, selectionName: name }).length;
+        const ok = await rsConfirm(
+          `Удалить подбор «${name}»${n ? ' и все его варианты (' + n + ')' : ''}?`,
+          'Это действие необратимо.', { okLabel: 'Удалить', cancelLabel: 'Отмена' });
+        if (!ok) return;
+        deleteSelection(kind, { projectCode: projectCode || null, selectionName: name, variantsToo: true });
+        if (activeSelName === name) { activeSelName = null; fireSel(null); }
+        render();
+        rsToast('Подбор удалён', 'ok');
+      }
+      return;
+    }
     // v0.60.422: клик на header подбора → toggle collapsed.
     const selHead = ev.target.closest('[data-act-sel="toggle"]');
     if (selHead) {
