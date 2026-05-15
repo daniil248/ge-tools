@@ -2440,20 +2440,24 @@ defaults по kind+model).
   - Standalone (Wi-Fi AP, IP-камера, принтер): координаты + высота
     установки → прямой путь к ближайшей трассе.
 
-- [ ] **16.7** — Авто-пересчёт длин при изменениях
-  - Hooks на `savePlan(p)`, `setLinks(...)`, `state.contents` change.
-  - Перебираем все links → если `!link.lengthFrozen` → пересчитываем
-    `link.lengthM = computeSuggestedLength(link, plan)`.
-  - При изменении `device.positionU` — пересчёт всех links, где этот
-    device endpoint.
-  - При изменении `rack` position на плане — пересчёт всех links
-    where this rack involved.
+- [x] **16.7** — Авто-пересчёт длин при изменениях ✅ v0.60.426 (для движка схем / layout-страницы)
+  - Hook на mouseup после drag узла на layout-странице (interaction.js):
+    `recalcLayoutCableLengths()` перебирает все conns → если
+    `!c.lengthFrozen` → пересчитывает `c.lengthM = layoutConnLengthM(c)`
+    (ортогональный маршрут между центрами узлов + waypoints, мм→м).
+  - Перетаскивание узла (вкл. зоны/секции/группы — все children) →
+    пересчёт всех инцидентных связей. Перетаскивание waypoint\'а →
+    пересчёт его связи.
+  - Расчёт по физ.маршруту port→organizer→tray (Phase 16.1–16.6) —
+    отдельная задача для модуля scs-design (там реальные стойки/трассы).
 
-- [ ] **16.8** — Флаг lengthFrozen + UI
-  - `link.lengthFrozen: boolean` — юзер вручную задал длину.
-  - Иконка 🔒 рядом с полем длины в таблице связей.
-  - Кнопка «↻ Пересчитать автоматически» — снимает freeze и пересчитывает.
-  - В bulk-toolbar — массовое снятие freeze у выделенных.
+- [x] **16.8** — Флаг lengthFrozen + UI ✅ v0.60.426
+  - `conn.lengthFrozen: boolean` — Пользователь вручную задал длину
+    (ставится при ручном вводе поля «Длина, м» в conn-инспекторе).
+  - На layout-странице у поля длины: «↻ авто по плану» (не зафиксировано)
+    либо кнопка «🔒 ↻ авто» (снимает freeze и немедленно пересчитывает).
+  - Сериализуется (переживает сохранение проекта).
+  - [ ] bulk-toolbar — массовое снятие freeze у выделенных (TODO).
 
 - [ ] **16.9** — Подробный breakdown в tooltip
   - При hover на длину в таблице связей — tooltip:

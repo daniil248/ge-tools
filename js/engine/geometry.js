@@ -133,6 +133,36 @@ export function nodeHeight(n) {
   if (isUtilitySource(n)) return 140;
   return NODE_H;
 }
+// v0.60.426 (Phase 16.7): центр узла в мировых координатах. На
+// layout-странице мир = миллиметры (1 ед = 1 мм, см. renderLayoutRuler).
+export function nodeCenterMm(n) {
+  return {
+    x: (Number(n.x) || 0) + nodeWidth(n) / 2,
+    y: (Number(n.y) || 0) + nodeHeight(n) / 2,
+  };
+}
+// Длина кабеля связи по ортогональному (манхэттенскому) физическому
+// маршруту между центрами узлов, с учётом waypoints'ов. Возвращает метры
+// (округление до 0.1 м) или null, если узлы не найдены. Имеет смысл только
+// на layout-странице — вызывающий код обязан это проверять.
+export function layoutConnLengthM(c) {
+  const a = c && c.from && state.nodes.get(c.from.nodeId);
+  const b = c && c.to && state.nodes.get(c.to.nodeId);
+  if (!a || !b) return null;
+  const pts = [nodeCenterMm(a)];
+  if (Array.isArray(c.waypoints)) {
+    for (const w of c.waypoints) {
+      pts.push({ x: Number(w.x) || 0, y: Number(w.y) || 0 });
+    }
+  }
+  pts.push(nodeCenterMm(b));
+  let mm = 0;
+  for (let i = 1; i < pts.length; i++) {
+    mm += Math.abs(pts[i].x - pts[i - 1].x) + Math.abs(pts[i].y - pts[i - 1].y);
+  }
+  return Math.max(0, Math.round((mm / 1000) * 10) / 10);
+}
+
 export function portPos(n, kind, idx) {
   const w = nodeWidth(n);
   const h = nodeHeight(n);

@@ -5,7 +5,8 @@ import { listCableTypes, getCableType } from '../../../shared/cable-types-catalo
 // TCC-chart грузится лениво в _mountConnTccChart (только когда пользователь
 // открывает инспектор линии с автоматом/кабелем)
 let _tccChartMod = null;
-import { state, inspectorBody } from '../state.js';
+import { state, inspectorBody, getCurrentPage, getPageKind } from '../state.js';
+import { layoutConnLengthM } from '../geometry.js';
 import { escHtml, escAttr, fmt, field, flash, helpIcon } from '../utils.js';
 import { effectiveTag } from '../zones.js';
 import { cableVoltageClass, computeCurrentA, nodeCalcVoltage, isThreePhase } from '../electrical.js';
@@ -603,8 +604,23 @@ export function renderInspectorConn(c) {
     }
   } catch (e) { /* каталог опционален */ }
 
+  // v0.60.426 (Phase 16.7/16.8): на layout-странице длина авто-пересчитывается
+  // по физическому маршруту при перемещении узлов. Ручной ввод фиксирует
+  // длину (🔒); кнопка «↻ авто» снимает фиксацию и пересчитывает.
+  const _onLayout = (() => { try { return getPageKind(getCurrentPage()) === 'layout'; } catch { return false; } })();
+  const _frozen = !!c.lengthFrozen;
+  let _autoHint = '';
+  if (_onLayout) {
+    let _autoL = null;
+    try { _autoL = layoutConnLengthM(c); } catch {}
+    if (_frozen) {
+      _autoHint = `<button type="button" data-conn-len-auto title="Снять ручную фиксацию и пересчитать длину по плану${_autoL != null ? ` (≈ ${_autoL} м)` : ''}" style="margin-left:6px;font-size:11px;padding:2px 7px;border:1px solid #cbd5e1;border-radius:4px;background:#fff;cursor:pointer">🔒 ↻ авто</button>`;
+    } else {
+      _autoHint = `<span title="Длина авто-пересчитывается по плану при перемещении узлов" style="margin-left:6px;font-size:11px;color:#2e7d32">↻ авто по плану</span>`;
+    }
+  }
   h.push(`<div class="field">
-    <label>Длина, м${helpIcon('Физическая длина кабеля. Используется для расчёта падения напряжения и сопротивления линии. Для расчёта токов КЗ — Z_кабеля = ρ × L / S.')}</label>
+    <label>Длина, м${helpIcon('Физическая длина кабеля. Используется для расчёта падения напряжения и сопротивления линии. Для расчёта токов КЗ — Z_кабеля = ρ × L / S. На странице «План расположения» длина пересчитывается автоматически по ортогональному маршруту между узлами при их перемещении (если не зафиксирована вручную).')}${_autoHint}</label>
     <input type="number" min="0" max="10000" step="0.5" data-conn-prop="lengthM" value="${c.lengthM ?? 1}">
   </div>`);
 
@@ -1276,6 +1292,21 @@ export function renderInspectorConn(c) {
       renderInspector();
     });
   });
+  // v0.60.426 (Phase 16.8): «↻ авто» — снять ручную фиксацию длины и
+  // немедленно пересчитать по плану расположения.
+  inspectorBody.querySelectorAll('[data-conn-len-auto]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      snapshot('conn:' + c.id + ':lengthUnfreeze');
+      delete c.lengthFrozen;
+      let L = null;
+      try { L = layoutConnLengthM(c); } catch {}
+      if (L != null) c.lengthM = L;
+      render();
+      notifyChange();
+      renderInspector();
+      try { flash(L != null ? `Длина пересчитана по плану: ${L} м` : 'Авто-пересчёт длины включён', 'success'); } catch {}
+    });
+  });
   inspectorBody.querySelectorAll('[data-conn-prop]').forEach(inp => {
     const isSelect = inp.tagName === 'SELECT';
     const isCheckbox = inp.type === 'checkbox';
@@ -1295,6 +1326,10 @@ export function renderInspectorConn(c) {
         else delete c.manualFuseIn;
       }
       c[prop] = v;
+      // v0.60.426 (Phase 16.8): ручной ввод длины «замораживает» связь —
+      // авто-пересчёт по плану (layout) больше её не трогает, пока
+      // Пользователь не снимет фиксацию кнопкой «↻ авто».
+      if (prop === 'lengthM') c.lengthFrozen = true;
       // Фаза 1.11: при выборе марки кабеля из справочника — автозаполняем
       // материал / изоляцию из записи (если есть информация).
       if (prop === 'cableMark' && v) {

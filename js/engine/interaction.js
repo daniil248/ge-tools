@@ -2,7 +2,7 @@
 
 import { state, svg, layerOver, uid, getCurrentPage, getPageKind, saveCurrentPagePositions, loadPagePositions, isOnCurrentPage } from './state.js';
 import { NODE_H, SVG_NS, DEFAULTS, GLOBAL } from './constants.js';
-import { nodeInputCount, nodeOutputCount, nodeWidth, nodeHeight, portPos, getNodeGeometryMm } from './geometry.js';
+import { nodeInputCount, nodeOutputCount, nodeWidth, nodeHeight, portPos, getNodeGeometryMm, layoutConnLengthM } from './geometry.js';
 import { snapshot, notifyChange } from './history.js';
 import { selectNode, selectConn, renderInspector, clientToSvg } from './inspector.js';
 import { render, updateViewBox, el, bezier } from './render.js';
@@ -58,6 +58,32 @@ function _isCompatibleConsumer(a, b) {
   // Individual-режим не объединяем — в нём каждый прибор имеет свои параметры.
   if (a.groupMode === 'individual' || b.groupMode === 'individual') return false;
   return true;
+}
+
+// v0.60.426 (Phase 16.7): авто-пересчёт длины кабеля по физическому
+// маршруту на layout-странице. Расчёт маршрута — layoutConnLengthM()
+// в geometry.js. Связи с c.lengthFrozen (длина задана Пользователем
+// вручную) не трогаются.
+// Пересчитывает lengthM у всех связей, инцидентных перемещённым узлам.
+// Возвращает число изменённых связей. Тихо выходит вне layout-страницы.
+function recalcLayoutCableLengths(nodeIds) {
+  if (getPageKind(getCurrentPage()) !== 'layout') return 0;
+  const set = new Set((nodeIds || []).filter(Boolean));
+  if (!set.size) return 0;
+  let changed = 0;
+  for (const c of state.conns.values()) {
+    if (c.lengthFrozen) continue;
+    const fid = c.from && c.from.nodeId;
+    const tid = c.to && c.to.nodeId;
+    if (!set.has(fid) && !set.has(tid)) continue;
+    const L = layoutConnLengthM(c);
+    if (L == null) continue;
+    if (Math.abs((Number(c.lengthM) || 0) - L) > 1e-6) {
+      c.lengthM = L;
+      changed++;
+    }
+  }
+  return changed;
 }
 
 function _findConsumerOverlapAt(dragged) {
@@ -2077,6 +2103,12 @@ export function initInteraction() {
       const wasLength = !!state.drag.lengthNodeId;
       const draggedNodeId = state.drag.nodeId;
       const hadChildren = !!(state.drag.children && state.drag.children.length);
+      // v0.60.426: id'шники перемещаемого узла + детей (зона/секции/группа)
+      // для авто-пересчёта длин кабелей на layout-странице.
+      const _movedNodeIds = wasNodeDrag
+        ? [draggedNodeId, ...((state.drag.children || []).map(ch => ch && ch.id))]
+        : [];
+      const _wasWpConnId = state.drag.waypointConnId || null;
       // v0.60.178: захватываем стартовую позицию для anti-spurious-merge
       // (см. ниже в drop-merge блоке).
       const _dragStartX = state.drag.startX;
@@ -2166,6 +2198,29 @@ export function initInteraction() {
             try { flash(`Параметры разные — узлы остаются отдельными. Для cross-discipline связи (один физ.объект, разные параметры) откройте Группа-tab.`, 'info'); } catch {}
           }
         }
+      }
+      // v0.60.426 (Phase 16.7): авто-пересчёт длин кабелей при изменении
+      // расположения на layout-странице. Перемещение узла → все его связи;
+      // перемещение waypoint'а → конкретная связь. Связи с lengthFrozen
+      // не трогаются (длина задана Пользователем вручную).
+      let _lenChanged = 0;
+      if (wasNodeDrag) {
+        _lenChanged += recalcLayoutCableLengths(_movedNodeIds);
+      }
+      if (wasWpDrag && _wasWpConnId) {
+        const _wc = state.conns.get(_wasWpConnId);
+        if (_wc && !_wc.lengthFrozen && getPageKind(getCurrentPage()) === 'layout') {
+          const L = layoutConnLengthM(_wc);
+          if (L != null && Math.abs((Number(_wc.lengthM) || 0) - L) > 1e-6) {
+            _wc.lengthM = L;
+            _lenChanged++;
+          }
+        }
+      }
+      if (_lenChanged) {
+        render();
+        try { renderInspector(); } catch {}
+        try { flash(`Длина кабеля пересчитана по плану (связей: ${_lenChanged})`, 'info'); } catch {}
       }
       if (wasNodeDrag || wasWpDrag || wasZoneResize || wasRotate || wasLength) notifyChange();
     }
