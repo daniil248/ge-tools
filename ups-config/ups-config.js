@@ -803,6 +803,10 @@ function _loadReqFromSelection(selName) {
   if (r.redundancy) { rq.redundancy = r.redundancy; rq.moduleRedundancy = r.redundancy; }
   if (r.cosPhi != null && r.cosPhi !== '') rq.cosPhi = Number(r.cosPhi) || rq.cosPhi;
   if (r.phases != null && r.phases !== '') rq.phases = Number(r.phases) || rq.phases;
+  // v0.60.448: высота установки + макс. темп. среды — условия подбора
+  // (дерейтинг). Из проекта/технолога или вручную в «Свойства подбора».
+  if (r.altitudeM != null && r.altitudeM !== '') rq.altitudeM = Number(r.altitudeM) || 0;
+  if (r.ambientMaxC != null && r.ambientMaxC !== '') rq.ambientMaxC = Number(r.ambientMaxC) || 0;
   return true;
 }
 
