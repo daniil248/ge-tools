@@ -571,6 +571,9 @@
       </form>
       <div id="rack-result"></div>
     </section>
+    <!-- v0.60.429: панель ПОДБОРА АКБ (условия + TCO/CAPEX/OPEX/сравнение),
+         как в «Подбор холода». Активный подбор — из сайдбара слева. -->
+    <div id="bt-selection-panel"></div>
   </main>
   </div><!-- /.bt-shell -->
 
@@ -599,6 +602,72 @@
     if (api && api.enabled) {
       window.addEventListener('battery:configs-changed', () => { try { api.refresh(); } catch {} });
     }
+  </script>
+  <!-- v0.60.429: панель ПОДБОРА АКБ (условия + TCO/CAPEX/OPEX/сравнение) -->
+  <script type="module">
+    import { mountSelectionPanel } from '../shared/selection-panel.js';
+    import { getActiveProjectCode } from '../shared/configuration-catalog.js';
+    const mountEl = document.getElementById('bt-selection-panel');
+    const pc = getActiveProjectCode();
+    let activeSel = null;
+
+    const requirementsSchema = [
+      { key: 'loadKw',          label: 'Нагрузка ИБП/DC', unit: 'кВт', type: 'number', step: 0.5,
+        tip: 'Мощность, которую АКБ должна держать на автономии. Общее условие подбора.' },
+      { key: 'autonomyMin',     label: 'Автономия',       unit: 'мин', type: 'number', step: 1,
+        tip: 'Требуемое время работы от АКБ.' },
+      { key: 'dcVoltage',       label: 'Напряжение DC',   unit: 'В',   type: 'number', step: 1,
+        tip: 'Номинальное напряжение батарейной шины.' },
+      { key: 'invEffPct',       label: 'КПД инвертора',   unit: '%',   type: 'number', step: 1,
+        tip: 'КПД преобразования ИБП при разряде (для пересчёта мощности в DC).' },
+      { key: 'serviceLifeYears',label: 'Срок службы АКБ', unit: 'лет', type: 'number', step: 1,
+        tip: 'Расчётный срок службы батарей. Если меньше срока проекта — замена учитывается как CAPEX-событие в TCO. VRLA ≈ 5–8, Li-ion ≈ 10–15.' },
+      { key: 'maintPctPerYear', label: 'ТО, %/год от CAPEX', unit: '%', type: 'number', step: 0.5,
+        tip: 'Годовая стоимость обслуживания как % от стоимости АКБ. Типично 1–2%.' },
+      { key: 'pricePerKwh',     label: 'Цена, /кВт·ч ёмкости', type: 'number', step: 1,
+        tip: 'Удельная цена ёмкости (в валюте подбора) для оценки CAPEX, если в варианте нет явной цены. CAPEX = ёмкость кВт·ч × цена.' },
+    ];
+
+    // OPEX АКБ = ТО + замена АКБ как CAPEX-событие при сроке службы < срока проекта.
+    function variantEconomics(entry, selEco, req) {
+      const p = (entry && entry.payload) || {};
+      const cur = selEco.currency || '₸';
+      const totalKwh = Number(p.totalKwh) || 0;
+      const pricePerKwh = Number(req.pricePerKwh) || 0;
+      const price = Number(p.totalPrice) || (totalKwh * pricePerKwh) || 0;
+      const maintPerYear = price * ((Number(req.maintPctPerYear) || 1) / 100);
+      // срок службы: из условий, иначе по химии АКБ.
+      const chem = String(p.battery && (p.battery.chemistry || p.battery.type) || '').toLowerCase();
+      const defLife = /li|lfp|lto|ион/.test(chem) ? 12 : 6;
+      const life = Math.max(1, Math.round(Number(req.serviceLifeYears) || defLife));
+      const N = Math.max(1, Math.round(Number(selEco.projectLifetimeYears) || 10));
+      const events = [];
+      for (let y = life; y < N; y += life) events.push({ year: y, amount: price });
+      return {
+        annualEnergyKwh: 0,   // АКБ: OPEX не энергозатратный (доминируют ТО + замена)
+        extraCapexEvents: events,
+        costItems: [{
+          id: 'akb-main', label: entry.label || 'АКБ', qty: 1,
+          equipmentPrice:          { value: price, currency: cur },
+          installPrice:            { value: 0, currency: cur },
+          maintenancePerYearPrice: { value: maintPerYear, currency: cur },
+        }],
+      };
+    }
+
+    const sp = mountSelectionPanel({
+      kind: 'battery', mountEl, projectCode: pc,
+      getActiveSelectionName: () => activeSel,
+      requirementsSchema, variantEconomics,
+      variantLabel: (e) => e.label || e.id,
+      convertFn: null,
+    });
+    window.addEventListener('rs-selection-change', (ev) => {
+      const d = ev.detail || {};
+      if (d.kind && d.kind !== 'battery') return;
+      activeSel = d.selectionName || null;
+      sp.setSelection(activeSel);
+    });
   </script>
 </body>
 </html>

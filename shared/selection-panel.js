@@ -160,6 +160,31 @@ export function mountSelectionPanel(o) {
         tariffRubKwh: Number(eco.tariff) || 0,
         eco: flat,
       });
+      // v0.60.429: ступенчатые CAPEX-события (замена АКБ при сроке службы <
+      // срока проекта и т.п.). amount уже в валюте подбора. Дисконтируем по
+      // ставке и добавляем в TCO/raw/среднее; в payback-поток (yearlyOpex)
+      // добавляем недисконтированную сумму в соответствующий год — так
+      // discountedPaybackYears учтёт замену корректно.
+      const events = Array.isArray(ec.extraCapexEvents) ? ec.extraCapexEvents : [];
+      if (events.length) {
+        const rr = (Number(t.discountRatePct) || 0) / 100;
+        let addDisc = 0, addRaw = 0;
+        for (const evp of events) {
+          const yr = Math.round(Number(evp.year) || 0);
+          const amt = Number(evp.amount) || 0;
+          if (yr < 1 || yr > t.projectLifetimeYears || amt <= 0) continue;
+          addDisc += amt / Math.pow(1 + rr, yr);
+          addRaw += amt;
+          const ye = t.yearlyOpex.find(y => y.year === yr);
+          if (ye) { ye.totalRub += amt; ye.cumDiscounted += amt / Math.pow(1 + rr, yr); }
+        }
+        if (addDisc || addRaw) {
+          t.tco += addDisc;
+          t.tcoUndiscounted += addRaw;
+          t.averageRubPerYear = t.tco / t.projectLifetimeYears;
+          t._replacementNote = true;
+        }
+      }
       return { v, t, isMain: !!v.isMainVariant };
     });
     const main = rows.find(r => r.isMain) || rows[0];
