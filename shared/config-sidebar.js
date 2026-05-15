@@ -123,38 +123,16 @@ export function mountConfigSidebar(opts) {
   // чтобы сайдбар и бейдж в шапке всегда показывали ОДИН и тот же проект.
   const _projRef = getActiveProjectRef();
   const baseProjectCode = o.projectCode != null ? o.projectCode : (_projRef && _projRef.code) || null;
-  const baseProjectName = (_projRef && _projRef.name) || baseProjectCode || '';
-  // v0.60.434: «КОНТЕКСТ ПОДБОРА» как в «Подбор холода» — привязка к проекту
-  // ИЛИ разовый подбор (standalone). По умолчанию: если есть активный проект
-  // — привязка к нему, иначе разовый. Выбор запоминается per-kind.
-  const CTX_KEY = 'raschet.cs.ctx.' + kind;
-  let ctxStandalone;
-  try {
-    const stored = o.groupBySelection ? localStorage.getItem(CTX_KEY) : null;
-    ctxStandalone = stored ? stored === 'standalone' : !baseProjectCode;
-  } catch { ctxStandalone = !baseProjectCode; }
-  if (!baseProjectCode) ctxStandalone = true;
-  // projectCode — действующий контекст (let: меняется при переключении).
-  let projectCode = ctxStandalone ? null : baseProjectCode;
+  // v0.60.441 (по замечанию Пользователя 2026-05-15: «зачем вообще выбор в
+  // 2-х местах»): НИКАКОГО селектора контекста в сайдбаре. Проект (и режим
+  // «разовый/проект») задаётся ТОЛЬКО бейджем в шапке — единый источник.
+  // Есть активный проект → подборы привязаны к нему; нет → разовый (null).
+  let projectCode = baseProjectCode || null;
   const projHint = '';
 
   const root = document.createElement('div');
   root.className = 'rs-cs-sidebar' + (o.groupBySelection ? ' rs-cs-gbs' : '');
-  const ctxBlock = (o.groupBySelection && has('list')) ? `
-    <div class="rs-cs-sect">
-      <div class="rs-cs-ctx">
-        <label title="Привязывать подборы к активному проекту (проект выбирается ТОЛЬКО в шапке) или вести разовый подбор без проекта.">Контекст подбора</label>
-        <select data-act="ctx" title="🔓 Разовый подбор — данные в общем хранилище, не привязаны к проекту. 📁 К активному проекту — подборы привязаны к проекту, выбранному в ШАПКЕ (единый источник; здесь проект не переключается).">
-          <option value="standalone"${ctxStandalone ? ' selected' : ''}>🔓 Разовый подбор</option>
-          ${baseProjectCode ? `<option value="project"${!ctxStandalone ? ' selected' : ''}>📁 К активному проекту (из шапки)</option>` : ''}
-        </select>
-        <div class="rs-cs-ctx-hint">${ctxStandalone
-          ? 'Разовый подбор — без привязки к проекту.'
-          : 'Привязан к активному проекту из шапки: <b>' + esc(baseProjectName) + '</b>. Сменить проект — бейджем в шапке.'}</div>
-      </div>
-    </div>` : '';
   root.innerHTML = `
-    ${ctxBlock}
     ${has('settings') ? `
     <div class="rs-cs-sect">
       <div class="rs-cs-sect-head">Основные настройки</div>
@@ -478,24 +456,8 @@ export function mountConfigSidebar(opts) {
     render();
   });
 
-  // v0.60.434: переключение «Контекст подбора» (проект ↔ разовый подбор).
-  const ctxSel = root.querySelector('[data-act="ctx"]');
-  if (ctxSel) ctxSel.addEventListener('change', () => {
-    ctxStandalone = ctxSel.value === 'standalone';
-    try { localStorage.setItem(CTX_KEY, ctxStandalone ? 'standalone' : 'project'); } catch {}
-    projectCode = ctxStandalone ? null : baseProjectCode;
-    activeSelName = null;
-    activeId = null;
-    const hint = root.querySelector('.rs-cs-ctx-hint');
-    if (hint) hint.textContent = ctxStandalone
-      ? 'Разовый подбор — без привязки к проекту.'
-      : 'Подборы сохраняются в проекте «' + baseProjectCode + '».';
-    render();
-    // Панель «Свойства подбора / TCO» должна перепривязаться к новому
-    // контексту (projectCode) и сбросить активный подбор.
-    try { window.dispatchEvent(new CustomEvent('rs-cs-context', { detail: { kind, projectCode } })); } catch {}
-    fireSel(null);
-  });
+  // v0.60.441: селектор «Контекст подбора» удалён из сайдбара — проект
+  // задаётся ТОЛЬКО бейджем в шапке (единый источник, без дублирования).
 
   const unsub = onConfigsChange(kind, () => render());
   render();
