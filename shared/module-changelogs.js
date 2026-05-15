@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.423', date: '2026-05-06', items: [
+      '🐛 <b>Hotfix: <code>CHANGELOGS is not defined</code> — крах footer-скрипта в 12 модулях</b>. Регрессия v0.60.419 (рефактор changelog: «footer монтируется всегда — dynamic import вместо static»).',
+      '<b>Корень</b>: 12 inline-скриптов модулей передавали <code>entries: CHANGELOGS[\'xxx\']</code> в mountModuleFooter, но <code>CHANGELOGS</code> больше нигде не импортировался → <code>ReferenceError</code> рушил весь inline-модуль (footer не монтировался, на ups-config — и сайдбар вариантов).',
+      '<b>Fix</b>: убран устаревший аргумент <code>entries: CHANGELOGS[...]</code> из всех 12 файлов. <code>mountFooter</code> с v0.60.419 сам делает dynamic import <code>./module-changelogs.js</code> по moduleId (паттерн как в cooling/configurator3d).',
+      'Затронуты: <code>ups-config</code>, <code>transformer-config</code>, <code>suppression-config</code>, <code>scs-design</code>, <code>rack-config</code>, <code>panel-config</code>, <code>mv-config</code>, <code>mdc-config</code>, <code>facility-inventory</code>, <code>scs-config/rack.html</code>, <code>scs-config/inventory.html</code>, <code>help</code>.',
+    ] },
     { version: '0.60.422', date: '2026-05-06', items: [
       '📋 <b>Подборы → Варианты в UPS-конфигураторе (как в «Подбор холода»)</b>. По запросу Пользователя 2026-05-06: «Добавь конфигурации с вариантами как в модуле подбор холода».',
       '<b>Часть A: shared/configuration-catalog.js</b>',
