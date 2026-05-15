@@ -730,6 +730,19 @@ function _openStandaloneProjectMenu(currentModuleId, opts = {}) {
     });
   });
 
+  // v0.60.449 (по репорту Пользователя: «кнопка разовый расчёт не
+  // работает»): обработчик отсутствовал. Сбрасываем активный проект →
+  // модуль работает без проекта (разовый расчёт), перезагружаем.
+  overlay.querySelector('.rs-proj-menu-standalone')?.addEventListener('click', () => {
+    try { setActiveProjectId(null); } catch {}
+    close();
+    const url = new URL(location.href);
+    url.searchParams.delete('project');
+    url.searchParams.delete('pid');
+    url.searchParams.delete('from');
+    location.href = url.toString();
+  });
+
   overlay.querySelector('.rs-proj-menu-create')?.addEventListener('click', async () => {
     let name = null;
     try {

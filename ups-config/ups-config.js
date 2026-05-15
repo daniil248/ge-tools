@@ -803,6 +803,7 @@ function _loadReqFromSelection(selName) {
   if (r.redundancy) { rq.redundancy = r.redundancy; rq.moduleRedundancy = r.redundancy; }
   if (r.cosPhi != null && r.cosPhi !== '') rq.cosPhi = Number(r.cosPhi) || rq.cosPhi;
   if (r.phases != null && r.phases !== '') rq.phases = Number(r.phases) || rq.phases;
+  if (r.upsType != null) rq.upsType = r.upsType;  // v0.60.449: тип из подбора
   // v0.60.448: высота установки + макс. темп. среды — условия подбора
   // (дерейтинг). Из проекта/технолога или вручную в «Свойства подбора».
   if (r.altitudeM != null && r.altitudeM !== '') rq.altitudeM = Number(r.altitudeM) || 0;
@@ -828,10 +829,36 @@ function _enterVariantEditor(selName) {
   if (back2) back2.onclick = toPodbor;
   const editCfg = document.getElementById('wiz-btn-edit-cfg');
   if (editCfg) editCfg.onclick = toPodbor;
-  // Баннер условий подбора (read-only) в индикаторе шага.
   const rq = wizState.requirements;
+  // v0.60.449: дефолт фильтров подбора модели — ИЗ условий подбора, чтобы
+  // «Мощность ≥/≤ kW» были осмысленно предзаполнены, а не пусты.
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e && v != null && v !== '') e.value = v; };
+  setVal('wiz-filter-kwMin', Math.round(Number(rq.loadKw) || 0) || '');
+  setVal('wiz-redundancy', rq.moduleRedundancy || rq.redundancy || 'N');
+  setVal('wiz-redundancy-modules', rq.moduleRedundancy || rq.redundancy || 'N');
+  setVal('wiz-redundancy-units', rq.unitRedundancy || 'N');
+  // v0.60.449: видимый read-only баннер УСЛОВИЙ ПОДБОРА вверху редактора
+  // варианта (не только в индикаторе) + ссылка вернуться в зону подбора.
+  const typeLbl = rq.upsType === 'modular' ? 'модульный' : rq.upsType === 'monoblock' ? 'моноблок' : 'любой тип';
+  const wiz2 = document.getElementById('wiz-step-2');
+  if (wiz2) {
+    let b = document.getElementById('wiz-podbor-conditions');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'wiz-podbor-conditions';
+      b.style.cssText = 'margin:0 0 12px;padding:9px 12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;font-size:12px;color:#3730a3;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap';
+      wiz2.insertBefore(b, wiz2.firstChild);
+    }
+    b.innerHTML = `<span title="Эти условия заданы в «Свойства подбора» и одинаковы для всех вариантов. Здесь подбирается конкретная модель.">📋 Условия подбора: <b>${Number(rq.loadKw) || 0} кВт</b> · ${rq.moduleRedundancy || rq.redundancy || 'N'} · ${typeLbl} · ${rq.topology || '—'} · cos φ ${rq.cosPhi || '—'} · ${rq.phases || 3}ф · автономия ${Number(rq.autonomyMin) || 0} мин</span>
+      <button type="button" id="wiz-back-podbor" style="flex:0 0 auto;padding:4px 10px;font-size:11.5px;background:#fff;border:1px solid #c7d2fe;border-radius:4px;color:#3730a3;cursor:pointer" title="Вернуться к условиям подбора («Свойства подбора»)">← Условия подбора</button>`;
+    b.querySelector('#wiz-back-podbor')?.addEventListener('click', toPodbor);
+  }
   const ind = document.getElementById('wiz-step-indicator');
-  if (ind) ind.textContent = `Условия подбора: ${rq.loadKw || 0} кВт · ${rq.moduleRedundancy || rq.redundancy || 'N'} · автономия ${rq.autonomyMin || 0} мин (задаются в «Свойства подбора»)`;
+  if (ind) ind.textContent = 'Подбор модели для варианта';
+  // v0.60.449: вспомогательная панель «Выбранная модель» (каскад справочника)
+  // не нужна в зоне варианта — скрываем (Пользователь: «блок ни от чего»).
+  const selPanel = document.getElementById('selected-ups-details');
+  if (selPanel && selPanel.closest('.panel')) selPanel.closest('.panel').style.display = 'none';
   try { _goStep2(); } catch (e) { console.warn('[ups-config] goStep2', e); _showStep(2); }
 }
 
