@@ -202,6 +202,160 @@ export function nextConfigId(kind, projectCode) {
 }
 
 // =========================================================================
+// v0.60.427: ЗАПИСЬ ПОДБОРА (selection-level record).
+// По запросу Пользователя 2026-05-15: «подбор ИБП и АКБ должен быть выполнен
+// как подбор холодильных систем — в самом подборе все УСЛОВИЯ, а в вариантах
+// конкретные решения, со сравнениями, TCO, CAPEX, OPEX».
+//
+// Раньше `selectionName` был просто строкой-тегом на каждом варианте.
+// Теперь у подбора есть собственная запись с общими УСЛОВИЯМИ (requirements,
+// формат задаёт модуль: kW, автономия, резерв, топология…) и ФИНАНСОВЫМИ
+// параметрами (eco — форма DEFAULT_ECONOMICS из shared/calc/capex-tco.js:
+// валюта, срок проекта, ставка дисконтирования, эскалации, costItems[]).
+//
+//   SelectionMeta = {
+//     kind, projectCode|null, selectionName,
+//     requirements: {},  — общие условия подбора (module-defined)
+//     eco: {},           — общие фин. параметры (DEFAULT_ECONOMICS-shape)
+//     createdAt, updatedAt,
+//   }
+//
+// Ключ localStorage: raschet.selections.<kind>.v1 = SelectionMeta[]
+// Идентификация записи — пара (projectCode||'', selectionName).
+// =========================================================================
+const SEL_KEY_PREFIX = 'raschet.selections.';
+
+function selStorageKey(kind) {
+  return SEL_KEY_PREFIX + String(kind || 'misc') + '.' + SCHEMA_VERSION;
+}
+function readAllSelections(kind) {
+  try {
+    const raw = localStorage.getItem(selStorageKey(kind));
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function writeAllSelections(kind, arr) {
+  try { localStorage.setItem(selStorageKey(kind), JSON.stringify(arr || [])); }
+  catch (e) { console.warn('[configuration-catalog] selection write failed', e); }
+  notify(kind);
+}
+function _selMatch(s, projectCode, selectionName) {
+  return String(s.selectionName || '') === String(selectionName || '')
+      && String(s.projectCode || '') === String(projectCode || '');
+}
+
+/** Запись подбора по (projectCode, selectionName) или null. */
+export function getSelectionMeta(kind, opts) {
+  const o = opts || {};
+  if (!o.selectionName) return null;
+  return readAllSelections(kind)
+    .find(s => _selMatch(s, o.projectCode || null, o.selectionName)) || null;
+}
+
+/** Все записи подборов (опц. фильтр по projectCode). */
+export function listSelectionMetas(kind, opts) {
+  const o = opts || {};
+  let out = readAllSelections(kind);
+  if (o.projectCode !== undefined) {
+    out = out.filter(s => String(s.projectCode || '') === String(o.projectCode || ''));
+  }
+  out.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  return out;
+}
+
+/** Upsert записи подбора по (projectCode, selectionName). */
+export function saveSelectionMeta(kind, entry) {
+  const e = entry || {};
+  if (!e.selectionName) return null;
+  const now = Date.now();
+  const all = readAllSelections(kind);
+  const idx = all.findIndex(s => _selMatch(s, e.projectCode || null, e.selectionName));
+  let rec;
+  if (idx >= 0) {
+    rec = {
+      ...all[idx],
+      requirements: e.requirements !== undefined ? e.requirements : all[idx].requirements,
+      eco: e.eco !== undefined ? e.eco : all[idx].eco,
+      updatedAt: now,
+    };
+    all[idx] = rec;
+  } else {
+    rec = {
+      kind: String(kind),
+      projectCode: e.projectCode || null,
+      selectionName: String(e.selectionName),
+      requirements: e.requirements || {},
+      eco: e.eco || {},
+      createdAt: now,
+      updatedAt: now,
+    };
+    all.push(rec);
+  }
+  writeAllSelections(kind, all);
+  return rec;
+}
+
+/** Гарантировать существование записи подбора (lazy-create с дефолтами). */
+export function ensureSelectionMeta(kind, opts, defaults) {
+  const o = opts || {};
+  if (!o.selectionName) return null;
+  const existing = getSelectionMeta(kind, o);
+  if (existing) return existing;
+  const d = defaults || {};
+  return saveSelectionMeta(kind, {
+    projectCode: o.projectCode || null,
+    selectionName: o.selectionName,
+    requirements: d.requirements || {},
+    eco: d.eco || {},
+  });
+}
+
+/**
+ * Переименовать подбор: меняем selectionName в записи подбора И во всех
+ * вариантах с этим selectionName (чтобы тег оставался консистентным).
+ */
+export function renameSelection(kind, opts) {
+  const o = opts || {};
+  const pc = o.projectCode || null;
+  if (!o.oldName || !o.newName || o.oldName === o.newName) return false;
+  let changed = false;
+  const sels = readAllSelections(kind);
+  for (const s of sels) {
+    if (_selMatch(s, pc, o.oldName)) { s.selectionName = String(o.newName); s.updatedAt = Date.now(); changed = true; }
+  }
+  if (changed) writeAllSelections(kind, sels);
+  const all = readAll(kind);
+  let cChanged = false;
+  for (const e of all) {
+    if ((e.selectionName || '') === o.oldName && String(e.projectCode || '') === String(pc || '')) {
+      e.selectionName = String(o.newName); e.updatedAt = Date.now(); cChanged = true;
+    }
+  }
+  if (cChanged) writeAll(kind, all);
+  return changed || cChanged;
+}
+
+/** Удалить запись подбора. variantsToo=true → удалить и все варианты. */
+export function deleteSelection(kind, opts) {
+  const o = opts || {};
+  const pc = o.projectCode || null;
+  if (!o.selectionName) return false;
+  const sels = readAllSelections(kind);
+  const nextSels = sels.filter(s => !_selMatch(s, pc, o.selectionName));
+  let changed = nextSels.length !== sels.length;
+  if (changed) writeAllSelections(kind, nextSels);
+  if (o.variantsToo) {
+    const all = readAll(kind);
+    const keep = all.filter(e => !((e.selectionName || '') === o.selectionName
+      && String(e.projectCode || '') === String(pc || '')));
+    if (keep.length !== all.length) { writeAll(kind, keep); changed = true; }
+  }
+  return changed;
+}
+
+// =========================================================================
 // Активный проект (для привязки конфигураций к коду проекта).
 // Структура: localStorage['raschet.activeProject.v1'] = { name, code, ... }
 // =========================================================================

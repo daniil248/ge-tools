@@ -4,6 +4,12 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.427', date: '2026-05-15', items: [
+      '🧱 <b>Фундамент: подбор ИБП/АКБ как подбор холода — Фаза 1/3</b>. По запросу Пользователя 2026-05-15: «подбор ИБП и АКБ должен быть выполнен как подбор холодильных систем — в самом подборе все условия, а в вариантах конкретные решения, со сравнениями, TCO, CAPEX, OPEX». Поэтапная реализация; это инфраструктурная фаза без видимых изменений UI.',
+      '<b>shared/calc/capex-tco.js</b> — чистый экономический модуль (CAPEX/OPEX/TCO/NPV/payback, costItems[]) вынесен из <code>cooling/calc/</code> в <code>shared/calc/</code> без изменения логики. Импорты cooling перенаправлены (<code>cooling/cooling.js</code> ×2, <code>cooling/calc/comparison.js</code> ×1). Теперь переиспользуется в ups-config и battery.',
+      '<b>shared/configuration-catalog.js</b> — добавлена ЗАПИСЬ ПОДБОРА (selection-level record): раньше <code>selectionName</code> был лишь строкой-тегом на варианте, теперь у подбора есть собственная запись с общими УСЛОВИЯМИ (<code>requirements</code>) и ФИНАНСАМИ (<code>eco</code>, форма DEFAULT_ECONOMICS). Новые API: <code>getSelectionMeta / listSelectionMetas / saveSelectionMeta / ensureSelectionMeta / renameSelection / deleteSelection</code>. Ключ LS <code>raschet.selections.&lt;kind&gt;.v1</code>, идентификация по паре (projectCode, selectionName). renameSelection синхронно переносит тег во всех вариантах.',
+      'Следующие фазы: 2 — панель «Свойства подбора / CAPEX / TCO / Сравнение» в ups-config (OPEX = потери КПД + ТО); 3 — то же для battery (OPEX = ТО + замена АКБ как CAPEX-событие при сроке службы < срока проекта).',
+    ] },
     { version: '0.60.426', date: '2026-05-15', items: [
       '📐 <b>Авто-пересчёт длины кабеля при перемещении узла на плане</b> (ROADMAP Фаза 16.7/16.8). Реализован отложенный пункт: «Длина кабелей пересчитывается автоматически при изменении расположения оборудования или стойки относительно других».',
       '<b>geometry.js</b>: новые экспортируемые <code>nodeCenterMm(n)</code> и <code>layoutConnLengthM(c)</code> — длина по ортогональному (манхэттенскому) физическому маршруту между центрами узлов с учётом waypoints\'ов связи. Мировые координаты layout-страницы = миллиметры (1 ед = 1 мм), результат в метрах с округлением до 0.1 м.',

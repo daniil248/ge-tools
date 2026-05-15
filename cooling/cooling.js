@@ -28,7 +28,7 @@ import * as util from '../meteo/util.js';
 import { DEFAULT_CHILLER, COLUMNS, DEFAULT_COLS, CHILLER_COLS, isCracType as isCracTypeLocal } from './calc/chiller-defaults.js';
 import { buildBinData } from './calc/chiller-bin-calc.js';
 import { computeFcSummary } from './calc/fc-summary.js';
-import { computeTco, DEFAULT_ECONOMICS, discountedPaybackYears, convertEcoToCurrency } from './calc/capex-tco.js';
+import { computeTco, DEFAULT_ECONOMICS, discountedPaybackYears, convertEcoToCurrency } from '../shared/calc/capex-tco.js';
 import { compareOptions } from './calc/comparison.js';
 
 import { renderChillerSpecForm } from './ui/chiller-form.js';
@@ -36,7 +36,7 @@ import { renderAnnualTable, renderColumnPicker } from './ui/annual-table-view.js
 import { renderFreeCoolingSummary } from './ui/fc-summary-view.js';
 import { drawChillerEnergyChart, drawTcoChart } from './ui/energy-chart.js';
 import { renderCapexForm, renderTcoKpi } from './ui/capex-form.js';
-import { syncCostItemsFromEquipment } from './calc/capex-tco.js';
+import { syncCostItemsFromEquipment } from '../shared/calc/capex-tco.js';
 import { fetchAndSaveMeteoForProject } from '../shared/meteo-fetch.js';
 import { createServiceOrderForProject } from '../shared/service-bridge.js';
 import { renderComparisonTable } from './ui/comparison-view.js';
