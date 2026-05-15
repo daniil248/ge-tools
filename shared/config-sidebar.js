@@ -287,6 +287,18 @@ export function mountConfigSidebar(opts) {
     try { if (typeof o.onSelectionChange === 'function') o.onSelectionChange(sel); } catch {}
     try { window.dispatchEvent(new CustomEvent('rs-selection-change', { detail: { kind, selectionName: sel } })); } catch {}
   }
+  // v0.60.443: фокус «зона подбора» vs «зона варианта» (как в «Подбор
+  // холода»). Клик по заголовку подбора → scope:'selection' (исходные
+  // данные + TCO/Сравнение). Клик по варианту → scope:'variant' (редактор
+  // конкретной конфигурации). Модуль слушает window-событие 'rs-cs-focus'
+  // и показывает соответствующую зону (backward-compatible).
+  function fireFocus(scope, name, entryId) {
+    try {
+      window.dispatchEvent(new CustomEvent('rs-cs-focus', {
+        detail: { kind, scope, selectionName: name || null, entryId: entryId || null },
+      }));
+    } catch {}
+  }
 
   // Делегирование кликов по списку
   if (slotList) slotList.addEventListener('click', async (ev) => {
@@ -327,6 +339,7 @@ export function mountConfigSidebar(opts) {
       collapsedSelections.set(name, !(collapsedSelections.get(name) === true));
       fireSel(name);   // сначала отметить активным…
       render();        // …затем перерисовать с подсветкой активного подбора
+      fireFocus('selection', name);  // зона подбора: исходные + TCO/Сравнение
       return;
     }
     const btn = ev.target.closest('[data-act]');
@@ -388,7 +401,7 @@ export function mountConfigSidebar(opts) {
     if (e && typeof o.onSelect === 'function') {
       try { o.onSelect(e); } catch (err) { console.warn(err); }
     }
-    if (e) fireSel(e.selectionName || null);
+    if (e) { fireSel(e.selectionName || null); fireFocus('variant', e.selectionName || null, e.id); }
   });
 
   // Сохранить
@@ -447,6 +460,7 @@ export function mountConfigSidebar(opts) {
     ensureSelectionMeta(kind, { projectCode: projectCode || null, selectionName: name },
       { requirements: {}, eco: {} });
     fireSel(name);          // активируем → панель «Свойства подбора» откроется
+    fireFocus('selection', name);
     render();
     rsToast(`Подбор «${name}» создан. Задайте условия в «Свойства подбора», добавляйте решения кнопкой «+ Вариант».`, 'ok');
   });
