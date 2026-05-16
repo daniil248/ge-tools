@@ -155,7 +155,7 @@ export function mountSelectionPanel(o) {
     });
   }
   // Активная convertFn для расчётов/модалки (провайдер → fallback o.convertFn).
-  const cvFn = () => _convertFn || cvFn();
+  const cvFn = () => _convertFn || (typeof o.convertFn === 'function' ? o.convertFn : null);
 
   function selEcoOf(meta) {
     return { ...DEFAULT_ECONOMICS, tariff: 0, ...(meta && meta.eco || {}) };

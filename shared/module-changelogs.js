@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.465', date: '2026-05-16', items: [
+      '🐞 <b>Фикс: бесконечная рекурсия <code>cvFn</code> в selection-panel</b> (RangeError: Maximum call stack), проявлялась в зоне варианта/сравнения когда курс валют не загружен (<code>_convertFn</code> = null). Регрессия v0.60.458 (replace_all задел определение <code>cvFn</code>). Стало: <code>_convertFn || o.convertFn || null</code>.',
+    ] },
     { version: '0.60.464', date: '2026-05-16', items: [
       '⚙ <b>B2.2 i2: Spec-вкладка варианта ИБП — выбор конкретной модели</b>. Каскад поставщик→серия→модель (shared/ups-picker) + резервирование варианта.',
       'selection-panel: новый generic-хук <code>variantSpec({host,entry,req,save})</code> — хост-модуль рисует выбор модели в [data-vspec-host], тихое сохранение payload без перерисовки (каскад не сбрасывается).',
