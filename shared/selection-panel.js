@@ -457,7 +457,8 @@ export function mountSelectionPanel(o) {
           const req = { ...((m && m.requirements) || {}) };
           req[key] = [...mountEl.querySelectorAll(`[data-reqmulti="${key}"]:checked`)].map(x => x.value);
           persist({ requirements: req });
-          render();
+          // НЕ перерисовываем — иначе теряются фокус и состояние соседних
+          // чекбоксов при быстром выборе нескольких типов.
         });
       });
     });
