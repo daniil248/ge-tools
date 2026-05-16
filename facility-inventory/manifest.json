@@ -1,0 +1,25 @@
+{
+  "id": "facility-inventory",
+  "name": "Реестр оборудования объекта",
+  "description": "Реестр установленного на объекте оборудования. Модуль в стадии заготовки (stub) — экран-заглушка без рабочей функциональности.",
+  "version": "0.1.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "facility-inventory/",
+  "icon": "blue",
+  "badge": "wip",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": [],
+  "dbCollections": [],
+  "permissions": ["facility-inventory.use"],
+  "lsNamespacesOwned": ["facility-inventory"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": []
+  }
+}

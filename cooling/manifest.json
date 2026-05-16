@@ -1,0 +1,25 @@
+{
+  "id": "cooling",
+  "name": "Подбор холодильных систем",
+  "description": "Подбор чиллеров/DX-систем, free-cooling, расчёт CAPEX/TCO/payback и технико-экономическое сравнение нескольких опций. Климат — из проекта (Meteo) через мост.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "cooling/",
+  "icon": "green",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/idb-store", "shared/meteo-fetch", "shared/meteo-util", "shared/service-bridge"],
+  "dbCollections": [],
+  "permissions": ["cooling.use"],
+  "lsNamespacesOwned": ["cooling"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project", "nodeId", "capacityKw"],
+    "bridges": ["cooling/meteo-bridge.js", "shared/service-bridge.js"]
+  }
+}

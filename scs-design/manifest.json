@@ -1,0 +1,25 @@
+{
+  "id": "scs-design",
+  "name": "Проектирование СКС",
+  "description": "Проектирование структурированной кабельной системы: мастер меж-шкафных связей (выбор стоек проекта, создание связей юнит↔юнит, список связей с типом кабеля).",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "scs-design/",
+  "icon": "orange",
+  "badge": "new",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/rack-storage", "shared/scheme-rack-bridge"],
+  "dbCollections": [],
+  "permissions": ["scs-design.use"],
+  "lsNamespacesOwned": ["scs-design"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": ["shared/scheme-rack-bridge.js"]
+  }
+}

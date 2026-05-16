@@ -1,0 +1,25 @@
+{
+  "id": "psychrometrics",
+  "name": "ID-диаграмма Молье-Рамзина",
+  "description": "Психрометрический калькулятор и редактор цикла точек с построением диаграммы Молье (i-d): нагрев, охлаждение/осушение, адиабатическое и паровое увлажнение, расчёт мощности и влагосъёма.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "psychrometrics/",
+  "icon": "blue",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/draggable-modal"],
+  "dbCollections": [],
+  "permissions": ["psychrometrics.use"],
+  "lsNamespacesOwned": ["psychrometrics"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": []
+  }
+}

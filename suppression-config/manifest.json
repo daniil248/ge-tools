@@ -1,0 +1,25 @@
+{
+  "id": "suppression-config",
+  "name": "АГПТ (газовое пожаротушение)",
+  "description": "Конфигуратор автоматического газового пожаротушения: иерархическая модель Установка → (Сборка модулей | Направления → Зоны), аксонометрия и отчёт. Расчёт — через библиотеку suppression-methods.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "suppression-config/",
+  "icon": "orange",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["suppression-methods"],
+  "dbCollections": [],
+  "permissions": ["suppression-config.use"],
+  "lsNamespacesOwned": ["suppression-config"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": []
+  }
+}

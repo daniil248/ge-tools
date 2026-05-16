@@ -1,0 +1,25 @@
+{
+  "id": "scs-config",
+  "name": "Компоновщик шкафа",
+  "description": "Конфигуратор СКС / телеком-оборудования: содержимое стойки (юниты, заглушки, PDU-раскладка), реестр шкафов проекта, инвентаризация.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "scs-config/",
+  "icon": "orange",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/rack-storage", "shared/scheme-rack-bridge", "shared/scs-catalog-data"],
+  "dbCollections": [],
+  "permissions": ["scs-config.use"],
+  "lsNamespacesOwned": ["scs-config"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": ["shared/scheme-rack-bridge.js"]
+  }
+}

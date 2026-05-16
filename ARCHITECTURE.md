@@ -109,27 +109,25 @@ shared/
    доки + `dependsOnContracts` обеих сторон.
 6. `python scripts/audit-manifest.py` зелёный; boundary-lint зелёный.
 
-## 5. Долг реестра (Фаза 1, отслеживается audit-manifest.py)
+## 5. Состояние реестра (отслеживается audit-manifest.py)
 
-`modules.json` рассинхронизирован с реальностью — это известный долг,
-гасится в Фазе 1 (НЕ в Фазе 0, т.к. меняет subscription-поведение):
-
-- **Не зарегистрированы UI-модули:** `cooling`, `meteo`, `service`,
-  `scs-config`, `scs-design`, `rack-config`, `mdc-config`, `dgu-config`,
-  `pdu-config`, `suppression-config`, `psychrometrics`,
-  `facility-inventory`, `configurator3d`.
+- **Реестр полон (v0.60.529, modules.json v1.3.0):** 28 UI + 1
+  calc-lib = 29 записей. `audit-manifest.py` → `UNREGISTERED 0`,
+  `PARITY 0`. Ранее не учтённые 13 UI-модулей зарегистрированы с
+  `subscriptionPlan:'free'` (нулевой риск: `hasModuleAccess`=true →
+  UI-лок не появляется, поведение идентично «не в реестре»).
+  Монетизация (план ≠ free) — отдельное решение X.2, не Фаза 1.
 - **`kind:'calc-lib'`:** `suppression-methods/` зарегистрирован
-  (v0.60.528, первый calc-lib — manifest + REGISTRY_ORDER +
-  modules.json + карточка в реестре). Пайплайн регистрации calc-lib
-  доказан end-to-end. Прочие calc-папки — CORE/SHARED-слой (§2),
-  не реестр по дизайну.
-- **`requires` декларативный/мёртвый** — у `cooling` `requires:[]`,
-  хотя реально тянет `shared/*`+`meteo` (через мост).
+  (v0.60.528, первый calc-lib). Прочие calc-папки (`shared/calc*`,
+  `js/methods`) — CORE/SHARED-слой (§2), не реестр по дизайну.
+- **Остаточный долг — `requires`-дрейф:** `audit-manifest.py`
+  `UNDECLARED ≈ 32` — реальные доменные/мост-зависимости не
+  объявлены в `requires` (напр. `cooling → meteo` через
+  `cooling/meteo-bridge.js`). Advisory/non-blocking; гасится
+  синком `requires` по модулю (Фаза 1, продолжается).
 
-`scripts/audit-manifest.py` превращает этот дрейф в автоматическую
-проверку. Регистрация (manifest + REGISTRY_ORDER + карточка) каждой
-позиции — отдельный пункт Фазы 1 (по одному модулю, т.к. затрагивает
-реестр подписок).
+`scripts/audit-manifest.py` держит этот контракт честным
+автоматически (CI non-blocking; ужесточить после синка `requires`).
 
 ## 6. Миграция (инкрементально, без big-bang)
 

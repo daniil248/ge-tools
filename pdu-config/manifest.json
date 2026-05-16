@@ -1,0 +1,25 @@
+{
+  "id": "pdu-config",
+  "name": "Конфигуратор PDU",
+  "description": "Standalone-подбор PDU из единой библиотеки элементов: расчёт тока стойки по контексту (серверов, кВт/серв, cos φ, 2N), автоподбор номинала и количества розеток C13, ранжирование вариантов.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "pdu-config/",
+  "icon": "orange",
+  "badge": "new",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/catalog-bridge", "shared/module-changelogs"],
+  "dbCollections": [],
+  "permissions": ["pdu-config.use"],
+  "lsNamespacesOwned": ["pdu-config"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": ["shared/catalog-bridge.js"]
+  }
+}

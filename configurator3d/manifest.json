@@ -1,0 +1,25 @@
+{
+  "id": "configurator3d",
+  "name": "Конфигуратор модульного ЦОД (2D → 3D)",
+  "description": "Конфигуратор модульного ЦОД с переходом из 2D-компоновки в 3D-визуализацию (рендер на Three.js). Экспериментальный.",
+  "version": "0.1.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "configurator3d/",
+  "icon": "purple",
+  "badge": "wip",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/module-changelogs"],
+  "dbCollections": [],
+  "permissions": ["configurator3d.use"],
+  "lsNamespacesOwned": ["configurator3d"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": []
+  }
+}

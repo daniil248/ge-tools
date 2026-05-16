@@ -1,0 +1,25 @@
+{
+  "id": "meteo",
+  "name": "Метеоданные",
+  "description": "Stand-alone модуль метеоданных: хранит наборы почасовых метеоизмерений («датасеты») внутри активного проекта, загрузка из источников (Open-Meteo, ASHRAE, RP5, CSV), графики и годовые таблицы.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "meteo/",
+  "icon": "blue",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/draggable-modal", "shared/idb-store", "shared/meteo-util"],
+  "dbCollections": [],
+  "permissions": ["meteo.use"],
+  "lsNamespacesOwned": ["meteo"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": []
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "service",
+  "name": "Сервис: монтаж и ТО",
+  "description": "Расчёт стоимости технического обслуживания и монтажных работ: формирование себестоимости и цены для клиента по нарядам (проектным или разовым), генерация КП. Импорт позиций из любого инженерного модуля.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "service/",
+  "icon": "green",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/currency-defaults", "shared/meteo-util"],
+  "dbCollections": [],
+  "permissions": ["service.use"],
+  "lsNamespacesOwned": ["service"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": ["shared/service-bridge.js"]
+  }
+}

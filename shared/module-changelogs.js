@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.529', date: '2026-05-16', items: [
+      '🧩 <b>Реестр модулей полон: +13 UI-модулей (modules.json v1.3.0, 29 записей)</b>. Зарегистрированы ранее не учтённые: cooling, meteo, service, scs-config, scs-design, rack-config, mdc-config, dgu-config, pdu-config, suppression-config, psychrometrics, facility-inventory, configurator3d. Каждому создан <code>manifest.json</code> (kind:\\'ui\\', requires=реальные доменные shared-зависимости), id добавлен в <code>REGISTRY_ORDER</code>, <code>modules.json</code> перегенерирован (паритет manifests↔modules.json подтверждён). <b>Нулевой риск:</b> все 13 — <code>subscriptionPlan:\\'free\\'</code>, поэтому <code>hasModuleAccess</code>=true и UI-лок в /modules/ не появляется (поведение идентично «не в реестре»); монетизация — отдельное решение. <code>audit-manifest.py</code>: UNREGISTERED 0, PARITY 0; остаётся UNDECLARED ≈32 (requires-дрейф мост-зависимостей, advisory, синк по модулю — Фаза 1).',
+    ] },
     { version: '0.60.528', date: '2026-05-16', items: [
       '🧩 <b>Первый kind:\\'calc-lib\\' в реестре: suppression-methods</b>. Создан <code>suppression-methods/manifest.json</code> (kind:\\'calc-lib\\', requires:[], без UI/subscription-лока), id добавлен в <code>REGISTRY_ORDER</code> (<code>tools/gen-modules-json.mjs</code>), <code>modules.json</code> перегенерирован (v1.2.0, 16 записей, паритет manifests↔modules.json подтверждён) + карточка в техническом реестре <code>/modules/</code>. Нулевой риск: <code>modules/index.html</code> пропускает subscription-лок для calc-lib (строка 87), <code>suppression-config</code> импортит <code>../suppression-methods/*</code> без изменений. Пайплайн регистрации calc-lib доказан end-to-end. Остаётся долг: 13 UI-папок вне реестра (Фаза 1, по одной).',
     ] },

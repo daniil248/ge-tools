@@ -1,0 +1,25 @@
+{
+  "id": "rack-config",
+  "name": "Конфигуратор стойки",
+  "description": "Конфигуратор 19\" стойки: каталог готовых комплектов или произвольная сборка (корпус, двери, стенки, крыша/пол, вводы, заглушки U); PDU со смешанным набором розеток и проверкой ёмкости.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "ui",
+  "standalone": true,
+  "path": "rack-config/",
+  "icon": "orange",
+  "badge": "active",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": ["shared/catalog-bridge", "shared/pdu-picker-modal", "shared/rack-catalog-data", "shared/sketch-refs-reverse"],
+  "dbCollections": [],
+  "permissions": ["rack-config.use"],
+  "lsNamespacesOwned": ["rack-config"],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": ["project"],
+    "bridges": ["shared/catalog-bridge.js"]
+  }
+}
