@@ -4787,6 +4787,12 @@ function _buildSchemeFromConcept(concept, variantName) {
       snomKva: Number(concept.feed.tp.kva) || 1000,
       voltage: 400, voltageLevelIdx: 0, phase: '3ph', cosPhi: 0.95,
       ukPct: 4.5, sscMva: 250,
+      // v0.60.519: паспорт/габариты ТП из концепции.
+      manufacturer: concept.feed.tp.manufacturer || '',
+      model: concept.feed.tp.model || '',
+      widthMm: Number(concept.feed.tp.widthMm) || 3000,
+      depthMm: Number(concept.feed.tp.depthMm) || 2000,
+      heightMm: Number(concept.feed.tp.heightMm) || 2500,
       pageIds: [pageId],
       positionsByPage: { [pageId]: { x: colX.source, y: curY } },
     });
@@ -4809,6 +4815,12 @@ function _buildSchemeFromConcept(concept, variantName) {
       capacityKw: Number(concept.feed.dgu.kw) || 100,
       backupMode: concept.feed.dgu.mode === 'esp',
       phase: '3ph', voltage: 400, cosPhi: 0.85,
+      // v0.60.519: паспорт/габариты ДГУ из концепции.
+      manufacturer: concept.feed.dgu.manufacturer || '',
+      model: concept.feed.dgu.model || '',
+      widthMm: Number(concept.feed.dgu.widthMm) || 4000,
+      depthMm: Number(concept.feed.dgu.depthMm) || 1600,
+      heightMm: Number(concept.feed.dgu.heightMm) || 2200,
       pageIds: [pageId],
       positionsByPage: { [pageId]: { x: colX.source, y: curY } },
     });
@@ -4827,13 +4839,37 @@ function _buildSchemeFromConcept(concept, variantName) {
   // ИБП-узлы
   let upsY = panelY;
   for (const us of (concept.upsSystems || [])) {
+    // v0.60.519 (продолжение «всё что можно и актуально» + чтобы
+    // расчётное ядро схемы стартовало с данных концепции): переносим
+    // в узел ИБП паспорт, заданный технологом — capacityKw (recalc
+    // читает именно его), КПД, тип, резервирование, cos φ, габариты,
+    // производитель/модель. Раньше шёл только kva/autonomy → схема
+    // открывалась с пустыми электр. параметрами ИБП.
+    const _kva = Number(us.ratedKva) || 0;
+    const _cos = Number(us.cosPhi) || 0.95;
+    const _capKw = Math.round(_kva * _cos) || 0;
     nodes.push({
       id: newId(), type: 'ups', tag: newTag(us.purpose === 'cooling' ? 'ИБПК' : 'ИБП'),
       name: us.name, x: colX.mid + 250, y: upsY,
-      kva: Number(us.ratedKva) || 0,
+      kva: _kva,
+      capacityKw: _capKw,
+      efficiency: Number(us.efficiencyPct) || 95,
+      upsType: us.upsType || 'monoblock',
+      redundancyScheme: us.redundancy || 'N',
+      cosPhi: _cos,
+      canParallel: true,
+      batteryAutonomyMin: Number(us.autonomyMin) || 15,
       autonomyMin: Number(us.autonomyMin) || 15,
+      phase: (Number(us.inputPhases) === 1) ? '1ph' : '3ph',
+      widthMm: Number(us.widthMm) || 600,
+      depthMm: Number(us.depthMm) || 850,
+      heightMm: Number(us.heightMm) || 1900,
+      manufacturer: us.manufacturer || '',
+      model: us.model || '',
       pageIds: [pageId],
       positionsByPage: { [pageId]: { x: colX.mid + 250, y: upsY } },
+      _fromTechWorkspace: true,
+      _conceptUsId: us.id,
     });
     upsY += 200;
   }
@@ -4886,9 +4922,16 @@ function _buildSchemeFromConcept(concept, variantName) {
       demandKw: Number(cu.kwPerUnit) || 0,
       cosPhi: 0.85, phase: '3ph', voltage: 400,
       width: 250, height: 120,
+      // v0.60.519: переносим габариты/паспорт кондиционера из концепции.
+      widthMm: Number(cu.widthMm) || 700,
+      depthMm: Number(cu.depthMm) || 900,
+      heightMm: Number(cu.heightMm) || 2000,
+      manufacturer: cu.manufacturer || '',
+      model: cu.model || '',
       pageIds: [pageId],
       positionsByPage: { [pageId]: { x: colX.end, y: rackY } },
       _fromTechWorkspace: true,
+      _conceptCuId: cu.id,
     });
     rackY += 200;
   }
