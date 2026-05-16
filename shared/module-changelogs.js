@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.534', date: '2026-05-16', items: [
+      '🧱 <b>Дробление монолитов — calc/ui (rack-config)</b>. Выделен чистый расчётный слой <code>rack-config/calc/rack-power.js</code> (электрика, без DOM): <code>guessRackIs3ph()</code> (фазность шкафа), <code>kwToA()/aToKw()</code> (P↔I по cosφ/фазности), <code>pduCapacityKw()/computePduCapacityByFeed()</code> (ёмкость PDU и группировка по вводам, cosφ — явный параметр). В <code>rack-config.js</code> локальные <code>_rcGuessRackIs3ph/_rcKwToA/_rcAToKw</code> заменены импортом (call-sites не тронуты), <code>pduCapacityKw/computePduCapacityByFeed</code> — тонкие обёртки, подставляющие <code>current().cosphi</code> (поведение байт-в-байт идентично). Shim не нужен (leaf-модуль). 3-й модуль calc-извлечения.',
+    ] },
     { version: '0.60.533', date: '2026-05-16', items: [
       '🧱 <b>Дробление монолитов — calc/ui (ups-config)</b>. Выделен чистый расчётный слой <code>ups-config/calc/ups-sizing.js</code>: <code>parseRedundancy()</code> (N/N+1/N+2/2N → {mode,x}) + <code>calcModules()</code> (рабочие модули + резерв) — без DOM, переиспользуемо (ups-types pickFit, отчёты, тесты). <code>ups-config.js</code> импортирует <code>parseRedundancy</code> из calc-слоя, локальные определения удалены, алгоритм перенесён байт-в-байт (поведение идентично). Shim не нужен (leaf-модуль, внешних импортёров внутренностей нет). 2-й модуль после пилота transformer-config.',
     ] },

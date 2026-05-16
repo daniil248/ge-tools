@@ -44,6 +44,14 @@ import { APP_VERSION } from '../js/engine/constants.js';
 // Чип появляется только если выбрана реальная стойка-инстанс (с tag);
 // для template без tag — скрыт.
 import { mountReverseLinkChip, refreshAllChips } from '../shared/sketch-refs-reverse.js';
+// v0.60.534: чистый расчётный слой (электрика) выделен в calc/ (без DOM).
+import {
+  guessRackIs3ph as _rcGuessRackIs3ph,
+  kwToA as _rcKwToA,
+  aToKw as _rcAToKw,
+  pduCapacityKw as _calcPduCapacityKw,
+  computePduCapacityByFeed as _calcPduCapacityByFeed,
+} from './calc/rack-power.js';
 initCatalogBridge();
 
 // Re-render при правках каталога (админ изменил встроенный rack/pdu/accessory).
@@ -1268,23 +1276,9 @@ function renderPduList() {
 }
 
 /* ---------- расчёт ---------- */
-function pduCapacityKw(p) {
-  // P = 230·I·cosφ (1ф) или √3·400·I·cosφ (3ф)
-  const cos = current().cosphi || 0.9;
-  const I = p.rating;
-  if (p.phases === 3) return (Math.sqrt(3) * 400 * I * cos) / 1000;
-  return (230 * I * cos) / 1000;
-}
-
-// Возвращает {A: kW, B: kW, ...} — ёмкость PDU, сгруппированная по вводам.
-function computePduCapacityByFeed(t) {
-  const out = {};
-  t.pdus.forEach(p => {
-    const f = p.feed || 'A';
-    out[f] = (out[f] || 0) + (p.qty || 1) * pduCapacityKw(p);
-  });
-  return out;
-}
+// Тонкие обёртки над calc/rack-power.js: подставляют cosφ текущего шаблона.
+function pduCapacityKw(p) { return _calcPduCapacityKw(p, current().cosphi || 0.9); }
+function computePduCapacityByFeed(t) { return _calcPduCapacityByFeed(t, current().cosphi || 0.9); }
 
 function computeBom() {
   const t = current();
@@ -2200,26 +2194,7 @@ function sendApplyToHost() {
 // v0.59.733: bidirectional sync для rc-demand-kw ↔ rc-demand-a.
 // Фаза стойки определяется по существующим PDU: если есть хотя бы
 // один 3ф PDU → 3ф 400В, иначе → 1ф 230В. cos φ берётся из rc-cosphi.
-function _rcGuessRackIs3ph(t) {
-  if (!t || !Array.isArray(t.pdus) || !t.pdus.length) return true; // default 3ф (DC-typical)
-  return t.pdus.some(p => Number(p.phases) === 3);
-}
-function _rcKwToA(kw, t) {
-  if (!(kw > 0)) return 0;
-  const cos = (t && Number(t.cosphi)) || 0.9;
-  const is3 = _rcGuessRackIs3ph(t);
-  const U = is3 ? 400 : 230;
-  const k = is3 ? Math.sqrt(3) : 1;
-  return (kw * 1000) / (k * U * cos);
-}
-function _rcAToKw(a, t) {
-  if (!(a > 0)) return 0;
-  const cos = (t && Number(t.cosphi)) || 0.9;
-  const is3 = _rcGuessRackIs3ph(t);
-  const U = is3 ? 400 : 230;
-  const k = is3 ? Math.sqrt(3) : 1;
-  return (a * k * U * cos) / 1000;
-}
+// _rcGuessRackIs3ph / _rcKwToA / _rcAToKw → ./calc/rack-power.js (без DOM).
 let _rcDemandFieldsWired = false;
 function _rcSyncDemandAFromKw() {
   const kwEl = el('rc-demand-kw'); const aEl = el('rc-demand-a');

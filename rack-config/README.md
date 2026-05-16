@@ -5,11 +5,12 @@
 - **Тип:** `ui`
 - **Точка входа:** `index.html`
 - **Главные файлы:**
-  - `rack-config.js` — конфигуратор: комплекты/произвольная сборка, PDU, проверка ёмкости
+  - `rack-config.js` — UI/рендер: комплекты/произвольная сборка, PDU, проверка ёмкости
+  - `calc/rack-power.js` — чистый расчётный слой (электрика, без DOM): `guessRackIs3ph()`, `kwToA()/aToKw()`, `pduCapacityKw()/computePduCapacityByFeed()`
   - `rack-sidebar.js` — боковая панель (список/контекст стоек)
   - `rack-config.css` — стили
-- **Расчётная часть (calc):** логика проверки ёмкости/сборки внутри `rack-config.js` (отдельный calc-слой не выделен)
+- **Расчётная часть (calc):** `calc/rack-power.js` — чистые функции без DOM (cosφ передаётся параметром; переиспользуемо: отчёты, BOM, тесты)
 - **UI/рендер:** `rack-config.js`, `rack-sidebar.js`
 - **Данные/справочники:** каталог комплектов/корпусов; шаблоны стоек `localStorage['rack-config.templates.v1']`
-- **Cross-module связи:** шаблоны стоек читаются в `scs-config`; (нет manifest.json; не зарегистрирован в modules.json)
+- **Cross-module связи:** шаблоны стоек читаются в `scs-config`; зарегистрирован в `modules.json` (manifest.json есть)
 - **Куда добавлять новое:** комплекты/компоненты — в каталог; логику сборки и экран — в `rack-config.js`
