@@ -6,11 +6,15 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 
 .tw-main {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  /* v0.60.512: ширина левого сайдбара изменяема (shared/sidebar-resizer
+     пишет --rs-sidebar-left-w). Fallback 260px. */
+  grid-template-columns: var(--rs-sidebar-left-w, 260px) 1fr;
   gap: 12px;
   padding: 12px;
   min-height: calc(100vh - 60px);
 }
+/* Якорь для абсолютной ручки ресайза. */
+.tw-sidebar.rs-sidebar-left { position: sticky; }
 
 /* ─── Sidebar (left) */
 .tw-sidebar {

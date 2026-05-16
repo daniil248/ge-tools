@@ -581,6 +581,51 @@ function _coolAvail(cu) {
 function calcCoolTotal(c) {
   return (c.coolingUnits || []).reduce((s, cu) => s + _coolAvail(cu), 0);
 }
+// v0.60.512 (правка Пользователя 2026-05-16): в лимит холода добавлены
+// тепловыделения ИБП и прочие теплопритоки (стены/ограждающие, кабельные
+// линии, электротехнические щиты). Требуемая холодопроизводительность =
+// IT-нагрузка + потери ИБП + теплопритоки. Коэффициенты — инженерные
+// дефолты, переопределяются в c.coolingSystem.heatGains (user-params-
+// sacred: ручные значения не затираются).
+const HEAT_DEFAULTS = {
+  upsEff: 0.95,      // КПД ИБП (для расчёта тепловых потерь)
+  wallWPerM2: 20,    // теплоприток через ограждающие, Вт/м² пола
+  cablePctIT: 1.5,   // потери в силовых кабелях, % от IT (тепло в зале)
+  panelPctIT: 2.0,   // тепловыделение электрощитов/РУ, % от IT
+};
+function _heatCfg(c) {
+  const hg = (c.coolingSystem && c.coolingSystem.heatGains) || {};
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v)) ? v : d;
+  return {
+    upsEff: num(hg.upsEff, HEAT_DEFAULTS.upsEff),
+    wallWPerM2: num(hg.wallWPerM2, HEAT_DEFAULTS.wallWPerM2),
+    cablePctIT: num(hg.cablePctIT, HEAT_DEFAULTS.cablePctIT),
+    panelPctIT: num(hg.panelPctIT, HEAT_DEFAULTS.panelPctIT),
+  };
+}
+// Требуемая холодопроизводительность с разбивкой теплопритоков.
+function calcHeatLoad(c) {
+  const itKw = calcITTotal(c);
+  const cfg = _heatCfg(c);
+  const eta = (cfg.upsEff > 0.5 && cfg.upsEff < 1) ? cfg.upsEff : 0.95;
+  // Тепловыделение ИБП = активная мощность × (1/η − 1) (потери в тепло).
+  const upsKw = itKw * (1 / eta - 1);
+  // Теплоприток через ограждающие конструкции: Σ площадь помещений ×
+  // q (Вт/м²). Если площади не заданы — оценка ~2% от IT.
+  const areaM2 = (Array.isArray(c.rooms) ? c.rooms : [])
+    .reduce((s, r) => s + (Number(r.areaSqM) || 0), 0);
+  const wallKw = areaM2 > 0
+    ? areaM2 * cfg.wallWPerM2 / 1000
+    : itKw * 0.02;
+  // Потери в силовых кабелях (тепло в зале) и тепловыделение щитов/РУ.
+  const cableKw = itKw * cfg.cablePctIT / 100;
+  const panelKw = itKw * cfg.panelPctIT / 100;
+  const totalKw = itKw + upsKw + wallKw + cableKw + panelKw;
+  return {
+    itKw, upsKw, wallKw, cableKw, panelKw, totalKw,
+    areaM2, eta, cfg,
+  };
+}
 function calcFeedTotal(c) {
   const itTotal = calcITTotal(c);
   const climateLoss = itTotal * 0.3;
@@ -1440,7 +1485,11 @@ function renderListRail(c, ro) {
   // ИБП IT недостаток
   const upsItKw = upsByPurpose.it + upsByPurpose.mixed;
   const upsItMissing = (itKw > 0 && upsItKw < itKw) ? _redChip(`−${(itKw - upsItKw).toFixed(1)} кВт`) : '';
-  const coolMissing = (itKw > 0 && coolKw < itKw) ? _redChip(`−${(itKw - coolKw).toFixed(1)} кВт`) : '';
+  // v0.60.512: лимит холода = требуемая холодопроизводительность
+  // (IT + потери ИБП + теплопритоки стены/кабель/щиты), а не голый IT.
+  const _heat = calcHeatLoad(c);
+  const reqCoolKw = _heat.totalKw;
+  const coolMissing = (reqCoolKw > 0 && coolKw < reqCoolKw) ? _redChip(`−${(reqCoolKw - coolKw).toFixed(1)} кВт`) : '';
 
   // v0.59.900: блок «Объект» сверху rail
   const pd = c.projectData || {};
@@ -1580,7 +1629,7 @@ function renderListRail(c, ro) {
         })()}
         ${coolRows || ''}
       </div>
-      <div class="tw-rail-foot">Σ ${coolKw.toFixed(1)} кВт холода ${coolMissing}</div>
+      <div class="tw-rail-foot" title="Требуемая холодопроизводительность = IT ${_heat.itKw.toFixed(1)} + ИБП-потери ${_heat.upsKw.toFixed(1)} + ограждающие ${_heat.wallKw.toFixed(1)} + кабели ${_heat.cableKw.toFixed(1)} + щиты ${_heat.panelKw.toFixed(1)} кВт">Σ ${coolKw.toFixed(1)} / нужно ${reqCoolKw.toFixed(1)} кВт ${coolMissing}</div>
     </div>
 
     ${(c.projectData?.dcType || 'stationary') === 'modular' ? `<div class="tw-rail-section" data-objsec="mdc">
@@ -1809,6 +1858,23 @@ function renderDetails(c, ro) {
             <label>Capacity correction, %/°C:<input type="number" step="0.1" data-field="coolingSystem.chillerSpec.capCorrPctPerC" value="${cs.chillerSpec?.capCorrPctPerC || -1.5}" ${ro ? 'disabled' : ''}></label>
           </div>
           <p class="muted tw-details-note">📊 Эти параметры используются в расчёте PUE (см. блок «📊 PUE») и в годовой энергии чиллера в /meteo/. Rated COP — типовая эффективность при rated ambient.</p>
+          ${(() => {
+            // v0.60.512 (правка Пользователя): лимит холода = IT + потери
+            // ИБП + теплопритоки (ограждающие/кабели/щиты). Коэффициенты
+            // редактируются здесь (user-params-sacred — дефолты только
+            // если поле не задано).
+            const cfg = _heatCfg(c);
+            const h = calcHeatLoad(c);
+            const f = (n) => Number(n).toFixed(1);
+            return `<h5 class="tw-section-h5">🔥 Теплопритоки (лимит холода)</h5>
+            <div class="tw-grid">
+              <label title="КПД ИБП. Тепловые потери ИБП = P_IT × (1/η − 1) рассеиваются в зал и должны покрываться холодом.">КПД ИБП η (для тепловых потерь):<input type="number" step="0.01" min="0.5" max="0.999" data-field="coolingSystem.heatGains.upsEff" value="${cfg.upsEff}" ${ro ? 'disabled' : ''}></label>
+              <label title="Теплоприток через ограждающие конструкции (стены/перекрытия/двери), Вт на м² площади помещений. Типично 15–25 Вт/м² для тех. помещений.">Ограждающие, Вт/м²:<input type="number" step="1" min="0" data-field="coolingSystem.heatGains.wallWPerM2" value="${cfg.wallWPerM2}" ${ro ? 'disabled' : ''}></label>
+              <label title="Тепловыделение силовых кабельных линий в зале, % от IT-нагрузки. Типично 1–2%.">Кабели, % от IT:<input type="number" step="0.1" min="0" max="10" data-field="coolingSystem.heatGains.cablePctIT" value="${cfg.cablePctIT}" ${ro ? 'disabled' : ''}></label>
+              <label title="Тепловыделение электротехнических щитов / РУ (распределение, потери в аппаратах), % от IT-нагрузки. Типично 1.5–3%.">Эл. щиты, % от IT:<input type="number" step="0.1" min="0" max="10" data-field="coolingSystem.heatGains.panelPctIT" value="${cfg.panelPctIT}" ${ro ? 'disabled' : ''}></label>
+            </div>
+            <p class="muted tw-details-note">Требуемая холодопроизводительность <b>${f(h.totalKw)} кВт</b> = IT ${f(h.itKw)} + ИБП-потери ${f(h.upsKw)} + ограждающие ${f(h.wallKw)}${h.areaM2 > 0 ? ` (${h.areaM2} м²)` : ' (~2% IT, площади не заданы)'} + кабели ${f(h.cableKw)} + щиты ${f(h.panelKw)}. По ней оценивается достаточность холода (KPI «❄ Холод») и pre-fill в «Подбор холодильных систем».</p>`;
+          })()}
           <h5 class="tw-section-h5">🔗 Связь с модулем «Подбор холодильных систем»</h5>
           <p class="muted tw-details-note">Создайте подбор оборудования (чиллеры/CRAC/DX) для этой концепции — с pre-filled требуемой холодопроизводительностью и условиями объекта. После «✓ Применить и вернуться» в /cooling/ — концепция автоматически использует данные подбора в PUE-расчёте (mode=cooling-module).</p>
           <div class="tw-pue-actions">
@@ -3264,7 +3330,10 @@ function renderActiveVariant() {
     _ensureSelectedBlock(c);
     // Top summary bar — ключевые KPI
     const upsItOk = (itKw > 0 && upsItKw >= itKw);
-    const coolOk = (itKw > 0 && coolKw >= itKw);
+    // v0.60.512: достаточность холода — против требуемой
+    // холодопроизводительности (IT + ИБП-потери + теплопритоки).
+    const _heatSum = calcHeatLoad(c);
+    const coolOk = (_heatSum.totalKw > 0 && coolKw >= _heatSum.totalKw);
     // v0.59.897: МЦОД-итоги в summary-bar (если хотя бы одно здание сконфигурировано)
     const mdcStats = (c.mdcBuildings || []).reduce((acc, b) => {
       const s = _readMdcSummary(b.mdcSubProjectId);
@@ -3293,9 +3362,9 @@ function renderActiveVariant() {
         <span class="tw-kpi-lbl">⚡ ИБП IT</span>
         <span class="tw-kpi-val">${upsItKw.toFixed(1)} <small>кВт</small></span>
       </div>
-      <div class="tw-kpi ${itKw > 0 ? (coolOk ? 'ok' : 'bad') : ''}" title="Холодопроизводительность = Σ coolingUnits.{count × kwPerUnit × redundancy_factor}. Должна покрывать IT-нагрузку с запасом ~5-10%. Зелёный если хватает, красный если меньше IT.">
+      <div class="tw-kpi ${_heatSum.totalKw > 0 ? (coolOk ? 'ok' : 'bad') : ''}" title="Холодопроизводительность = Σ coolingUnits.{count × kwPerUnit × redundancy_factor}. Должна покрывать ТРЕБУЕМУЮ тепловую нагрузку = IT ${_heatSum.itKw.toFixed(1)} + ИБП-потери ${_heatSum.upsKw.toFixed(1)} + ограждающие ${_heatSum.wallKw.toFixed(1)} + кабели ${_heatSum.cableKw.toFixed(1)} + щиты ${_heatSum.panelKw.toFixed(1)} = ${_heatSum.totalKw.toFixed(1)} кВт. Зелёный если хватает.">
         <span class="tw-kpi-lbl">❄ Холод</span>
-        <span class="tw-kpi-val">${coolKw.toFixed(1)} <small>кВт</small></span>
+        <span class="tw-kpi-val">${coolKw.toFixed(1)} <small>/ ${_heatSum.totalKw.toFixed(0)} кВт</small></span>
       </div>
       <div class="tw-kpi" title="Общая принятая электрическая мощность объекта = (IT + Cooling + UPS_loss + Aux) с коэффициентом одновременности ~0.7. Используется для расчёта мощности ТП/ДГУ. Это значение служит для авто-подбора в блоке «🔌 Ввод».">
         <span class="tw-kpi-lbl">Σ Принятая</span>
@@ -4185,7 +4254,11 @@ function bindListEvents() {
         const pueTarget = (cur.concept.pue?.mode === 'manual')
           ? (Number(cur.concept.pue.manualPue) || 1.4)
           : 1.4;
-        const reqCoolKw = Math.ceil(itKw * (pueTarget - 1));
+        // v0.60.512: требуемая холодопроизводительность учитывает не
+        // только PUE-долю, но и явные теплопритоки (ИБП-потери, стены,
+        // кабели, щиты). Берём максимум — что больше, то и лимит.
+        const _heatReq = calcHeatLoad(cur.concept).totalKw;
+        const reqCoolKw = Math.ceil(Math.max(itKw * (pueTarget - 1), _heatReq));
         // Pre-fill payload в LS-bridge (cooling.js считывает на init).
         const prefillKey = `raschet.cooling.prefill.v1`;
         const payload = {
