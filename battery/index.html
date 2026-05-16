@@ -684,6 +684,7 @@
     import { mountSelectionPanel } from '../shared/selection-panel.js';
     import { getActiveProjectCode, getSelectionMeta, saveSelectionMeta } from '../shared/configuration-catalog.js';
     import { forecastBatteryLifeYears } from './battery-discharge.js';
+    import { getBattery } from './battery-catalog.js';
     const mountEl = document.getElementById('bt-selection-panel');
     const pc = getActiveProjectCode();
     let activeSel = null;
@@ -720,7 +721,17 @@
       const cur = selEco.currency || '₸';
       const totalKwh = Number(p.totalKwh) || 0;
       const pricePerKwh = Number(req.pricePerKwh) || 0;
-      const price = Number(p.totalPrice) || (totalKwh * pricePerKwh) || 0;
+      // v0.60.491 (Roadmap 23.4): цена из каталога модели АКБ как
+      // приоритетный fallback (цена за блок × число блоков), если в
+      // варианте нет явной totalPrice.
+      let catPrice = 0;
+      try {
+        const bid = p.battery && p.battery.id;
+        const cb = bid ? getBattery(bid) : null;
+        const per = cb && cb.price && Number(cb.price.value) || 0;
+        if (per > 0) catPrice = per * (Number(p.totalBlocks) || 1);
+      } catch {}
+      const price = Number(p.totalPrice) || catPrice || (totalKwh * pricePerKwh) || 0;
       const maintPerYear = price * ((Number(req.maintPctPerYear) || 1) / 100);
       // срок службы: ручной (если задан) → 🔮 авто-прогноз старения по
       // условиям подбора и химии конкретной батареи варианта → дефолт.

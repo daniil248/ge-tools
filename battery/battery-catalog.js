@@ -109,6 +109,18 @@ export function addBattery(entry) {
   return entry;
 }
 
+// v0.60.491 (Roadmap 23.4): цена модели АКБ + разбивка (priceItems).
+// Хранится в записи каталога (per-user). Не ломает импорт/старые записи.
+export function setBatteryPrice(id, price, priceItems) {
+  const list = load();
+  const b = list.find(x => x.id === id);
+  if (!b) return null;
+  if (price && typeof price === 'object') b.price = { value: Number(price.value) || 0, currency: price.currency || '₸' };
+  if (Array.isArray(priceItems)) b.priceItems = priceItems;
+  save(list);
+  return b;
+}
+
 export function removeBattery(id) {
   const list = load();
   const next = list.filter(b => b.id !== id);

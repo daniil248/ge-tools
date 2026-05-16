@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.491', date: '2026-05-16', items: [
+      '💲 <b>Roadmap 23.4 (battery-catalog): цена модели АКБ + построчная разбивка</b>. В справочнике АКБ — колонка «Цена» и кнопка «✏» (per-user): построчная разбивка через общий <code>cost-items-modal</code> (оборуд./доставка/НДС…), курс на дату из общего провайдера, Σ → <code>price{value,currency}</code> + <code>priceItems[]</code> (<code>setBatteryPrice</code>). Цена авто-подхватывается в составе/ЖЦ (<code>_lcSyncFromBom</code>) и в TCO варианта (<code>variantEconomics</code> fallback = цена каталога × число блоков) — состав/CAPEX/TCO больше не нулевые «из коробки». Импорт XLSX и старые записи не затронуты. scs-config/breaker-catalog — тем же паттерном позже.',
+    ] },
     { version: '0.60.490', date: '2026-05-16', items: [
       '📦 <b>Roadmap 23.3: стоимость перевозки в Logistics — построчно (статьи)</b>. Единое поле «Стоимость перевозки, ₽» заменено редактируемыми статьями (Перевозка / Растаможка / Страхование / Погрузка-разгрузка / Экспедирование / Прочее) с подсказками; итог = Σ статей; <code>shipment.costItems[]</code> + backward-compat <code>shipment.cost</code> = сумма (таблица/калькулятор не сломаны).',
     ] },

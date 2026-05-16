@@ -5,7 +5,7 @@
 //   2. Расчёт разряда — выбор АКБ + параметры нагрузки → автономия
 // ======================================================================
 
-import { listBatteries, addBattery, removeBattery, clearCatalog, getBattery, makeBatteryId } from './battery-catalog.js';
+import { listBatteries, addBattery, removeBattery, clearCatalog, getBattery, makeBatteryId, setBatteryPrice } from './battery-catalog.js';
 import { rsToast, rsConfirm, rsPrompt } from '../shared/dialog.js';
 import { parseBatteryXlsx } from './battery-data-parser.js';
 import { calcAutonomy, calcRequiredBlocks, interpTimeByPower } from './battery-discharge.js';
@@ -149,7 +149,7 @@ function renderCatalog() {
     return;
   }
   const h = ['<table class="cat-table">'];
-  h.push('<thead><tr><th></th><th>Поставщик</th><th>Модель</th><th>Тип АКБ</th><th>Блок</th><th>Ёмкость</th><th>Точек</th><th>Источник</th><th></th></tr></thead>');
+  h.push('<thead><tr><th></th><th>Поставщик</th><th>Модель</th><th>Тип АКБ</th><th>Блок</th><th>Ёмкость</th><th>Точек</th><th title="Цена за 1 блок/модуль (per-user). «✏» — построчная разбивка (оборуд./доставка/НДС…), курс на дату.">Цена</th><th>Источник</th><th></th></tr></thead>');
   h.push('<tbody>');
   for (const b of list) {
     const isCustom = b.custom === true;
@@ -170,6 +170,9 @@ function renderCatalog() {
       <td>${fmt(b.blockVoltage)} В</td>
       <td>${b.capacityAh != null ? fmt(b.capacityAh) + ' А·ч' : '—'}</td>
       <td>${b.dischargeTable?.length || 0}</td>
+      <td style="white-space:nowrap">${b.price && Number(b.price.value) > 0
+        ? `<b>${fmtMoney(Number(b.price.value), b.price.currency || '₸')}</b>` : '<span class="muted">—</span>'}
+        <button class="btn-sm btn-price" data-price="${escHtml(b.id)}" title="Цена + построчная разбивка (курс на дату)">✏</button></td>
       <td class="src">${escHtml(b.source || '')}</td>
       <td>
         <button class="btn-sm btn-curve" data-curve="${escHtml(b.id)}" title="Открыть таблицу и кривую разряда">📈 Кривая</button>
@@ -198,6 +201,32 @@ function renderCatalog() {
       const id = btn.dataset.edit;
       const b = listBatteries().find(x => x.id === id);
       if (b) openManualBatteryModal(b);
+    });
+  });
+  // v0.60.491 (Roadmap 23.4): цена модели АКБ + построчная разбивка
+  // через общий cost-items-modal (курс на дату — общий провайдер).
+  wrap.querySelectorAll('[data-price]').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = btn.dataset.price;
+      const b = listBatteries().find(x => x.id === id);
+      if (!b) return;
+      const cur = (b.price && b.price.currency) || _lcState.currency || '₸';
+      await _lcEnsureRates(false);
+      const start = Array.isArray(b.priceItems) && b.priceItems.length
+        ? b.priceItems
+        : [{ id: 'mdl', label: (b.supplier || '') + ' ' + (b.type || b.id), qty: 1,
+             equipmentPrice: { value: Number(b.price && b.price.value) || 0, currency: cur },
+             installPrice: { value: 0, currency: cur },
+             maintenancePerYearPrice: { value: 0, currency: cur } }];
+      const res = await openCostItemsModal(start, cur, _lcConvertFn);
+      if (res == null) return;
+      const t = computeEcoTotals({ costItems: res, currency: cur }, cur, _lcConvertFn);
+      const val = (Number(t.equipmentCost) || 0) + (Number(t.installationCost) || 0);
+      setBatteryPrice(id, { value: val, currency: cur }, res);
+      renderCatalog();
+      try { renderBatterySelector(); } catch {}
+      flash('Цена модели сохранена: ' + fmtMoney(val, cur), 'success');
     });
   });
   // Явная кнопка «Кривая» — открывает модалку таблицы/кривой разряда
@@ -1664,6 +1693,7 @@ function _lcSyncFromBom(bom) {
     if (ex) { ex.qty += (Number(l.qty) || 1); continue; }
     agg.set(key, {
       id: key, role: l.role, qty: Number(l.qty) || 1,
+      battId: l.id || null,
       name: `${l.model || l.id}${l.role === 'module' ? ' (модуль АКБ)' : ''}`,
     });
   }
@@ -1675,12 +1705,23 @@ function _lcSyncFromBom(bom) {
   // ТОЛЬКО позиции текущего состава — устаревшие строки отбрасываем.
   _lcState.costItems = [...agg.values()].map(g => {
     const old = byLink.get(g.id);
+    // v0.60.491 (Roadmap 23.4): если у модели АКБ задана цена в каталоге
+    // и строка ещё без цены — авто-подставляем (состав/ЖЦ/CAPEX не 0).
+    let eqp = old && old.equipmentPrice;
+    if (!eqp && g.role === 'module' && g.battId) {
+      try {
+        const cb = getBattery(g.battId);
+        if (cb && cb.price && Number(cb.price.value) > 0) {
+          eqp = { value: Number(cb.price.value), currency: cb.price.currency || cur };
+        }
+      } catch {}
+    }
     return {
       id: (old && old.id) || ('lc-' + g.id),
       linkedGroupId: g.id,
       label: g.name,
       qty: g.qty,
-      equipmentPrice:          (old && old.equipmentPrice) || zero(),
+      equipmentPrice:          eqp || zero(),
       installPrice:            (old && old.installPrice) || zero(),
       maintenancePerYearPrice: (old && old.maintenancePerYearPrice) || zero(),
     };
