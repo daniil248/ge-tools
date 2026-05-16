@@ -15,6 +15,56 @@
 
 ---
 
+## 0. Раскладка корня репозитория
+
+> **Папки модулей лежат в КОРНЕ репозитория намеренно — это
+> требование zero-build + GitHub Pages, а НЕ беспорядок.**
+> GitHub Pages раздаёт сайт из корня ветки `main`, поэтому
+> `daniil248.github.io/raschet/<module>/` ↔ физическая папка
+> `<module>/`. Импорты — сырые относительные (`../shared/`,
+> `../js/engine/`); глубина пути критична. Перенос модуля в
+> `modules/<name>/` сломал бы 58 файлов с `../`-импортами, 29
+> публичных URL, `modules.json`, `hub.html`, `/modules/`, ссылки
+> инспектора/Технолога и закладки → нерабочий прод. Вложение папок
+> модулей **запрещено** до отдельной фазы X.5 (`ROADMAP` X.5 /
+> §6 ниже), где это делается вместе с build-шагом и редиректами.
+
+Легенда верхнего уровня (что где лежит):
+
+```
+raschet/
+  index.html login.html hub.html      ПЛАТФОРМА: точки входа сайта
+  app.js app.css manifest.json        (обязаны быть в корне для Pages)
+  modules.json                        реестр модулей (проекция manifests)
+  firebase-config.js firebase.json    инфра Firebase / firestore.rules
+  .nojekyll .gitattributes            служебные (Pages: не трогать)
+  README.md ARCHITECTURE.md           документация (этот файл — закон формы)
+  CONTRIBUTING.md ROADMAP*.md TODO.md
+  js/                  CORE: engine/ (recalc/render/serialization),
+                       calc/, methods/ — владеет APP_VERSION
+  shared/              SHARED-контракты + мосты + catalogs/ + contracts/
+  <module>/            PLUGGABLE-модули (по 1 папке на модуль, см. §1):
+                       battery cable cooling tech-workspace ups-config
+                       scs-config scs-design rack-config mdc-config
+                       genset-config transformer-config mv-config
+                       panel-config pdu-config suppression-config
+                       suppression-methods meteo psychrometrics service
+                       projects reports logistics facility-inventory
+                       catalog schematic sketch configurator3d
+  elements/ help/ dev/ functions/     вспомогательные (UI-ресурсы,
+                                       Cloud Functions, dev-страницы)
+  tools/ scripts/                     CI-утилиты (boundary-lint,
+                                       gen-modules-json, audit-manifest)
+  .github/workflows/   CI (Actions требует ИМЕННО этот путь — не трогать)
+  .claude/  tmp/       локальное, в .gitignore — на Pages не попадает
+```
+
+Итог: «плоско в корне» — это и есть правильная форма для данной
+платформы. Структуру делает понятной не вложенность папок, а §1
+(единый скелет модуля), `README.md` в каждой папке и эта легенда.
+
+---
+
 ## 1. Канонический скелет модуля
 
 Один предсказуемый шаблон. Эталон уже в коде: `cooling/`, `service/`.
