@@ -420,17 +420,41 @@
         const lossKw = pOut * (1 / eff - 1);
         const annualEnergyKwh = lossKw * 8760;
         const maintPerYear = price * ((Number(req.maintPctPerYear) || 2) / 100);
-        // v0.60.470: CAPEX набора = ИБП + АКБ ПРЯМО в варианте (auto-seed;
-        // дальше Пользователь правит построчно во вкладке CAPEX без
-        // запуска конфигуратора — приоритет у entry.eco.costItems).
-        const items = [{
-          id: 'ups-main',
-          label: ([p.upsSupplier, p.upsModel].filter(Boolean).join(' ')) || entry.label || 'ИБП',
-          qty: 1,
-          equipmentPrice:          { value: price, currency: priceCur },
-          installPrice:            { value: 0, currency: priceCur },
-          maintenancePerYearPrice: { value: maintPerYear, currency: priceCur },
-        }];
+        // v0.60.470/488: CAPEX набора ПРЯМО в варианте. Если есть состав
+        // (composition: фрейм/модули/принадлежности — кабели, наконечники,
+        // модули связи, parallel-kit, ПНР, ЗИП) — раскладываем ПОСТРОЧНО,
+        // чтобы Пользователь задавал цену каждой позиции (cost-items-modal
+        // во вкладке CAPEX). Иначе — одна строка ИБП. Приоритет всегда у
+        // entry.eco.costItems (ручные правки).
+        const comp = Array.isArray(p.composition) ? p.composition : null;
+        let items;
+        if (comp && comp.length) {
+          items = comp.map((c, i) => {
+            const incl = c.kitInclusion === 'included';
+            return {
+              id: 'cmp-' + i + '-' + (c.role || c.cls || 'x'),
+              label: (c.label || c.role || 'позиция') + (incl ? ' (в комплекте)' : ''),
+              qty: Number(c.qty) || 1,
+              equipmentPrice:          { value: 0, currency: priceCur },
+              installPrice:            { value: 0, currency: priceCur },
+              maintenancePerYearPrice: { value: 0, currency: priceCur },
+            };
+          });
+          // Базовую цену/ТО кладём на главный шкаф/фрейм (если задана).
+          const fIdx = comp.findIndex(c => /frame|cabinet|active|integrated|aio/.test(String(c.role || '')));
+          const main = items[fIdx >= 0 ? fIdx : 0];
+          if (main && price > 0) main.equipmentPrice = { value: price, currency: priceCur };
+          if (main && maintPerYear > 0) main.maintenancePerYearPrice = { value: maintPerYear, currency: priceCur };
+        } else {
+          items = [{
+            id: 'ups-main',
+            label: ([p.upsSupplier, p.upsModel].filter(Boolean).join(' ')) || entry.label || 'ИБП',
+            qty: 1,
+            equipmentPrice:          { value: price, currency: priceCur },
+            installPrice:            { value: 0, currency: priceCur },
+            maintenancePerYearPrice: { value: maintPerYear, currency: priceCur },
+          }];
+        }
         const b = p.battery;
         if (p.batteryChoice !== 'skip' && b && (b.id || b.model)) {
           const bQty = Number(p.batterySetsQty) || 1;
@@ -737,7 +761,18 @@
             ${row('Номинал/итоговая мощность, кВт', escHtmlSafe(p.capacityKw || u.capacityKw || '—'))}
             ${row('КПД, %', escHtmlSafe(u.efficiency || '—'))}
             ${row('V<sub>DC</sub>, В', (u.vdcMin && u.vdcMax) ? (u.vdcMin + '…' + u.vdcMax) : '—')}
-          </tbody></table>`;
+          </tbody></table>
+          ${(() => {
+            const bom = Array.isArray(p.composition) ? p.composition : [];
+            if (!bom.length) return '';
+            const r = bom.map(c => {
+              const inc = c.kitInclusion === 'included';
+              return `<tr><td class="rsp-lft">${escHtmlSafe(c.label || c.role || 'позиция')}${inc ? ' <span style="color:#1b5e20;font-size:11px">(в комплекте)</span>' : (c.cls ? ' <span style="color:#9a3412;font-size:11px">(заказ отдельно)</span>' : '')}</td><td style="text-align:right"><b>${escHtmlSafe(c.qty || 1)}</b></td></tr>`;
+            }).join('');
+            return `<div class="rsp-sub" style="font-weight:600;margin:10px 0 2px">Состав комплекта (BOM)</div>
+              <table class="rsp-table"><thead><tr><th class="rsp-lft">Позиция</th><th style="text-align:right">Кол-во</th></tr></thead><tbody>${r}</tbody></table>
+              <div class="rsp-note">ℹ Принадлежности (кабели/наконечники/связь/parallel-kit/ПНР) добавлены автоматически по типу ИБП. Цены задаются построчно во вкладке «💰 CAPEX».</div>`;
+          })()}`;
         host.innerHTML = `
           ${reportHtml}
           <div class="rsp-note" data-vitog-info></div>
