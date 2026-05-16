@@ -3234,6 +3234,13 @@ function bindPlanEvents() {
     const area = $('tw-plan-area');
     if (!area) return;
     const obj = e.target.closest('[data-plan-obj]');
+    // v0.60.516 (фикс Пользователя «объекты не размещаются»): пан
+    // запускать ТОЛЬКО при нажатии на сам холст (#tw-plan-area), а не
+    // на палитру/кнопки. Раньше любой ЛКМ-press в панели (вкл. «Разместить
+    // все» и чипы) стартовал пан с preventDefault → click подавлялся и
+    // размещение не срабатывало.
+    const inArea = !!e.target.closest('#tw-plan-area');
+    if (!inArea) return;
     const v = (_ensurePlan(c), c.plan.view);
     // Пан: средняя кнопка ИЛИ ЛКМ по пустому холсту (не по объекту).
     if (e.button === 1 || (!obj && e.button === 0)) {
