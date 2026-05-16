@@ -110,6 +110,15 @@ function newUpsSystem(name, purpose) {
     count: 2, ratedKva: 0, redundancy: 'N+1',
     cosPhi: 0.95, loadFactor: 0.8, autonomyMin: 15, batteryTech: 'vrla',
     modelRef: null,
+    // v0.60.514 (правка Пользователя 2026-05-16): пока модель ИБП не
+    // подобрана, технолог может внести габариты и основные паспортные
+    // характеристики вручную (для площадей, плана зала, тепла, ТЗ).
+    upsType: 'monoblock',   // monoblock | modular | integrated | all-in-one
+    efficiencyPct: 95,      // КПД на номинале, % (для тепловых потерь/PUE)
+    inputPhases: 3,         // фазность ввода/вывода (1 | 3)
+    widthMm: 600, depthMm: 850, heightMm: 1900,
+    weightKg: 0,            // масса шкафа (для нагрузки на перекрытие)
+    manufacturer: '', model: '',  // если известно из ТЗ — без привязки к каталогу
     // v0.60.111: ИБП могут стоять в одном зале со стойками (roomId = тот
     // же что у rackGroup) или в отдельной электрощитовой/UPS-room.
     roomId: null,
@@ -863,12 +872,35 @@ function renderUpsCard(us, isReadOnly, rooms) {
         </select>
       </label>
     </div>
-    ${_bindBtnHtml('ups', us.id, us.modelRef)}
-    <a class="tw-bind-btn" style="text-decoration:none;display:inline-block;margin-left:6px"
-       href="../ups-config/?project=${escAttr(_pid || '')}&capacityKw=${upsPrefillKw}&autonomyMin=${us.autonomyMin || 10}&cosPhi=${us.cosPhi || 0.9}&redundancy=${escAttr(us.redundancy || 'N')}&phases=3"
+    <h5 class="tw-section-h5" title="Если конкретная модель ИБП ещё не подобрана — внесите габариты и паспортные данные вручную (нужны для площадей, плана зала, тепловых потерь и ТЗ). При подборе в Конфигураторе ИБП эти поля можно обновить из выбранной модели.">📐 Габариты и характеристики ИБП ${(us.modelRef && us.modelRef.id) ? '<span class="muted" style="font-weight:400">(из каталога)</span>' : '<span class="muted" style="font-weight:400">(ручной ввод — до подбора модели)</span>'}</h5>
+    <div class="tw-grid">
+      <label title="Конструктив ИБП: моноблок (фиксированная мощность) / модульный (frame со слотами) / интегрированный / All-in-One (с АКБ в одном корпусе). Влияет на габариты и компоновку.">Тип ИБП:
+        <select data-field="upsType" ${ro}>
+          <option value="monoblock"${(us.upsType || 'monoblock') === 'monoblock' ? ' selected' : ''}>Моноблок</option>
+          <option value="modular"${us.upsType === 'modular' ? ' selected' : ''}>Модульный</option>
+          <option value="integrated"${us.upsType === 'integrated' ? ' selected' : ''}>Интегрированный</option>
+          <option value="all-in-one"${us.upsType === 'all-in-one' ? ' selected' : ''}>All-in-One</option>
+        </select>
+      </label>
+      <label title="КПД ИБП на номинальной нагрузке, %. Используется для расчёта тепловых потерь (лимит холода) и PUE. Типично 94–97% (double-conversion).">КПД, %:<input type="number" data-field="efficiencyPct" min="80" max="99.5" step="0.5" value="${us.efficiencyPct ?? 95}" ${ro}></label>
+      <label title="Фазность ввода/вывода ИБП. 3-фазный — типовой для ЦОД; 1-фазный — для малых нагрузок.">Фазность:
+        <select data-field="inputPhases" ${ro}>
+          <option value="3"${(Number(us.inputPhases) || 3) === 3 ? ' selected' : ''}>3-фазный</option>
+          <option value="1"${Number(us.inputPhases) === 1 ? ' selected' : ''}>1-фазный</option>
+        </select>
+      </label>
+      <label title="Ширина шкафа ИБП, мм (фронт). Для расчёта площади помещения и расстановки на плане зала.">Ширина, мм:<input type="number" data-field="widthMm" min="200" step="50" value="${us.widthMm ?? 600}" ${ro}></label>
+      <label title="Глубина шкафа ИБП, мм. Для площади и плана зала.">Глубина, мм:<input type="number" data-field="depthMm" min="200" step="50" value="${us.depthMm ?? 850}" ${ro}></label>
+      <label title="Высота шкафа ИБП, мм. Для проверки высоты помещения и ТЗ.">Высота, мм:<input type="number" data-field="heightMm" min="200" step="50" value="${us.heightMm ?? 1900}" ${ro}></label>
+      <label title="Масса шкафа ИБП (без АКБ), кг. Для проверки нагрузки на перекрытие / фальшпол.">Масса, кг:<input type="number" data-field="weightKg" min="0" step="10" value="${us.weightKg ?? 0}" ${ro}></label>
+      <label title="Производитель (если известен из ТЗ; не требует наличия модели в каталоге).">Производитель:<input type="text" data-field="manufacturer" value="${escAttr(us.manufacturer || '')}" placeholder="напр. Kehua / ABB / Vertiv" ${ro}></label>
+      <label title="Модель / серия ИБП (если известна из ТЗ).">Модель:<input type="text" data-field="model" value="${escAttr(us.model || '')}" placeholder="напр. MR33 / S3" ${ro}></label>
+    </div>
+    <a class="tw-bind-btn tw-bind-btn-bound" style="text-decoration:none;display:inline-block"
+       href="../ups-config/?project=${escAttr(_pid || '')}&capacityKw=${upsPrefillKw}&loadKw=${upsPrefillKw}&autonomyMin=${us.autonomyMin || 10}&cosPhi=${us.cosPhi || 0.9}&redundancy=${escAttr(us.redundancy || 'N')}&upsType=${escAttr(us.upsType || '')}&phases=${Number(us.inputPhases) || 3}"
        target="_blank"
-       title="Открыть конфигуратор ИБП с pre-filled параметрами этой системы (loadKw=${upsPrefillKw} кВт, autonomy=${us.autonomyMin || 10} мин, cos φ=${us.cosPhi || 0.9}, ${us.redundancy || 'N'}). Wizard запустится автоматически. После подбора можете вернуться и нажать «↩ Применить» (v0.60.89).">
-      ⚙ Подобрать в ups-config →
+       title="Открыть Конфигуратор ИБП с условиями этой системы (нагрузка=${upsPrefillKw} кВт, автономия=${us.autonomyMin || 10} мин, cos φ=${us.cosPhi || 0.9}, ${us.redundancy || 'N'}, ${us.upsType || 'тип любой'}). Подбор привязан к проекту; после выбора модели вернитесь и нажмите «↩ Применить».">
+      ⚙ Конфигуратор ИБП — подобрать модель →
     </a>
     ${(() => {
       // v0.60.89 (Phase 30.2 PULL): читаем selected UPS из ups-config bridge.
@@ -2851,8 +2883,8 @@ function _planUnitDefs(c) {
   }
   for (const us of (c.upsSystems || [])) {
     const base = _tagBase(us.name, 'UPS');
-    // У ИБП нет габаритов в модели — берём типовой шкаф ИБП.
-    push('ups', us, us.count, 600, 850, base, us.name || 'ИБП', '⚡');
+    // v0.60.514: габариты ИБП — из введённых технологом (или дефолт).
+    push('ups', us, us.count, us.widthMm || 600, us.depthMm || 850, base, us.name || 'ИБП', '⚡');
   }
   for (const cu of (c.coolingUnits || [])) {
     const base = _tagBase(cu.name, 'AC');
