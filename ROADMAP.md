@@ -1,6 +1,6 @@
 # Raschet — Roadmap архитектурного развития платформы
 
-> **Статус:** v0.60.273 (2026-05-06). Phase 23.1 (line-items для CAPEX) ✅. Запланированы фазы 23.2–23.6 (rollout pattern на весь проект), 24 (модуль Сервис: монтаж/ТО), 25 (Импорт даташитов климат-оборудования), 26 (SharePoint integration), 27 (MS365 auth — deferred). Фаза 1.27 — «Проекты» полностью закрыта. Фаза 1.28 — POR-registry, cross-discipline reconciliation, 1.28.20 (consumer-container) — Phase 1+2+3 ✅ (включая kit-container для cond+outdoor v0.60.250-259). **Фаза 45 (File-storage drawio-style)** ✅ v0.60.258-273 — File System Access API + IndexedDB persistent handle + external-change detection + ↻ Перечитать + ✕ Закрыть + Ctrl+O/Ctrl+Shift+S + discoverability с /projects/. **Фаза 46 (Firestore quota optimization)** ✅ v0.60.260-263 — solo-skip коллаборации (-95% writes), heartbeat 60с/45с, lock debounce 800мс, autosave 3с, persistence + TTL cache (-90% reads). Фаза 19 (пресеты карточек) полностью закрыта. 1.24.18 закрыто. **Фаза 20 (Технолог ЦОД)**: 20.1 ✅ (двухпанельный layout v0.59.892), 20.2–20.6 ✅ (rackGroups/upsSystems/coolingUnits/feed/PDU per-group), 20.8 ✅ (блок МЦОД через sub-проект v0.59.893), 20.9 ✅ (HTML-ПЗ — будет переработана через модуль отчётов), 20.10 ✅ (compare), 20.11 ✅ (handoff MVP), 20.12 ✅ (PUE авто/ручной v0.59.895), 20.13 ✅ (BOM с ценами по дате v0.59.896). Открыто 20.7 (план зала). **Фаза 21 (Метеоданные)**: stand-alone модуль `meteo/` с plugin-архитектурой источников (Open-Meteo REST + rp5 CSV) — 21.1 ✅ v0.59.894. Local/Online switcher. Центр помощи с 23 статьями + кнопка ❓ в общей шапке.
+> **Статус:** v0.60.489 (2026-05-16). Phase 23.1 (line-items для CAPEX) ✅. **Phase 23.2/23.2a/B2.2 ✅** — подбор ИБП/АКБ полностью как «Подбор холода»: единый `shared/selection-panel.js` (вариант-вкладки Spec/АКБ/CAPEX/Итог), `shared/ui/cost-items-modal.js`, централизованный курс валют на дату (`shared/currency-rates/provider.js`), ЖЦ/ТЭО из состава, мастер старения АКБ, авто-принадлежности ИБП (`shared/ups-types/accessories.js` + `shared/catalogs/ups-accessories.js`), мост мастер→вариант. Далее по 23: 23.3 (logistics), 23.4 (scs/breaker/battery-catalog), 23.5 (tech-workspace BOM), 23.6 (тариф э/э cooling). Запланированы фазы 23.2–23.6 (rollout pattern на весь проект), 24 (модуль Сервис: монтаж/ТО), 25 (Импорт даташитов климат-оборудования), 26 (SharePoint integration), 27 (MS365 auth — deferred). Фаза 1.27 — «Проекты» полностью закрыта. Фаза 1.28 — POR-registry, cross-discipline reconciliation, 1.28.20 (consumer-container) — Phase 1+2+3 ✅ (включая kit-container для cond+outdoor v0.60.250-259). **Фаза 45 (File-storage drawio-style)** ✅ v0.60.258-273 — File System Access API + IndexedDB persistent handle + external-change detection + ↻ Перечитать + ✕ Закрыть + Ctrl+O/Ctrl+Shift+S + discoverability с /projects/. **Фаза 46 (Firestore quota optimization)** ✅ v0.60.260-263 — solo-skip коллаборации (-95% writes), heartbeat 60с/45с, lock debounce 800мс, autosave 3с, persistence + TTL cache (-90% reads). Фаза 19 (пресеты карточек) полностью закрыта. 1.24.18 закрыто. **Фаза 20 (Технолог ЦОД)**: 20.1 ✅ (двухпанельный layout v0.59.892), 20.2–20.6 ✅ (rackGroups/upsSystems/coolingUnits/feed/PDU per-group), 20.8 ✅ (блок МЦОД через sub-проект v0.59.893), 20.9 ✅ (HTML-ПЗ — будет переработана через модуль отчётов), 20.10 ✅ (compare), 20.11 ✅ (handoff MVP), 20.12 ✅ (PUE авто/ручной v0.59.895), 20.13 ✅ (BOM с ценами по дате v0.59.896). Открыто 20.7 (план зала). **Фаза 21 (Метеоданные)**: stand-alone модуль `meteo/` с plugin-архитектурой источников (Open-Meteo REST + rp5 CSV) — 21.1 ✅ v0.59.894. Local/Online switcher. Центр помощи с 23 статьями + кнопка ❓ в общей шапке.
 
 > **Правило ведения:** roadmap обновляется ПОСТОЯННО — при появлении новой фичи / задачи и при закрытии любого этапа. Hotfix'ы (regressions, мелкие правки UX) НЕ попадают в roadmap, только содержательная функциональность. Это правило зафиксировано пользователем 2026-04-29.
 
@@ -3303,14 +3303,15 @@ standalone-приложение в отдельном. Чтобы использ
     (`renderCapexForm` + `openMoneyItemsModal`), `cooling/cooling.css`
     (`.cl-money-cell`, `.cl-mi-table`).
 
-- [ ] **23.2** Экстракция в shared/. Перенести `openMoneyItemsModal` и
-  `normMoney`/`moneyTotalIn` в `shared/money-items.js` + `shared/money-items.css`,
-  чтобы их могли использовать ВСЕ модули проекта (logistics, scs-config,
-  tech-workspace, breaker-catalog, battery-catalog, ups-picker, новый
-  service-модуль). API:
-  ```js
-  import { openMoneyItemsModal, normMoney, moneyTotalIn } from 'shared/money-items.js';
-  ```
+- [x] **23.2** ✅ Реализовано иначе (лучше): построчный редактор статей
+  вынесен в `shared/ui/cost-items-modal.js` (`openCostItemsModal`) +
+  чистая модель в `shared/calc/capex-tco.js` (`computeEcoTotals /
+  normCostItems / syncCostItemsFromEquipment / convertEcoToCurrency`) +
+  централизованная конвертация валют `shared/currency-rates/provider.js`.
+  Используется selection-panel (ups/battery), ЖЦ-АКБ, состав ИБП.
+  Остаток (по мере необходимости): миграция cooling `openMoneyItemsModal`
+  и rollout на logistics/scs/breaker/battery-catalog/tech-workspace BOM
+  на единый `cost-items-modal` (см. 23.3–23.5).
 - [x] **23.2a** Подбор ИБП/АКБ как «Подбор холода» — selection-level условия +
   TCO/CAPEX/OPEX/сравнение. Закрыто v0.60.427–429 (по запросу Пользователя
   2026-05-15: «подбор ИБП и АКБ должен быть выполнен как подбор холодильных
@@ -3346,11 +3347,35 @@ standalone-приложение в отдельном. Чтобы использ
   - Сопутств.: `getActiveProjectCode` из единого источника (бейдж шапки);
     «Контекст подбора» убран из сайдбара (проект только в шапке);
     «Разовый расчёт» в меню проекта починен (v0.60.439/441/449).
-  - [ ] **B2** (отложено Пользователем «пока», 2026-05-16): полная
-    косметическая замена 4-шагового wizard ИБП на cooling-style вкладки.
-    Функционально поведение уже соответствует cooling — это визуальный
-    рефактор ~1900 строк, высокий риск; делать отдельным заходом по
-    явному запросу.
+  - [x] **B2.2** ✅ Закрыто v0.60.455–489 (по запросу Пользователя
+    2026-05-16 «полный перепис + мосты»). Вариант-зона ИБП = cooling-
+    style вкладки [Spec / АКБ / CAPEX / Итог] прямо в `selection-panel`;
+    старый 4-шаговый wizard остался ТОЛЬКО как «мастер подбора»
+    (авто-конфигурация кол-ва модулей) и мост для `?nodeId`/`?capacityKw`.
+    Ключевое:
+    - i1–i4: generic-хуки `variantSpec/variantAkb/variantItog/compareCheck`
+      в selection-panel; ups-config: каскад модели (фильтр по типам),
+      мост к Расчёту АКБ, «Итог»-отчёт (через reports/), контроль
+      корректности сравнения. battery-паритет (i5).
+    - Централизованный курс валют на дату: `shared/currency-rates/
+      provider.js` (`makeConvertFn`, LS-кэш по дате) подключён в
+      selection-panel/cost-items-modal (v0.60.458).
+    - ЖЦ/ТЭО АКБ: цена из состава системы (BOM), замена = только
+      модули; комплектность позиции «в комплекте/отдельно» + пресеты
+      (v0.60.459/462/478/480/485).
+    - Мастер прогноза старения АКБ `forecastBatteryLifeYears()` (pure)
+      → авто `serviceLifeYears` (v0.60.460); мастер «Срок службы АКБ»
+      (v0.60.477).
+    - Сайдбар-аккордеон как в cooling; пер-вариантная независимость
+      состояния; lock переданных из ИБП параметров; авто-передача
+      ★ основного варианта АКБ в ИБП (v0.60.469/481/482).
+    - Мост: завершение мастера → авто новый вариант в панели
+      (v0.60.487). Авто-принадлежности ИБП (кабели/наконечники/связь/
+      parallel-kit/ПНР/ЗИП) — `shared/ups-types/accessories.js` +
+      каталог `shared/catalogs/ups-accessories.js`, построчно в составе
+      и BOM «Итог» (v0.60.487–489).
+    - Известный нюанс: не-версионные модули кэшируются ~10 мин;
+      deployed-source верный (curl + fresh-import подтверждают).
   - TODO (по мере необходимости): bulk-снятие freeze; rollout панели на
     mv-config / dgu-config / panel-config / transformer-config; авто-проброс
     из tech-workspace в URL (сейчас подбор сам читает project.location).
