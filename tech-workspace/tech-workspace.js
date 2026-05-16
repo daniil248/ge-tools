@@ -383,8 +383,12 @@ function newVariant(name) {
       // По умолчанию пустой (стационарный ЦОД); пользователь добавляет МЦОД явно.
       mdcBuildings: [],
       feed: {
-        tp: { needed: false, kva: 0, redundancy: '2', modelRef: null },
-        dgu: { needed: false, kw: 0, mode: 'esp', redundancy: 'N+1', modelRef: null },
+        // v0.60.517 (правка Пользователя «всё что можно и актуально»):
+        // габариты/паспорт ТП и ДГУ — ручной ввод до подбора модели.
+        tp: { needed: false, kva: 0, redundancy: '2', modelRef: null,
+          widthMm: 3000, depthMm: 2000, heightMm: 2500, weightKg: 0, manufacturer: '', model: '' },
+        dgu: { needed: false, kw: 0, mode: 'esp', redundancy: 'N+1', modelRef: null,
+          widthMm: 4000, depthMm: 1600, heightMm: 2200, weightKg: 0, manufacturer: '', model: '' },
       },
       // v0.59.895 (Etap D): PUE — режим mode = 'auto' (расчёт по meteo +
       // нагрузкам) или 'manual' (юзер вводит). Кэш меньше зависит от mode:
@@ -528,9 +532,26 @@ function migrateVariant(v) {
     delete c.cooling;
   }
   if (!c.feed) c.feed = {
-    tp: { needed: false, kva: 0, redundancy: '2', modelRef: null },
-    dgu: { needed: false, kw: 0, mode: 'esp', redundancy: 'N+1', modelRef: null },
+    tp: { needed: false, kva: 0, redundancy: '2', modelRef: null,
+      widthMm: 3000, depthMm: 2000, heightMm: 2500, weightKg: 0, manufacturer: '', model: '' },
+    dgu: { needed: false, kw: 0, mode: 'esp', redundancy: 'N+1', modelRef: null,
+      widthMm: 4000, depthMm: 1600, heightMm: 2200, weightKg: 0, manufacturer: '', model: '' },
   };
+  // v0.60.517: мягкая миграция габаритов ТП/ДГУ (не затираем заданные).
+  {
+    const _td = { tp: { widthMm: 3000, depthMm: 2000, heightMm: 2500 },
+                  dgu: { widthMm: 4000, depthMm: 1600, heightMm: 2200 } };
+    for (const k of ['tp', 'dgu']) {
+      if (!c.feed[k] || typeof c.feed[k] !== 'object') continue;
+      const o = c.feed[k];
+      if (typeof o.widthMm !== 'number') o.widthMm = _td[k].widthMm;
+      if (typeof o.depthMm !== 'number') o.depthMm = _td[k].depthMm;
+      if (typeof o.heightMm !== 'number') o.heightMm = _td[k].heightMm;
+      if (typeof o.weightKg !== 'number') o.weightKg = 0;
+      if (typeof o.manufacturer !== 'string') o.manufacturer = '';
+      if (typeof o.model !== 'string') o.model = '';
+    }
+  }
   // v0.59.893: миграция МЦОД (если не задано — пустой массив; не подменяем дефолтом)
   if (!Array.isArray(c.mdcBuildings)) c.mdcBuildings = [];
   // v0.59.895: миграция PUE (мягкая — не перезаписывать существующие пользовательские значения)
@@ -1105,6 +1126,26 @@ function renderFeedSection(feed, isReadOnly, concept) {
       </select>
     </label>
   </div>
+  ${feed.tp.needed ? `
+  <h5 class="tw-section-h5" title="Габариты и паспорт ТП (КТП/2КТП) — ручной ввод до подбора модели. Нужны для площади ТП, плана зала и ТЗ.">📐 Габариты ТП ${(feed.tp.modelRef && feed.tp.modelRef.id) ? '<span class="muted" style="font-weight:400">(из каталога)</span>' : '<span class="muted" style="font-weight:400">(ручной ввод)</span>'}</h5>
+  <div class="tw-grid">
+    <label title="Ширина (длина по фронту) блока ТП/КТП, мм. Для площади помещения ТП и плана зала.">Ширина, мм:<input type="number" data-field="tp.widthMm" min="500" step="100" value="${feed.tp.widthMm ?? 3000}" ${ro}></label>
+    <label title="Глубина блока ТП, мм.">Глубина, мм:<input type="number" data-field="tp.depthMm" min="500" step="100" value="${feed.tp.depthMm ?? 2000}" ${ro}></label>
+    <label title="Высота блока ТП, мм (проверка высоты помещения).">Высота, мм:<input type="number" data-field="tp.heightMm" min="500" step="100" value="${feed.tp.heightMm ?? 2500}" ${ro}></label>
+    <label title="Масса ТП, кг (нагрузка на фундамент/перекрытие).">Масса, кг:<input type="number" data-field="tp.weightKg" min="0" step="100" value="${feed.tp.weightKg ?? 0}" ${ro}></label>
+    <label title="Производитель (если известен из ТЗ).">Производитель:<input type="text" data-field="tp.manufacturer" value="${escAttr(feed.tp.manufacturer || '')}" placeholder="напр. ABB / Schneider" ${ro}></label>
+    <label title="Модель / тип КТП (если известна).">Модель:<input type="text" data-field="tp.model" value="${escAttr(feed.tp.model || '')}" placeholder="напр. 2КТПН-1000" ${ro}></label>
+  </div>` : ''}
+  ${feed.dgu.needed ? `
+  <h5 class="tw-section-h5" title="Габариты и паспорт ДГУ — ручной ввод до подбора модели. Нужны для площади ДГУ-зала, плана зала и ТЗ.">📐 Габариты ДГУ ${(feed.dgu.modelRef && feed.dgu.modelRef.id) ? '<span class="muted" style="font-weight:400">(из каталога)</span>' : '<span class="muted" style="font-weight:400">(ручной ввод)</span>'}</h5>
+  <div class="tw-grid">
+    <label title="Длина ДГУ (рама/контейнер), мм. Для площади ДГУ-зала и плана.">Длина, мм:<input type="number" data-field="dgu.widthMm" min="500" step="100" value="${feed.dgu.widthMm ?? 4000}" ${ro}></label>
+    <label title="Ширина ДГУ, мм.">Ширина, мм:<input type="number" data-field="dgu.depthMm" min="500" step="100" value="${feed.dgu.depthMm ?? 1600}" ${ro}></label>
+    <label title="Высота ДГУ (с кожухом/контейнером), мм.">Высота, мм:<input type="number" data-field="dgu.heightMm" min="500" step="100" value="${feed.dgu.heightMm ?? 2200}" ${ro}></label>
+    <label title="Масса ДГУ, кг (с топливным баком — для фундамента).">Масса, кг:<input type="number" data-field="dgu.weightKg" min="0" step="100" value="${feed.dgu.weightKg ?? 0}" ${ro}></label>
+    <label title="Производитель (если известен из ТЗ).">Производитель:<input type="text" data-field="dgu.manufacturer" value="${escAttr(feed.dgu.manufacturer || '')}" placeholder="напр. Cummins / CAT / FG Wilson" ${ro}></label>
+    <label title="Модель ДГУ (если известна).">Модель:<input type="text" data-field="dgu.model" value="${escAttr(feed.dgu.model || '')}" placeholder="напр. C150 D5" ${ro}></label>
+  </div>` : ''}
   <div class="tw-summary">
     <button type="button" class="tw-bind-btn ${feed.tp.modelRef ? 'tw-bind-btn-bound' : ''}" data-bind-domain="tp" data-ref-id="feed-tp">📦 ${feed.tp.modelRef ? escHtml((feed.tp.modelRef.manufacturer || '') + ' ' + (feed.tp.modelRef.model || '')) + ' ✏' : 'Привязать модель ТП'}</button>
     <button type="button" class="tw-bind-btn ${feed.dgu.modelRef ? 'tw-bind-btn-bound' : ''}" data-bind-domain="dgu" data-ref-id="feed-dgu">📦 ${feed.dgu.modelRef ? escHtml((feed.dgu.modelRef.manufacturer || '') + ' ' + (feed.dgu.modelRef.model || '')) + ' ✏' : 'Привязать модель ДГУ'}</button>
@@ -2924,11 +2965,13 @@ function _planUnitDefs(c) {
   const fd = c.feed || {};
   if (fd.tp && fd.tp.needed) {
     const tpN = (String(fd.tp.redundancy || '1').startsWith('2')) ? 2 : 1;
-    push('tp', { id: 'feed-tp' }, tpN, 3000, 2000, 'TP', `ТП ${fd.tp.kva ? fd.tp.kva + ' кВА' : ''}`.trim(), '🔌');
+    // v0.60.517: габариты ТП — из введённых технологом.
+    push('tp', { id: 'feed-tp' }, tpN, fd.tp.widthMm || 3000, fd.tp.depthMm || 2000, 'TP', `ТП ${fd.tp.kva ? fd.tp.kva + ' кВА' : ''}`.trim(), '🔌');
   }
   if (fd.dgu && fd.dgu.needed) {
     const dgN = Math.max(1, Number(fd.dgu.count) || 1);
-    push('dgu', { id: 'feed-dgu' }, dgN, 4000, 1600, 'DGU', `ДГУ ${fd.dgu.kw ? fd.dgu.kw + ' кВт' : ''}`.trim(), '⚡');
+    // v0.60.517: габариты ДГУ — из введённых технологом.
+    push('dgu', { id: 'feed-dgu' }, dgN, fd.dgu.widthMm || 4000, fd.dgu.depthMm || 1600, 'DGU', `ДГУ ${fd.dgu.kw ? fd.dgu.kw + ' кВт' : ''}`.trim(), '⚡');
   }
   return defs;
 }
