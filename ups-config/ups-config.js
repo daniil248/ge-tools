@@ -1690,11 +1690,20 @@ function _openBatteryPicker() {
       redundancyScheme: rq.redundancy || 'N',
     },
   };
+  // v0.60.457: «Допустимые типы АКБ» — из УСЛОВИЙ подбора ИБП → в подбор АКБ.
+  let battTypes = [];
+  try {
+    const m = getSelectionMeta('ups', { projectCode: getActiveProjectCode() || null, selectionName: _activeSelName });
+    if (m && Array.isArray(m.requirements && m.requirements.batteryTypes)) battTypes = m.requirements.batteryTypes.slice();
+  } catch {}
+  handoff.batteryTypes = battTypes;
+  handoff.selectionName = _activeSelName || null;
   try { localStorage.setItem('raschet.upsHandoff.v1', JSON.stringify(handoff)); } catch {}
   const url = new URL('../battery/', location.href);
   url.searchParams.set('fromUps', '1');
   url.searchParams.set('loadKw', loadKwToPicker.toFixed(2));
   url.searchParams.set('autonomyMin', rq.autonomyMin);
+  if (battTypes.length) url.searchParams.set('battTypes', battTypes.join(','));
   if (u.vdcMin) url.searchParams.set('vdcMin', u.vdcMin);
   if (u.vdcMax) url.searchParams.set('vdcMax', u.vdcMax);
   if (u.efficiency) url.searchParams.set('invEff', u.efficiency);

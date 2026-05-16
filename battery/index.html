@@ -612,6 +612,37 @@
       window.addEventListener('battery:configs-changed', () => { try { api.refresh(); } catch {} });
     }
   </script>
+  <!-- v0.60.457: проброс условий ИЗ подбора ИБП → подбор АКБ при запуске
+       «⚡ Подобрать АКБ» (raschet.upsHandoff.v1). Выполняется ДО mount
+       панели, чтобы подбор уже существовал с переданными условиями. -->
+  <script type="module">
+    import { getActiveProjectCode, ensureSelectionMeta, getSelectionMeta, saveSelectionMeta }
+      from '../shared/configuration-catalog.js';
+    try {
+      const raw = localStorage.getItem('raschet.upsHandoff.v1');
+      const ho = raw ? JSON.parse(raw) : null;
+      if (ho && ho.source === 'ups-config') {
+        const guard = 'raschet.battHandoffSeeded.' + (ho.selectedAt || '0');
+        if (!sessionStorage.getItem(guard)) {
+          const pc = getActiveProjectCode() || null;
+          const selName = (ho.selectionName ? ('АКБ для ' + ho.selectionName) : ('АКБ для ИБП ' + (ho.upsLabel || ''))).trim() || 'АКБ из ИБП';
+          ensureSelectionMeta('battery', { projectCode: pc, selectionName: selName }, { requirements: {}, eco: {} });
+          const m = getSelectionMeta('battery', { projectCode: pc, selectionName: selName });
+          const req = { ...((m && m.requirements) || {}) };
+          // Передаём ТОЛЬКО если ещё не задано (не затираем правки Пользователя).
+          if (Array.isArray(ho.batteryTypes) && ho.batteryTypes.length && !(req.batteryTypes && req.batteryTypes.length)) req.batteryTypes = ho.batteryTypes.slice();
+          if (ho.loadKw != null && (req.loadKw == null || req.loadKw === '')) req.loadKw = Number(ho.loadKw) || 0;
+          if (ho.autonomyMin != null && (req.autonomyMin == null || req.autonomyMin === '')) req.autonomyMin = Number(ho.autonomyMin) || 0;
+          const vdc = Number(ho.vdcMin) || Number(ho.vdcMax) || 0;
+          if (vdc && (req.dcVoltage == null || req.dcVoltage === '')) req.dcVoltage = vdc;
+          if (ho.invEff != null && (req.invEffPct == null || req.invEffPct === '')) req.invEffPct = Math.round((Number(ho.invEff) || 0) * 100) || '';
+          saveSelectionMeta('battery', { projectCode: pc, selectionName: selName, requirements: req });
+          sessionStorage.setItem(guard, '1');
+          try { sessionStorage.setItem('raschet.battActiveSel', selName); } catch {}
+        }
+      }
+    } catch (e) { console.warn('[battery] ups→battery handoff seed failed', e); }
+  </script>
   <!-- v0.60.429: панель ПОДБОРА АКБ (условия + TCO/CAPEX/OPEX/сравнение) -->
   <script type="module">
     import { mountSelectionPanel } from '../shared/selection-panel.js';
@@ -623,6 +654,9 @@
     const requirementsSchema = [
       { key: 'loadKw',          label: 'Нагрузка ИБП/DC', unit: 'кВт', type: 'number', step: 0.5,
         tip: 'Мощность, которую АКБ должна держать на автономии. Общее условие подбора.' },
+      { key: 'batteryTypes',    label: 'Допустимые типы АКБ', type: 'multiselect',
+        options: [{ value: 'vrla', label: 'VRLA / AGM / Gel' }, { value: 'li-ion', label: 'Li-ion (LFP/NMC)' }, { value: 'nicd', label: 'NiCd' }],
+        tip: 'Какие типы АКБ допустимы в этом подборе (можно несколько; пусто = любой). При запуске из подбора ИБП — приходит оттуда.' },
       { key: 'autonomyMin',     label: 'Автономия',       unit: 'мин', type: 'number', step: 1,
         tip: 'Требуемое время работы от АКБ.' },
       { key: 'dcVoltage',       label: 'Напряжение DC',   unit: 'В',   type: 'number', step: 1,
