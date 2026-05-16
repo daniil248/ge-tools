@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.533', date: '2026-05-16', items: [
+      '🧱 <b>Дробление монолитов — calc/ui (ups-config)</b>. Выделен чистый расчётный слой <code>ups-config/calc/ups-sizing.js</code>: <code>parseRedundancy()</code> (N/N+1/N+2/2N → {mode,x}) + <code>calcModules()</code> (рабочие модули + резерв) — без DOM, переиспользуемо (ups-types pickFit, отчёты, тесты). <code>ups-config.js</code> импортирует <code>parseRedundancy</code> из calc-слоя, локальные определения удалены, алгоритм перенесён байт-в-байт (поведение идентично). Shim не нужен (leaf-модуль, внешних импортёров внутренностей нет). 2-й модуль после пилота transformer-config.',
+    ] },
     { version: '0.60.532', date: '2026-05-16', items: [
       '🧱 <b>Дробление монолитов — пилот calc/ui (transformer-config)</b>. Выделен чистый расчётный слой <code>transformer-config/calc/tx-select.js</code>: <code>classifyTxType()</code> (сухой/масляный) + <code>selectTransformers(catalog, criteria)</code> (фильтр+ранжирование по загрузке) — без DOM, переиспользуемо. <code>transformer-config.js</code> теперь только читает DOM и рендерит, алгоритм вызывается из calc-слоя. Поведение идентично (алгоритм перенесён байт-в-байт). Shim не нужен (leaf-модуль, внешних импортёров внутренностей нет). Доказан безопасный паттерн calc-извлечения на наименьшем модуле перед крупными монолитами (tech-workspace/scs-*).',
     ] },

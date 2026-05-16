@@ -23,6 +23,8 @@ import { wireExportImport } from '../shared/config-io.js';
 import { APP_VERSION } from '../js/engine/constants.js';
 import { getActiveProjectCode, getSelectionMeta } from '../shared/configuration-catalog.js';
 import { getProject as _getProjectD, getActiveProjectId as _getActiveProjectIdD } from '../shared/project-storage.js';
+// v0.60.533: чистый расчётный слой выделен в calc/ (без DOM, переиспользуемо).
+import { parseRedundancy as _parseRedundancy } from './calc/ups-sizing.js';
 
 let cascadeHandle = null;
 const cascadeState = { supplier: '', series: '', modelId: '' };
@@ -1257,23 +1259,7 @@ function _readStep2() {
 }
 
 // ====================== Шаг 2: Подбор ======================
-// Парсит схему резервирования N/N+1/N+2/2N → { mode, x }
-function _parseRedundancy(scheme) {
-  if (scheme === '2N') return { mode: '2N', x: 0 };
-  const m = /^N(?:\+(\d+))?$/.exec(scheme || 'N');
-  return { mode: 'N+X', x: m ? Number(m[1] || 0) : 0 };
-}
-
-// Вычисляет число рабочих модулей + резерв для модульного ИБП
-function _calcModules(loadKw, moduleKw, moduleSlots, redundancy) {
-  const r = _parseRedundancy(redundancy);
-  const working = Math.ceil(loadKw / moduleKw);
-  let installed;
-  if (r.mode === '2N') installed = working * 2;
-  else installed = working + r.x;
-  const fits = installed <= moduleSlots;
-  return { working, redundant: r.x, installed, fits, redundancyLabel: redundancy };
-}
+// _parseRedundancy / _calcModules → ./calc/ups-sizing.js (без DOM).
 
 function _pickSuitable() {
   const rq = wizState.requirements;
