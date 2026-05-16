@@ -144,20 +144,12 @@
     <div class="rs-sidebar-resizer" title="Потяните, чтобы изменить ширину"></div>
   </aside>
   <main>
-    <!-- v0.60.432: панель ПОДБОРА АКБ — ВВЕРХУ, как в «Подбор холода»
-         (сначала условия подбора, затем расчёт конкретного варианта). -->
-    <div id="bt-selection-panel"></div>
-    <!-- v0.60.447: ЗОНА ВАРИАНТА (расчёт/компоновка/справочник). Две зоны
-         как в «Подбор холода»: подбор → панель; вариант → этот редактор. -->
-    <div id="bt-editor" style="display:none">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="tab-calc">Расчёт разряда</button>
-      <button class="tab-btn" data-tab="tab-rack">Компоновка VRLA-шкафа</button>
-      <button class="tab-btn tab-ref" data-tab="tab-catalog" title="Справочник — в конце, как справочная БД">📚 Справочник АКБ</button>
-    </div>
-
-    <!-- ================== Справочник АКБ (вынесен в конец, справочная БД) ================== -->
-    <section id="tab-catalog" class="tab-panel">
+    <!-- v0.60.456: Справочник АКБ — ОБЩИЙ (per-user БД, НЕ зависит от
+         подбора). Вынесен ВЫШЕ подбора, отдельным сворачиваемым блоком,
+         чтобы не казалось, что у каждого подбора свой справочник. -->
+    <details class="bt-catalog-global" style="margin:0 0 14px;border:1px solid #e2e8f0;border-radius:8px;background:#fff">
+      <summary style="cursor:pointer;padding:10px 14px;font-weight:600;color:#334155;list-style:none">📚 Справочник АКБ <span style="font-weight:400;color:#64748b;font-size:12px">— общий справочник моделей (per-user, не зависит от подбора)</span></summary>
+    <section id="tab-catalog" style="padding:0 14px 14px">
       <div id="upload-zone" class="upload-zone">
         <div><strong>+ Загрузить</strong> XLSX-файлы с таблицами разряда</div>
         <div class="hint">Перетащите файлы или кликните. Формат: Battery_Supplier | Battery_Type | Capacity | End_Voltage | Time_Value | Power_Value.</div>
@@ -195,6 +187,17 @@
       <div id="cat-cascade-mount" style="margin-bottom:10px"></div>
       <div id="catalog-list"></div>
     </section>
+    </details>
+
+    <!-- v0.60.432: панель ПОДБОРА АКБ — ВВЕРХУ, как в «Подбор холода». -->
+    <div id="bt-selection-panel"></div>
+    <!-- v0.60.447/456: ЗОНА ВАРИАНТА — расчёт/компоновка (справочник вынесен
+         ВЫШЕ как общий). Две зоны: подбор → панель; вариант → этот редактор. -->
+    <div id="bt-editor" style="display:none">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tab-calc">Расчёт разряда</button>
+      <button class="tab-btn" data-tab="tab-rack">Компоновка VRLA-шкафа</button>
+    </div>
 
     <!-- ================== Расчёт разряда ================== -->
     <section id="tab-calc" class="tab-panel active">

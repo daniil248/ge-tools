@@ -526,18 +526,20 @@ export function mountSelectionPanel(o) {
         return;
       }
     }
-    const inner = activeTab === 'general' ? renderGeneral(meta)
-      : activeTab === 'capex' ? renderCapex(meta)
-      : renderCompare(meta);
+    // v0.60.456: CAPEX убран из ПОДБОР-зоны — цена задаётся в ВАРИАНТЕ
+    // (вкладка CAPEX варианта: построчно, цена за 1 элемент × Кол-во ×
+    // своя валюта на пункт → стоимость на всём объекте). В подборе —
+    // только условия и сравнение.
+    if (activeTab === 'capex') activeTab = 'general';
+    const inner = activeTab === 'general' ? renderGeneral(meta) : renderCompare(meta);
     mountEl.innerHTML = `
       <div class="rsp-wrap">
         <div class="rsp-head">
-          <h3 title="Активный подбор. Условия — общие для всех вариантов.">📋 Подбор «${escH(selName)}»</h3>
+          <h3 title="Активный подбор. Условия — общие для всех вариантов; цены — в вариантах.">📋 Подбор «${escH(selName)}»</h3>
           <span class="rsp-sub">${escH(o.kind)} · условия + TCO</span>
         </div>
         <div class="rsp-tabs">
           <div class="rsp-tab ${activeTab === 'general' ? 'active' : ''}" data-tab="general" title="Общие условия подбора и финансовые параметры.">📋 Свойства подбора</div>
-          <div class="rsp-tab ${activeTab === 'capex' ? 'active' : ''}" data-tab="capex" title="Цены вариантов построчно (Состав оборудования).">💰 CAPEX (по вариантам)</div>
           <div class="rsp-tab ${activeTab === 'compare' ? 'active' : ''}" data-tab="compare" title="Сравнение вариантов: CAPEX / OPEX / TCO / окупаемость.">📈 TCO / Сравнение</div>
         </div>
         <div class="rsp-body">${inner}</div>
