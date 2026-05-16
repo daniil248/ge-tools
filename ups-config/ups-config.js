@@ -649,6 +649,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (d.kind && d.kind !== 'ups') return;
     if (d.selectionName) _activeSelName = d.selectionName;
   });
+  // v0.60.483 (по замечанию Пользователя: «верни сам подход»): «Сменить
+  // модель / мастер подбора» и пустой (ещё не сконфигурированный) вариант
+  // открывают СТАРЫЙ конфигуратор-wizard с АВТО-конфигурацией количества
+  // модулей и прочих элементов (он был лучше). Запускается ЯВНО (по
+  // кнопке / для пустого варианта), не на каждый фокус — дубля нет.
+  window.addEventListener('ups:open-master', (ev) => {
+    const d = ev.detail || {};
+    if (d.kind && d.kind !== 'ups') return;
+    const sn = d.selectionName || _activeSelName;
+    try { _enterVariantEditor(sn); }
+    catch (e) { try { launchStandaloneWizard(); } catch {} }
+  });
   window.addEventListener('rs-selection-change', (ev) => {
     const d = ev.detail || {};
     if (d.kind && d.kind !== 'ups') return;

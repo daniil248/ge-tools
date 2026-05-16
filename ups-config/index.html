@@ -563,7 +563,36 @@
           if (doneEl) doneEl.addEventListener('click', () => { editMode = false; drawSummary(); });
         }
 
-        if (editMode) drawPicker(); else drawSummary();
+        // v0.60.483 (по замечанию Пользователя: «верни сам подход»):
+        // мастер подбора = СТАРЫЙ конфигуратор-wizard с авто-конфигурацией
+        // количества модулей и прочих элементов (он был лучше). Открываем
+        // его (зона wizard), скрывая панель варианта — без дубля.
+        function openMaster() {
+          try { _wizardMode = true; applyZones(); } catch {}
+          try {
+            window.dispatchEvent(new CustomEvent('ups:open-master', {
+              detail: { kind: 'ups', selectionName: ctx.selectionName || activeSel },
+            }));
+          } catch {}
+        }
+        function drawEmptyPrompt() {
+          host.innerHTML = `
+            <div class="rsp-sec-title" style="margin-top:4px">⚙ Вариант ещё не сконфигурирован</div>
+            <div class="rsp-note">Запустите <b>мастер подбора</b> — он авто-конфигурирует количество модулей, резерв и состав по условиям подбора.</div>
+            <div style="margin-top:10px"><button type="button" class="rs-cs-btn rs-cs-btn-primary" data-vspec="master">🧙 Мастер подбора (авто-конфигурация)</button></div>`;
+          const mb = host.querySelector('[data-vspec="master"]');
+          if (mb) mb.addEventListener('click', openMaster);
+        }
+        // Кнопка «Сменить модель» в сводке → старый мастер (не каскад).
+        const _origDrawSummary = drawSummary;
+        drawSummary = function () {
+          _origDrawSummary();
+          const eb = host.querySelector('[data-vspec="edit"]');
+          if (eb) { const n = eb.cloneNode(true); eb.parentNode.replaceChild(n, eb);
+            n.addEventListener('click', openMaster); }
+        };
+
+        if (p.upsId) drawSummary(); else drawEmptyPrompt();
       }
 
       // B2.2 i3: АКБ-вкладка варианта — решение «подобрать/пропустить»
