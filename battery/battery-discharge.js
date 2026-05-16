@@ -220,4 +220,73 @@ export function calcRequiredBlocks(input) {
   return null;
 }
 
-export { interpTable, interpTimeByPower, avgEfficiency };
+// =============================================================================
+// v0.60.460: Прогноз срока службы АКБ по условиям эксплуатации (мастер
+// старения для подбора АКБ). Pure, без DOM — переиспользуется и в
+// selection-panel (условия подбора), и в battery-calc (ЖЦ).
+//
+// Срок = min(календарный, циклический):
+//  • Календарный (float/standby): паспортный срок по химии, ускоренный
+//    температурой по правилу Аррениуса — для VRLA срок ~вдвое короче на
+//    каждые +10°C над 25°C (IEEE 1188 / рекомендации производителей);
+//    Li-ion менее чувствителен (T_double ≈ 15°C). Ниже 25°C — небольшой
+//    бонус (не более ×1.5).
+//  • Циклический: паспортный ресурс циклов при заданной глубине разряда
+//    (DoD). Каждое отключение сети ≈ 1 цикл разряд/заряд. Чем глубже
+//    разряд — тем меньше циклов (для свинца сильнее, чем для Li-ion).
+//    Ресурс_лет = ресурс_циклов / (циклов в год).
+//
+// @param {object} o
+//   @param {string} o.chemistry         'li-ion' | 'vrla' | 'nicd'
+//   @param {number} o.tempC             средняя температура эксплуатации, °C
+//   @param {number} o.dodPct            глубина разряда за отключение, % (1..100)
+//   @param {number} o.outagesPerMonth   среднее число отключений сети в месяц
+//   @param {number} [o.avgOutageMin]    средняя длительность отключения, мин (инфо)
+//   @param {number} [o.baseFloatLifeYears] переопределить паспортный календарный срок
+// @returns {{years,calendarYears,cycleYears,ratedCycles,cyclesPerYear,kTemp,chemistry}}
+function forecastBatteryLifeYears(o = {}) {
+  const chem = String(o.chemistry || 'vrla').toLowerCase();
+  const isLi  = /li|lfp|nmc|lto|ион/.test(chem);
+  const isNiCd = /nicd|ni-cd|никель/.test(chem);
+  // Паспортный календарный срок (лет до EOL 80% при 25°C).
+  const baseLife = Number.isFinite(Number(o.baseFloatLifeYears)) && Number(o.baseFloatLifeYears) > 0
+    ? Number(o.baseFloatLifeYears)
+    : (isLi ? 15 : isNiCd ? 20 : 5);
+  // Температурное ускорение старения (Аррениус, упрощённо).
+  const T = Number.isFinite(Number(o.tempC)) ? Number(o.tempC) : 25;
+  const tDouble = isLi ? 15 : isNiCd ? 14 : 10; // °C на удвоение скорости деградации
+  let kTemp;
+  if (T >= 25) kTemp = Math.pow(2, (T - 25) / tDouble);          // >25°C → срок короче
+  else         kTemp = 1 / Math.min(1.5, Math.pow(2, (25 - T) / tDouble)); // <25°C → бонус ≤×1.5
+  const calendarYears = baseLife / kTemp;
+  // Циклический ресурс при заданной DoD.
+  const dod = Math.max(5, Math.min(100, Number(o.dodPct) || 50)) / 100;
+  let ratedCycles;
+  if (isLi) {
+    // LFP: ~6000 циклов при 80% DoD, мягкая зависимость от глубины.
+    ratedCycles = 6000 * Math.pow(0.8 / dod, 0.6);
+    ratedCycles = Math.max(2500, Math.min(12000, ratedCycles));
+  } else if (isNiCd) {
+    // NiCd: устойчив к глубокому разряду.
+    ratedCycles = 2000 * Math.pow(0.8 / dod, 0.5);
+    ratedCycles = Math.max(1200, Math.min(5000, ratedCycles));
+  } else {
+    // VRLA/AGM: сильная зависимость (≈500 циклов при 50% DoD).
+    ratedCycles = 176.8 * Math.pow(dod, -1.5);
+    ratedCycles = Math.max(150, Math.min(2000, ratedCycles));
+  }
+  const cyclesPerYear = Math.max(0, (Number(o.outagesPerMonth) || 0) * 12);
+  const cycleYears = cyclesPerYear > 0 ? ratedCycles / cyclesPerYear : Infinity;
+  const years = Math.max(1, Math.round(Math.min(calendarYears, cycleYears)));
+  return {
+    years,
+    calendarYears: +calendarYears.toFixed(1),
+    cycleYears: Number.isFinite(cycleYears) ? +cycleYears.toFixed(1) : null,
+    ratedCycles: Math.round(ratedCycles),
+    cyclesPerYear,
+    kTemp: +kTemp.toFixed(2),
+    chemistry: isLi ? 'li-ion' : isNiCd ? 'nicd' : 'vrla',
+  };
+}
+
+export { interpTable, interpTimeByPower, avgEfficiency, forecastBatteryLifeYears };

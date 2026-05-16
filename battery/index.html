@@ -650,6 +650,7 @@
   <script type="module">
     import { mountSelectionPanel } from '../shared/selection-panel.js';
     import { getActiveProjectCode } from '../shared/configuration-catalog.js';
+    import { forecastBatteryLifeYears } from './battery-discharge.js';
     const mountEl = document.getElementById('bt-selection-panel');
     const pc = getActiveProjectCode();
     let activeSel = null;
@@ -666,8 +667,19 @@
         tip: 'Номинальное напряжение батарейной шины.' },
       { key: 'invEffPct',       label: 'КПД инвертора',   unit: '%',   type: 'number', step: 1,
         tip: 'КПД преобразования ИБП при разряде (для пересчёта мощности в DC).' },
+      // 🔮 Мастер прогноза старения АКБ — шаг условий подбора. Из частоты
+      // отключений сети, глубины разряда и температуры прогнозируется срок
+      // службы конкретной батареи (см. forecastBatteryLifeYears).
+      { key: 'outagesPerMonth', label: 'Отключений сети', unit: '/мес', type: 'number', step: 0.5,
+        tip: '🔮 Прогноз старения: среднее число отключений электросети в месяц. Каждое отключение ≈ 1 цикл разряд/заряд АКБ. 0 = только календарное старение.' },
+      { key: 'avgOutageMin',    label: 'Длит. отключения', unit: 'мин', type: 'number', step: 1,
+        tip: '🔮 Прогноз старения: средняя длительность одного отключения сети (справочно; глубину разряда задайте отдельно).' },
+      { key: 'dodPct',          label: 'Глубина разряда (DoD)', unit: '%', type: 'number', step: 5,
+        tip: '🔮 Прогноз старения: средняя глубина разряда за отключение, % ёмкости. Чем глубже разряд — тем меньше ресурс циклов (для VRLA сильнее, чем для Li-ion). Типично 30–80%.' },
+      { key: 'operTempC',       label: 'Темп. эксплуатации', unit: '°C', type: 'number', step: 1,
+        tip: '🔮 Прогноз старения: средняя температура в АКБ-помещении. Каждые +10°C над 25°C ≈ вдвое сокращают срок VRLA (Аррениус, IEEE 1188); Li-ion менее чувствителен.' },
       { key: 'serviceLifeYears',label: 'Срок службы АКБ', unit: 'лет', type: 'number', step: 1,
-        tip: 'Расчётный срок службы батарей. Если меньше срока проекта — замена учитывается как CAPEX-событие в TCO. VRLA ≈ 5–8, Li-ion ≈ 10–15.' },
+        tip: '🔮 Прогноз старения: расчётный срок службы батарей. Оставьте пустым/0 — будет авто-прогноз из отключений/DoD/температуры и химии конкретной модели варианта (min календарного и циклического ресурса). Если меньше срока проекта — замена учитывается как CAPEX-событие в TCO.' },
       { key: 'maintPctPerYear', label: 'ТО, %/год от CAPEX', unit: '%', type: 'number', step: 0.5,
         tip: 'Годовая стоимость обслуживания как % от стоимости АКБ. Типично 1–2%.' },
       { key: 'pricePerKwh',     label: 'Цена, /кВт·ч ёмкости', type: 'number', step: 1,
@@ -682,10 +694,30 @@
       const pricePerKwh = Number(req.pricePerKwh) || 0;
       const price = Number(p.totalPrice) || (totalKwh * pricePerKwh) || 0;
       const maintPerYear = price * ((Number(req.maintPctPerYear) || 1) / 100);
-      // срок службы: из условий, иначе по химии АКБ.
+      // срок службы: ручной (если задан) → 🔮 авто-прогноз старения по
+      // условиям подбора и химии конкретной батареи варианта → дефолт.
       const chem = String(p.battery && (p.battery.chemistry || p.battery.type) || '').toLowerCase();
       const defLife = /li|lfp|lto|ион/.test(chem) ? 12 : 6;
-      const life = Math.max(1, Math.round(Number(req.serviceLifeYears) || defLife));
+      const manualLife = Number(req.serviceLifeYears) || 0;
+      let life = manualLife;
+      if (!(life > 0)) {
+        const hasAgingInputs = (Number(req.outagesPerMonth) || 0) > 0
+          || Number.isFinite(Number(req.operTempC)) || (Number(req.dodPct) || 0) > 0;
+        if (hasAgingInputs) {
+          try {
+            const fc = forecastBatteryLifeYears({
+              chemistry: chem || (Array.isArray(req.batteryTypes) && req.batteryTypes[0]) || 'vrla',
+              tempC: Number(req.operTempC),
+              dodPct: Number(req.dodPct),
+              outagesPerMonth: Number(req.outagesPerMonth),
+              avgOutageMin: Number(req.avgOutageMin),
+            });
+            life = fc.years;
+          } catch {}
+        }
+      }
+      life = Math.max(1, Math.round(life || defLife));
+      const lifeSrc = manualLife > 0 ? '' : ' 🔮';   // 🔮 = авто-прогноз старения
       const N = Math.max(1, Math.round(Number(selEco.projectLifetimeYears) || 10));
       const events = [];
       for (let y = life; y < N; y += life) events.push({ year: y, amount: price });
@@ -693,7 +725,7 @@
         annualEnergyKwh: 0,   // АКБ: OPEX не энергозатратный (доминируют ТО + замена)
         extraCapexEvents: events,
         costItems: [{
-          id: 'akb-main', label: entry.label || 'АКБ', qty: 1,
+          id: 'akb-main', label: `${entry.label || 'АКБ'} · ресурс ~${life} лет${lifeSrc}`, qty: 1,
           equipmentPrice:          { value: price, currency: cur },
           installPrice:            { value: 0, currency: cur },
           maintenancePerYearPrice: { value: maintPerYear, currency: cur },
