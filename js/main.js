@@ -5990,6 +5990,26 @@ function _updateProjectStatusBar() {
     </div>`;
   };
   const html = [];
+  // v0.60.500 (Roadmap 47.4.1-followup): чип дисциплины схемы. Для
+  // не-electrical — амбер + подсказка «движок в разработке (47.4)».
+  {
+    const DISC = {
+      electrical: { ic: '⚡', lb: 'Электрика', el: true },
+      hydraulic:  { ic: '💧', lb: 'Гидравлика' },
+      hvac:       { ic: '❄', lb: 'ОВК' },
+      gas:        { ic: '🔥', lb: 'Газоснабжение' },
+      mechanical: { ic: '⚙', lb: 'Механика' },
+      data:       { ic: '🌐', lb: 'Данные/СКС' },
+    };
+    const dId = (S.project && S.project.discipline) || 'electrical';
+    const d = DISC[dId] || DISC.electrical;
+    const col = d.el ? '#1565c0' : '#b45309';
+    const bg = d.el ? 'rgba(255,255,255,0.95)' : 'rgba(254,243,199,0.95)';
+    const ttl = d.el
+      ? 'Дисциплина схемы: Электрика (расчётный движок IEC активен). Сменить — «Свойства проекта».'
+      : `Дисциплина схемы: ${d.lb}. Граф/узлы доступны как каркас; полноценный расчётный движок — Phase 47.4.2. Сменить — «Свойства проекта».`;
+    html.push(chip(col, bg, `${d.ic} ${d.lb}${d.el ? '' : ' ⚙'}`, ttl, 'projinfo'));
+  }
   if (errors || warns) {
     const parts = [];
     if (errors) parts.push(`<span style="color:#c62828;font-weight:700">${errors}</span> ошибок`);
@@ -6048,6 +6068,7 @@ function _updateProjectStatusBar() {
       const a = el.dataset.statusAction;
       if (a === 'issues') openProjectIssuesModal();
       else if (a === 'dashboard') openDashboardModal();
+      else if (a === 'projinfo') { try { openProjectInfoModal(); } catch {} }
     });
   });
 }
