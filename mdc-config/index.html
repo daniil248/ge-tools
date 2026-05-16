@@ -18,6 +18,9 @@
 </head>
 <body>
   <div id="rs-header-mount"></div>
+  <script type="importmap">
+  { "imports": { "shared/": "../shared/", "engine/": "../js/engine/" } }
+  </script>
   <script type="module">
     import { mountHeader } from '../shared/app-header.js';
     mountHeader({ title: 'Конфигуратор модульного ЦОД (GDM-600)', home: '../hub.html' });

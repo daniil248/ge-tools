@@ -31,6 +31,9 @@
 </head>
 <body>
   <div id="rs-header-mount"></div>
+  <script type="importmap">
+  { "imports": { "shared/": "../shared/", "engine/": "../js/engine/" } }
+  </script>
   <script type="module">
     import { mountHeader } from '../shared/app-header.js';
     import { ensureDefaultProject, getActiveProjectId, getProject } from '../shared/project-storage.js';

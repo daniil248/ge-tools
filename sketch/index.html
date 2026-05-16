@@ -400,6 +400,9 @@ modules.json верните "enabled": true, в hub.html раскомменти�
 </head>
 <body>
   <div id="rs-header-mount"></div>
+  <script type="importmap">
+  { "imports": { "shared/": "../shared/", "engine/": "../js/engine/" } }
+  </script>
   <script type="module">
     import { mountHeader } from '../shared/app-header.js';
     mountHeader({ title: 'Скетч (drawio)', home: '../hub.html' });
