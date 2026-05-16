@@ -5,10 +5,11 @@
 - **Тип:** `ui`
 - **Точка входа:** `index.html`
 - **Главные файлы:**
-  - `scs-design.js` — вкладка «Связи»: выбор стоек, создание/удаление связей, расчёт длины кабеля
+  - `scs-design.js` — UI/рендер: выбор стоек, создание/удаление связей, план зала
+  - `calc/cable-route.js` — чистый расчётный слой (Manhattan-геометрия, без DOM): `pushManhattan()`, `routeCells()`, `ptsToPath()`
   - `scs-design.css` — стили
-- **Расчётная часть (calc):** расчёт маршрута/длины кабеля внутри `scs-design.js` (отдельный calc-слой не выделен)
+- **Расчётная часть (calc):** `calc/cable-route.js` — чистые функции без DOM (PLAN_CELL_PX передаётся параметром; переиспользуемо: длины, экспорт, отчёты, тесты)
 - **UI/рендер:** `scs-design.js`
-- **Данные/справочники:** стойки проекта через `shared/project-storage`; (нет manifest.json; не зарегистрирован в modules.json)
+- **Данные/справочники:** стойки проекта через `shared/project-storage`; зарегистрирован в `modules.json` (manifest.json есть)
 - **Cross-module связи:** проекты/подпроекты (`ensureDefaultProject`, `createSketchForModule`); стойки из проекта
 - **Куда добавлять новое:** логику связей/маршрутизации и экран — в `scs-design.js`

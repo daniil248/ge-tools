@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.536', date: '2026-05-16', items: [
+      '🧱 <b>Дробление монолитов — calc/ui (scs-design)</b>. Выделен чистый расчётный слой <code>scs-design/calc/cable-route.js</code> (Manhattan-геометрия кабельных маршрутов, без DOM): <code>pushManhattan()</code> (наращивание ломаной без диагоналей), <code>routeCells()</code> (длина маршрута в клетках), <code>ptsToPath()</code> (SVG path). В <code>scs-design.js</code> (5.2k) <code>pushManhattan/ptsToPath</code> заменены импортом, <code>routeCells</code> — тонкая обёртка, подставляющая текущий <code>PLAN_CELL_PX</code> (мутирует при зуме) — поведение байт-в-байт идентично, 25 call-sites не тронуты. Shim не нужен (leaf-модуль). 5-й модуль calc-извлечения.',
+    ] },
     { version: '0.60.535', date: '2026-05-16', items: [
       '🧱 <b>Дробление монолитов — calc/ui (scs-config)</b>. Выделен чистый расчётный слой <code>scs-config/calc/rack-slots.js</code> (геометрия U-слотов стойки, без DOM): <code>computeOccupiedU()</code>, <code>freeURanges()</code>, <code>findFirstFreeSlot()</code>, <code>canPlace()</code>, <code>findNearestFreeSlot()</code> — каталог передаётся параметром (resolver typeId→type). В <code>scs-config.js</code> (5.2k) одноимённые функции заменены тонкими обёртками, подставляющими <code>state.catalog</code> — все 15+ call-sites не тронуты, поведение байт-в-байт идентично. Shim не нужен (leaf-модуль). 4-й модуль calc-извлечения; крупнейший монолит после tech-workspace.',
     ] },

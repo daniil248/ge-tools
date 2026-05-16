@@ -24,6 +24,13 @@ import { loadSchemeVirtualRacks, loadPorGroupVirtualRacks } from '../shared/sche
 // родителя (16 шт. SR01-08, MR01, CR01 у тестового проекта).
 import '../shared/por.js';
 import '../shared/por-types/index.js';
+// v0.60.536: чистый расчётный слой Manhattan-геометрии выделен в calc/
+// (без DOM). routeCells получает PLAN_CELL_PX параметром (мутирует при зуме).
+import {
+  pushManhattan,
+  ptsToPath,
+  routeCells as _calcRouteCells,
+} from './calc/cable-route.js';
 
 const LS_RACK      = LS_TEMPLATES_GLOBAL;              // для совместимости storage-listener
 const LS_CATALOG   = 'scs-config.catalog.v1';          // глобальный каталог IT
@@ -3418,16 +3425,7 @@ function snapTrayPosition(t, nx, ny, plan) {
 // Чистый Manhattan-сегмент от P→Q. Если (px,py) и (qx,qy) различаются по обеим
 // осям — добавляется L-точка (qx,py) (или (px,qy)) так, чтобы все сегменты были
 // строго горизонтальные или вертикальные.
-function pushManhattan(pts, qx, qy, preferAxis /* 'h'|'v' */) {
-  const last = pts[pts.length - 1];
-  const [lx, ly] = last;
-  if (lx === qx && ly === qy) return;
-  if (lx === qx || ly === qy) { pts.push([qx, qy]); return; }
-  // нужен L-угол
-  if (preferAxis === 'v') pts.push([lx, qy]);
-  else pts.push([qx, ly]);
-  pts.push([qx, qy]);
-}
+// pushManhattan → ./calc/cable-route.js (без DOM, импортирован выше).
 
 // Строит трассу A → ближайшая точка канала → вдоль канала → ближайшая к B → B.
 // v0.59.296: строгий Manhattan (без диагоналей) + принуждение канала, если он
@@ -3636,20 +3634,9 @@ function renderTrayCrossSection(t, fillInfo) {
   </div>`;
 }
 
-function routeCells(pts) {
-  let len = 0;
-  for (let i = 1; i < pts.length; i++) {
-    len += Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
-  }
-  return len / PLAN_CELL_PX;
-}
-
-function ptsToPath(pts) {
-  if (!pts.length) return '';
-  let d = `M ${pts[0][0]} ${pts[0][1]}`;
-  for (let i = 1; i < pts.length; i++) d += ` L ${pts[i][0]} ${pts[i][1]}`;
-  return d;
-}
+// Тонкая обёртка: подставляет текущий PLAN_CELL_PX (мутирует при зуме).
+function routeCells(pts) { return _calcRouteCells(pts, PLAN_CELL_PX); }
+// ptsToPath → ./calc/cable-route.js (без DOM, импортирован выше).
 
 function drawPlanLinks(svg, plan) {
   while (svg.firstChild) svg.removeChild(svg.firstChild);
