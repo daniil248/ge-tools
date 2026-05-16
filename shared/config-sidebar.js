@@ -250,7 +250,12 @@ export function mountConfigSidebar(opts) {
     }
     const html = [];
     for (const [selName, entries] of groups) {
-      const collapsed = collapsedSelections.get(selName) === true;
+      // v0.60.469 (по замечанию Пользователя 2026-05-16, как в «Подбор
+      // холода»): аккордеон — развёрнут ТОЛЬКО активный подбор; клик по
+      // активному его НЕ сворачивает, клик по другому сворачивает
+      // прочие и разворачивает выбранный. Пока активный не выбран —
+      // показываем все развёрнутыми.
+      const collapsed = !!activeSelName && selName !== activeSelName;
       const mainEntry = entries.find(e => e.isMainVariant);
       const selActive = activeSelName && selName === activeSelName;
       const selPcAttr = esc(selPc.get(selName) || '');
@@ -404,13 +409,16 @@ export function mountConfigSidebar(opts) {
       }
       return;
     }
-    // v0.60.422: клик на header подбора → toggle collapsed.
+    // v0.60.469: клик по заголовку подбора = сделать активным (аккордеон).
+    // Клик по уже активному НЕ сворачивает его (как в «Подбор холода»);
+    // клик по другому сворачивает прочие и разворачивает выбранный.
     const selHead = ev.target.closest('[data-act-sel="toggle"]');
     if (selHead) {
       const name = selHead.getAttribute('data-sel-name');
-      collapsedSelections.set(name, !(collapsedSelections.get(name) === true));
-      fireSel(name);   // сначала отметить активным…
-      render();        // …затем перерисовать с подсветкой активного подбора
+      activeSelName = name;            // только он будет развёрнут (render)
+      collapsedSelections.clear();
+      fireSel(name);
+      render();
       fireFocus('selection', name);  // зона подбора: исходные + TCO/Сравнение
       return;
     }

@@ -669,10 +669,43 @@
         });
       }
 
+      // v0.60.469 (по замечанию Пользователя): корректность сравнения
+      // вариантов. Сравнивать можно только сопоставимые: либо ВСЕ с
+      // подобранными АКБ, либо ВСЕ без АКБ. Если в каком-то варианте
+      // АКБ не подобраны — предупреждение, что сравнение некорректно.
+      function compareCheck(entries, req) {
+        const w = [];
+        const st = (entries || []).map(e => {
+          const p = (e && e.payload) || {};
+          const skip = p.batteryChoice === 'skip';
+          const hasAkb = !!(p.battery && (p.battery.id || p.battery.model));
+          return { label: e.label || e.id, skip, hasAkb, choice: p.batteryChoice };
+        });
+        if (!st.length) return w;
+        const missing = st.filter(s => !s.skip && !s.hasAkb);
+        if (missing.length) {
+          w.push('Сравнение некорректно: в варианте(ах) '
+            + missing.map(s => '«' + s.label + '»').join(', ')
+            + ' не подобраны АКБ. Подберите АКБ (вкладка «🔋 АКБ») или отметьте «Без АКБ».');
+        }
+        const withA = st.filter(s => !s.skip);
+        const without = st.filter(s => s.skip);
+        if (withA.length && without.length) {
+          w.push('Варианты несопоставимы: часть с АКБ, часть без. '
+            + 'Сравнение TCO корректно только если ВСЕ варианты с АКБ либо ВСЕ без АКБ.');
+        }
+        if (st.length && st.every(s => s.skip)
+          && !(Array.isArray(req && req.batteryTypes) && req.batteryTypes.length)) {
+          w.push('Все варианты без АКБ — укажите «Допустимые типы АКБ» в условиях подбора '
+            + '(конфигурация должна поддерживать заданные типы АКБ).');
+        }
+        return w;
+      }
+
       const api = mountSelectionPanel({
         kind: 'ups', mountEl, projectCode: pc,
         getActiveSelectionName: () => activeSel,
-        requirementsSchema, variantEconomics, variantSpec, variantAkb, variantItog,
+        requirementsSchema, variantEconomics, variantSpec, variantAkb, variantItog, compareCheck,
         variantLabel: (e) => e.label || e.id,
         convertFn: null,
         // v0.60.446: УСЛОВИЯ подбора задаются ЗДЕСЬ (зона подбора —

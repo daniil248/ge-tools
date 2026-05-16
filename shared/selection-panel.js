@@ -83,6 +83,9 @@ const FIN_FIELDS = [
  *  @param {function({host,entry,req,kind,selectionName,save,refresh}):void} [o.variantItog]
  *      — B2.2 i4: хост рисует действия Итога (применить к схеме / печать)
  *        — мост к существующей логике модуля.
+ *  @param {function(entries,req):string[]} [o.compareCheck]
+ *      — вернуть список предупреждений о НЕкорректности сравнения
+ *        (напр. вариант без подобранных АКБ; смесь с АКБ / без АКБ).
  *  @param {function|null} [o.convertFn]
  */
 export function mountSelectionPanel(o) {
@@ -413,8 +416,21 @@ export function mountSelectionPanel(o) {
       </tr>`;
     }).join('');
 
+    // v0.60.469: проверка корректности сравнения (хост-модуль решает,
+    // что делает сравнение некорректным — напр. часть вариантов без
+    // подобранных АКБ, или смесь «с АКБ»/«без АКБ»).
+    let cmpWarn = [];
+    if (typeof o.compareCheck === 'function') {
+      try { cmpWarn = o.compareCheck(variants, req) || []; } catch {}
+    }
+    const cmpWarnHtml = (Array.isArray(cmpWarn) && cmpWarn.length)
+      ? `<div class="rsp-note" style="margin:0 0 10px;background:#fff7ed;border-color:#fed7aa;color:#9a3412">
+          ${cmpWarn.map(w => '⚠ ' + escH(w)).join('<br>')}
+        </div>`
+      : '';
     return `
       ${ratesBarHtml()}
+      ${cmpWarnHtml}
       ${chartSvg}
       <div class="rsp-sec-title" title="Технико-экономическое сравнение вариантов подбора. TCO = CAPEX + Σ дисконтированных OPEX за срок проекта (ISO 15686-5).">⚖ Финансовая сводка по вариантам · TCO ${main ? main.t.projectLifetimeYears : eco.projectLifetimeYears} лет</div>
       <table class="rsp-table">
