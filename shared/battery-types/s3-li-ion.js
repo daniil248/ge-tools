@@ -26,6 +26,25 @@ import {
   computeS3Configuration, findMinimalS3Config,
 } from '../battery-s3-logic.js';
 
+// v0.60.462: комплектность позиции BOM. По замечанию Пользователя
+// 2026-05-16: часть принадлежностей производитель комплектует САМ и они
+// входят в общую стоимость системы (заглушки слотов, сетевой коммутатор),
+// а часть оплачивается/заказывается ОТДЕЛЬНО (combiner, комплект проводов
+// slave). Это пресеты по роли — Пользователь может переопределить на
+// конкретной позиции.
+//   'included' — в комплекте производителя (в цене системы, не отдельной
+//                заказной строкой);
+//   'separate' — оплачивается/заказывается отдельно.
+export const DEFAULT_KIT_INCLUSION = {
+  module:              'separate',  // батарейные модули — основное оборудование
+  master:              'separate',  // шкаф master
+  slave:               'separate',  // шкаф slave
+  combiner:            'separate',  // комбайнер DC — отдельная позиция
+  'wire-kit':          'separate',  // комплект проводов slave — отдельно
+  'networking-device': 'included',  // сетевой коммутатор — в комплекте
+  'blank-panel':       'included',  // заглушки пустых слотов — в комплекте
+};
+
 export const s3LiIonType = {
   id: 's3-li-ion',
   label: 'Kehua S³ Li-Ion (модульная LFP-система)',
@@ -259,6 +278,7 @@ export const s3LiIonType = {
         model: module.type || module.model,
         qty: systemSpec.totalModules,
         role: 'module',
+        kitInclusion: DEFAULT_KIT_INCLUSION.module,
       });
     }
     // Шкафы (master + slave + combiner)
@@ -270,6 +290,7 @@ export const s3LiIonType = {
         model: c.model,
         qty: 1,
         role: c.role,
+        kitInclusion: DEFAULT_KIT_INCLUSION[c.role] || 'separate',
         meta: {
           variant: c.variant,
           modulesInCabinet: c.modulesInCabinet,
@@ -287,6 +308,7 @@ export const s3LiIonType = {
         model: (cat && cat.type) || a.id,
         qty: a.qty,
         role: a.role,
+        kitInclusion: DEFAULT_KIT_INCLUSION[a.role] || 'separate',
       });
     }
     return out;

@@ -38,8 +38,9 @@ import { saveConfig as _saveConfig, nextConfigId as _nextConfigId, getActiveProj
 // централизованный курс валют на дату (как «Подбор холода»).
 import { openCostItemsModal } from '../shared/ui/cost-items-modal.js';
 import { makeConvertFn } from '../shared/currency-rates/provider.js';
-import { computeEcoTotals } from '../shared/calc/capex-tco.js';
+import { computeEcoTotals, syncCostItemsFromEquipment } from '../shared/calc/capex-tco.js';
 import { fmtMoney } from '../shared/money.js';
+import { DEFAULT_KIT_INCLUSION } from '../shared/battery-types/s3-li-ion.js';
 
 const fmt = (n, d = 2) => {
   if (!Number.isFinite(n)) return '—';
@@ -1597,11 +1598,27 @@ let _lcState = {
   rateDate: new Date().toISOString().slice(0, 10), sourceId: null,
 };
 let _lcConvertFn = null;
+// v0.60.462: последний посчитанный состав системы (BOM-строки с ролью и
+// комплектностью). ЖЦ берёт стоимость ИЗ СОСТАВА (а не отдельным полем):
+// — цены задаются построчно для позиций «заказ отдельно» (включая модули);
+// — позиции «в комплекте производителя» в цене системы, отдельной строки
+//   заказа/цены не требуют;
+// — при ПЛАНОВОЙ ЗАМЕНЕ меняются ТОЛЬКО батарейные модули (шкафы,
+//   combiner, коммутатор служат весь срок проекта).
+let _lcLastBom = [];
+if (!_lcState.kitIncl || typeof _lcState.kitIncl !== 'object') _lcState.kitIncl = {};
+const _lcLineKey = (l) => `${l.role || 'item'}:${l.model || l.id || ''}`;
+function _lcEffIncl(l) {
+  const k = _lcLineKey(l);
+  return _lcState.kitIncl[k]
+    || l.kitInclusion || DEFAULT_KIT_INCLUSION[l.role] || 'separate';
+}
 function _lcLoad() {
   try {
     const r = JSON.parse(localStorage.getItem(LC_KEY) || 'null');
     if (r && typeof r === 'object') _lcState = { ..._lcState, ...r };
   } catch {}
+  if (!_lcState.kitIncl || typeof _lcState.kitIncl !== 'object') _lcState.kitIncl = {};
 }
 function _lcSave() { try { localStorage.setItem(LC_KEY, JSON.stringify(_lcState)); } catch {} }
 async function _lcEnsureRates(force) {
@@ -1611,23 +1628,55 @@ async function _lcEnsureRates(force) {
     return r;
   } catch { _lcConvertFn = null; return null; }
 }
-function _lcTotals() {
-  const items = Array.isArray(_lcState.costItems) ? _lcState.costItems : [];
-  if (!items.length) return { setCost: 0, maintPerYear: 0 };
+// Синхронизировать построчные цены с составом системы. Цена нужна только
+// для позиций «заказ отдельно» (+ модули). «В комплекте» не порождают
+// строку цены (входят в стоимость системы у производителя).
+function _lcSyncFromBom(bom) {
+  _lcLastBom = Array.isArray(bom) ? bom : [];
+  const groups = _lcLastBom
+    .filter(l => l && (l.role === 'module' || _lcEffIncl(l) === 'separate'))
+    .map(l => ({
+      id: _lcLineKey(l),
+      qty: Number(l.qty) || 1,
+      spec: { name: `${l.model || l.id}${l.role === 'module' ? ' (модуль АКБ)' : ''}` },
+      role: l.role,
+    }));
+  _lcState.costItems = syncCostItemsFromEquipment(
+    { costItems: _lcState.costItems, currency: _lcState.currency },
+    groups, _lcState.currency);
+  _lcState._roleByGroup = {};
+  for (const g of groups) _lcState._roleByGroup[g.id] = g.role;
+  _lcSave();
+}
+// Стоимость ОДНОЙ плановой замены = только батарейные модули из состава.
+function _lcReplacementTotals() {
+  const items = (Array.isArray(_lcState.costItems) ? _lcState.costItems : [])
+    .filter(it => (_lcState._roleByGroup || {})[it.linkedGroupId] === 'module');
+  if (!items.length) return { setCost: 0, modulesQty: 0 };
   const t = computeEcoTotals({ costItems: items, currency: _lcState.currency }, _lcState.currency, _lcConvertFn);
-  return {
-    setCost: (Number(t.equipmentCost) || 0) + (Number(t.installationCost) || 0),
-    maintPerYear: Number(t.maintenanceRubPerYear) || 0,
-  };
+  const modulesQty = items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
+  return { setCost: (Number(t.equipmentCost) || 0) + (Number(t.installationCost) || 0), modulesQty };
+}
+// Стоимость всех «заказываемых отдельно» позиций (для подсказки/CAPEX).
+function _lcSeparateTotal() {
+  const items = Array.isArray(_lcState.costItems) ? _lcState.costItems : [];
+  if (!items.length) return 0;
+  const t = computeEcoTotals({ costItems: items, currency: _lcState.currency }, _lcState.currency, _lcConvertFn);
+  return (Number(t.equipmentCost) || 0) + (Number(t.installationCost) || 0);
 }
 function _lcRefreshLabel() {
   const el = document.getElementById('calc-lc-cost-label');
   if (!el) return;
-  const c = _lcTotals().setCost;
-  el.textContent = c > 0 ? fmtMoney(c, _lcState.currency) + ' / комплект' : 'не задано';
+  const r = _lcReplacementTotals();
+  el.textContent = r.setCost > 0
+    ? `${fmtMoney(r.setCost, _lcState.currency)} / замена (${r.modulesQty} мод. из состава)`
+    : 'из состава системы (задайте цены позиций)';
 }
 async function _lcOpenEditor() {
   await _lcEnsureRates(false);
+  // Пересобрать строки из актуального состава, чтобы цены задавались по
+  // позициям состава, а не «лишним» отдельным полем.
+  if (_lcLastBom.length) _lcSyncFromBom(_lcLastBom);
   const start = Array.isArray(_lcState.costItems) ? _lcState.costItems : [];
   const res = await openCostItemsModal(start, _lcState.currency, _lcConvertFn);
   if (res == null) return;
@@ -1667,7 +1716,7 @@ function _lifecycleHtml(lc) {
   h += `<div style="padding:8px;background:#f5f5f5;border-radius:6px;text-align:center"><div class="muted" style="font-size:10px">Всего комплектов АКБ</div><div style="font-size:18px;font-weight:700;color:${color}">${lc.sets}</div><div class="muted" style="font-size:10px">за ${lc.designLife} лет</div></div>`;
   h += `<div style="padding:8px;background:#f5f5f5;border-radius:6px;text-align:center"><div class="muted" style="font-size:10px">Замен АКБ</div><div style="font-size:18px;font-weight:700;color:${color}">${lc.replacements}</div><div class="muted" style="font-size:10px">${lc.replacements === 0 ? 'не требуется' : 'плановых замен'}</div></div>`;
   if (lc.totalCost) {
-    h += `<div style="padding:8px;background:#f5f5f5;border-radius:6px;text-align:center"><div class="muted" style="font-size:10px">Стоимость АКБ (ЖЦ)</div><div style="font-size:18px;font-weight:700;color:#4a148c">${fmtMoney(lc.totalCost, lc.currency)}</div><div class="muted" style="font-size:10px">${lc.sets} × ${fmtMoney(lc.setCost, lc.currency)}</div></div>`;
+    h += `<div style="padding:8px;background:#f5f5f5;border-radius:6px;text-align:center" title="Замена только батарейных модулей (из состава системы) за весь срок проекта. Шкафы/combiner/коммутатор не заменяются."><div class="muted" style="font-size:10px">Модули за ЖЦ (из состава)</div><div style="font-size:18px;font-weight:700;color:#4a148c">${fmtMoney(lc.totalCost, lc.currency)}</div><div class="muted" style="font-size:10px">${lc.sets} компл. × ${fmtMoney(lc.setCost, lc.currency)} модулей</div></div>`;
   }
   h += `</div>`;
   if (!isLi && lc.replacements > 0) {
@@ -1921,6 +1970,9 @@ function _renderS3SystemSpecHtml(battery, totalModules, loadKw, invEff, requeste
     options: { masterVariant, slaveVariant, fireFighting, minCabinets },
   });
   const bom  = s3LiIonType.bomLines(spec, { module: battery, accessoryCatalog });
+  // v0.60.462: запомнить состав для ЖЦ/ТЭО — стоимость берётся ОТСЮДА,
+  // отдельное поле цены в «Жизненном цикле» убрано.
+  _lcLastBom = bom;
   // Финальный чек уже на фактической конфигурации (cabinetsCount после bump).
   const cRateChk = s3LiIonType.validateMaxCRate({
     module: battery, loadKw, totalModules: spec.totalModules || totalModules, invEff,
@@ -1960,9 +2012,15 @@ function _renderS3SystemSpecHtml(battery, totalModules, loadKw, invEff, requeste
 
   const accRows = (spec.accessories || []).map(a => {
     const cat = accessoryCatalog.find(x => x.id === a.id);
-    const name = cat ? (cat.type || cat.id) : a.id;
+    const name = cat ? (cat.type || a.id) : a.id;
     const desc = cat ? (cat.systemDescription || '') : '';
-    return `<tr><td>${escHtml(name)}</td><td>${a.qty}</td><td class="muted" style="font-size:11px">${escHtml(desc)}</td></tr>`;
+    // v0.60.462: комплектность позиции (пресет по роли, можно переключить).
+    const incl = _lcEffIncl({ role: a.role, model: name, kitInclusion: a.kitInclusion });
+    const isInc = incl === 'included';
+    const badge = `<span data-kit-toggle="${escHtml(a.role || '')}:${escHtml(name)}" title="${isInc
+      ? 'В комплекте производителя — входит в стоимость системы, отдельно не заказывается и цена не задаётся. Клик — сделать «заказ отдельно».'
+      : 'Заказывается/оплачивается отдельно — попадает в построчную стоимость состава. Клик — сделать «в комплекте производителя».'}" style="cursor:pointer;display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;border:1px solid ${isInc ? '#a5d6a7;background:#e8f5e9;color:#1b5e20' : '#ffcc80;background:#fff3e0;color:#e65100'}">${isInc ? '✓ в комплекте' : '⛏ заказ отдельно'}</span>`;
+    return `<tr><td>${escHtml(name)}</td><td>${a.qty}</td><td style="text-align:center">${badge}</td><td class="muted" style="font-size:11px">${escHtml(desc)}</td></tr>`;
   }).join('');
 
   let html = `<div class="result-block" style="margin-top:14px">`;
@@ -1983,9 +2041,10 @@ function _renderS3SystemSpecHtml(battery, totalModules, loadKw, invEff, requeste
   if (accRows) {
     html += `<div class="result-title" style="margin-top:12px;font-size:13px">Аксессуары (BOM)</div>`;
     html += `<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px">`;
-    html += `<thead><tr style="background:#f5f7fa"><th style="text-align:left;padding:6px;border:1px solid #e0e3ea">Наименование</th><th style="text-align:left;padding:6px;border:1px solid #e0e3ea">Кол-во</th><th style="text-align:left;padding:6px;border:1px solid #e0e3ea">Описание</th></tr></thead>`;
+    html += `<thead><tr style="background:#f5f7fa"><th style="text-align:left;padding:6px;border:1px solid #e0e3ea">Наименование</th><th style="text-align:left;padding:6px;border:1px solid #e0e3ea">Кол-во</th><th style="text-align:center;padding:6px;border:1px solid #e0e3ea" title="«В комплекте» — производитель комплектует сам, в стоимости системы. «Заказ отдельно» — оплачивается/заказывается отдельно и входит в построчную стоимость состава.">Комплектность</th><th style="text-align:left;padding:6px;border:1px solid #e0e3ea">Описание</th></tr></thead>`;
     html += `<tbody>${accRows.replace(/<td>/g, '<td style="padding:6px;border:1px solid #e0e3ea;vertical-align:top">')}</tbody>`;
     html += `</table>`;
+    html += `<div class="muted" style="font-size:11px;margin-top:4px">Клик по бейджу переключает «в комплекте производителя» ↔ «заказ отдельно». Позиции «заказ отдельно» получают цену в составе («Жизненный цикл» → ✏ Состав / стоимость); «в комплекте» — уже в цене системы.</div>`;
   }
 
   if (spec.warnings && spec.warnings.length) {
@@ -2131,7 +2190,11 @@ function _doCalcS3({ battery, loadKw, mode, targetMin, vRange, derate, invEff })
     const get2 = id => document.getElementById(id);
     const designLife = Number(get2('calc-design-life')?.value) || 10;
     const battLife   = Number(get2('calc-batt-life')?.value)   || _defaultBattLife('li-ion');
-    const _lct = _lcTotals();
+    // Цена ЖЦ — ИЗ СОСТАВА системы (BOM посчитан в _renderS3SystemSpecHtml);
+    // плановая замена = только батарейные модули.
+    _lcSyncFromBom(_lcLastBom);
+    const _lct = _lcReplacementTotals();
+    _lcRefreshLabel();
     html += _lifecycleHtml(_calcLifecycle({ designLife, battLife, chemistry: 'li-ion', setCost: _lct.setCost, currency: _lcState.currency }));
   }
   // График разряда + zoom (как для обычной АКБ — battery.dischargeTable есть).
@@ -2397,7 +2460,16 @@ function doCalc() {
   {
     const designLife = Number(get('calc-design-life')?.value) || 10;
     const battLife   = Number(get('calc-batt-life')?.value)   || _defaultBattLife(chemistry);
-    const _lct = _lcTotals();
+    // Состав для не-S³ АКБ = N блоков выбранной модели (это и есть
+    // батарейные модули). Цена ЖЦ — из состава, замена = эти блоки.
+    const _genBom = battery
+      ? [{ role: 'module', model: battery.type || battery.model || 'АКБ',
+            id: battery.id, qty: (Number(strings) || 1) * (Number(blocksPerString) || 1),
+            kitInclusion: 'separate' }]
+      : [];
+    _lcSyncFromBom(_genBom);
+    const _lct = _lcReplacementTotals();
+    _lcRefreshLabel();
     const lc = _calcLifecycle({ designLife, battLife, chemistry, setCost: _lct.setCost, currency: _lcState.currency });
     html += _lifecycleHtml(lc);
   }
@@ -3881,6 +3953,18 @@ window.addEventListener('DOMContentLoaded', () => {
   const _lcBtn = document.getElementById('calc-lc-cost-edit');
   if (_lcBtn) _lcBtn.addEventListener('click', _lcOpenEditor);
   _lcEnsureRates(false).then(_lcRefreshLabel).catch(() => _lcRefreshLabel());
+  // v0.60.462: переключение комплектности позиции состава (бейдж в BOM).
+  const _calcRes = document.getElementById('calc-result');
+  if (_calcRes) _calcRes.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-kit-toggle]');
+    if (!b) return;
+    const key = b.getAttribute('data-kit-toggle');
+    const cur = _lcState.kitIncl[key]
+      || (DEFAULT_KIT_INCLUSION[String(key).split(':')[0]] || 'separate');
+    _lcState.kitIncl[key] = (cur === 'included') ? 'separate' : 'included';
+    _lcSave();
+    try { if (lastBatteryCalc) doCalc(); } catch {}
+  });
 });
 
 // ================= Интеграция с Конструктором схем (Фаза 1.4.4) =================
