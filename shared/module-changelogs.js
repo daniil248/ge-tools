@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.537', date: '2026-05-16', items: [
+      '🧱 <b>Дробление монолитов — calc/ui (tech-workspace, ФИНАЛ)</b>. Выделен чистый расчётный слой <code>tech-workspace/calc/concept-loads.js</code> (нагрузки/площади концепции ЦОД, без DOM): <code>calcITTotal/calcRackGroupKw/calcMachroomArea/calcUpsByPurpose/calcCoolTotal/calcHeatLoad/calcFeedTotal/calcAreas</code> + хелперы <code>_upsAvail/_coolAvail/_heatCfg</code> + <code>HEAT_DEFAULTS</code> — принимают объект концепции <code>c</code>. В <code>tech-workspace.js</code> (5.7k) 12 функций заменены импортом (сигнатуры идентичны, ~60 call-sites не тронуты, поведение байт-в-байт идентично). Shim не нужен (leaf-модуль). 6-й и последний крупный монолит — calc-извлечение по плану X.1.4 завершено для всех модулей очереди (transformer-config→ups-config→rack-config→scs-config→scs-design→tech-workspace).',
+    ] },
     { version: '0.60.536', date: '2026-05-16', items: [
       '🧱 <b>Дробление монолитов — calc/ui (scs-design)</b>. Выделен чистый расчётный слой <code>scs-design/calc/cable-route.js</code> (Manhattan-геометрия кабельных маршрутов, без DOM): <code>pushManhattan()</code> (наращивание ломаной без диагоналей), <code>routeCells()</code> (длина маршрута в клетках), <code>ptsToPath()</code> (SVG path). В <code>scs-design.js</code> (5.2k) <code>pushManhattan/ptsToPath</code> заменены импортом, <code>routeCells</code> — тонкая обёртка, подставляющая текущий <code>PLAN_CELL_PX</code> (мутирует при зуме) — поведение байт-в-байт идентично, 25 call-sites не тронуты. Shim не нужен (leaf-модуль). 5-й модуль calc-извлечения.',
     ] },

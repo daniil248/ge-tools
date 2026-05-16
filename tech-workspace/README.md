@@ -5,9 +5,10 @@
 - **Тип:** `ui`
 - **Точка входа:** `index.html`
 - **Главные файлы:**
-  - `tech-workspace.js` — концепция объекта, варианты, сравнение, handoff, «План зала»
+  - `tech-workspace.js` — UI/рендер: концепция объекта, варианты, сравнение, handoff, «План зала»
+  - `calc/concept-loads.js` — чистый расчётный слой (нагрузки/площади, без DOM): `calcITTotal`, `calcUpsByPurpose`, `calcCoolTotal`, `calcHeatLoad`, `calcFeedTotal`, `calcAreas` и др.
   - `tech-workspace.css` — стили
-- **Расчётная часть (calc):** агрегирующие расчёты внутри `tech-workspace.js` (отдельный calc-слой не выделен)
+- **Расчётная часть (calc):** `calc/concept-loads.js` — чистые функции без DOM (принимают объект концепции `c`; переиспользуемо: карточки, отчёты, сравнение, тесты)
 - **UI/рендер:** `tech-workspace.js`
 - **Данные/справочники:** LS-ключи `raschet.project.<pid>.tech-workspace.variants.v1`, `...activeVariantId.v1`, `raschet.cooling.prefill.v1`
 - **Cross-module связи:** мост `scheme-rack-bridge`; PUSH контекста в дочерние конфигураторы (genset-config и др.) через URL; prefill для cooling

@@ -37,6 +37,13 @@ import { pricesForElement } from '../shared/price-records.js';
 // По правилу feedback_role_based_access.md — canApproveVariants только
 // для manager / gip. Для engineer / viewer кнопка disabled.
 import { hasPermission, currentRole, ROLES } from '../shared/subscriptions.js';
+// v0.60.537: чистый расчётный слой нагрузок/площадей концепции выделен
+// в calc/ (без DOM, переиспользуемо: карточки, отчёты, сравнение, тесты).
+import {
+  calcITTotal, calcRackGroupKw, calcMachroomArea, _upsAvail,
+  calcUpsByPurpose, _coolAvail, calcCoolTotal, HEAT_DEFAULTS,
+  _heatCfg, calcHeatLoad, calcFeedTotal, calcAreas,
+} from './calc/concept-loads.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -577,117 +584,10 @@ function migrateVariant(v) {
 }
 
 // ─── Calculations
-function calcITTotal(c) {
-  // Сумма по всем rack-группам с profile in {it, blade, gpu, storage} (не network)
-  return (c.rackGroups || []).reduce((s, rg) => {
-    if (rg.profile === 'network') return s; // network — не IT-нагрузка
-    return s + (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0);
-  }, 0);
-}
-function calcRackGroupKw(rg) {
-  return (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0);
-}
-function calcMachroomArea(c) {
-  const N = (c.rackGroups || []).reduce((s, rg) => s + (Number(rg.count) || 0), 0);
-  return Math.round(N * 2.5 * 1.4);
-}
-function _upsAvail(us) {
-  const count = Number(us.count) || 0;
-  const reserve = us.redundancy === 'N+1' ? 1 : (us.redundancy === '2N' ? Math.floor(count / 2) : 0);
-  const N = Math.max(1, count - reserve);
-  const kva = Number(us.ratedKva) || 0;
-  const cos = Number(us.cosPhi) || 0.95;
-  const lf = Number(us.loadFactor) || 0.8;
-  return Math.round(N * kva * cos * lf * 10) / 10;
-}
-function calcUpsByPurpose(c) {
-  const out = { it: 0, cooling: 0, mixed: 0, total: 0 };
-  for (const us of (c.upsSystems || [])) {
-    const kw = _upsAvail(us);
-    out[us.purpose || 'it'] = (out[us.purpose || 'it'] || 0) + kw;
-    out.total += kw;
-  }
-  return out;
-}
-function _coolAvail(cu) {
-  const count = Number(cu.count) || 0;
-  const reserve = cu.redundancy === 'N+1' ? 1 : (cu.redundancy === '2N' ? Math.floor(count / 2) : 0);
-  const N = Math.max(1, count - reserve);
-  return Math.round(N * (Number(cu.kwPerUnit) || 0) * 10) / 10;
-}
-function calcCoolTotal(c) {
-  return (c.coolingUnits || []).reduce((s, cu) => s + _coolAvail(cu), 0);
-}
-// v0.60.512 (правка Пользователя 2026-05-16): в лимит холода добавлены
-// тепловыделения ИБП и прочие теплопритоки (стены/ограждающие, кабельные
-// линии, электротехнические щиты). Требуемая холодопроизводительность =
-// IT-нагрузка + потери ИБП + теплопритоки. Коэффициенты — инженерные
-// дефолты, переопределяются в c.coolingSystem.heatGains (user-params-
-// sacred: ручные значения не затираются).
-const HEAT_DEFAULTS = {
-  upsEff: 0.95,      // КПД ИБП (для расчёта тепловых потерь)
-  wallWPerM2: 20,    // теплоприток через ограждающие, Вт/м² пола
-  cablePctIT: 1.5,   // потери в силовых кабелях, % от IT (тепло в зале)
-  panelPctIT: 2.0,   // тепловыделение электрощитов/РУ, % от IT
-};
-function _heatCfg(c) {
-  const hg = (c.coolingSystem && c.coolingSystem.heatGains) || {};
-  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v)) ? v : d;
-  return {
-    upsEff: num(hg.upsEff, HEAT_DEFAULTS.upsEff),
-    wallWPerM2: num(hg.wallWPerM2, HEAT_DEFAULTS.wallWPerM2),
-    cablePctIT: num(hg.cablePctIT, HEAT_DEFAULTS.cablePctIT),
-    panelPctIT: num(hg.panelPctIT, HEAT_DEFAULTS.panelPctIT),
-  };
-}
-// Требуемая холодопроизводительность с разбивкой теплопритоков.
-function calcHeatLoad(c) {
-  const itKw = calcITTotal(c);
-  const cfg = _heatCfg(c);
-  const eta = (cfg.upsEff > 0.5 && cfg.upsEff < 1) ? cfg.upsEff : 0.95;
-  // Тепловыделение ИБП = активная мощность × (1/η − 1) (потери в тепло).
-  const upsKw = itKw * (1 / eta - 1);
-  // Теплоприток через ограждающие конструкции: Σ площадь помещений ×
-  // q (Вт/м²). Если площади не заданы — оценка ~2% от IT.
-  const areaM2 = (Array.isArray(c.rooms) ? c.rooms : [])
-    .reduce((s, r) => s + (Number(r.areaSqM) || 0), 0);
-  const wallKw = areaM2 > 0
-    ? areaM2 * cfg.wallWPerM2 / 1000
-    : itKw * 0.02;
-  // Потери в силовых кабелях (тепло в зале) и тепловыделение щитов/РУ.
-  const cableKw = itKw * cfg.cablePctIT / 100;
-  const panelKw = itKw * cfg.panelPctIT / 100;
-  const totalKw = itKw + upsKw + wallKw + cableKw + panelKw;
-  return {
-    itKw, upsKw, wallKw, cableKw, panelKw, totalKw,
-    areaM2, eta, cfg,
-  };
-}
-function calcFeedTotal(c) {
-  const itTotal = calcITTotal(c);
-  const climateLoss = itTotal * 0.3;
-  const totalNeeded = itTotal + climateLoss;
-  const tp = c.feed?.tp?.needed ? Number(c.feed.tp.kva) || 0 : 0;
-  return Math.max(totalNeeded, tp * 0.8);
-}
-function calcAreas(c) {
-  const N = (c.rackGroups || []).reduce((s, rg) => s + (Number(rg.count) || 0), 0);
-  const upsCount = (c.upsSystems || []).reduce((s, us) => s + (Number(us.count) || 0), 0);
-  const upsKvaTotal = (c.upsSystems || []).reduce((s, us) => s + (Number(us.ratedKva) || 0) * (Number(us.count) || 0), 0);
-  const hasVrla = (c.upsSystems || []).some(us => us.batteryTech === 'vrla');
-  const coolCount = (c.coolingUnits || []).reduce((s, cu) => s + (Number(cu.count) || 0), 0);
-  const areas = [
-    { name: 'Машзал (стойки)', m2: Math.max(20, Math.round(N * 2.5 * 1.4)) },
-    { name: 'ИБП-зал', m2: Math.max(15, Math.round(upsCount * 4)) },
-    { name: 'АКБ-зал (VRLA)', m2: hasVrla ? Math.max(10, Math.round(upsKvaTotal * 0.012)) : 0 },
-    { name: 'Климат-зал', m2: Math.max(20, Math.round(coolCount * 6)) },
-    { name: 'ТП', m2: c.feed.tp.needed ? Math.max(20, Math.round((Number(c.feed.tp.kva) || 0) * 0.025)) : 0 },
-    { name: 'ДГУ-зал', m2: c.feed.dgu.needed ? Math.max(30, Math.round((Number(c.feed.dgu.kw) || 0) * 0.04)) : 0 },
-    { name: 'Склад', m2: 15 },
-    { name: 'Диспетчерская', m2: 12 },
-  ].filter(a => a.m2 > 0);
-  return areas;
-}
+// calcITTotal / calcRackGroupKw / calcMachroomArea / _upsAvail /
+// calcUpsByPurpose / _coolAvail / calcCoolTotal / HEAT_DEFAULTS /
+// _heatCfg / calcHeatLoad / calcFeedTotal / calcAreas
+// → ./calc/concept-loads.js (без DOM, импортированы выше).
 
 // ─── Render: variants list (sidebar)
 function renderVariantsList() {
