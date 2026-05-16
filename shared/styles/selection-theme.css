@@ -65,11 +65,18 @@
 .rs-cs-ctx-hint { font-size:10.5px; color:var(--sel-muted); margin-top:4px; }
 .rs-cs-gbs .rs-cs-list { border:0; border-radius:0; max-height:none; overflow:visible; background:transparent; }
 .rs-cs-gbs .rs-cs-sel-block { border:0; padding:8px 10px 0; }
-.rs-cs-gbs .rs-cs-sel-head { padding:8px 12px; background:var(--sel-podbor-bg); border:1px solid var(--sel-podbor-bd); border-radius:5px; font-size:12.5px; font-weight:600; color:var(--sel-podbor-ink); }
+/* v0.60.453: вид как option-row в «Подбор холода» — счётчик уезжает
+   на отдельную строку под именем; имя/мета как cl-sel/cl-option. */
+.rs-cs-gbs .rs-cs-sel-head { display:flex; flex-wrap:wrap; align-items:flex-start; gap:6px; row-gap:3px; padding:8px 12px; background:var(--sel-podbor-bg); border:1px solid var(--sel-podbor-bd); border-radius:5px; font-size:12.5px; font-weight:600; color:var(--sel-podbor-ink); }
 .rs-cs-gbs .rs-cs-sel-head:hover { background:var(--sel-podbor-hover); }
 .rs-cs-gbs .rs-cs-sel-head.rs-cs-sel-active { background:var(--sel-podbor-act-bg); border-color:var(--sel-podbor-act-bd); color:var(--sel-podbor-act-ink); }
-.rs-cs-gbs .rs-cs-sel-head::before { color:var(--sel-podbor-ink); }
-.rs-cs-gbs .rs-cs-sel-count { color:var(--sel-podbor-act-ink); opacity:.8; }
+.rs-cs-gbs .rs-cs-sel-head::before { color:var(--sel-podbor-ink); align-self:center; }
+.rs-cs-gbs .rs-cs-sel-name { flex:1 1 0; min-width:0; }
+.rs-cs-gbs .rs-cs-sel-actions { flex:0 0 auto; }
+.rs-cs-gbs .rs-cs-sel-count { flex:1 1 100%; color:var(--sel-podbor-act-ink); opacity:.75; font-weight:400; font-size:11px; }
+.rs-cs-gbs .rs-cs-item-main { min-width:0; }
+.rs-cs-gbs .rs-cs-item-label { font-weight:600; color:#1f2937; }
+.rs-cs-gbs .rs-cs-item-desc { color:var(--sel-muted); font-size:11px; margin-top:2px; word-break:break-word; }
 .rs-cs-gbs .rs-cs-sel-block > ul { margin:4px 0 0 14px; }
 .rs-cs-gbs .rs-cs-item { border:1px solid var(--sel-var-bd); background:var(--sel-var-bg); border-radius:5px; margin-bottom:4px; padding:8px 12px; }
 .rs-cs-gbs .rs-cs-item:hover { background:var(--sel-var-hover-bg); border-color:var(--sel-var-hover-bd); }

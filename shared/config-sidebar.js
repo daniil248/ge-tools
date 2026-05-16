@@ -218,11 +218,11 @@ export function mountConfigSidebar(opts) {
       html.push(`<li class="rs-cs-sel-block">
         <div class="rs-cs-sel-head${collapsed ? ' collapsed' : ''}${selActive ? ' rs-cs-sel-active' : ''}" data-act-sel="toggle" data-sel-name="${esc(selName)}" title="Активный подбор — общие условия и финансы задаются в панели «Свойства подбора».">
           <span class="rs-cs-sel-name">📋 ${esc(selName)}</span>
-          <span class="rs-cs-sel-count">${entries.length} вар.${mainEntry ? ' · ★ ' + esc(mainEntry.label || mainEntry.id) : ''}</span>
           <span class="rs-cs-sel-actions">
-            <button type="button" data-act-selop="rename" data-sel-name="${esc(selName)}" title="Переименовать подбор">✎</button>
-            <button type="button" data-act-selop="del" data-sel-name="${esc(selName)}" title="Удалить подбор (с вариантами)">🗑</button>
+            <button type="button" data-act-selop="rename" data-sel-name="${esc(selName)}" title="Переименовать подбор">✏</button>
+            <button type="button" data-act-selop="del" data-sel-name="${esc(selName)}" title="Удалить подбор (со всеми вариантами)">🗑</button>
           </span>
+          <span class="rs-cs-sel-count">${(() => { const n = entries.length; const m = n % 100; const u = n % 10; const w = (m >= 11 && m <= 14) ? 'вариантов' : (u === 1 ? 'вариант' : (u >= 2 && u <= 4 ? 'варианта' : 'вариантов')); return n + ' ' + w; })()}</span>
         </div>
         ${collapsed ? '' : `<ul style="list-style:none;padding:0;margin:0">${entries.map(e => renderEntryItem(e)).join('')}</ul>`}
       </li>`);
@@ -231,21 +231,40 @@ export function mountConfigSidebar(opts) {
   }
 
   function renderEntryItem(e) {
-    const mainBadge = e.isMainVariant
-      ? '<span class="rs-cs-main-badge" title="Основной вариант подбора">★ основной</span>'
-      : '';
-    return `
-      <li class="rs-cs-item ${e.id === activeId ? 'rs-active' : ''}${e.isMainVariant ? ' rs-cs-item-main' : ''}" data-id="${esc(e.id)}">
+    // v0.60.453: вид варианта 1:1 как option-row в «Подбор холода»:
+    // имя варианта + «★ основной», описательная мета-строка снизу,
+    // компактные иконки на hover (★/✏/🗑) — без id-моноширинного и без 📋.
+    if (!o.groupBySelection) {
+      // backward-compat: плоский режим (panel/mv/rack…) — как было.
+      return `
+      <li class="rs-cs-item ${e.id === activeId ? 'rs-active' : ''}" data-id="${esc(e.id)}">
         <div class="rs-cs-item-main">
-          <span class="rs-cs-item-id">${esc(e.id)}</span>${mainBadge}
+          <span class="rs-cs-item-id">${esc(e.id)}</span>
           ${e.label ? ` · <span class="rs-cs-item-label">${esc(e.label)}</span>` : ''}
           ${e.description ? `<div class="rs-cs-item-desc">${esc(e.description)}</div>` : ''}
         </div>
         <div class="rs-cs-item-actions">
-          ${o.groupBySelection ? `<button type="button" class="rs-cs-btn" data-act="movesel" title="Переместить в подбор / создать подбор">📋</button>` : ''}
-          ${e.selectionName && !e.isMainVariant ? `<button type="button" class="rs-cs-btn" data-act="setmain" title="Сделать основным вариантом подбора">★</button>` : ''}
           <button type="button" class="rs-cs-btn" data-act="rename" title="Переименовать">✎</button>
           <button type="button" class="rs-cs-btn rs-cs-btn-danger" data-act="del" title="Удалить">✕</button>
+        </div>
+      </li>`;
+    }
+    const mainBadge = e.isMainVariant
+      ? '<span class="rs-cs-main-badge" title="Основной вариант подбора — база для расчёта окупаемости в сравнении.">★ основной</span>'
+      : '';
+    const name = esc(e.label || e.id);
+    return `
+      <li class="rs-cs-item ${e.id === activeId ? 'rs-active' : ''}${e.isMainVariant ? ' rs-cs-item-main' : ''}" data-id="${esc(e.id)}" title="${esc(e.id)} — кликните, чтобы открыть вариант.">
+        <div class="rs-cs-item-main">
+          <span class="rs-cs-item-label">${name}</span> ${mainBadge}
+          ${e.description ? `<div class="rs-cs-item-desc">${esc(e.description)}</div>` : ''}
+        </div>
+        <div class="rs-cs-item-actions">
+          ${!e.isMainVariant && e.selectionName ? `<button type="button" class="rs-cs-btn" data-act="setmain" title="Сделать основным вариантом подбора">★</button>` : ''}
+          <button type="button" class="rs-cs-btn" data-act="rename" title="Переименовать вариант">✏</button>
+          ${e.isMainVariant
+            ? `<button type="button" class="rs-cs-btn" data-act="movesel" title="Переместить в другой подбор">↪</button>`
+            : `<button type="button" class="rs-cs-btn rs-cs-btn-danger" data-act="del" title="Удалить вариант">🗑</button>`}
         </div>
       </li>
     `;
