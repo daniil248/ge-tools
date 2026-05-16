@@ -667,8 +667,12 @@ export function mountSelectionPanel(o) {
               activeVariantId = ent.id;
               scopeMode = 'variant';
               variantTab = 'spec';
-              render();
-              try { window.dispatchEvent(new CustomEvent('rs-cs-focus', { detail: { kind, scope: 'variant', selectionName: selName, entryId: ent.id } })); } catch {}
+              // Перерисовку откладываем — не реентрируем render() из
+              // обработчика, вызванного во время текущего render().
+              setTimeout(() => {
+                try { render(); } catch {}
+                try { window.dispatchEvent(new CustomEvent('rs-cs-focus', { detail: { kind, scope: 'variant', selectionName: selName, entryId: ent.id } })); } catch {}
+              }, 0);
             }
             return ent;
           },
