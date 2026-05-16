@@ -664,16 +664,29 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
 }
 .tw-plan-chip:hover { filter: brightness(0.95); }
 .tw-plan-empty { padding: 14px; text-align: center; font-size: 12px; }
-/* Холст плана — позиционированный контейнер (объекты absolute). */
+/* Холст плана — безразмерный (v0.60.507): clip-контейнер + world-слой
+   с transform translate/scale. Объекты — в мировых координатах. */
 #tw-plan-area {
   position: relative;
-  overflow: auto;
+  overflow: hidden;
   display: block;
   align-items: initial;
   justify-content: initial;
   min-height: 460px;
   flex: 1;
+  cursor: grab;
+  touch-action: none;
 }
+#tw-plan-area:active { cursor: grabbing; }
+.tw-plan-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  will-change: transform;
+}
+.tw-plan-zoom { font-size: 12px; min-width: 52px; }
 #tw-plan-area .tw-plan-placeholder {
   position: absolute;
   inset: 0;

@@ -2805,6 +2805,16 @@ function _tagBase(name, fallback) {
 function _ensurePlan(c) {
   if (!c.plan || typeof c.plan !== 'object') c.plan = {};
   if (typeof c.plan.pxPerM !== 'number' || !(c.plan.pxPerM > 0)) c.plan.pxPerM = 45;
+  // v0.60.507 (правка Пользователя 2026-05-16): план — безразмерный холст
+  // как у схем. view = пан (экранные px) + зум; объекты в мировых
+  // координатах (u.x/u.y), мир = transform translate(view.x,view.y)
+  // scale(view.zoom). Правила зума/пана/панорамирования — как в
+  // Конструкторе схем (Ctrl+wheel = зум с якорем, без Ctrl = скролл
+  // страницы; drag фона = пан; средняя кнопка = пан).
+  if (!c.plan.view || typeof c.plan.view !== 'object') c.plan.view = { x: 0, y: 0, zoom: 1 };
+  if (!Number.isFinite(c.plan.view.x)) c.plan.view.x = 0;
+  if (!Number.isFinite(c.plan.view.y)) c.plan.view.y = 0;
+  if (!Number.isFinite(c.plan.view.zoom) || c.plan.view.zoom <= 0) c.plan.view.zoom = 1;
   if (!c.plan.units || typeof c.plan.units !== 'object') c.plan.units = {};
   const defs = _planUnitDefs(c);
   const valid = new Set(defs.map(d => d.id));
@@ -2877,18 +2887,25 @@ function renderPlanEditor(c, ro) {
         <input type="range" id="tw-plan-scale" min="20" max="90" step="5" value="${pxPerM}" ${ro ? 'disabled' : ''}>
         <span class="muted">${pxPerM} px/м</span>
       </label>
+      <span class="tw-plan-zoom muted" title="Зум холста: Ctrl+колесо — зум с якорем под курсором; без Ctrl — скролл страницы">🔍 ${Math.round(c.plan.view.zoom * 100)}%</span>
+      <button type="button" class="tw-plan-btn" id="tw-plan-resetview" title="Сбросить вид (зум 100%, в начало)">⟲ Вид</button>
       ${ro ? '<span class="tw-readonly-badge">🔒 read-only</span>' : `
         <button type="button" class="tw-plan-btn" id="tw-plan-arrange" title="Авто-разместить все объекты сеткой по группам">▦ Разместить всё</button>
         <button type="button" class="tw-plan-btn" id="tw-plan-clear" title="Снять все объекты с плана (вернуть в набор)">↺ Снять всё</button>`}
-      <span class="muted tw-plan-hint">Объект = реальный конструктив (размер по габаритам). Цвет = группа. Подпись = тег (двойной клик — изменить). Перетаскивайте мышью.</span>
+      <span class="muted tw-plan-hint">Безразмерный холст: <b>Ctrl+колесо</b> — зум, <b>перетаскивание фона</b> (или средняя кнопка) — панорамирование. Объект = конструктив (размер по габаритам), цвет = группа, подпись = тег (двойной клик — правка).</span>
     </div>
     <div class="tw-plan-body">
       <aside class="tw-plan-palette" data-plan-dropzone-ignore="1">
         <div class="tw-plan-palette-h">📦 Набор (готовы к размещению)</div>
         ${paletteHtml}
       </aside>
-      <div class="tw-plan-canvas" id="tw-plan-area">
-        ${objsHtml || '<div class="tw-plan-placeholder">Перетащите объекты из набора слева<br><small>или «▦ Разместить всё»</small></div>'}
+      <div class="tw-plan-canvas" id="tw-plan-area"
+        style="background-size:${Math.max(6, 20 * c.plan.view.zoom)}px ${Math.max(6, 20 * c.plan.view.zoom)}px;background-position:${c.plan.view.x}px ${c.plan.view.y}px">
+        <div class="tw-plan-world" id="tw-plan-world"
+          style="transform:translate(${c.plan.view.x}px,${c.plan.view.y}px) scale(${c.plan.view.zoom});transform-origin:0 0">
+          ${objsHtml}
+        </div>
+        ${placed.length ? '' : '<div class="tw-plan-placeholder">Перетащите объекты из набора слева<br><small>или «▦ Разместить всё»</small></div>'}
       </div>
     </div>`;
 }
@@ -2970,6 +2987,12 @@ function bindPlanEvents() {
       persistVariants(); renderActiveVariant();
       return;
     }
+    if (e.target.id === 'tw-plan-resetview') {
+      _ensurePlan(c);
+      c.plan.view = { x: 0, y: 0, zoom: 1 };
+      persistVariants(); renderActiveVariant();
+      return;
+    }
   });
   // Масштаб.
   pane.addEventListener('input', (e) => {
@@ -3002,36 +3025,77 @@ function bindPlanEvents() {
     });
     inp.addEventListener('blur', commit);
   });
-  // Drag-move объектов мышью (pointer events).
-  let drag = null;
+  // v0.60.507: безразмерный холст — экран→мир через view (пан+зум).
+  const _world = (clientX, clientY, area, view) => {
+    const ar = area.getBoundingClientRect();
+    return {
+      x: (clientX - ar.left - view.x) / view.zoom,
+      y: (clientY - ar.top - view.y) / view.zoom,
+    };
+  };
+  const _applyView = (c) => {
+    const w = $('tw-plan-world'), a = $('tw-plan-area');
+    const v = c.plan.view;
+    if (w) w.style.transform = `translate(${v.x}px,${v.y}px) scale(${v.zoom})`;
+    if (a) {
+      const g = Math.max(6, 20 * v.zoom);
+      a.style.backgroundSize = `${g}px ${g}px`;
+      a.style.backgroundPosition = `${v.x}px ${v.y}px`;
+    }
+  };
+  // Drag объекта (мир) ИЛИ панорамирование фона (экран).
+  let drag = null;   // объект
+  let pan = null;     // фон
   pane.addEventListener('pointerdown', (e) => {
     const c = curConcept(); if (!c) return;
     if (e.target.closest('.tw-plan-obj-x') || e.target.closest('.tw-plan-tagedit')) return;
-    const obj = e.target.closest('[data-plan-obj]');
     const area = $('tw-plan-area');
-    if (!obj || !area) return;
+    if (!area) return;
+    const obj = e.target.closest('[data-plan-obj]');
+    const v = (_ensurePlan(c), c.plan.view);
+    // Пан: средняя кнопка ИЛИ ЛКМ по пустому холсту (не по объекту).
+    if (e.button === 1 || (!obj && e.button === 0)) {
+      pan = { sx: e.clientX, sy: e.clientY, vx: v.x, vy: v.y };
+      area.style.cursor = 'grabbing';
+      area.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+      return;
+    }
+    if (!obj || e.button !== 0) return;
     const id = obj.dataset.planObj;
-    const u = c.plan?.units?.[id]; if (!u) return;
-    const ar = area.getBoundingClientRect();
-    drag = { id, dx: e.clientX - ar.left - u.x, dy: e.clientY - ar.top - u.y, obj, area };
+    const u = c.plan.units[id]; if (!u) return;
+    const wpt = _world(e.clientX, e.clientY, area, v);
+    drag = { id, ox: wpt.x - u.x, oy: wpt.y - u.y, obj };
     obj.setPointerCapture?.(e.pointerId);
     obj.style.zIndex = '50'; obj.style.opacity = '0.85';
     e.preventDefault();
   });
   pane.addEventListener('pointermove', (e) => {
+    const c = curConcept(); if (!c) return;
+    if (pan) {
+      c.plan.view.x = pan.vx + (e.clientX - pan.sx);
+      c.plan.view.y = pan.vy + (e.clientY - pan.sy);
+      _applyView(c);
+      return;
+    }
     if (!drag) return;
-    const ar = drag.area.getBoundingClientRect();
-    let nx = e.clientX - ar.left - drag.dx;
-    let ny = e.clientY - ar.top - drag.dy;
-    nx = Math.max(0, Math.round(nx / 10) * 10);
-    ny = Math.max(0, Math.round(ny / 10) * 10);
+    const area = $('tw-plan-area'); if (!area) return;
+    const wpt = _world(e.clientX, e.clientY, area, c.plan.view);
+    const nx = Math.max(0, Math.round((wpt.x - drag.ox) / 10) * 10);
+    const ny = Math.max(0, Math.round((wpt.y - drag.oy) / 10) * 10);
     drag.obj.style.left = nx + 'px';
     drag.obj.style.top = ny + 'px';
     drag._nx = nx; drag._ny = ny;
   });
   pane.addEventListener('pointerup', () => {
-    if (!drag) return;
     const c = curConcept();
+    if (pan) {
+      const a = $('tw-plan-area'); if (a) a.style.cursor = '';
+      if (c) persistVariants();
+      pan = null;
+      return;
+    }
+    if (!drag) return;
     if (c && c.plan?.units?.[drag.id] && drag._nx != null) {
       c.plan.units[drag.id].x = drag._nx;
       c.plan.units[drag.id].y = drag._ny;
@@ -3040,7 +3104,26 @@ function bindPlanEvents() {
     if (drag.obj) { drag.obj.style.zIndex = ''; drag.obj.style.opacity = ''; }
     drag = null;
   });
-  // HTML5 drag из палитры на холст.
+  // Зум: Ctrl/⌘+колесо — с якорем под курсором; без Ctrl — нативный
+  // скролл страницы (правило feedback_zoom_ctrl_scroll.md).
+  pane.addEventListener('wheel', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const area = e.target.closest('#tw-plan-area');
+    if (!area) return;
+    const c = curConcept(); if (!c) return;
+    e.preventDefault();
+    _ensurePlan(c);
+    const v = c.plan.view;
+    const before = _world(e.clientX, e.clientY, area, v);
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const nz = Math.max(0.2, Math.min(4, v.zoom * factor));
+    const ar = area.getBoundingClientRect();
+    v.x = (e.clientX - ar.left) - before.x * nz;
+    v.y = (e.clientY - ar.top) - before.y * nz;
+    v.zoom = nz;
+    persistVariants(); renderActiveVariant();
+  }, { passive: false });
+  // HTML5 drag из палитры на холст (в мировые координаты).
   pane.addEventListener('dragstart', (e) => {
     const chip = e.target.closest('[data-plan-place]');
     if (!chip) return;
@@ -3058,9 +3141,9 @@ function bindPlanEvents() {
     const id = e.dataTransfer.getData('text/plain');
     _ensurePlan(c);
     const u = c.plan.units[id]; if (!u) return;
-    const ar = area.getBoundingClientRect();
-    u.x = Math.max(0, Math.round((e.clientX - ar.left) / 10) * 10);
-    u.y = Math.max(0, Math.round((e.clientY - ar.top) / 10) * 10);
+    const wpt = _world(e.clientX, e.clientY, area, c.plan.view);
+    u.x = Math.max(0, Math.round(wpt.x / 10) * 10);
+    u.y = Math.max(0, Math.round(wpt.y / 10) * 10);
     u.placed = true;
     persistVariants(); renderActiveVariant();
   });
