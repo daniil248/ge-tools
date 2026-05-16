@@ -708,7 +708,38 @@
         const u = p.upsId ? getUps(p.upsId) : null;
         const qp = new URLSearchParams(location.search);
         const nodeId = qp.get('nodeId') || null;
+        // v0.60.486 (по замечанию Пользователя): отчёт «Шаг 4. Итоговая
+        // конфигурация» показывается во вкладке «Итог» варианта —
+        // ТОЛЬКО когда вариант полностью сконфигурирован (выбрана модель).
+        const cmp = p.composition || (p.configuration && p.configuration.composition) || null;
+        const row = (k, v) => `<tr><td class="rsp-lft">${escHtmlSafe(k)}</td><td style="text-align:right"><b>${v}</b></td></tr>`;
+        const reportHtml = !u ? '' : `
+          <div class="rsp-sec-title" style="margin-top:4px">🧾 Итоговая конфигурация</div>
+          <div class="rsp-sub" style="font-weight:600;margin:6px 0 2px">Исходные требования</div>
+          <table class="rsp-table"><tbody>
+            ${row('Нагрузка, кВт', escHtmlSafe(req.loadKw ?? '—'))}
+            ${row('Автономия, мин', escHtmlSafe(req.autonomyMin ?? '—'))}
+            ${row('Резервирование', escHtmlSafe(p.redundancy || req.redundancy || 'N'))}
+            ${row('Тип ИБП', escHtmlSafe(p.upsType || (detectUpsType(u) || {}).id || '—'))}
+            ${row('V<sub>DC</sub> (паспорт), В', (u.vdcMin && u.vdcMax) ? (u.vdcMin + '…' + u.vdcMax) : '—')}
+            ${row('cos φ / фазы', escHtmlSafe((req.cosPhi ?? '—') + ' / ' + (req.phases ?? '3') + 'ph'))}
+            ${row('Решение по АКБ', p.batteryChoice === 'skip' ? 'без АКБ' : 'подбор АКБ (отдельный раздел)')}
+          </tbody></table>
+          <div class="rsp-sub" style="font-weight:600;margin:10px 0 2px">Подобранная конфигурация</div>
+          <table class="rsp-table"><tbody>
+            ${row('Модель', escHtmlSafe((u.supplier || '') + ' ' + (u.model || u.id)))}
+            ${row('Тип конструктива', escHtmlSafe(p.upsType || (detectUpsType(u) || {}).id || '—'))}
+            ${u.frameKw ? row('Корпус (frame), кВт', escHtmlSafe(u.frameKw)) : ''}
+            ${u.moduleKwRated ? row('Модуль, кВт', escHtmlSafe(u.moduleKwRated)) : ''}
+            ${cmp && cmp.moduleInstalled != null ? row('Установлено модулей', escHtmlSafe(cmp.moduleInstalled)) : ''}
+            ${cmp && cmp.moduleWorking != null ? row('Рабочих модулей', escHtmlSafe(cmp.moduleWorking)) : ''}
+            ${cmp && cmp.moduleRedundant != null ? row('Резерв модулей', escHtmlSafe(cmp.moduleRedundant)) : ''}
+            ${row('Номинал/итоговая мощность, кВт', escHtmlSafe(p.capacityKw || u.capacityKw || '—'))}
+            ${row('КПД, %', escHtmlSafe(u.efficiency || '—'))}
+            ${row('V<sub>DC</sub>, В', (u.vdcMin && u.vdcMax) ? (u.vdcMin + '…' + u.vdcMax) : '—')}
+          </tbody></table>`;
         host.innerHTML = `
+          ${reportHtml}
           <div class="rsp-note" data-vitog-info></div>
           <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" class="rs-cs-btn rs-cs-btn-primary" data-vitog="apply"${u ? '' : ' disabled'}>${nodeId ? '✓ Применить к схеме' : '✓ Применить в Конструктор'}</button>
