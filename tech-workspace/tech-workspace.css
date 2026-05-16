@@ -556,6 +556,11 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, san
   gap: 12px;
   flex: 1;
 }
+/* v0.60.503: класс .tw-mode-pane (display:flex) перебивал UA-правило
+   [hidden]{display:none}, из-за чего скрытая панель «План зала»
+   подмешивалась под содержимое режима «Список» (видно как пустая
+   заглушка после full-width-перехода v0.60.502). Явно гасим скрытые. */
+.tw-mode-pane[hidden] { display: none !important; }
 .tw-plan-toolbar {
   padding: 8px;
   background: #f9fafb;
