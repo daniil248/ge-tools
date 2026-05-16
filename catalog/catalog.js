@@ -1536,6 +1536,14 @@ function openPriceModal(presets = {}, editId = null) {
       <div class="field"><label>Цена *</label><input type="number" id="f-price" min="0" step="0.01" value="${rec.price ?? ''}"></div>
       <div class="field"><label>Валюта</label><select id="f-currency">${curOpts}</select></div>
     </div>
+    <div class="field" style="margin:-4px 0 6px">
+      <label style="font-weight:400;font-size:12px"><input type="checkbox" id="f-pb-on"${rec.priceBreakdown ? ' checked' : ''}> 📦 Разбивка цены (база + доставка − скидка)</label>
+    </div>
+    <div id="f-pb-box" class="field-row" style="display:${rec.priceBreakdown ? 'flex' : 'none'}">
+      <div class="field"><label>База</label><input type="number" id="f-pb-base" min="0" step="0.01" value="${rec.priceBreakdown?.base ?? ''}"></div>
+      <div class="field"><label>Доставка</label><input type="number" id="f-pb-delivery" min="0" step="0.01" value="${rec.priceBreakdown?.delivery ?? 0}"></div>
+      <div class="field"><label>Скидка, %</label><input type="number" id="f-pb-discount" min="0" max="100" step="0.5" value="${rec.priceBreakdown?.discountPct ?? 0}"></div>
+    </div>
     <div class="field-row">
       <div class="field"><label>Тип цены</label><select id="f-priceType">${ptOpts}</select></div>
       <div class="field"><label>Контрагент</label><select id="f-counterpartyId"><option value="">—</option>${cpOpts}</select></div>
@@ -1555,15 +1563,38 @@ function openPriceModal(presets = {}, editId = null) {
     <div class="field"><label>Условия</label><input id="f-conditions" value="${esc(rec.conditions || '')}" placeholder="DDP склад заказчика, FCA Москва, и т.д."></div>
     <div class="field"><label>Примечания</label><textarea id="f-notes">${esc(rec.notes || '')}</textarea></div>
   `;
+  // v0.60.493 (Roadmap 23.4): разбивка цены (база+доставка−скидка).
+  const _pbCompute = () => {
+    const on = document.getElementById('f-pb-on');
+    const box = document.getElementById('f-pb-box');
+    const pInp = document.getElementById('f-price');
+    if (!on || !box || !pInp) return;
+    box.style.display = on.checked ? 'flex' : 'none';
+    pInp.readOnly = !!on.checked;
+    pInp.style.background = on.checked ? '#f0f0f0' : '';
+    if (on.checked) {
+      const base = Number(document.getElementById('f-pb-base').value) || 0;
+      const dlv = Number(document.getElementById('f-pb-delivery').value) || 0;
+      const disc = Number(document.getElementById('f-pb-discount').value) || 0;
+      pInp.value = +(((base + dlv) * (1 - disc / 100))).toFixed(2);
+    }
+  };
   openModal(editId ? 'Редактирование цены' : 'Новая цена', html, () => {
     const elementId = document.getElementById('f-elementId').value;
+    const pbOn = document.getElementById('f-pb-on') && document.getElementById('f-pb-on').checked;
+    if (pbOn) _pbCompute();
     const price = Number(document.getElementById('f-price').value);
     if (!elementId) { flash('Выберите элемент', 'error'); return false; }
     if (!price || price < 0) { flash('Укажите цену', 'error'); return false; }
+    const priceBreakdown = pbOn ? {
+      base: Number(document.getElementById('f-pb-base').value) || 0,
+      delivery: Number(document.getElementById('f-pb-delivery').value) || 0,
+      discountPct: Number(document.getElementById('f-pb-discount').value) || 0,
+    } : null;
     const validUntil = document.getElementById('f-validUntil').value;
     savePrice({
       id: editId || undefined,
-      elementId, price,
+      elementId, price, priceBreakdown,
       currency: document.getElementById('f-currency').value,
       priceType: document.getElementById('f-priceType').value,
       counterpartyId: document.getElementById('f-counterpartyId').value || null,
@@ -1578,6 +1609,17 @@ function openPriceModal(presets = {}, editId = null) {
     });
     flash('Сохранено', 'success');
   });
+  // v0.60.493: пост-рендер — слушатели разбивки цены.
+  setTimeout(() => {
+    const on = document.getElementById('f-pb-on');
+    if (!on) return;
+    on.addEventListener('change', _pbCompute);
+    ['f-pb-base', 'f-pb-delivery', 'f-pb-discount'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', _pbCompute);
+    });
+    _pbCompute();
+  }, 0);
 }
 
 // ====================== TAB: КОНТРАГЕНТЫ ======================

@@ -3384,12 +3384,16 @@ standalone-приложение в отдельном. Чтобы использ
   заменена построчными статьями (Перевозка/Растаможка/Страхование/
   Погрузка/Экспедирование/Прочее) с подсказками и live-итогом;
   `shipment.costItems[]` + backward-compat `shipment.cost` = Σ.
-- [~] **23.4** Rollout цены позиции с разбивкой. **battery-catalog ✅
-  v0.60.491**: колонка «Цена» + «✏» построчная разбивка (общий
-  cost-items-modal, курс на дату), `price/priceItems`, авто-проброс в
-  состав/ЖЦ/TCO (`_lcSyncFromBom`/`variantEconomics`). TODO тем же
-  паттерном: scs-config, breaker-catalog (цена позиции + доставка/
-  НДС/скидка построчно).
+- [x] **23.4** ✅ Rollout цены позиции с разбивкой.
+  - **battery-catalog ✅ v0.60.491**: колонка «Цена» + «✏» построчная
+    разбивка (общий cost-items-modal, курс на дату), `price/priceItems`,
+    авто-проброс в состав/ЖЦ/TCO (`_lcSyncFromBom`/`variantEconomics`).
+  - **Центральный «Каталог и цены» ✅ v0.60.493**: в модале цены —
+    «📦 Разбивка цены» (База+Доставка−Скидка% → авто-итог),
+    `priceBreakdown` в price-record. Покрывает автоматы/breaker/щиты/
+    климат/АКБ через единый каталог `shared/price-records.js` (scs-config
+    и прочие модули берут цены отсюда же). `.price` — скаляр (sparkline/
+    min-max не затронуты), backward-compat.
 - [ ] **23.5** Rollout в Tech-workspace BOM — каждая строка с возможной
   разбивкой стоимости.
 - [x] **23.6** ✅ v0.60.492 — Тариф э/э cooling: кнопка «📊 День/ночь/ПИК»
