@@ -210,17 +210,33 @@ export function mountConfigSidebar(opts) {
       slotList.innerHTML = entries.map(e => renderEntryItem(e)).join('');
       return;
     }
+    // v0.60.461: реальный projectCode каждого подбора (вариант приоритетнее
+    // меты). Нужен, чтобы переименование/удаление работало и когда сайдбар
+    // показывает подборы из ДРУГИХ проектов (режим «Без проекта»): handler
+    // должен оперировать тем же projectCode, под которым подбор сохранён,
+    // иначе _selMatch не находит запись и 🗑 «не удаляет».
+    const selPc = new Map();
+    try {
+      for (const m of listSelectionMetas(kind, { projectCode: projectCode || undefined })) {
+        const nm = String(m.selectionName || '').trim();
+        if (nm && !selPc.has(nm)) selPc.set(nm, String(m.projectCode || ''));
+      }
+    } catch {}
+    for (const [nm, ents] of groups) {
+      if (ents && ents[0]) selPc.set(nm, String(ents[0].projectCode || ''));
+    }
     const html = [];
     for (const [selName, entries] of groups) {
       const collapsed = collapsedSelections.get(selName) === true;
       const mainEntry = entries.find(e => e.isMainVariant);
       const selActive = activeSelName && selName === activeSelName;
+      const selPcAttr = esc(selPc.get(selName) || '');
       html.push(`<li class="rs-cs-sel-block">
-        <div class="rs-cs-sel-head${collapsed ? ' collapsed' : ''}${selActive ? ' rs-cs-sel-active' : ''}" data-act-sel="toggle" data-sel-name="${esc(selName)}" title="Активный подбор — общие условия и финансы задаются в панели «Свойства подбора».">
+        <div class="rs-cs-sel-head${collapsed ? ' collapsed' : ''}${selActive ? ' rs-cs-sel-active' : ''}" data-act-sel="toggle" data-sel-name="${esc(selName)}" data-sel-pc="${selPcAttr}" title="Активный подбор — общие условия и финансы задаются в панели «Свойства подбора».">
           <span class="rs-cs-sel-name">📋 ${esc(selName)}</span>
           <span class="rs-cs-sel-actions">
-            <button type="button" data-act-selop="rename" data-sel-name="${esc(selName)}" title="Переименовать подбор">✏</button>
-            <button type="button" data-act-selop="del" data-sel-name="${esc(selName)}" title="Удалить подбор (со всеми вариантами)">🗑</button>
+            <button type="button" data-act-selop="rename" data-sel-name="${esc(selName)}" data-sel-pc="${selPcAttr}" title="Переименовать подбор">✏</button>
+            <button type="button" data-act-selop="del" data-sel-name="${esc(selName)}" data-sel-pc="${selPcAttr}" title="Удалить подбор (со всеми вариантами)">🗑</button>
           </span>
           <span class="rs-cs-sel-count">${(() => { const n = entries.length; const m = n % 100; const u = n % 10; const w = (m >= 11 && m <= 14) ? 'вариантов' : (u === 1 ? 'вариант' : (u >= 2 && u <= 4 ? 'варианта' : 'вариантов')); return n + ' ' + w; })()}</span>
         </div>
@@ -328,26 +344,32 @@ export function mountConfigSidebar(opts) {
       ev.stopPropagation();
       const name = selOp.getAttribute('data-sel-name');
       const op = selOp.dataset.actSelop;
+      // v0.60.461: projectCode подбора берём из data-атрибута (реальный pc
+      // записи), а НЕ из сайдбара — иначе в режиме «Без проекта» подборы
+      // других проектов не находятся и не удаляются/не переименовываются.
+      const selPcRaw = selOp.getAttribute('data-sel-pc');
+      const selPc = (selPcRaw == null || selPcRaw === '')
+        ? (projectCode || null) : selPcRaw;
       if (op === 'rename') {
         const nn = await rsPrompt('Новое название подбора', name);
         if (nn == null) return;
         const newName = String(nn || '').trim();
         if (!newName || newName === name) return;
-        renameSelection(kind, { projectCode: projectCode || null, oldName: name, newName });
+        renameSelection(kind, { projectCode: selPc, oldName: name, newName });
         if (activeSelName === name) activeSelName = newName;
         render();
         fireSel(activeSelName);
         rsToast('Подбор переименован → «' + newName + '»', 'ok');
       } else if (op === 'del') {
-        const n = listConfigs(kind, { projectCode: projectCode || undefined, selectionName: name }).length;
+        const n = listConfigs(kind, { projectCode: selPc || undefined, selectionName: name }).length;
         const ok = await rsConfirm(
           `Удалить подбор «${name}»${n ? ' и все его варианты (' + n + ')' : ''}?`,
           'Это действие необратимо.', { okLabel: 'Удалить', cancelLabel: 'Отмена' });
         if (!ok) return;
-        deleteSelection(kind, { projectCode: projectCode || null, selectionName: name, variantsToo: true });
+        const removed = deleteSelection(kind, { projectCode: selPc, selectionName: name, variantsToo: true });
         if (activeSelName === name) { activeSelName = null; fireSel(null); }
         render();
-        rsToast('Подбор удалён', 'ok');
+        rsToast(removed ? 'Подбор удалён' : 'Подбор не найден (уже удалён?)', removed ? 'ok' : 'warn');
       }
       return;
     }
