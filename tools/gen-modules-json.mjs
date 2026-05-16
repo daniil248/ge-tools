@@ -29,6 +29,8 @@ const REGISTRY_ORDER = [
   'constructor', 'cable', 'schematic', 'sketch', 'battery', 'ups-config',
   'panel-config', 'mv-config', 'transformer-config', 'reports', 'catalog',
   'help', 'tech-workspace', 'logistics', 'projects',
+  // calc-lib (kind:'calc-lib') — без UI/subscription-check, auto-included.
+  'suppression-methods',
 ];
 
 // Папка модуля по id (для constructor манифест — в корне).

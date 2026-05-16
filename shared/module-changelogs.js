@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.528', date: '2026-05-16', items: [
+      '🧩 <b>Первый kind:\\'calc-lib\\' в реестре: suppression-methods</b>. Создан <code>suppression-methods/manifest.json</code> (kind:\\'calc-lib\\', requires:[], без UI/subscription-лока), id добавлен в <code>REGISTRY_ORDER</code> (<code>tools/gen-modules-json.mjs</code>), <code>modules.json</code> перегенерирован (v1.2.0, 16 записей, паритет manifests↔modules.json подтверждён) + карточка в техническом реестре <code>/modules/</code>. Нулевой риск: <code>modules/index.html</code> пропускает subscription-лок для calc-lib (строка 87), <code>suppression-config</code> импортит <code>../suppression-methods/*</code> без изменений. Пайплайн регистрации calc-lib доказан end-to-end. Остаётся долг: 13 UI-папок вне реестра (Фаза 1, по одной).',
+    ] },
     { version: '0.60.527', date: '2026-05-16', items: [
       '📐 <b>Структура-канон (Фаза 0, код не тронут)</b>. Добавлен <code>ARCHITECTURE.md</code> — закон раскладки файлов модуля (скелет calc/ + ui/ + data/, привязка к <code>manifest.json</code> kind/requires, целевая реорганизация <code>shared/</code> по доменам, чек-лист создания модуля, явный долг реестра). В 29 модуль-папках создан <code>README.md</code> (12–20 строк: назначение, главные файлы, точки расширения — навигация для Пользователя). Новый <code>scripts/audit-manifest.py</code> сверяет реальные импорты с <code>requires</code> и полнотой реестра (UNDECLARED 23 / UNREGISTERED ui 13 / PARITY 0) — подключён в CI non-blocking. Нулевой риск: только документация + аудит-скрипт, ни одного .js модуля не изменено.',
     ] },

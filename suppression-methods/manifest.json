@@ -1,0 +1,25 @@
+{
+  "id": "suppression-methods",
+  "name": "Методики газового пожаротушения",
+  "description": "Переиспользуемая библиотека методик расчёта газового пожаротушения (без UI): СП РК 2022, СП 485-2020 (+Прил. Д), NFPA 2001, ISO 14520. Единый интерфейс { META, compute(input) }, справочник ГОТВ, гидравлика, текст отчёта. Потребляется модулем suppression-config.",
+  "version": "1.0.0",
+  "owner": "unassigned",
+  "kind": "calc-lib",
+  "standalone": false,
+  "path": "suppression-methods/",
+  "icon": "orange",
+  "badge": "lib",
+  "enabled": true,
+  "internalOnly": false,
+  "subscriptionPlan": "free",
+  "requires": [],
+  "dbCollections": [],
+  "permissions": [],
+  "lsNamespacesOwned": [],
+  "dependsOnContracts": {
+    "storageKeys": [],
+    "events": { "emits": [], "consumes": [] },
+    "urlParams": [],
+    "bridges": []
+  }
+}

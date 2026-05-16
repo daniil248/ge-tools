@@ -118,9 +118,11 @@ shared/
   `scs-config`, `scs-design`, `rack-config`, `mdc-config`, `dgu-config`,
   `pdu-config`, `suppression-config`, `psychrometrics`,
   `facility-inventory`, `configurator3d`.
-- **Нет ни одной записи `kind:'calc-lib'`** — кандидат №1
-  `suppression-methods/` (чистая methods-библиотека, потребляется
-  `suppression-config/`).
+- **`kind:'calc-lib'`:** `suppression-methods/` зарегистрирован
+  (v0.60.528, первый calc-lib — manifest + REGISTRY_ORDER +
+  modules.json + карточка в реестре). Пайплайн регистрации calc-lib
+  доказан end-to-end. Прочие calc-папки — CORE/SHARED-слой (§2),
+  не реестр по дизайну.
 - **`requires` декларативный/мёртвый** — у `cooling` `requires:[]`,
   хотя реально тянет `shared/*`+`meteo` (через мост).
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "1.1.0",
-  "description": "Манифест модулей платформы Raschet. Используется hub.html для рендера карточек, /modules/ для реестра, и shared/subscriptions.js для проверки доступа per-module. v1.1.0 (Phase 44 v0.60.131): добавлены поля kind ('ui'|'calc-lib') и subscriptionPlan для per-module подписок.",
+  "version": "1.2.0",
+  "description": "Манифест модулей платформы Raschet. Используется hub.html для рендера карточек, /modules/ для реестра, и shared/subscriptions.js для проверки доступа per-module. v1.2.0: первая запись kind:'calc-lib' (suppression-methods) — calc-lib auto-included, без UI-лока. Источник правды — <module>/manifest.json; этот файл — проекция (tools/gen-modules-json.mjs).",
   "modules": [
     {
       "id": "constructor",
@@ -21,9 +21,9 @@
       "permissions": [
         "constructor.use"
       ],
+      "enabled": true,
       "kind": "ui",
       "subscriptionPlan": "starter",
-      "enabled": true,
       "internalOnly": false
     },
     {
@@ -315,10 +315,25 @@
       "permissions": [
         "projects.use"
       ],
+      "enabled": true,
       "kind": "ui",
       "subscriptionPlan": "enterprise",
-      "internalOnly": true,
-      "enabled": true
+      "internalOnly": true
+    },
+    {
+      "id": "suppression-methods",
+      "name": "Методики газового пожаротушения",
+      "description": "Переиспользуемая библиотека методик расчёта газового пожаротушения (без UI): СП РК 2022, СП 485-2020 (+Прил. Д), NFPA 2001, ISO 14520. Единый интерфейс { META, compute(input) }, справочник ГОТВ, гидравлика, текст отчёта. Потребляется модулем suppression-config.",
+      "path": "suppression-methods/",
+      "icon": "orange",
+      "badge": "lib",
+      "requires": [],
+      "dbCollections": [],
+      "permissions": [],
+      "enabled": true,
+      "kind": "calc-lib",
+      "subscriptionPlan": "free",
+      "internalOnly": false
     }
   ]
 }
