@@ -2563,7 +2563,31 @@ function _renderCalcDischargeChart(params, calcResult, blocksPerString, blockV) 
     endVsForChart = [bestEv];
   }
   const highlight = _snapHighlightToCurve(rows, bestEv, blockPowerW, autonomyMin, extrapolated);
+  rows = _appendMarkerToCurve(rows, bestEv, highlight);
   _renderDischargeChart(mount, rows, endVsForChart, highlight);
+}
+
+// v0.60.479: гарантируем, что рабочая точка ЛЕЖИТ на нарисованной линии.
+// Если точка вне диапазона табличных строк (t или P за пределами) —
+// добавляем её как синтетическую точку кривой (тот же ряд rows, тот же
+// метод отрисовки), чтобы полилиния прошла строго через маркер.
+function _appendMarkerToCurve(rows, ev, highlight) {
+  if (!highlight || !Number.isFinite(highlight.tMin) || !Number.isFinite(highlight.powerW)) return rows;
+  const same = rows.filter(r => r.endV === ev && r.tMin > 0 && r.powerW > 0);
+  if (!same.length) return rows;
+  const tMax = Math.max(...same.map(r => r.tMin));
+  const tMin = Math.min(...same.map(r => r.tMin));
+  const pMin = Math.min(...same.map(r => r.powerW));
+  const pMax = Math.max(...same.map(r => r.powerW));
+  const out = highlight.tMin > tMax + 1e-6 || highlight.tMin < tMin - 1e-6
+    || highlight.powerW < pMin - 1e-6 || highlight.powerW > pMax + 1e-6;
+  if (!out) return rows;
+  // не дублируем, если такая точка уже есть
+  const exists = rows.some(r => r.endV === ev
+    && Math.abs(r.tMin - highlight.tMin) < 1e-6 && Math.abs(r.powerW - highlight.powerW) < 1e-6);
+  if (exists) return rows;
+  return [...rows, { endV: ev, tMin: highlight.tMin, powerW: highlight.powerW, _marker: true }]
+    .sort((a, b) => a.tMin - b.tMin);
 }
 
 // v0.59.457: единая функция snap-to-curve. Берёт строки кривой и мощность
@@ -2592,8 +2616,20 @@ function _snapHighlightToCurve(rows, ev, blockPowerW, fallbackTMin, extrapolated
       }
     }
   } else if (blockPowerW < curve[curve.length - 1].powerW) {
-    snappedT = curve[curve.length - 1].tMin;
-    outOfTable = ' (P ниже таблицы → автономия ≥ макс. табличной)';
+    // v0.60.479 (по замечанию Пользователя: «точка должна быть всегда на
+    // линии, тем же методом»): P ниже таблицы — НЕ зажимаем в последний
+    // tMin (точка повисала ниже кривой), а ЭКСТРАПОЛИРУЕМ t тем же
+    // лог-линейным методом по двум последним точкам. Кривая затем
+    // дотягивается до этой точки (см. _appendMarkerToCurve).
+    if (curve.length >= 2) {
+      const a = curve[curve.length - 2], b = curve[curve.length - 1];
+      const lpA = Math.log(a.powerW), lpB = Math.log(b.powerW);
+      if (lpA !== lpB) {
+        const k = (lp - lpA) / (lpB - lpA);
+        snappedT = Math.max(b.tMin, a.tMin + (b.tMin - a.tMin) * k);
+      } else { snappedT = b.tMin; }
+    } else { snappedT = curve[curve.length - 1].tMin; }
+    outOfTable = ' (экстраполяция за таблицу)';
   } else {
     for (let i = 0; i < curve.length - 1; i++) {
       const a = curve[i], b = curve[i + 1];
@@ -2670,6 +2706,8 @@ function _renderCalcDischargeChartZoom(params, calcResult, blocksPerString, bloc
     mount.innerHTML = '<div class="muted" style="font-size:12px;text-align:center;padding:20px">Нет рабочей точки для детализации</div>';
     return;
   }
+  // v0.60.479: маркер обязан лежать на линии — добавляем его точкой ряда.
+  allRows = _appendMarkerToCurve(allRows, bestEv, highlight);
   // Окно
   const filterWindow = (factor) => {
     const tLo = highlight.tMin / factor, tHi = highlight.tMin * factor;
