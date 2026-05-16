@@ -260,7 +260,27 @@ function openShipmentModal(editId) {
         <select id="f-destinationId"><option value="">—</option>${whOpts.replace(/value="([^"]+)"/g, (m, v) => `value="${v}"${v === rec.destinationId ? ' selected' : ''}`)}</select>
       </div>
     </div>
-    <div class="field"><label>Стоимость перевозки, ₽</label><input type="number" id="f-cost" min="0" step="0.01" value="${rec.cost || ''}"></div>
+    <h4 style="margin:14px 0 6px;font-size:13px">Статьи стоимости перевозки</h4>
+    <div class="shipment-item-row" style="grid-template-columns:1fr 140px 32px;font-size:11px;color:#666;font-weight:600">
+      <span>Статья</span><span>Сумма, ₽</span><span></span>
+    </div>
+    <div id="cost-items-list">${
+      (Array.isArray(rec.costItems) && rec.costItems.length
+        ? rec.costItems
+        : [{ label: 'Перевозка', amountRUB: Number(rec.cost) || 0 }]
+      ).map((ci, i) => `
+      <div class="shipment-item-row cost-item-row" data-idx="${i}" style="grid-template-columns:1fr 140px 32px">
+        <input class="ci-label" list="ci-label-presets" placeholder="статья" value="${esc(ci.label || '')}">
+        <input class="ci-amt" type="number" min="0" step="0.01" placeholder="₽" value="${ci.amountRUB || ''}">
+        <button type="button" class="ci-del danger">×</button>
+      </div>`).join('')
+    }</div>
+    <datalist id="ci-label-presets">
+      <option value="Перевозка"><option value="Растаможка"><option value="Страхование">
+      <option value="Погрузка/разгрузка"><option value="Экспедирование"><option value="Прочее">
+    </datalist>
+    <button type="button" id="add-cost-item" style="margin-top:8px">+ Статья</button>
+    <div style="margin-top:6px;font-size:12px">Итого перевозка: <b id="cost-items-total">₽ 0</b></div>
     <h4 style="margin:14px 0 6px;font-size:13px">Позиции отправления</h4>
     <div class="shipment-item-row" style="font-size:11px;color:#666;font-weight:600">
       <span>Наименование</span><span>Кол-во</span><span>Кг/шт</span><span>м³/шт</span><span>Цена ₽/шт</span><span></span>
@@ -282,6 +302,15 @@ function openShipmentModal(editId) {
         unitPriceRUB: Number(row.querySelector('.it-price')?.value) || 0,
       });
     });
+    // v0.60.490 (Roadmap 23.3): стоимость перевозки построчно (статьи).
+    const costItems = [];
+    document.querySelectorAll('.cost-item-row').forEach(row => {
+      const label = (row.querySelector('.ci-label')?.value || '').trim();
+      const amountRUB = Number(row.querySelector('.ci-amt')?.value) || 0;
+      if (!label && !amountRUB) return;
+      costItems.push({ label: label || 'Прочее', amountRUB });
+    });
+    const costTotal = costItems.reduce((s, c) => s + (Number(c.amountRUB) || 0), 0);
     saveShipment({
       id: editId || undefined,
       label: document.getElementById('f-label').value.trim(),
@@ -289,7 +318,8 @@ function openShipmentModal(editId) {
       mode: document.getElementById('f-mode').value,
       originId: document.getElementById('f-originId').value || null,
       destinationId: document.getElementById('f-destinationId').value || null,
-      cost: Number(document.getElementById('f-cost').value) || 0,
+      costItems,
+      cost: costTotal,                       // backward-compat: Σ статей
       plannedAt: document.getElementById('f-plannedAt').value ? new Date(document.getElementById('f-plannedAt').value).getTime() : null,
       notes: document.getElementById('f-notes').value || null,
       items,
@@ -315,6 +345,36 @@ function openShipmentModal(editId) {
     div.querySelector('.it-del').onclick = () => div.remove();
   };
   document.querySelectorAll('.it-del').forEach(b => { b.onclick = () => b.closest('.shipment-item-row').remove(); });
+
+  // v0.60.490 (Roadmap 23.3): wire статьи стоимости перевозки.
+  const _ciTotal = () => {
+    let s = 0;
+    document.querySelectorAll('.cost-item-row .ci-amt').forEach(i => { s += Number(i.value) || 0; });
+    const el = document.getElementById('cost-items-total');
+    if (el) el.textContent = '₽ ' + s.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+  };
+  const _wireCiRow = (div) => {
+    div.querySelector('.ci-del').onclick = () => { div.remove(); _ciTotal(); };
+    div.querySelectorAll('input').forEach(i => i.addEventListener('input', _ciTotal));
+  };
+  document.querySelectorAll('.cost-item-row').forEach(_wireCiRow);
+  const _addCi = document.getElementById('add-cost-item');
+  if (_addCi) _addCi.onclick = () => {
+    const list = document.getElementById('cost-items-list');
+    const idx = list.querySelectorAll('.cost-item-row').length;
+    const div = document.createElement('div');
+    div.className = 'shipment-item-row cost-item-row';
+    div.dataset.idx = idx;
+    div.style.gridTemplateColumns = '1fr 140px 32px';
+    div.innerHTML = `
+      <input class="ci-label" list="ci-label-presets" placeholder="статья">
+      <input class="ci-amt" type="number" min="0" step="0.01" placeholder="₽">
+      <button type="button" class="ci-del danger">×</button>`;
+    list.appendChild(div);
+    _wireCiRow(div);
+    _ciTotal();
+  };
+  _ciTotal();
 }
 
 // ====================== TAB: СКЛАДЫ ======================

@@ -3380,7 +3380,10 @@ standalone-приложение в отдельном. Чтобы использ
     mv-config / dgu-config / panel-config / transformer-config; авто-проброс
     из tech-workspace в URL (сейчас подбор сам читает project.location).
 
-- [ ] **23.3** Rollout в Logistics — стоимость доставки/растаможки как статьи.
+- [x] **23.3** ✅ v0.60.490 — Rollout в Logistics: «Стоимость перевозки»
+  заменена построчными статьями (Перевозка/Растаможка/Страхование/
+  Погрузка/Экспедирование/Прочее) с подсказками и live-итогом;
+  `shipment.costItems[]` + backward-compat `shipment.cost` = Σ.
 - [ ] **23.4** Rollout в SCS-config / breaker-catalog / battery-catalog — поля
   цены позиции с возможностью разбивки (доставка + НДС + скидка).
 - [ ] **23.5** Rollout в Tech-workspace BOM — каждая строка с возможной

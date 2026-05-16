@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.490', date: '2026-05-16', items: [
+      '📦 <b>Roadmap 23.3: стоимость перевозки в Logistics — построчно (статьи)</b>. Единое поле «Стоимость перевозки, ₽» заменено редактируемыми статьями (Перевозка / Растаможка / Страхование / Погрузка-разгрузка / Экспедирование / Прочее) с подсказками; итог = Σ статей; <code>shipment.costItems[]</code> + backward-compat <code>shipment.cost</code> = сумма (таблица/калькулятор не сломаны).',
+    ] },
     { version: '0.60.489', date: '2026-05-16', items: [
       '🗂 <b>Принадлежности ИБП вынесены в каталог</b> (правило «справочники — в каталоге»). Новый <code>shared/catalogs/ups-accessories.js</code> — записи {id,sku,cls,kitInclusion,applies(ctx),qty(ctx),label(ctx)}. <code>buildUpsAccessories</code> теперь применяет правила каталога (не хардкод), формат строк состава прежний; расширяемо без правки сборщика.',
     ] },
