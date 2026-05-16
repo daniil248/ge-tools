@@ -1,0 +1,60 @@
+{
+  "_comment": "Санкционированные текущие нарушения границ (boundary-lint). CI зелёный с дня 1; каждая запись гасится по тикету ROADMAP X.1.3 (упрочнение мостов). НЕ добавлять новые без тикета. Спека: shared/contracts/README.md.",
+  "version": 1,
+  "updated": "2026-05-16",
+  "crossModuleImports": [
+    {
+      "from": "cooling/cooling.js",
+      "imports": ["meteo/util", "meteo/charts"],
+      "reason": "Переиспользование meteo-утилит/графиков до выделения в shared/",
+      "burndown": "X.1.3 — вынести общую часть в shared/ или meteo-bridge"
+    },
+    {
+      "from": "service/service.js",
+      "imports": ["cooling/calc/fc-summary", "catalog/work-templates", "catalog/wizards"],
+      "reason": "Service использует cooling-экономику и каталог работ напрямую",
+      "burndown": "X.1.3 + 1.8 — WORK_TEMPLATES в shared/catalogs/, fc-summary через bridge"
+    },
+    {
+      "from": "service/ui/order-wizard.js",
+      "imports": ["catalog/wizards"],
+      "reason": "Мастер наряда тянет catalog/wizards напрямую",
+      "burndown": "X.1.3"
+    },
+    {
+      "from": "meteo/ashrae-datasheet.js",
+      "imports": ["psychrometrics/psychrometrics-core"],
+      "reason": "Психрометрические формулы переиспользуются",
+      "burndown": "X.1.3 — psychrometrics-core → shared/calc/"
+    },
+    {
+      "from": "shared/battery-seed.js",
+      "imports": ["battery/battery-catalog"],
+      "reason": "CATALOGS-слой импортирует модуль (нарушение §3) — seed тянет данные из модуля",
+      "burndown": "X.1.3 — перенести seed-данные в shared/catalogs/battery/"
+    },
+    {
+      "from": "cooling/meteo-bridge.js",
+      "imports": ["shared/meteo-fetch"],
+      "reason": "Мост в cooling/, а не в shared/ — допустимо как объявленный мост, но место не каноничное",
+      "burndown": "X.1.3 — переместить в shared/meteo-bridge.js"
+    }
+  ],
+  "rawForeignLsReaders": [
+    {
+      "file": "projects/project.js",
+      "note": "Читает 15+ чужих LS-ключей модулей напрямую для сводок/экспорта",
+      "burndown": "X.1.3 (Фаза 2) — через project-storage/configuration-catalog helpers; самый высокий приоритет"
+    },
+    {
+      "files": [
+        "shared/service-bridge.js",
+        "shared/scheme-rack-bridge.js",
+        "shared/inventory-bridge.js",
+        "shared/legacy-rack-migration.js"
+      ],
+      "note": "Мосты читают мульти-модульные LS — допустимо для мостов, но ключи должны идти через helpers",
+      "burndown": "X.1.3 — обернуть чтения в project-storage helpers"
+    }
+  ]
+}
