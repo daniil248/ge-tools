@@ -420,15 +420,30 @@
         const lossKw = pOut * (1 / eff - 1);
         const annualEnergyKwh = lossKw * 8760;
         const maintPerYear = price * ((Number(req.maintPctPerYear) || 2) / 100);
-        return {
-          annualEnergyKwh,
-          costItems: [{
-            id: 'ups-main', label: entry.label || 'ИБП', qty: 1,
-            equipmentPrice:          { value: price, currency: priceCur },
-            installPrice:            { value: 0, currency: priceCur },
-            maintenancePerYearPrice: { value: maintPerYear, currency: priceCur },
-          }],
-        };
+        // v0.60.470: CAPEX набора = ИБП + АКБ ПРЯМО в варианте (auto-seed;
+        // дальше Пользователь правит построчно во вкладке CAPEX без
+        // запуска конфигуратора — приоритет у entry.eco.costItems).
+        const items = [{
+          id: 'ups-main',
+          label: ([p.upsSupplier, p.upsModel].filter(Boolean).join(' ')) || entry.label || 'ИБП',
+          qty: 1,
+          equipmentPrice:          { value: price, currency: priceCur },
+          installPrice:            { value: 0, currency: priceCur },
+          maintenancePerYearPrice: { value: maintPerYear, currency: priceCur },
+        }];
+        const b = p.battery;
+        if (p.batteryChoice !== 'skip' && b && (b.id || b.model)) {
+          const bQty = Number(p.batterySetsQty) || 1;
+          items.push({
+            id: 'akb-main',
+            label: 'АКБ: ' + [b.supplier, b.model || b.type].filter(Boolean).join(' '),
+            qty: bQty,
+            equipmentPrice:          { value: Number(b.price) || 0, currency: b.currency || priceCur },
+            installPrice:            { value: 0, currency: b.currency || priceCur },
+            maintenancePerYearPrice: { value: 0, currency: b.currency || priceCur },
+          });
+        }
+        return { annualEnergyKwh, costItems: items };
       }
 
       // B2.2 i2: Spec-вкладка варианта — каскад поставщик→серия→модель
@@ -439,7 +454,7 @@
       // конфигурацию, а НЕ выбор ИБП по требованиям. Мастер подбора
       // (каскад поставщик→серия→модель) вызывается ОТДЕЛЬНО — кнопкой.
       function variantSpec(ctx) {
-        const { host, entry, req, save } = ctx;
+        const { host, entry, req, save, createVariant } = ctx;
         const p = (entry && entry.payload) || {};
         const allowed = Array.isArray(req.upsTypes) ? req.upsTypes : [];
         const all = listUpses() || [];
@@ -448,6 +463,11 @@
           return !allowed.length || (tid && allowed.includes(tid));
         });
         const curUps = () => p.upsId ? (list.find(u => u.id === p.upsId) || all.find(u => u.id === p.upsId)) : null;
+        // v0.60.470: если вариант УЖЕ сконфигурирован — переконфигурация
+        // через мастер создаёт НОВЫЙ вариант с новым номером (исходный не
+        // меняется, чтобы не сравнить разные составы под одним номером).
+        const wasConfigured = !!p.upsId;
+        let draft = {};
         let editMode = !p.upsId;          // нет модели → сразу мастер
 
         function drawSummary() {
@@ -472,6 +492,12 @@
         function drawPicker() {
           const redOpts = ['N', 'N+1', 'N+2', '2N'].map(r =>
             `<option value="${r}"${(p.redundancy || req.redundancy || 'N+1') === r ? ' selected' : ''}>${r}</option>`).join('');
+          draft = {
+            upsId: p.upsId || '', upsSupplier: p.upsSupplier || '', upsSeries: p.upsSeries || '',
+            upsModel: p.upsModel || '', capacityKw: p.capacityKw || 0,
+            upsType: p.upsType || '', efficiency: p.efficiency || 0,
+            redundancy: p.redundancy || req.redundancy || 'N+1',
+          };
           host.innerHTML = `
             <div class="rsp-sec-title" style="margin-top:4px" title="Мастер подбора: каскад поставщик→серия→модель. Список ограничен допустимыми типами подбора.">🧙 Мастер подбора — выбор модели ИБП</div>
             <div data-ups-pick-host></div>
@@ -480,9 +506,16 @@
                 <select data-vspec="redundancy">${redOpts}</select></label>
             </div>
             <div class="rsp-note" data-ups-pick-info></div>
-            ${p.upsId ? `<div style="margin-top:8px"><button type="button" class="rs-cs-btn" data-vspec="done">↩ К подобранной конфигурации</button></div>` : ''}`;
+            ${wasConfigured
+              ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                   <button type="button" class="rs-cs-btn rs-cs-btn-primary" data-vspec="newvar" disabled>💾 Создать НОВЫЙ вариант (новый №)</button>
+                   <button type="button" class="rs-cs-btn" data-vspec="done">↩ К подобранной конфигурации</button>
+                 </div>
+                 <div class="rsp-note">ℹ Переконфигурация создаёт <b>новый</b> вариант с новым номером — исходный не меняется (чтобы не сравнить разные составы под одним номером).</div>`
+              : ''}`;
           const pickHost = host.querySelector('[data-ups-pick-host]');
           const info = host.querySelector('[data-ups-pick-info]');
+          const newBtn = host.querySelector('[data-vspec="newvar"]');
           const setInfo = (u) => {
             const tt = u ? detectUpsType(u) : null;
             info.innerHTML = u
@@ -496,19 +529,36 @@
             currentSupplier: p.upsSupplier || '', currentSeries: p.upsSeries || '',
             onChange({ supplier, series, modelId, ups }) {
               const tt = ups ? detectUpsType(ups) : null;
-              p.upsId = modelId || ''; p.upsSupplier = supplier || ''; p.upsSeries = series || '';
-              p.upsModel = ups ? ups.model : ''; p.capacityKw = ups ? (ups.capacityKw || 0) : 0;
-              p.upsType = tt ? tt.id : ''; p.efficiency = ups ? (ups.efficiency || 0) : 0;
-              save({ payload: {
-                upsId: p.upsId, upsSupplier: p.upsSupplier, upsSeries: p.upsSeries,
-                upsModel: p.upsModel, capacityKw: p.capacityKw, upsType: p.upsType, efficiency: p.efficiency,
-              } });
+              if (wasConfigured) {
+                // Не трогаем исходный вариант — копим в draft, создадим новый.
+                draft.upsId = modelId || ''; draft.upsSupplier = supplier || ''; draft.upsSeries = series || '';
+                draft.upsModel = ups ? ups.model : ''; draft.capacityKw = ups ? (ups.capacityKw || 0) : 0;
+                draft.upsType = tt ? tt.id : ''; draft.efficiency = ups ? (ups.efficiency || 0) : 0;
+                if (newBtn) newBtn.disabled = !(draft.upsId && draft.upsId !== p.upsId);
+              } else {
+                p.upsId = modelId || ''; p.upsSupplier = supplier || ''; p.upsSeries = series || '';
+                p.upsModel = ups ? ups.model : ''; p.capacityKw = ups ? (ups.capacityKw || 0) : 0;
+                p.upsType = tt ? tt.id : ''; p.efficiency = ups ? (ups.efficiency || 0) : 0;
+                save({ payload: {
+                  upsId: p.upsId, upsSupplier: p.upsSupplier, upsSeries: p.upsSeries,
+                  upsModel: p.upsModel, capacityKw: p.capacityKw, upsType: p.upsType, efficiency: p.efficiency,
+                } });
+              }
               setInfo(ups || null);
             },
           });
           setInfo(p.upsId ? list.find(u => u.id === p.upsId) : null);
           const redEl = host.querySelector('[data-vspec="redundancy"]');
-          if (redEl) redEl.addEventListener('change', () => { p.redundancy = redEl.value; save({ payload: { redundancy: redEl.value } }); });
+          if (redEl) redEl.addEventListener('change', () => {
+            if (wasConfigured) { draft.redundancy = redEl.value; }
+            else { p.redundancy = redEl.value; save({ payload: { redundancy: redEl.value } }); }
+          });
+          if (newBtn && typeof createVariant === 'function') newBtn.addEventListener('click', () => {
+            if (!(draft.upsId && draft.upsId !== p.upsId)) return;
+            const np = { ...p, ...draft };
+            const lbl = [draft.upsModel, draft.capacityKw ? draft.capacityKw + ' кВт' : ''].filter(Boolean).join(' ') || 'Вариант';
+            createVariant(np, lbl);   // создаст новый вариант и переключит панель
+          });
           const doneEl = host.querySelector('[data-vspec="done"]');
           if (doneEl) doneEl.addEventListener('click', () => { editMode = false; drawSummary(); });
         }

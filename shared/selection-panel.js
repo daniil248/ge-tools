@@ -650,6 +650,28 @@ export function mountSelectionPanel(o) {
             if (patch && patch.label != null) ne.label = patch.label;
             saveConfig(kind, ne);
           },
+          // v0.60.470: переконфигурирование через мастер создаёт НОВЫЙ
+          // вариант с НОВЫМ номером (исходный не меняется — чтобы не
+          // путать составы под одним номером). Возвращает новую запись;
+          // панель переключается на неё.
+          createVariant(payload, label) {
+            const cur = getConfig(kind, activeVariantId) || {};
+            const ent = saveConfig(kind, {
+              label: label || cur.label || 'Вариант',
+              description: cur.description || '',
+              selectionName: selName,
+              projectCode: pc,
+              payload: payload || { ...(cur.payload || {}) },
+            });
+            if (ent && ent.id) {
+              activeVariantId = ent.id;
+              scopeMode = 'variant';
+              variantTab = 'spec';
+              render();
+              try { window.dispatchEvent(new CustomEvent('rs-cs-focus', { detail: { kind, scope: 'variant', selectionName: selName, entryId: ent.id } })); } catch {}
+            }
+            return ent;
+          },
           refresh: render,
         });
         if (variantTab === 'spec' && typeof o.variantSpec === 'function') {
