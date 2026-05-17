@@ -519,3 +519,38 @@ export function clearProjectData(pid) {
   toRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
   return toRemove.length;
 }
+
+// v0.60.607: разовый идемпотентный бэкафилл для подпроектов, созданных
+// ДО v0.60.606 (createSubProject тогда не наследовал площадку). Репорт
+// Пользователя: «МЦОД-1» внутри проекта Qarmet открывался с пустой
+// локацией. Чиним существующие: для sketch с parentProjectId без своей
+// location — копируем location (deep) + customer/category из родителя.
+// Preserve-on-miss: только пустые поля, заполненные не трогаем (правило
+// user-params-sacred). Guard-флаг — чтобы не сканировать на каждый импорт;
+// сама операция идемпотентна. Без новых экспортов (single-deploy safe §6a).
+(function _backfillSubProjectSiteIdentity() {
+  try {
+    const GUARD = `${APP_NS}.migrate.subProjSite.v1`;
+    if (localStorage.getItem(GUARD) === '1') return;
+    const arr = listProjects();
+    if (!Array.isArray(arr) || !arr.length) { localStorage.setItem(GUARD, '1'); return; }
+    const byId = new Map(arr.map(p => [p.id, p]));
+    let changed = 0;
+    for (const p of arr) {
+      if (!p || p.kind !== 'sketch' || !p.parentProjectId) continue;
+      const par = byId.get(p.parentProjectId);
+      if (!par) continue;
+      if ((!p.location || typeof p.location !== 'object') && par.location && typeof par.location === 'object') {
+        p.location = JSON.parse(JSON.stringify(par.location));
+        changed++;
+      }
+      if (!p.customer && par.customer) { p.customer = par.customer; changed++; }
+      if (!p.category && par.category) { p.category = par.category; changed++; }
+    }
+    if (changed) {
+      saveJson(LS_PROJECTS, arr);
+      console.info(`[project-storage v0.60.607] Бэкафилл площадки подпроектов: ${changed} полей заполнено из родителей.`);
+    }
+    localStorage.setItem(GUARD, '1');
+  } catch (e) { /* best-effort миграция — не блокируем загрузку */ }
+})();
