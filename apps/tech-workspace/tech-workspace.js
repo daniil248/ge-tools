@@ -5230,9 +5230,10 @@ function bindReport() {
     const v = _variants.find(x => x.id === _activeId);
     if (!v) { twToast('Сначала выберите вариант.', 'warn'); return; }
     try {
-      const [Report, B] = await Promise.all([
+      const [Report, B, Tpl] = await Promise.all([
         import('shared/report/index.js'),
         import('shared/report/blocks.js'),
+        import('shared/report/template.js'),
       ]);
       // Отчёт ТОЛЬКО через кастомный сохраняемый шаблон (требование
       // Пользователя): пользователь выбирает шаблон (оформление,
@@ -5251,10 +5252,14 @@ function bindReport() {
         author: v.concept?.projectData?.designer || tpl.meta?.author || '',
       };
       tpl.content = blocks;
-      // Состав разделов — из содержимого; порядок/видимость берём из
-      // сохранённого шаблона (если пользователь их уже настроил).
+      // Редизайн: собираем ЕДИНЫЙ ПОТОК (структура шаблона + тело
+      // в одном flow → структурные зоны не накладываются на контент;
+      // печать/подпись уходят в floating с привязкой к подписанту).
+      Tpl.migrateToFlow(tpl);
+      // Состав разделов — из ПОТОКА (вкл. Шапку/Подписи); порядок/
+      // видимость берём из сохранённого шаблона.
       if (!tpl.sections || typeof tpl.sections !== 'object') tpl.sections = {};
-      tpl.sections.manifest = Report.sectionManifestFromContent(blocks);
+      tpl.sections.manifest = Report.sectionManifestFromContent(tpl.flow);
       if (!Array.isArray(tpl.sections.order))  tpl.sections.order  = [];
       if (!Array.isArray(tpl.sections.hidden)) tpl.sections.hidden = [];
       await persistPickedManifest(rec.id, tpl.sections.manifest);

@@ -459,6 +459,11 @@ export function migrateToFlow(tpl) {
   const extras = [];   // неклассифицированное — не теряем
 
   for (const ov of overlays) {
+    // Бегущий колонтитул (номер страницы и т.п.) — НЕ тянем в поток;
+    // оставляем overlay (рисуется absolute в зоне полей — это
+    // санкционировано инвариантом: за поля можно колонтитулам).
+    if (ov.type !== 'image' &&
+        /\{\{\s*pages?\s*\}\}/.test(String(ov.content?.text || ''))) continue;
     const role = classifyOverlay(ov);
     if (role === 'docTitle') {
       top.push({ type: 'docTitle', text: ov.content?.text || '{{meta.title}}',
@@ -497,6 +502,13 @@ export function migrateToFlow(tpl) {
         style: ov.content?.styleRef === 'caption' ? 'caption' : undefined });
     }
   }
+
+  // Структурные блоки шапки/подписи получают свои разделы — чтобы
+  // поток был полностью секционирован (effectiveFlow применяет
+  // порядок/видимость, редактор «Разделы» их показывает).
+  for (const b of top)    { b.section = 'doc-head'; b.sectionLabel = 'Шапка документа'; }
+  for (const b of extras) { b.section = b.section || 'doc-head'; b.sectionLabel = b.sectionLabel || 'Шапка документа'; }
+  for (const b of bottom) { b.section = 'doc-sign'; b.sectionLabel = 'Подписи и печать'; }
 
   tpl.flow = [...top, ...extras, ...content, ...bottom];
   return tpl;
