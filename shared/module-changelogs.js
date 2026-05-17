@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.630', date: '2026-05-17', items: [
+      '📋 <b>Фаза 1 (хвост): манифест panel-config честный</b>. apps/panel-config/manifest.json: storageKeys +raschet.lastPanelConfig.v1/pendingPanelSelection.v1/panelWizardPreload.v1 (handoff write/read с инспектором/конструктором); urlParams +name/kind/voltage/inputs/outputs/ip/form (pre-fill из ?nodeId-контекста). Базовые storageKeys (configurations.panel/panelCatalog) и events (rs-selection-change/rs-cs-focus) уже верны. Исключён raschet.panel-config.v1 — schema-id (wire-format, RENAME.md §3). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/panel-config/manifest.json.',
+    ] },
     { version: '0.60.629', date: '2026-05-17', items: [
       '📋 <b>Фаза 1 (хвост): манифест mv-config честный</b>. apps/mv-config/manifest.json: bridges [] → shared/catalog-bridge.js (фактический импорт, был пропущен); urlParams +name/Un_kV/loadA/In_A/mvType/cellsCount/lockedId (pre-fill подбора из ?nodeId-контекста). storageKeys (raschet.configurations.mv.v1, raschet.pendingMvSelection.v1) и events (rs-selection-change/rs-cs-focus) уже корректны. Исключён raschet.mv-config.v1 — schema-id импорта/экспорта (wire-format, RENAME.md §3). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/mv-config/manifest.json.',
     ] },
