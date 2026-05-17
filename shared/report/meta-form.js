@@ -16,8 +16,8 @@
 
 const LS_PREFIX = 'raschet.reportMeta.';
 
-// Поля: id → { label, custom? (в meta.custom, иначе meta), area? }
-const FIELDS = [
+// Поля: id → { label, custom? (в meta.custom, иначе meta) }
+const ALL_FIELDS = [
   { id: 'author',         label: 'Составил (Ф.И.О.)' },
   { id: 'recipient',      label: 'Кому (получатель)',           custom: true },
   { id: 'recipientPost',  label: 'Должность получателя',        custom: true },
@@ -53,6 +53,14 @@ function savePersisted(key, obj) {
  */
 export function collectReportMeta(opts = {}) {
   const { defaults = {}, persistKey = 'global', title = 'Реквизиты документа' } = opts;
+  // Только поля, реально присутствующие в ЭТОМ документе (плейсхолдеры
+  // шаблона). Если не передано/пусто — показываем все (fallback).
+  const only = opts.onlyKeys
+    ? (opts.onlyKeys instanceof Set ? opts.onlyKeys : new Set(opts.onlyKeys))
+    : null;
+  const FIELDS = (only && only.size)
+    ? ALL_FIELDS.filter(f => only.has(f.id))
+    : ALL_FIELDS;
   const saved = loadPersisted(persistKey);
   // Приоритет: сохранённое > defaults(проект) > ''
   const initial = {};

@@ -5252,9 +5252,19 @@ function bindReport() {
         tags: ['tech-workspace', 'концепция', 'общее'],
       });
       if (!rec) return;
-      // Реквизиты конкретного отчёта (кому/составил/компания/№/версия)
-      // → плейсхолдеры шаблона. Предзаполнение из проекта/варианта,
-      // запоминается per-project.
+      const tpl = Report.createTemplate(rec.template);
+      // Документ наследует оформление базы (вид колонтитулов, поля,
+      // стили, разделы) — иначе плейсхолдеры/разделы базы не видны.
+      if (tpl.baseTemplateId) {
+        try {
+          const Cat = await import('shared/report-catalog.js');
+          const base = Cat.getTemplate(tpl.baseTemplateId);
+          if (base && base.template) Tpl.applyBaseChrome(tpl, base.template);
+        } catch (e) { /* база недоступна */ }
+      }
+      // Реквизиты конкретного отчёта → плейсхолдеры. Форма показывает
+      // ТОЛЬКО поля, реально присутствующие в этом документе.
+      // Предзаполнение из проекта/варианта, запоминается per-project.
       let _mf = null;
       try {
         const { collectReportMeta } = await import('shared/report/meta-form.js');
@@ -5263,6 +5273,7 @@ function bindReport() {
         _mf = await collectReportMeta({
           persistKey: pid || 'tech-workspace',
           title: 'Реквизиты документа — пояснительная записка',
+          onlyKeys: Tpl.extractMetaPlaceholders(tpl),
           defaults: {
             author: pd.designer || '',
             companyName: pd.companyName || pd.customer || '',
@@ -5273,7 +5284,6 @@ function bindReport() {
         if (_mf === null) return;   // отменён
       } catch (e) { _mf = null; }
       const blocks = tagReportSections(generateReportBlocks(v, B));
-      const tpl = Report.createTemplate(rec.template);
       tpl.meta = {
         ...(tpl.meta || {}),
         title:  `Пояснительная записка — ${v.name}`,

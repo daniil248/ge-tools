@@ -41,21 +41,6 @@ export async function composeReport(opts = {}) {
     if (!rec) return 'cancelled';
   }
 
-  // Реквизиты КОНКРЕТНОГО документа (кому/составил/компания/№/версия)
-  // → плейсхолдеры шаблона. Пропускается opts.collectMeta===false.
-  let _metaFill = null;
-  if (opts.collectMeta !== false) {
-    try {
-      const { collectReportMeta } = await import('./meta-form.js');
-      _metaFill = await collectReportMeta({
-        defaults: opts.metaDefaults || {},
-        persistKey: opts.metaPersistKey || kind || 'global',
-        title: 'Реквизиты документа' + (title ? ' — ' + title : ''),
-      });
-      if (_metaFill === null) return 'cancelled';   // закрыли крестиком/фоном
-    } catch (e) { _metaFill = null; }
-  }
-
   const tpl = Report.createTemplate(rec ? rec.template : {});
   // Двухуровневая модель: документный шаблон наследует chrome
   // (поля/колонтитулы/стили/логотип/обложка) из базового по
@@ -66,6 +51,24 @@ export async function composeReport(opts = {}) {
       const base = Cat.getTemplate(tpl.baseTemplateId);
       if (base && base.template) applyBaseChrome(tpl, base.template);
     } catch (e) { /* база недоступна — рендерим как есть */ }
+  }
+
+  // Реквизиты КОНКРЕТНОГО документа → плейсхолдеры шаблона. Форма
+  // показывает ТОЛЬКО поля, реально присутствующие в этом документе
+  // (extractMetaPlaceholders). Пропуск opts.collectMeta===false.
+  let _metaFill = null;
+  if (opts.collectMeta !== false) {
+    try {
+      const { collectReportMeta } = await import('./meta-form.js');
+      const { extractMetaPlaceholders } = await import('./template.js');
+      _metaFill = await collectReportMeta({
+        defaults: opts.metaDefaults || {},
+        persistKey: opts.metaPersistKey || kind || 'global',
+        title: 'Реквизиты документа' + (title ? ' — ' + title : ''),
+        onlyKeys: extractMetaPlaceholders(tpl),
+      });
+      if (_metaFill === null) return 'cancelled';
+    } catch (e) { _metaFill = null; }
   }
   tpl.meta = {
     ...(tpl.meta || {}),

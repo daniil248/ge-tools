@@ -407,6 +407,45 @@ export function overlaysForPage(tpl, isFirstPage) {
  *  content. Подпрограмма вызывает её после сборки блоков и кладёт
  *  результат в tpl.sections.manifest, чтобы редактор «Разделы» знал
  *  состав даже когда сам content в сохранённый шаблон не пишется. */
+/** Сканирует ВЕСЬ текст шаблона (flow/content/cover + header/footer +
+ *  pageSections-колонтитулы) и возвращает множество id-полей реквизитов,
+ *  реально используемых в ЭТОМ документе: {{meta.author}}→'author',
+ *  {{meta.custom.recipient}}→'recipient'. Чтобы форма реквизитов
+ *  показывала только поля, которые есть в этом документе (требование
+ *  Пользователя «для каждого отчёта свой шаблон со своими полями»). */
+export function extractMetaPlaceholders(tpl) {
+  const ids = new Set();
+  const scan = (txt) => {
+    if (!txt) return;
+    const re = /\{\{\s*meta\.(custom\.)?([\w]+)\s*\}\}/g;
+    let m;
+    while ((m = re.exec(String(txt)))) ids.add(m[2]);
+  };
+  const scanBlocks = (arr) => {
+    for (const b of (Array.isArray(arr) ? arr : [])) {
+      if (!b) continue;
+      scan(b.text); scan(b.title);
+      if (Array.isArray(b.items)) b.items.forEach(scan);
+      if (Array.isArray(b.rows)) b.rows.forEach(r => (r || []).forEach(scan));
+    }
+  };
+  if (!tpl || typeof tpl !== 'object') return ids;
+  scanBlocks(tpl.flow); scanBlocks(tpl.content);
+  if (tpl.cover) scanBlocks(tpl.cover.blocks);
+  for (const grp of [tpl.header, tpl.footer]) {
+    if (!grp) continue;
+    for (const k of ['firstPage', 'otherPages']) scanBlocks(grp[k] && grp[k].blocks);
+  }
+  for (const s of (Array.isArray(tpl.pageSections) ? tpl.pageSections : [])) {
+    scanBlocks(s && s.header && s.header.blocks);
+    scanBlocks(s && s.footer && s.footer.blocks);
+  }
+  for (const ov of (Array.isArray(tpl.overlays) ? tpl.overlays : [])) {
+    scan(ov && ov.content && ov.content.text);
+  }
+  return ids;
+}
+
 export function sectionManifestFromContent(content) {
   const seen = new Map();
   for (const b of (Array.isArray(content) ? content : [])) {
@@ -540,6 +579,39 @@ function applyColontitleBands(tpl) {
   }
 }
 
+// Идемпотентный дедуп потока: структурные блоки документа
+// (заголовок/реквизиты/адресат/дата/содержание/подпись/печать)
+// должны быть в ЕДИНСТВЕННОМ экземпляре; подряд идущие «разрывы
+// раздела» схлопываются; ведущий/замыкающий разрыв убирается.
+// Лечит накопленные дубли (репорт Пользователя: Адресат×2,
+// Подпись×2, Разрыв×2, дублирование колонтитула).
+const _STRUCT_SINGLE = new Set([
+  'docTitle', 'companyInfo', 'addressee', 'metaLine', 'tocAuto',
+  'signature', 'stamp',
+]);
+export function dedupeStructuralFlow(flow) {
+  if (!Array.isArray(flow)) return flow;
+  const seen = new Set();
+  const out = [];
+  for (const b of flow) {
+    if (!b) continue;
+    if (b.type && _STRUCT_SINGLE.has(b.type)) {
+      if (seen.has(b.type)) continue;
+      seen.add(b.type);
+      out.push(b); continue;
+    }
+    if (b.type === 'sectionBreak') {
+      const prev = out[out.length - 1];
+      if (prev && prev.type === 'sectionBreak') continue; // схлопнуть подряд
+      out.push(b); continue;
+    }
+    out.push(b);
+  }
+  while (out.length && out[0].type === 'sectionBreak') out.shift();
+  while (out.length && out[out.length - 1].type === 'sectionBreak') out.pop();
+  return out;
+}
+
 export function migrateToFlow(tpl) {
   if (!tpl || typeof tpl !== 'object') return tpl;
   if (!Array.isArray(tpl.floating)) tpl.floating = [];
@@ -556,6 +628,7 @@ export function migrateToFlow(tpl) {
     // tpl.content (тело отчёта) и оно ещё не влито — вставляем тело
     // МЕЖДУ шапкой и подписью (перед первым блоком раздела
     // doc-sign; иначе в конец). Идемпотентно через _flowBodyMerged.
+    tpl.flow = dedupeStructuralFlow(tpl.flow);   // лечим накопленные дубли
     const body = Array.isArray(tpl.content) ? tpl.content : [];
     if (body.length && !tpl._flowBodyMerged) {
       const flow = tpl.flow.slice();
@@ -643,7 +716,7 @@ export function migrateToFlow(tpl) {
   for (const b of extras) { b.section = b.section || 'doc-head'; b.sectionLabel = b.sectionLabel || 'Шапка документа'; }
   for (const b of bottom) { b.section = 'doc-sign'; b.sectionLabel = 'Подписи и печать'; }
 
-  tpl.flow = [...top, ...extras, ...content, ...bottom];
+  tpl.flow = dedupeStructuralFlow([...top, ...extras, ...content, ...bottom]);
 
   // R6: колонтитул-overlay → band-колонтитулы (header/footer).
   // Абсолютный overlay-путь полностью убран → рендер согласован с
@@ -731,8 +804,15 @@ function expandStructural(b, tpl) {
       return [wrap({ type: 'paragraph', style: 'caption',
         text: S(b.text || '{{date}}'), align: b.align || 'right' })];
     case 'tocAuto': {
-      const items = (tpl.sections?.manifest || []).map(s => s.label);
-      const arr = [wrap({ type: 'heading', level: 2, text: b.title || 'Содержание' })];
+      // Содержание строится ИЗ ПОРЯДКА РАЗДЕЛОВ документа, без
+      // служебных псевдо-разделов (шапка/содержание/подписи) —
+      // только содержательные разделы (репорт Пользователя).
+      const STRUCT = new Set(['doc-head', 'doc-sign', 'doc-toc']);
+      const title = b.title || 'Содержание';
+      const items = (tpl.sections?.manifest || [])
+        .filter(s => s && !STRUCT.has(s.id) && s.label && s.label !== title)
+        .map(s => s.label);
+      const arr = [wrap({ type: 'heading', level: 2, text: title })];
       if (items.length) arr.push(wrap({ type: 'list', ordered: false, items }));
       return arr;
     }
