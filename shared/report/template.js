@@ -75,6 +75,20 @@ export function defaultTemplate() {
     // (разный колонтитул 1-й стр. уже задаётся header/footer.firstPage).
     firstPage: { page: null },        // {format,orientation,margins} | null
 
+    // ——— ПО-РАЗДЕЛЬНАЯ МОДЕЛЬ (sections-as-base, спека
+    // SPEC-section-model.md) ———
+    // Базовый шаблон владеет массивом разделов: у каждого своя
+    // геометрия + свой колонтитул (шапка/подвал) + опц. свой логотип.
+    // Документ наследует pageSections из базы (applyBaseChrome) и
+    // блоком sectionBreak{ sectionRef } переключается на именованный
+    // раздел базы. ПУСТОЙ массив → старая модель header/footer
+    // first/other (полная обратная совместимость, нулевая регрессия).
+    // Форма элемента:
+    //  { id, name, page:{format,orientation,width,height,margins},
+    //    header:{enabled,height,width,bleed,valign,blocks[]},
+    //    footer:{...}, logo:{src,width,height,x,y}|null, repeat }
+    pageSections: [],
+
     // ——— логотип (опционально) ———
     logo: {
       src:      null,                  // data URL (PNG/JPEG) или null
@@ -809,9 +823,70 @@ export function colontitleBox(geom, band, where) {
  *  первый сегмент; затем контент, разрезаемый блоками sectionBreak
  *  (каждый меняет геометрию относительно текущей). Структурные блоки
  *  уже развёрнуты (effectiveFlow). */
+/** Нормализация массива pageSections (форма + дефолты имён). */
+export function normalizePageSections(tpl) {
+  const arr = Array.isArray(tpl && tpl.pageSections) ? tpl.pageSections : [];
+  const DEF = ['Титул', 'Основной', 'Приложение'];
+  return arr.map((s, i) => {
+    s = s || {};
+    if (!s.id) s.id = 'ps' + (i + 1);
+    if (!s.name) s.name = DEF[i] || ('Раздел ' + (i + 1));
+    if (!s.page || typeof s.page !== 'object') s.page = {};
+    for (const k of ['header', 'footer']) {
+      if (!s[k] || typeof s[k] !== 'object') s[k] = { enabled: false, blocks: [] };
+      if (!Array.isArray(s[k].blocks)) s[k].blocks = [];
+    }
+    if (s.repeat == null) s.repeat = true;
+    return s;
+  });
+}
+
 export function flowSegments(tpl) {
   const base = tpl.page || {};
   const segs = [];
+  const ps = normalizePageSections(tpl);
+
+  // ——— Новая по-раздельная модель (если pageSections заданы —
+  // обычно унаследованы из базы через applyBaseChrome) ———
+  if (ps.length) {
+    if (tpl.cover && tpl.cover.enabled) {
+      const cb = (tpl.cover.blocks && tpl.cover.blocks.length)
+        ? effectiveFlow({ flow: tpl.cover.blocks, meta: tpl.meta, sections: {} })
+        : [];
+      segs.push({ isCover: true, chrome: !!tpl.cover.chrome,
+        geom: mergePageGeom(base, tpl.cover.page), blocks: cb });
+    }
+    const findSec = (ref, fallbackIdx) => {
+      if (ref != null) {
+        const f = ps.find(x => x.id === ref || x.name === ref);
+        if (f) return f;
+      }
+      return ps[Math.min(Math.max(0, fallbackIdx), ps.length - 1)];
+    };
+    let idx = 0;
+    let sec = ps[0];
+    let cur = { isCover: false, chrome: true, section: sec,
+      geom: mergePageGeom(base, sec.page), blocks: [] };
+    for (const b of effectiveFlow(tpl)) {
+      if (b && b.type === 'sectionBreak') {
+        segs.push(cur);
+        // Документ ЯВНО выбирает именованный раздел базы
+        // (b.sectionRef = id|name); без ref — следующий по порядку.
+        sec = findSec(b.sectionRef, idx + 1);
+        idx = ps.indexOf(sec);
+        cur = { isCover: false, chrome: true, section: sec,
+          geom: mergePageGeom(base, sec.page), blocks: [] };
+        continue;
+      }
+      cur.blocks.push(b);
+    }
+    segs.push(cur);
+    const outP = segs.filter((s, i) => s.isCover || s.blocks.length ||
+      (i === segs.length - 1 && !segs.some(x => !x.isCover && x.blocks.length)));
+    return outP.length ? outP : segs;
+  }
+
+  // ——— Legacy-модель header/footer first/other (нулевая регрессия) ———
   if (tpl.cover && tpl.cover.enabled) {
     const cb = (tpl.cover.blocks && tpl.cover.blocks.length)
       ? effectiveFlow({ flow: tpl.cover.blocks, meta: tpl.meta, sections: {} })
@@ -857,7 +932,8 @@ export function applyBaseChrome(tpl, base) {
     src.level = 'base';
     migrateToFlow(src);
   } catch (e) { src = base; }
-  for (const k of ['page', 'header', 'footer', 'styles', 'logo', 'cover', 'firstPage']) {
+  for (const k of ['page', 'header', 'footer', 'styles', 'logo', 'cover',
+                   'firstPage', 'pageSections']) {
     if (src[k] != null) tpl[k] = clone(src[k]);
   }
   return tpl;

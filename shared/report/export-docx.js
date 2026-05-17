@@ -83,14 +83,22 @@ export async function exportDOCX(tpl, filename) {
           titlePage: si === 0 && !seg.isCover,
         },
       },
-      headers: chromeOn ? {
+      // По-раздельная модель: один колонтитул раздела повторяется
+      // (first==default). Иначе legacy first/other.
+      headers: chromeOn ? (seg.section ? {
+        default: seg.section.header && seg.section.header.enabled
+          ? new Header({ children: blocksToDocx(seg.section.header.blocks, tpl, D, { first: false }) }) : undefined,
+      } : {
         first:   tpl.header.firstPage.enabled  ? new Header({ children: blocksToDocx(tpl.header.firstPage.blocks,  tpl, D, { first: true })  }) : undefined,
         default: tpl.header.otherPages.enabled ? new Header({ children: blocksToDocx(tpl.header.otherPages.blocks, tpl, D, { first: false }) }) : undefined,
-      } : {},
-      footers: chromeOn ? {
+      }) : {},
+      footers: chromeOn ? (seg.section ? {
+        default: seg.section.footer && seg.section.footer.enabled
+          ? new Footer({ children: blocksToDocx(seg.section.footer.blocks, tpl, D, { first: false, footer: true }) }) : undefined,
+      } : {
         first:   tpl.footer.firstPage.enabled  ? new Footer({ children: blocksToDocx(tpl.footer.firstPage.blocks,  tpl, D, { first: true,  footer: true }) }) : undefined,
         default: tpl.footer.otherPages.enabled ? new Footer({ children: blocksToDocx(tpl.footer.otherPages.blocks, tpl, D, { first: false, footer: true }) }) : undefined,
-      } : {},
+      }) : {},
       children: blocksToDocx(seg.blocks || [], tpl, D, {}),
     };
     if (chromeOn) {

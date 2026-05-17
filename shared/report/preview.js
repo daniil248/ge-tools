@@ -308,8 +308,15 @@ function buildPageShell(tpl, scale, guides, pg, pageNum, totalPages, pageLabel) 
   const chromeOn = !pg || pg.chrome !== false;
   const { width, height } = pageSizeMm(geom);
   const m    = geom.margins || tpl.page.margins;
-  const hdr  = chromeOn ? (isFirst ? tpl.header.firstPage : tpl.header.otherPages) : { enabled: false };
-  const ftr  = chromeOn ? (isFirst ? tpl.footer.firstPage : tpl.footer.otherPages) : { enabled: false };
+  // По-раздельная модель: колонтитул берётся из раздела сегмента
+  // (повторяется на всех его страницах). Иначе — legacy first/other.
+  const sec = pg && pg.section;
+  const hdr  = !chromeOn ? { enabled: false }
+    : sec ? (sec.header || { enabled: false })
+    : (isFirst ? tpl.header.firstPage : tpl.header.otherPages);
+  const ftr  = !chromeOn ? { enabled: false }
+    : sec ? (sec.footer || { enabled: false })
+    : (isFirst ? tpl.footer.firstPage : tpl.footer.otherPages);
 
   const page = div('rpt-page');
   page.style.width  = (width  * scale) + 'px';
@@ -374,14 +381,16 @@ function buildPageShell(tpl, scale, guides, pg, pageNum, totalPages, pageLabel) 
   if (guides) body.classList.add('rpt-body--edit');
   page.appendChild(body);
 
-  // Логотип
-  if (chromeOn && tpl.logo && tpl.logo.src && (!tpl.logo.onFirstPageOnly || isFirst)) {
+  // Логотип: per-section (свой размер на титульном/др. разделах)
+  // имеет приоритет; иначе глобальный tpl.logo.
+  const lg = (sec && sec.logo && sec.logo.src) ? sec.logo : tpl.logo;
+  if (chromeOn && lg && lg.src && (sec || !lg.onFirstPageOnly || isFirst)) {
     const img = document.createElement('img');
     img.className = 'rpt-logo';
-    img.src = tpl.logo.src;
-    img.style.width  = (tpl.logo.width  * scale) + 'px';
-    img.style.height = (tpl.logo.height * scale) + 'px';
-    positionLogo(img, tpl, scale);
+    img.src = lg.src;
+    img.style.width  = (lg.width  * scale) + 'px';
+    img.style.height = (lg.height * scale) + 'px';
+    positionLogo(img, { ...tpl, logo: lg }, scale);
     page.appendChild(img);
   }
 

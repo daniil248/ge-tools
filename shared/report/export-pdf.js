@@ -297,7 +297,8 @@ function drawHeaderFooter(doc, tpl, pg, pageNum, total) {
     return free / 2;   // middle (по умолчанию)
   };
 
-  const hdr = isFirst ? tpl.header.firstPage : tpl.header.otherPages;
+  const sec = pg && pg.section;
+  const hdr = sec ? sec.header : (isFirst ? tpl.header.firstPage : tpl.header.otherPages);
   if (hdr && hdr.enabled) {
     const hb = colontitleBox(geom, hdr, 'header');
     const dy = vOffset(hdr, hdr.blocks, hb.height);
@@ -306,7 +307,7 @@ function drawHeaderFooter(doc, tpl, pg, pageNum, total) {
       { page: pageNum, pages: total });
   }
 
-  const ftr = isFirst ? tpl.footer.firstPage : tpl.footer.otherPages;
+  const ftr = sec ? sec.footer : (isFirst ? tpl.footer.firstPage : tpl.footer.otherPages);
   if (ftr && ftr.enabled) {
     const fb = colontitleBox(geom, ftr, 'footer');
     const dy = vOffset(ftr, ftr.blocks, fb.height);
@@ -352,10 +353,11 @@ function drawOverlays(doc, tpl, pg, pageNum, total) {
 }
 
 function drawLogo(doc, tpl, pg) {
-  const l = tpl.logo;
+  const sec = pg && pg.section;
+  const l = (sec && sec.logo && sec.logo.src) ? sec.logo : tpl.logo;
   if (!l || !l.src) return;
   const isFirst = !!(pg && pg.isFirst);
-  if (l.onFirstPageOnly && !isFirst) return;
+  if (!sec && l.onFirstPageOnly && !isFirst) return;
   const geom = (pg && pg.geom) || tpl.page;
   const m = geom.margins || tpl.page.margins;
   const { width, height } = pageSizeMm(geom);
