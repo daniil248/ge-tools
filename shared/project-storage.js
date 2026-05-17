@@ -415,6 +415,15 @@ export function projectSave(pid, module, key, value) {
   if (pid) updateProject(pid, {}); // bump updatedAt
 }
 
+// Sketch'и проекта живут в ОТДЕЛЬНОМ namespace raschet.sketch.<pid>.*
+// (не projectKey). Шов владеет этим ключом — потребители (projects/
+// project.js и др.) читают список sketch'ей через этот аксессор, а
+// не сырым литералом (Фаза 2, минимальный шаг). Всегда массив.
+export function loadSketchList(pid) {
+  const arr = loadJson(`${APP_NS}.sketch.${pid}.list.v1`, []);
+  return Array.isArray(arr) ? arr : [];
+}
+
 // ---------------- Export / Import ----------------
 // Формат — JSON со schema-версией, чтобы продаваемые отдельно модули
 // (Управление объектом и т.п.) могли читать проект независимо от того,

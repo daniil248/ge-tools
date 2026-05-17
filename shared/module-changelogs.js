@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.676', date: '2026-05-17', items: [
+      '🔧 <b>Фаза 2 (мин. безопасный шаг) — деплой A: аксессор шва loadSketchList</b>. Аудит projects/project.js: ~90% LS-доступа уже через шовный projectKey(); реально вне шва — единичный сырой литерал raschet.sketch.&lt;pid&gt;.list.v1 (стр.214) + санкционированные migration-циклы (не трогаем). shared/project-storage.js: добавлен export loadSketchList(pid) — шов владеет ключом sketch-namespace, всегда массив. Без потребителей в этом деплое (cache-safe; project.js перейдёт в деплое B). Миграцию/projectKey НЕ трогаем (низкий риск). Файл: shared/project-storage.js.',
+    ] },
     { version: '0.60.675', date: '2026-05-17', items: [
       '📍 <b>Модуль отчётов завершён ПОЛНОСТЬЮ — ROADMAP X.6.3 закрыт</b>. R6 verified e2e (ТЗ идентичен после конвертации колонтитул-overlay→band, консоль чистая). X.6.3 отмечен 100% (R1–R6 + RR1-3 общий composeReport + DS1-4 Word-разделы); status-header → v0.60.675; убрана устаревшая заметка в пункте. «Доделать отчёты» закрыто: единый flow без наложения, редактор=WYSIWYG=PDF, правка из превью, все отчёты унифицированы, Word-style разделы/обложка (preview/PDF/DOCX), legacy absolute-overlay путь удалён. Файл: ROADMAP.md.',
     ] },
