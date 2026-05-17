@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.714', date: '2026-05-18', items: [
+      '🧱 <b>Разделение ядро/модули — Фаза 2 R2: упрочнение чтения projects/project.js (Инкремент A)</b>. projectStats, subCoolings/subServiceOrders, _lsHasContent→_hasContent, план задач (_loadPlanTasks/_savePlanTasks) переведены с сырых localStorage.getItem/setItem(projectKey(...))+JSON.parse на шов-аксессоры projectLoad/projectSave. Семантика идентична (projectLoad=loadJson(projectKey); projectSave доп. bump updatedAt — для собственного ns plan желателен). Удалён неиспользуемый _planKey. Остаются изолированными PR: _readJSON×3 (Инкремент B) и write/migrate-пути 2410/2603+/2715+/2781/3358 (Инкремент C, высокий риск). Файлы: apps/projects/project.js, js/engine/constants.js.',
+    ] },
     { version: '0.60.713', date: '2026-05-18', items: [
       '🧱 <b>Разделение ядро/модули — Фаза 2 R2: чтение projects/project.js завершено</b>. Оставшиеся 8 cross-module чтений (scs-design links/plan, engine scheme×3, tech-workspace activeVariantId×3) переведены с JSON.parse(localStorage.getItem(projectKey(...))) на шов-аксессор projectLoad. Теперь 0 сырых cross-module read-чтений в project.js (17 через projectLoad). Поведение идентично (projectLoad=loadJson(projectKey)). Мутации (3 setItem(projectKey) — merge/migrate) намеренно оставлены: по плану — отдельными изолированными PR с round-trip-проверкой (высокий риск). audit-contracts --strict зелёный. Файлы: apps/projects/project.js, js/engine/constants.js.',
     ] },

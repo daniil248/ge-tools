@@ -10,9 +10,10 @@ import {
   listSubProjects, createSubProject,
   // v0.59.862: hide-when-empty — для определения «есть ли данные модуля».
   projectKey,
-  // Фаза 2 (R2): чтение чужих module-scoped данных через шов
-  // (projectLoad = loadJson(projectKey(...)) — централизовано, типобезоп.).
+  // Фаза 2 (R2): чтение/запись чужих module-scoped данных через шов
+  // (projectLoad/projectSave — централизовано, типобезоп., bump updatedAt).
   projectLoad,
+  projectSave,
   // Фаза 2: список sketch'ей через шов, не сырым литералом.
   loadSketchList,
 } from 'shared/project-storage.js';
@@ -971,13 +972,14 @@ const PLAN_STATUSES = [
   { id: 'blocked',     label: '🛑 Заблокирована', color: '#991b1b' },
 ];
 
-function _planKey(pid) { return projectKey(pid, 'plan', 'tasks.v1'); }
+// Фаза 2 (R2): план задач — собственный namespace модуля projects;
+// доступ через шов (projectLoad/projectSave), не сырой LS.
 function _loadPlanTasks(pid) {
-  try { return JSON.parse(localStorage.getItem(_planKey(pid)) || '[]'); }
-  catch { return []; }
+  const arr = projectLoad(pid, 'plan', 'tasks.v1', []);
+  return Array.isArray(arr) ? arr : [];
 }
 function _savePlanTasks(pid, tasks) {
-  try { localStorage.setItem(_planKey(pid), JSON.stringify(tasks)); }
+  try { projectSave(pid, 'plan', 'tasks.v1', tasks); }
   catch (e) { console.warn('[plan] save failed:', e); }
 }
 function _newTaskId() { return 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
@@ -1904,43 +1906,37 @@ function prStatusPicker(current) {
 function projectStats(pid) {
   const s = { nodes: 0, racks: 0, links: 0, inventory: 0, facility: 0 };
   try {
-    const sch = localStorage.getItem(projectKey(pid, 'engine', 'scheme.v1'));
-    if (sch) { try { s.nodes = (JSON.parse(sch).nodes || []).length; } catch {} }
+    const sch = projectLoad(pid, 'engine', 'scheme.v1', null);
+    if (sch && Array.isArray(sch.nodes)) s.nodes = sch.nodes.length;
   } catch {}
   try {
     // v0.59.379: предпочитаем считать по реальным экземплярам стоек проекта
     // (rack-config.instances.v1), а не по orphan-данным contents/rackTags.
-    const inst = localStorage.getItem(projectKey(pid, 'rack-config', 'instances.v1'));
-    let nInst = 0;
-    try { const arr = inst ? JSON.parse(inst) : []; nInst = Array.isArray(arr) ? arr.length : 0; } catch {}
+    const inst = projectLoad(pid, 'rack-config', 'instances.v1', []);
+    const nInst = Array.isArray(inst) ? inst.length : 0;
     if (nInst > 0) {
       s.racks = nInst;
     } else {
-      const cont = localStorage.getItem(projectKey(pid, 'scs-config', 'contents.v1'));
-      const tags = localStorage.getItem(projectKey(pid, 'scs-config', 'rackTags.v1'));
+      const cont = projectLoad(pid, 'scs-config', 'contents.v1', {}) || {};
+      const tags = projectLoad(pid, 'scs-config', 'rackTags.v1', {}) || {};
       const ids = new Set();
-      try { const o = cont ? JSON.parse(cont) : {}; Object.keys(o || {}).forEach(k => { if (Array.isArray(o[k]) && o[k].length) ids.add(k); }); } catch {}
-      try { const o = tags ? JSON.parse(tags) : {}; Object.keys(o || {}).forEach(k => { if ((o[k] || '').trim()) ids.add(k); }); } catch {}
+      try { Object.keys(cont).forEach(k => { if (Array.isArray(cont[k]) && cont[k].length) ids.add(k); }); } catch {}
+      try { Object.keys(tags).forEach(k => { if ((tags[k] || '').trim()) ids.add(k); }); } catch {}
       s.racks = ids.size;
     }
   } catch {}
   try {
-    const ln = localStorage.getItem(projectKey(pid, 'scs-design', 'links.v1'));
-    if (ln) { try { s.links = (JSON.parse(ln) || []).length; } catch {} }
+    const ln = projectLoad(pid, 'scs-design', 'links.v1', []);
+    if (Array.isArray(ln)) s.links = ln.length;
   } catch {}
   try {
-    const cont = localStorage.getItem(projectKey(pid, 'scs-config', 'contents.v1'));
-    if (cont) { try { const o = JSON.parse(cont) || {}; s.inventory = Object.values(o).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0); } catch {} }
+    const cont = projectLoad(pid, 'scs-config', 'contents.v1', {}) || {};
+    s.inventory = Object.values(cont).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
   } catch {}
   try {
-    const f = localStorage.getItem(projectKey(pid, 'facility-inventory', 'v1'));
-    if (f) {
-      try {
-        const o = JSON.parse(f);
-        if (Array.isArray(o)) s.facility = o.length;
-        else if (o && Array.isArray(o.items)) s.facility = o.items.length;
-      } catch {}
-    }
+    const o = projectLoad(pid, 'facility-inventory', 'v1', null);
+    if (Array.isArray(o)) s.facility = o.length;
+    else if (o && Array.isArray(o.items)) s.facility = o.items.length;
   } catch {}
   return s;
 }
@@ -2117,8 +2113,7 @@ function render() {
     // а как массив в LS-bucket cooling.selections.v1 проекта. Читаем напрямую.
     let subCoolings = [];
     try {
-      const raw = localStorage.getItem(projectKey(p.id, 'cooling', 'selections.v1'));
-      const arr = raw ? JSON.parse(raw) : [];
+      const arr = projectLoad(p.id, 'cooling', 'selections.v1', []);
       subCoolings = Array.isArray(arr) ? arr.map(s => ({
         id: s.id, name: s.name,
         meta: `${s.options?.length || 0} вариант${(s.options?.length === 1) ? '' : 'ов'}${s.mainOptionId ? ', есть ★' : ''}`,
@@ -2127,8 +2122,7 @@ function render() {
     // v0.60.44: service orders в проекте — multi-instance.
     let subServiceOrders = [];
     try {
-      const raw = localStorage.getItem(projectKey(p.id, 'service', 'orders.v1'));
-      const arr = raw ? JSON.parse(raw) : [];
+      const arr = projectLoad(p.id, 'service', 'orders.v1', []);
       subServiceOrders = Array.isArray(arr) ? arr.map(o => ({
         id: o.id, name: o.name || '(без имени)',
         meta: `${o.type || 'install'} · ${o.positions?.length || 0} позиций · ${o.date || ''}`,
@@ -2141,19 +2135,17 @@ function render() {
     // если есть подпроекты или (для схемы) Storage-схемы привязаны через
     // scheme.projectId. Те, у которых данных нет — доступны через
     // «+ Добавить ▾».
-    const _lsHasContent = (key) => {
+    const _hasContent = (v) => {
       try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return false;
-        const v = JSON.parse(raw);
+        if (v == null) return false;
         if (Array.isArray(v)) return v.length > 0;
-        if (v && typeof v === 'object') return Object.keys(v).length > 0;
-        return v != null;
+        if (typeof v === 'object') return Object.keys(v).length > 0;
+        return true;
       } catch { return false; }
     };
-    const hasTechWorkspace = _lsHasContent(projectKey(p.id, 'tech-workspace', 'variants.v1'));
-    const hasInventoryIT   = _lsHasContent(projectKey(p.id, 'scs-config', 'inventory.v1'));
-    const hasFacilityInv   = _lsHasContent(projectKey(p.id, 'facility-inventory', 'v1'));
+    const hasTechWorkspace = _hasContent(projectLoad(p.id, 'tech-workspace', 'variants.v1', null));
+    const hasInventoryIT   = _hasContent(projectLoad(p.id, 'scs-config', 'inventory.v1', null));
+    const hasFacilityInv   = _hasContent(projectLoad(p.id, 'facility-inventory', 'v1', null));
     // SCS legacy-данные в parent namespace (см. async-блок ниже).
     const hasScsLegacy = (() => {
       try {
