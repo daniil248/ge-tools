@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.668', date: '2026-05-17', items: [
+      '🩹 <b>Редактор отчётов — фикс вёрстки (репорт «верха не видно, сайдбар кривой»)</b>. После R3b новый flow-редактор использовал классы, которых не было в editor.css. Исправлено: (1) .rpt-editor__canvas-wrap align-items center→flex-start — при center+overflow верх страницы превью обрезался (классический flex-баг), теперь виден; (2) .rpt-editor__tabs button white-space:nowrap+font 12px+компактный паддинг + ярлык вкладки «Плавающий слой»→«Слой» — 5 вкладок больше не переносятся/не обрезаются; (3) sect() класс rpt-sect-title→rpt-section-title (есть в CSS — заголовки секций сайдбара теперь стилизованы); (4) добавлен .rpt-zone-add (колонка кнопок добавления). Файлы: shared/report/editor.css, editor.js.',
+    ] },
     { version: '0.60.667', date: '2026-05-17', items: [
       '📍 <b>Отчёты — финиш: ROADMAP-синк, composeReport verified e2e</b>. Проверка единого конвейера на проде: import compose.js → composeReport({tags,title,build}) → picker (12 шаблонов) → previewPDF: заголовок/адресат/тело/таблица в потоке БЕЗ наложения, кнопка «⚙ Шаблон» (R4) присутствует, консоль чистая. Все отчёты проекта унифицированы (RR1-3 ✅ в X.6.3). status-header ROADMAP → v0.60.667. «Добить по отчётам» закрыто: flow-редизайн (R1–R5) + редактор (R3b) + правка из превью (R4) + общий конвейер для ВСЕХ отчётов (RR1-3); остаётся опц. R6 (косметическая чистка legacy, без функц. пробела). Файл: ROADMAP.md.',
     ] },

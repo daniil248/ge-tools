@@ -93,7 +93,7 @@ export function openTemplateEditor(tpl, opts = {}) {
   const TABS = [
     ['structure', 'Структура'],
     ['chrome',    'Колонтитулы'],
-    ['floating',  'Плавающий слой'],
+    ['floating',  'Слой'],
     ['page',      'Лист'],
     ['styles',    'Стили'],
   ];
@@ -495,7 +495,7 @@ function btn(text, variant) {
   return b;
 }
 function sect(parent, text) {
-  const s = el('div', 'rpt-sect-title');
+  const s = el('div', 'rpt-section-title');
   s.textContent = text;
   parent.appendChild(s);
 }
