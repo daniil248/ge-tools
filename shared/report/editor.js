@@ -447,10 +447,10 @@ export function openTemplateEditor(tpl, opts = {}) {
 
   function buildSections(p) {
     const hint = el('div', 'rpt-hint');
-    hint.innerHTML = 'Формат и поля разделов берутся из <b>базового шаблона</b> ' +
-      '(вкладка «Основа»). В документе их отдельно настраивать нельзя — ' +
-      'можно лишь добавить разрыв раздела (новая страница) и для него ' +
-      'выбрать ориентацию (книжная/альбомная).';
+    hint.innerHTML = 'Формат, поля и <b>вид</b> колонтитулов — из ' +
+      '<b>базового шаблона</b> (вкладка «Основа»). В документе задаётся ' +
+      'разбиение на разделы (разрыв) и <b>содержимое</b> колонтитулов ' +
+      '(текст) — см. ниже. Геометрию разделов отдельно в документе не меняют.';
     p.appendChild(hint);
 
     const addRow = el('div', 'rpt-zone-add');
@@ -468,14 +468,18 @@ export function openTemplateEditor(tpl, opts = {}) {
 
     const secs = docSections();
     secs.forEach((s, k) => {
-      const card = el('div', 'rpt-style-card');
-      const h = document.createElement('h4');
+      // Сворачиваемая карточка раздела (требование Пользователя
+      // «разделы сделать сворачиваемыми»).
+      const card = el('details', 'rpt-style-card');
+      if (k === 0) card.open = true;
+      const sm = document.createElement('summary');
+      sm.style.cssText = 'cursor:pointer;font-weight:600;font-size:13px;padding:2px 0';
       const g = s.geom || {};
       const oTxt = (g.orientation === 'landscape' ? 'альбомная' : 'книжная');
-      h.textContent = (k === 0 ? '📄 Раздел 1 · основной' : '⮐ Раздел ' + (k + 1)) +
+      sm.textContent = (k === 0 ? '📄 Раздел 1 · основной' : '⮐ Раздел ' + (k + 1)) +
         ' · ' + (g.format || 'A4') + ' · ' + oTxt +
         ' · блоков: ' + s.blocks.length;
-      card.appendChild(h);
+      card.appendChild(sm);
 
       if (k === 0) {
         const g = s.geom || {};
@@ -528,16 +532,78 @@ export function openTemplateEditor(tpl, opts = {}) {
         card.appendChild(act);
       }
 
-      // Блоки раздела (только чтение — перестановка во вкладке «Структура»).
-      const bl = el('div', 'rpt-hint');
-      bl.style.marginTop = '6px';
-      bl.textContent = s.blocks.length
-        ? 'Блоки: ' + s.blocks.map(b => blockLabel(b).replace(/^[^\wА-Яа-я]+\s*/, '')).join(' · ')
-        : '(нет блоков — добавьте во вкладке «Структура»)';
-      card.appendChild(bl);
+      // Блоки этого раздела документа (реальный список, только чтение —
+      // перестановка во вкладке «Структура»).
+      sect(card, 'Блоки раздела (' + s.blocks.length + ')');
+      if (s.blocks.length) {
+        const ul = el('div', 'rpt-zone-list');
+        s.blocks.forEach((bb, bi) => {
+          const row = el('div', 'rpt-zone-list__item');
+          row.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer';
+          const ix = el('span'); ix.textContent = (bi + 1) + '.';
+          ix.style.cssText = 'color:#94a3b8;min-width:18px';
+          const nm = el('span'); nm.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+          nm.textContent = blockLabel(bb);
+          row.appendChild(ix); row.appendChild(nm);
+          row.title = 'Открыть в «Структуре»';
+          row.addEventListener('click', () => {
+            const gi = working.flow.indexOf(bb);
+            state.tab = 'structure'; state.sel = gi >= 0 ? gi : -1; rebuild();
+          });
+          ul.appendChild(row);
+        });
+        card.appendChild(ul);
+      } else {
+        const e0 = el('div', 'rpt-hint');
+        e0.textContent = 'Нет блоков — добавьте во вкладке «Структура».';
+        card.appendChild(e0);
+      }
 
       p.appendChild(card);
     });
+
+    // ——— Содержимое колонтитулов (СОДЕРЖИМОЕ — в документе; ВИД —
+    // в базе). Требование Пользователя «не иначе»: вид колонтитула
+    // настраивается в базовом шаблоне, текст — здесь, в документе. ———
+    const ps = Array.isArray(working.pageSections) ? working.pageSections : [];
+    if (ps.length) {
+      sect(p, 'Содержимое колонтитулов (текст — в документе)');
+      const ch = el('div', 'rpt-hint');
+      ch.innerHTML = 'Вид (вкл/высота/ширина/выравнивание) задаётся в ' +
+        '<b>базовом шаблоне</b>. Здесь — только ТЕКСТ шапки/подвала для ' +
+        'каждого унаследованного раздела. Пусто = текст из базы. ' +
+        'Плейсхолдеры: {{meta.title}} {{date}} {{page}} {{pages}}.';
+      p.appendChild(ch);
+      if (!working.colontitleContent || typeof working.colontitleContent !== 'object') {
+        working.colontitleContent = {};
+      }
+      ps.forEach((sc) => {
+        const cc = working.colontitleContent;
+        const cur = cc[sc.id] || cc[sc.name] || {};
+        const dc = el('details', 'rpt-style-card');
+        const sm = document.createElement('summary');
+        sm.style.cssText = 'cursor:pointer;font-weight:600;font-size:13px;padding:2px 0';
+        sm.textContent = '§ ' + (sc.name || sc.id);
+        dc.appendChild(sm);
+        const baseHdrTxt = (sc.header && sc.header.blocks && sc.header.blocks[0] && sc.header.blocks[0].text) || '';
+        const baseFtrTxt = (sc.footer && sc.footer.blocks && sc.footer.blocks[0] && sc.footer.blocks[0].text) || '';
+        const setCC = (field, v) => {
+          const o = cc[sc.id] || {};
+          if (v == null || v === '') delete o[field]; else o[field] = v;
+          if (Object.keys(o).length) cc[sc.id] = o; else delete cc[sc.id];
+          renderPane();
+        };
+        fld(dc, 'Шапка — текст' + (sc.header && sc.header.enabled ? '' : ' (выкл. в базе)'),
+          textArea(cur.headerText != null ? cur.headerText : '',
+            v => setCC('headerText', v)));
+        if (baseHdrTxt) { const hh = el('div', 'rpt-hint'); hh.textContent = 'В базе: ' + baseHdrTxt; dc.appendChild(hh); }
+        fld(dc, 'Подвал — текст' + (sc.footer && sc.footer.enabled ? '' : ' (выкл. в базе)'),
+          textArea(cur.footerText != null ? cur.footerText : '',
+            v => setCC('footerText', v)));
+        if (baseFtrTxt) { const fh = el('div', 'rpt-hint'); fh.textContent = 'В базе: ' + baseFtrTxt; dc.appendChild(fh); }
+        p.appendChild(dc);
+      });
+    }
   }
 
   function buildBlockProps(p, b) {
@@ -998,8 +1064,11 @@ export function openTemplateEditor(tpl, opts = {}) {
     p.appendChild(addRow);
 
     working.pageSections.forEach((s, i) => {
-      const card = el('div', 'rpt-style-card');
-      const h = document.createElement('h4');
+      // Сворачиваемая карточка раздела базы.
+      const card = el('details', 'rpt-style-card');
+      if (i === 0) card.open = true;
+      const h = document.createElement('summary');
+      h.style.cssText = 'cursor:pointer;font-weight:600;font-size:13px;padding:2px 0';
       h.textContent = '§ ' + (i + 1) + '. ' + (s.name || ('Раздел ' + (i + 1)));
       card.appendChild(h);
 

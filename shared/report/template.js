@@ -89,6 +89,11 @@ export function defaultTemplate() {
     //    footer:{...}, logo:{src,width,height,x,y}|null, repeat }
     pageSections: [],
 
+    // СОДЕРЖИМОЕ колонтитулов уровня ДОКУМЕНТА (вид — из базы):
+    // { '<sectionId|name>': { headerText, footerText } }. Пусто =
+    // текст из базового раздела. resolveSectionChrome подставляет.
+    colontitleContent: {},
+
     // ——— логотип (опционально) ———
     logo: {
       src:      null,                  // data URL (PNG/JPEG) или null
@@ -841,6 +846,31 @@ export function normalizePageSections(tpl) {
   });
 }
 
+/** Разделение ответственности (требование Пользователя «не иначе»):
+ *  ВИД колонтитула (вкл/высота/ширина/valign/позиция логотипа) —
+ *  из БАЗОВОГО раздела; СОДЕРЖИМОЕ (текст шапки/подвала) — из
+ *  ДОКУМЕНТА (tpl.colontitleContent[<id|name>] = { headerText,
+ *  footerText }). Возвращает клон раздела с уже подставленным
+ *  содержимым → единственный источник колонтитула (нет дублей). */
+export function resolveSectionChrome(tpl, sec) {
+  if (!sec) return sec;
+  let s; try { s = JSON.parse(JSON.stringify(sec)); } catch { s = sec; }
+  const cc = (tpl && tpl.colontitleContent) || {};
+  const dc = cc[s.id] || cc[s.name] || null;
+  const put = (band, text) => {
+    if (!band || typeof band !== 'object') return;
+    if (text == null || text === '') return;        // нет переопределения
+    const first = (band.blocks && band.blocks[0]) || {};
+    band.blocks = [{ type: 'paragraph', style: first.style || 'caption',
+      align: first.align || 'center', text: String(text) }];
+  };
+  if (dc) {
+    put(s.header, dc.headerText);
+    put(s.footer, dc.footerText);
+  }
+  return s;
+}
+
 export function flowSegments(tpl) {
   const base = tpl.page || {};
   const segs = [];
@@ -865,7 +895,8 @@ export function flowSegments(tpl) {
     };
     let idx = 0;
     let sec = ps[0];
-    let cur = { isCover: false, chrome: true, section: sec,
+    let cur = { isCover: false, chrome: true,
+      section: resolveSectionChrome(tpl, sec),
       geom: mergePageGeom(base, sec.page), blocks: [] };
     for (const b of effectiveFlow(tpl)) {
       if (b && b.type === 'sectionBreak') {
@@ -874,7 +905,8 @@ export function flowSegments(tpl) {
         // (b.sectionRef = id|name); без ref — следующий по порядку.
         sec = findSec(b.sectionRef, idx + 1);
         idx = ps.indexOf(sec);
-        cur = { isCover: false, chrome: true, section: sec,
+        cur = { isCover: false, chrome: true,
+          section: resolveSectionChrome(tpl, sec),
           geom: mergePageGeom(base, sec.page), blocks: [] };
         continue;
       }
