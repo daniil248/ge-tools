@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.560', date: '2026-05-17', items: [
+      '✅ <b>Фаза 2 / R2 ЗАКРЫТО полностью (бриджи проверены)</b>. Скан всех shared/*-bridge.js + legacy-rack-migration: 0 raw raschet.project/sketch литералов — все проектные ключи через projectKey (scheme-rack/service/inventory/meteo/catalog/legacy все импортируют project-storage helper). Остаток raschet.* = санкционированные НЕ-проектные глобальные неймспейсы: catalog-bridge storage-event prefix (raschet.<X>Catalog, глобальные каталоги), service-bridge raschet.service.standalone (standalone-режим), legacy-rack-migration FLAG raschet.legacy-rack-migration.v3 (одноразовый флаг) — это не foreign-project LS, не R2. Итог Фазы 2 R2: project.js 36 + батч 18 + финал 9 = 63 сырых доступа погашены + бриджи чисты. lint-allowlist.json / contracts/README.md §5 / ROADMAP X.1.3 синхронизированы: R2 ЗАКРЫТО, готово к graduation advisory→enforced (CI, Фаза F). Только документация/контракт-метаданные.',
+    ] },
     { version: '0.60.559', date: '2026-05-17', items: [
       '🔐 <b>R2-финал, ДЕПЛОЙ B: 5 модулей переключены на helper</b>. project-storage с projectPrefix/projectModulePrefix полностью распространён по edge (деплой A v0.60.558, проверено curl + браузерный PoP) → теперь cache-safe переключить потребителей. cooling.js (cooling.), meteo.js (meteo.), service.js (service.), scs-design.js (scs-design. ×2) — на projectModulePrefix; scs-config.js — projectPrefix (тернар pid?...:null сохранён) + 3 остаточных full-key (scs-design.links.v1 ×2, engine.scheme.v1) на projectKey. Все pid в сайтах truthy (guard-ы), байт-идентично. Итог R2 (с учётом project.js 36 + батч 18): raw raschet.project.dollar литералов в модулях не осталось; мосты — санкционированы отдельно. Инцидент 556→557 закрыт правильным двухдеплойным паттерном §6a.',
     ] },

@@ -51,13 +51,16 @@ legacy-rack-migration).
 (§4.5): вправе импортировать модуль и читать мульти-модульные LS;
 исключены из всех импортных правил и из R2.
 
-**Advisory (WARN, не блокирует до Фазы 2):** сырой чужой
+**R2 ЗАКРЫТО (v0.60.551..559, Фаза 2):** сырой чужой
 `localStorage` ключ `raschet.(project|projects|configurations|
 subscription).*` literal/template вне `project-storage.js`/
 `configuration-catalog.js`/`subscriptions.js`/`project-context.js`/
-`project-bootstrap.js`/моста. Эвристика шумит (ловит
-`projectKey()`-helper) → genuine рефактор сырого доступа —
-ROADMAP X.1.3 / Фаза 2.
+`project-bootstrap.js`/моста. Все genuine случаи погашены через
+`projectKey`/`projectPrefix`/`projectModulePrefix` (модули + бриджи
+проверены сканом — 0 raw project/sketch литералов). Остаток
+`raschet.*` — санкц. НЕ-проектные глобальные ns (см.
+`lint-allowlist.json` advisoryNotes.R2-raw-foreign-ls). Статус:
+advisory (WARN); готово к graduation advisory→enforced (CI, Фаза F).
 
 ## 4. Каналы кросс-модульного общения (единственно допустимые)
 1. **project-storage** — данные проекта (ключи `raschet.project.<pid>.
