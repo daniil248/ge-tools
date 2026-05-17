@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.736', date: '2026-05-18', items: [
+      '📐 <b>Конструктор/дисциплины — Ф-F2: sidebar-аккордеон single-open в scs-design (X.4.5.3 §5.1)</b>. apps/scs-design/scs-design.js +_initSidebarAccordion(): блоки .sd-plan-side-block в каждом aside.rs-sidebar → single-open аккордеон (первый раскрыт, клик по .sd-plan-side-h сворачивает остальные); одноблочный сайдбар (sd-links-side) не сворачивается. Идемпотентно (dataset.accBound). +CSS: кликабельный заголовок, стрелка ▾/▸, .sd-acc-collapsed прячет всё кроме заголовка. memory:sidebar_accordion (project-wide UX). <b>Чистая ОБОЛОЧКА</b> — UI-chrome, 0 изменений движка: «План зала»/связи/длины/владение СКС-данными не затронуты (§5.1). Файлы: apps/scs-design/scs-design.js, apps/scs-design/scs-design.css, shared/module-changelogs.js, ROADMAP.md, js/engine/constants.js.',
+    ] },
     { version: '0.60.735', date: '2026-05-18', items: [
       '📐 <b>Конструктор/дисциплины — Ф-F1b: read-only индикатор дисциплины-контекста в scs-config (X.4.5.3 §5.1)</b>. apps/scs-config/scs-config.js renderProjectBadge() +идемпотентная вставка бейджа #sc-disc-ctx соседом #sc-project-badge: «🔌 Контекст: СКС / слаботочка · data · только индикатор» + tooltip; +.sc-disc-ctx CSS. Идемпотентно (guard по id, не дублируется на rerender). <b>0 изменений движка</b>: компоновка шкафа/контент/матрица/превью и владение СКС-данными НЕ затронуты (контракт §5.1 — оболочка, не движок). Парный к Ф-F1 (scs-design). Файлы: apps/scs-config/scs-config.js, apps/scs-config/scs-config.css, shared/module-changelogs.js, ROADMAP.md, js/engine/constants.js.',
     ] },

@@ -4840,9 +4840,32 @@ function escapeHtml(s) {
 function escapeAttr(s) { return escapeHtml(s); }
 
 /* ---------- Init ---------- */
+// Ф-F2 (X.4.5.3 §5.1): sidebar-аккордеон single-open (memory:
+// sidebar_accordion, project-wide UX). Чистая ОБОЛОЧКА — UI-chrome,
+// НЕ движок: не трогает «План зала»/связи/длины/владение данными.
+// Идемпотентно (guard dataset). Одноблочный сайдбар не сворачивается.
+function _initSidebarAccordion() {
+  document.querySelectorAll('aside.rs-sidebar').forEach(side => {
+    const blocks = [...side.querySelectorAll('.sd-plan-side-block')];
+    if (blocks.length < 2) return; // один блок — оставить раскрытым
+    blocks.forEach((b, i) => {
+      b.classList.toggle('sd-acc-collapsed', i !== 0); // первый открыт
+      const h = b.querySelector('.sd-plan-side-h');
+      if (!h || h.dataset.accBound === '1') return;
+      h.dataset.accBound = '1';
+      h.addEventListener('click', () => {
+        const willOpen = b.classList.contains('sd-acc-collapsed');
+        blocks.forEach(x => x.classList.add('sd-acc-collapsed'));
+        if (willOpen) b.classList.remove('sd-acc-collapsed');
+      });
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const { pid, migrated } = rescopeToActiveProject();
   renderProjectBadge(pid);
+  try { _initSidebarAccordion(); } catch (e) { console.warn('[sd accordion]', e); }
   if (migrated > 0) {
     updateStatus(`ℹ Данные СКС перенесены в активный проект (перенесено ключей: ${migrated}). Старые глобальные ключи оставлены как резерв.`);
   }
