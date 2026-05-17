@@ -16,7 +16,7 @@
 //                           источник, регистрирующийся через registry.
 // =========================================================================
 
-import { ensureDefaultProject, projectKey, projectModulePrefix, getProject, setActiveProjectId } from 'shared/project-storage.js';
+import { ensureDefaultProject, projectKey, projectModulePrefix, getProject, setActiveProjectId, updateProject } from 'shared/project-storage.js';
 import { detectNavMode, renderModuleActions, completeReturn, cancelReturn } from 'shared/module-nav.js';
 import { idbGet, idbSet, idbDelete, idbAvailable } from 'shared/idb-store.js';
 import { historyAppend, historyTrash, historyRestore, historyPurge, historyList } from 'shared/history-log.js';
@@ -166,6 +166,13 @@ async function importViaSource(srcId) {
   const ctx = { util };
   const ds = await src.createDataset(ctx);
   if (!ds) return;
+  await commitDataset(ds, { action: 'import' });
+  util.toast(`Загружено ${(ds.hourly || []).length} строк (${ds.stats?.tmin}…${ds.stats?.tmax} °C)`, 'ok');
+}
+
+// v0.60.594: единый коммит датасета (импорт ИЛИ авто-подхват) —
+// id/active/persist/render/history + пропагация elevation в проект.
+async function commitDataset(ds, { action = 'import' } = {}) {
   const dataset = {
     id: util.newId('ds'),
     activeForProject: !_datasets.some(d => d.activeForProject),
@@ -177,20 +184,26 @@ async function importViaSource(srcId) {
   await persist();
   renderDatasetsList();
   renderActive();
-  // Phase 35: записываем в history-log как событие импорта.
-  // payload включает данные для возможности restore из корзины.
   if (_pid) {
     historyAppend(_pid, {
-      module: 'meteo',
-      action: 'import',
-      itemKind: 'meteo-dataset',
-      itemId: dataset.id,
-      itemName: dataset.name,
-      source: dataset.source,
-      payload: { dataset },
+      module: 'meteo', action, itemKind: 'meteo-dataset',
+      itemId: dataset.id, itemName: dataset.name,
+      source: dataset.source, payload: { dataset },
     });
   }
-  util.toast(`Загружено ${(ds.hourly || []).length} строк (${ds.stats?.tmin}…${ds.stats?.tmax} °C)`, 'ok');
+  // Point 1: высота площадки из открытых карт по координатам →
+  // project.location.elevationM. Preserve-on-miss (user-params-sacred):
+  // не перезаписываем, если Пользователь задал высоту вручную.
+  try {
+    if (_pid && Number.isFinite(ds.elevation)) {
+      const p = getProject(_pid);
+      const loc = (p && p.location) || {};
+      if (loc.elevationM == null || loc.elevationM === '') {
+        updateProject(_pid, { location: { ...loc, elevationM: ds.elevation } });
+      }
+    }
+  } catch (e) { console.warn('[meteo] elevation propagate failed', e); }
+  return dataset;
 }
 
 // ─── Render: список датасетов
@@ -589,6 +602,35 @@ async function init() {
   renderImportButtons();
   renderDatasetsList();
   renderActive();
+
+  // v0.60.594 (Point 1 + «метео почини»): авто-подхват метеоряда по
+  // локации проекта. Если у проекта задана локация (lat/lon), а метео-
+  // датасета ещё нет — НЕинтерактивно тянем Open-Meteo (последний год)
+  // + высоту (elevation). Флаг per-project: не повторяем после ручного
+  // удаления всех датасетов (уважение к действию Пользователя) и не
+  // спамим API. Промах сети — тихий тост, флаг ставим (одна попытка).
+  try {
+    if (_pid && _datasets.length === 0) {
+      const triedKey = projectKey(_pid, 'meteo', 'autoFetchTried.v1');
+      const tried = (() => { try { return JSON.parse(localStorage.getItem(triedKey) || 'false'); } catch { return false; } })();
+      const loc = (getProject(_pid) || {}).location || {};
+      const lat = Number(loc.lat), lon = Number(loc.lon);
+      if (!tried && Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon)) {
+        try { localStorage.setItem(triedKey, 'true'); } catch {}
+        const src = getSources().find(s => s.id === 'open-meteo');
+        if (src && typeof src.autoCreate === 'function') {
+          util.toast(`Метеоряд не найден — загружаю по локации проекта (${loc.city || ''} ${lat.toFixed(2)},${lon.toFixed(2)})…`, 'info');
+          const ds = await src.autoCreate({ util }, { lat, lon, locationName: loc.city || '' });
+          if (ds) {
+            await commitDataset(ds, { action: 'auto-import' });
+            util.toast(`Авто-загружено по локации проекта: ${(ds.hourly || []).length} строк${Number.isFinite(ds.elevation) ? `, высота ${ds.elevation} м` : ''}.`, 'ok');
+          } else {
+            util.toast('Авто-загрузка не удалась — импортируйте метеоряд вручную (кнопки слева).', 'warn');
+          }
+        }
+      }
+    }
+  } catch (e) { console.warn('[meteo] auto-fetch by project location failed', e); }
 
   $('mt-datasets-list').addEventListener('click', async (e) => {
     const actBtn = e.target.closest('button[data-act]');

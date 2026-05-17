@@ -65,7 +65,34 @@ register({
       stationId: picked.id || null,
     }));
   },
+
+  // v0.60.594: НЕинтерактивная загрузка по координатам (для авто-
+  // подхвата метео по локации проекта — meteo.js init). Без picker/
+  // modal: последние 365 дней по заданным lat/lon.
+  async autoCreate(ctx, { lat, lon, locationName }) {
+    const today = new Date().toISOString().slice(0, 10);
+    const yearAgo = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+    return fetchOpenMeteo({
+      ctx,
+      name: `${locationName || 'Локация проекта'} ${yearAgo}..${today}`,
+      lat, lon, locationName: locationName || '',
+      dateFrom: yearAgo, dateTo: today, stationId: null,
+    });
+  },
 });
+
+/** Высота над уровнем моря по координатам (Open-Meteo Elevation API).
+ *  Возвращает метры (число) или null. Безопасно при сбое сети. */
+export async function fetchElevation(lat, lon) {
+  try {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const r = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const e = Array.isArray(j.elevation) ? j.elevation[0] : null;
+    return Number.isFinite(e) ? Math.round(e) : null;
+  } catch { return null; }
+}
 
 async function fetchOpenMeteo({ ctx, name, lat, lon, locationName, dateFrom, dateTo, stationId = null }) {
   const { computeStats, toast } = ctx.util;
@@ -87,10 +114,14 @@ async function fetchOpenMeteo({ ctx, name, lat, lon, locationName, dateFrom, dat
     if (!hourly.length) { toast('API вернул пустой ряд.', 'warn'); return null; }
     try { localStorage.setItem('raschet.meteo.last-loc.v1', JSON.stringify({ lat, lon, name: locationName })); } catch {}
     const stats = computeStats(hourly);
+    // v0.60.594: высота площадки из открытых карт по координатам
+    // (Open-Meteo Elevation). Сохраняется в датасет и пропагируется
+    // в project.location.elevationM (meteo.js).
+    const elevation = await fetchElevation(lat, lon);
     return {
       name: name || locationName,
       source: 'open-meteo',
-      lat, lon, locationName, stationId,
+      lat, lon, locationName, stationId, elevation,
       dateFrom, dateTo, hourly, stats,
     };
   } catch (e) {
