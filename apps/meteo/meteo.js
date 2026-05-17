@@ -603,31 +603,36 @@ async function init() {
   renderDatasetsList();
   renderActive();
 
-  // v0.60.594 (Point 1 + «метео почини»): авто-подхват метеоряда по
-  // локации проекта. Если у проекта задана локация (lat/lon), а метео-
-  // датасета ещё нет — НЕинтерактивно тянем Open-Meteo (последний год)
-  // + высоту (elevation). Флаг per-project: не повторяем после ручного
-  // удаления всех датасетов (уважение к действию Пользователя) и не
-  // спамим API. Промах сети — тихий тост, флаг ставим (одна попытка).
+  // v0.60.596 (Point 1 + «метео почини», уточнено): авто-подхват
+  // метеоряда по локации проекта. Триггер — НЕТ датасета с пригодными
+  // ЧАСОВЫМИ данными (покрывает: 0 датасетов; ИЛИ есть только
+  // metadata-only записи без hourly — напр. IDB-серии потеряны).
+  // Флаг per-project ставим ТОЛЬКО при УСПЕХЕ — промах повторится при
+  // следующем открытии (само-восстановление; Open-Meteo бесплатен,
+  // 1 запрос/открытие). Existing metadata-записи НЕ трогаем, добавляем
+  // рабочий датасет и делаем активным.
   try {
-    if (_pid && _datasets.length === 0) {
-      const triedKey = projectKey(_pid, 'meteo', 'autoFetchTried.v1');
-      const tried = (() => { try { return JSON.parse(localStorage.getItem(triedKey) || 'false'); } catch { return false; } })();
+    const hasUsable = _datasets.some(d => d && Array.isArray(d.hourly) && d.hourly.length > 0);
+    if (_pid && !hasUsable) {
+      const okKey = projectKey(_pid, 'meteo', 'autoFetchOk.v1');
+      const done = (() => { try { return JSON.parse(localStorage.getItem(okKey) || 'false'); } catch { return false; } })();
       const loc = (getProject(_pid) || {}).location || {};
       const lat = Number(loc.lat), lon = Number(loc.lon);
-      if (!tried && Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon)) {
-        try { localStorage.setItem(triedKey, 'true'); } catch {}
+      if (!done && Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon)) {
         const src = getSources().find(s => s.id === 'open-meteo');
         if (src && typeof src.autoCreate === 'function') {
           util.toast(`Метеоряд не найден — загружаю по локации проекта (${loc.city || ''} ${lat.toFixed(2)},${lon.toFixed(2)})…`, 'info');
           const ds = await src.autoCreate({ util }, { lat, lon, locationName: loc.city || '' });
-          if (ds) {
+          if (ds && Array.isArray(ds.hourly) && ds.hourly.length) {
             await commitDataset(ds, { action: 'auto-import' });
-            util.toast(`Авто-загружено по локации проекта: ${(ds.hourly || []).length} строк${Number.isFinite(ds.elevation) ? `, высота ${ds.elevation} м` : ''}.`, 'ok');
+            try { localStorage.setItem(okKey, 'true'); } catch {}
+            util.toast(`Авто-загружено по локации проекта: ${ds.hourly.length} строк${Number.isFinite(ds.elevation) ? `, высота ${ds.elevation} м` : ''}.`, 'ok');
           } else {
-            util.toast('Авто-загрузка не удалась — импортируйте метеоряд вручную (кнопки слева).', 'warn');
+            util.toast('Авто-загрузка не удалась — повторю при следующем открытии или импортируйте вручную (кнопки слева).', 'warn');
           }
         }
+      } else if (!done && !(Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon))) {
+        util.toast('У проекта не задана локация — задайте в свойствах проекта или импортируйте метеоряд вручную (кнопки слева).', 'info');
       }
     }
   } catch (e) { console.warn('[meteo] auto-fetch by project location failed', e); }
