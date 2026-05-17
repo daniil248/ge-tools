@@ -624,6 +624,21 @@
       "kind": "calc-lib",
       "subscriptionPlan": "free",
       "internalOnly": false
+    },
+    {
+      "id": "hydraulic-methods",
+      "name": "Методики гидравлического расчёта",
+      "description": "Переиспользуемая библиотека гидравлики (без UI): потери напора/давления Дарси–Вейсбах + Colebrook–White (Swamee–Jain), NPSH (запас по кавитации), свойства воды, шероховатости. Единый интерфейс { META, compute(input) }. Дисциплина hydraulic (47.4.1). Первый из per-discipline движков X.4.1.",
+      "path": "lib/hydraulic-methods/",
+      "icon": "blue",
+      "badge": "lib",
+      "requires": [],
+      "dbCollections": [],
+      "permissions": [],
+      "enabled": true,
+      "kind": "calc-lib",
+      "subscriptionPlan": "free",
+      "internalOnly": false
     }
   ]
 }
