@@ -194,6 +194,14 @@ export function setInternalUser(flag) {
  *   canEditEconomics    — изменение тарифа/валюты/НДС в свойствах проекта
  *   canApproveVariants  — утверждение вариантов концепции в TW
  *   canPromoteOrgItems  — promote шаблонов работ / прайсов в org-каталог
+ *
+ * Ф-D (X.4.5.3, schema-constructor-architecture.md §4): поле
+ * `disciplineCreate` — какие дисциплины-схемы роль может СОЗДАВАТЬ
+ * в мастере «+ страница». '*' = любые; массив id = только эти; []
+ * = ни одной. Мульти-роль (effectiveRoles) = ОБЪЕДИНЕНИЕ. ГИП —
+ * координатор над всеми дисциплинами (memory:architecture_layers
+ * D7). Будущие дисциплинарные роли (электрик/технолог/архитектор,
+ * memory D8) добавляются правкой ТОЛЬКО этой матрицы.
  */
 export const ROLES = {
   manager: {
@@ -204,15 +212,17 @@ export const ROLES = {
       canEditEconomics: true, canApproveVariants: true,
       canPromoteOrgItems: true,
     },
+    disciplineCreate: '*',
   },
   gip: {
     label: '🛠 ГИП',
-    description: 'Главный Инженер Проекта: создание / утверждение, экономика, инженерные решения.',
+    description: 'Главный Инженер Проекта: создание / утверждение, экономика, инженерные решения. Координатор всех дисциплин.',
     permissions: {
       canCreateProjects: true, canDeleteProjects: true,
       canEditEconomics: true, canApproveVariants: true,
       canPromoteOrgItems: true,
     },
+    disciplineCreate: '*',
   },
   engineer: {
     label: '👤 Инженер',
@@ -222,6 +232,7 @@ export const ROLES = {
       canEditEconomics: false, canApproveVariants: false,
       canPromoteOrgItems: false,
     },
+    disciplineCreate: '*',
   },
   viewer: {
     label: '👁 Наблюдатель',
@@ -231,6 +242,7 @@ export const ROLES = {
       canEditEconomics: false, canApproveVariants: false,
       canPromoteOrgItems: false,
     },
+    disciplineCreate: [],
   },
 };
 
@@ -264,6 +276,40 @@ export function hasPermission(perm) {
   const role = currentRole();
   if (!role) return false;
   return !!ROLES[role]?.permissions?.[perm];
+}
+
+/**
+ * Эффективные роли пользователя. Сейчас одна (currentRole), но API
+ * возвращает МАССИВ — мульти-роль = объединение прав (spec §4).
+ * Хранилище мульти-роли — будущее расширение; потребители уже
+ * работают с union-семантикой (forward-compat, без редизайна).
+ * Пустой массив → ролевая модель НЕ применяется (внешний клиент:
+ * управляется подпиской, не ролями).
+ * @returns {string[]}
+ */
+export function effectiveRoles() {
+  const r = currentRole();
+  return r ? [r] : [];
+}
+
+/**
+ * Может ли пользователь СОЗДАВАТЬ схему данной дисциплины (мастер
+ * «+ страница», Ф-D). Ролевой гейт применяется ТОЛЬКО к internal-
+ * users; для внешних (effectiveRoles пуст) — true (subscription
+ * governs module access, не дисциплину → нулевая регрессия для
+ * обычного пользователя). Мульти-роль = ОБЪЕДИНЕНИЕ: достаточно,
+ * чтобы ХОТЬ ОДНА роль разрешала дисциплину.
+ * @param {string} disciplineId — id из shared/disciplines.js
+ * @returns {boolean}
+ */
+export function canCreateDiscipline(disciplineId) {
+  const roles = effectiveRoles();
+  if (!roles.length) return true; // ролевая модель неприменима
+  return roles.some(rid => {
+    const dc = ROLES[rid]?.disciplineCreate;
+    if (dc === '*') return true;
+    return Array.isArray(dc) && dc.includes(disciplineId);
+  });
 }
 
 /**

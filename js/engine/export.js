@@ -15,6 +15,10 @@ import { getActiveProjectId, ensureDefaultProject, listProjects } from '../../sh
 // штампуется ОДИН раз при создании (осознанное действие = создание
 // типизированной схемы) и далее immutable. Контракт — Ф-A pageDiscipline.
 import { pageDiscipline, DISCIPLINES, getDiscipline } from '../../shared/disciplines.js';
+// Ф-D (X.4.5.3 §4): дисциплинарный RBAC. CORE→SHARED разрешён
+// (contracts §3). canCreateDiscipline → true для не-internal (роли
+// неприменимы, нулевая регрессия); internal-роль гейтит чужой тип.
+import { canCreateDiscipline } from '../../shared/subscriptions.js';
 // v0.60.258: file-based storage (drawio-style).
 // v0.60.260: + persistent handle через IndexedDB + reload helper.
 import { openProjectFile, saveProjectAsFile, writeProjectToHandle, buildFilePayload, isFileSystemAccessSupported, reloadFromHandle, rememberHandle, loadRememberedHandle, forgetHandle, ensurePermission } from '../../shared/file-sync.js';
@@ -1116,41 +1120,69 @@ export function initToolbar() {
     };
     // Ф-B2 (X.4.5.3, Вариант I): мастер выбора immutable-дисциплины
     // страницы-схемы. Тип задаётся ТОЛЬКО здесь и НЕ меняется после
-    // создания (в свойствах проекта — 🔒 read-only). По умолчанию —
-    // дисциплина проекта (backward-compat). RBAC-гейт чужого типа —
-    // Ф-D (здесь не блокируем).
-    let _selDisc = pageDiscipline(null, state.project && state.project.discipline);
+    // создания (в свойствах проекта — 🔒 read-only).
+    // Ф-D (§4): дисциплинарный RBAC. Чужой для роли тип — строка
+    // disabled + tooltip (НЕ скрывать — паттерн memory:role_based_
+    // access). Для не-internal canCreateDiscipline=true → все
+    // доступны (нулевая регрессия). _selDisc по умолчанию =
+    // дисциплина проекта, но если она запрещена роли — первая
+    // разрешённая (мастер не должен стартовать на запрещённом типе).
+    const _allowed = (id) => canCreateDiscipline(id);
+    const _projDisc = pageDiscipline(null, state.project && state.project.discipline);
+    let _selDisc = _allowed(_projDisc)
+      ? _projDisc
+      : (DISCIPLINES.find(d => _allowed(d.id)) || {}).id || null;
     mkGroup('Дисциплина (тип схемы — 🔒 неизменяем)');
     const _discRows = [];
     const _paintDisc = () => {
-      for (const { row, id } of _discRows) {
-        const on = id === _selDisc;
+      for (const { row, id, ok } of _discRows) {
+        const on = ok && id === _selDisc;
         row.style.fontWeight = on ? '600' : '';
         row.style.background = on ? 'rgba(70,130,255,.12)' : '';
       }
     };
     for (const d of DISCIPLINES) {
+      const ok = _allowed(d.id);
       const row = document.createElement('div');
       row.className = 'pm-item';
       row.innerHTML = `<span style="margin-right:6px">${d.icon}</span>` +
         `${escapePage(d.label)}` +
-        (d.ready ? '' : ' <span style="opacity:.55;font-size:11px">(каркас)</span>');
-      row.title = d.ready
-        ? `Тип схемы: ${d.label}. Расчётный движок реализован. Неизменяем после создания страницы.`
-        : `Тип схемы: ${d.label}. Движок ещё каркас — палитра/расчёт ограничены. Неизменяем после создания.`;
-      row.onclick = (ev) => { ev.stopPropagation(); _selDisc = d.id; _paintDisc(); };
+        (d.ready ? '' : ' <span style="opacity:.55;font-size:11px">(каркас)</span>') +
+        (ok ? '' : ' <span style="opacity:.55;font-size:11px">🔒 нет прав</span>');
+      if (ok) {
+        row.title = d.ready
+          ? `Тип схемы: ${d.label}. Расчётный движок реализован. Неизменяем после создания страницы.`
+          : `Тип схемы: ${d.label}. Движок ещё каркас — палитра/расчёт ограничены. Неизменяем после создания.`;
+        row.onclick = (ev) => { ev.stopPropagation(); _selDisc = d.id; _paintDisc(); };
+      } else {
+        row.style.opacity = '.45';
+        row.style.cursor = 'not-allowed';
+        row.title = `Ваша роль не может создавать схемы дисциплины «${d.label}». Обратитесь к ГИП / менеджеру проекта.`;
+      }
       menu.appendChild(row);
-      _discRows.push({ row, id: d.id });
+      _discRows.push({ row, id: d.id, ok });
     }
     _paintDisc();
     // v0.58.7: ВИД страницы (schematic / layout / mechanical / ...).
     // Клик по виду создаёт типизированную страницу с выбранной выше
     // дисциплиной. Все страницы — independent (разделение
-    // independent/linked убрано из UX).
+    // independent/linked убрано из UX). Ф-D: если роли не разрешена
+    // НИ ОДНА дисциплина (_selDisc==null) — виды disabled + tooltip.
     mkGroup('Новая страница — вид');
+    const _noDisc = !_selDisc;
     for (const k of PAGE_KINDS) {
       const m = PAGE_KINDS_META[k];
       if (!m) continue;
+      if (_noDisc) {
+        const it = document.createElement('div');
+        it.className = 'pm-item';
+        it.innerHTML = `<span style="margin-right:6px">${m.icon}</span>${escapePage(m.label)}`;
+        it.style.opacity = '.45';
+        it.style.cursor = 'not-allowed';
+        it.title = 'Ваша роль не может создавать схемы — нет доступных дисциплин (только просмотр).';
+        menu.appendChild(it);
+        continue;
+      }
       mkItem(`<span style="margin-right:6px">${m.icon}</span>${escapePage(m.label)}`,
         () => addPage('independent', null, k, _selDisc),
         'Создать страницу этого вида с выбранной дисциплиной (тип схемы фиксируется и не меняется).');
