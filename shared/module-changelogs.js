@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.673', date: '2026-05-17', items: [
+      '📍 <b>Отчёты — Word-style разделы/обложка завершены: ROADMAP-синк</b>. DS1-4 (модель cover/firstPage/sectionBreak; рендереры preview/PDF переменная геометрия пер-странично; редактор «Разрыв раздела»/«Обложка»/«Первая страница»; DOCX мульти-Section) отмечены ✅ в X.6.3; status-header → v0.60.673. Verified e2e: sectionBreak→landscape-страница в живом превью, консоль чистая; нулевая регрессия обычных отчётов (ТЗ идентичен). Часть документа может быть альбомной, часть книжной + отдельная обложка — как разделы Word. Также фикс вёрстки редактора (v0.60.668). Файл: ROADMAP.md.',
+    ] },
     { version: '0.60.672', date: '2026-05-17', items: [
       '🏗 <b>Отчёты — DS2c: DOCX мульти-Section (полный Word-аналог)</b>. export-docx: каждый flowSegment → отдельная docx-Section со своей геометрией (size/orientation/margins из seg.geom), своими колонтитулами (или без — обложка при chrome:false), children=blocksToDocx(seg.blocks). titlePage только для первого нес-cover сегмента. injectOverlays/injectLogo — на chrome-сегменты. Нулевая регрессия: обычный документ → flowSegments=1 сегмент base-геометрии → одна Section, идентичная прежней (page/margins/headers/footers/children те же). Landscape-разделы и обложка теперь корректно экспортируются в Word отдельными секциями. Файл: shared/report/export-docx.js (мульти-Section по flowSegments).',
     ] },
