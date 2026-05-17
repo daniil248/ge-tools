@@ -453,7 +453,22 @@ function classifyOverlay(ov) {
 export function migrateToFlow(tpl) {
   if (!tpl || typeof tpl !== 'object') return tpl;
   if (!Array.isArray(tpl.floating)) tpl.floating = [];
-  if (Array.isArray(tpl.flow) && tpl.flow.length > 0) return tpl;
+  if (Array.isArray(tpl.flow) && tpl.flow.length > 0) {
+    // flow уже есть (сохранённый редактором шаблон: структура/
+    // колонтитулы/floating настроены). Если подпрограмма положила
+    // tpl.content (тело отчёта) и оно ещё не влито — вставляем тело
+    // МЕЖДУ шапкой и подписью (перед первым блоком раздела
+    // doc-sign; иначе в конец). Идемпотентно через _flowBodyMerged.
+    const body = Array.isArray(tpl.content) ? tpl.content : [];
+    if (body.length && !tpl._flowBodyMerged) {
+      const flow = tpl.flow.slice();
+      let at = flow.findIndex(b => b && b.section === 'doc-sign');
+      if (at < 0) at = flow.length;
+      tpl.flow = [...flow.slice(0, at), ...body, ...flow.slice(at)];
+      tpl._flowBodyMerged = true;
+    }
+    return tpl;
+  }
 
   const overlays = Array.isArray(tpl.overlays) ? tpl.overlays : [];
   const content  = Array.isArray(tpl.content)  ? tpl.content  : [];
