@@ -2157,8 +2157,8 @@ function render() {
     // SCS legacy-данные в parent namespace (см. async-блок ниже).
     const hasScsLegacy = (() => {
       try {
-        const links = JSON.parse(localStorage.getItem(projectKey(p.id, 'scs-design', 'links.v1')) || 'null');
-        const plan  = JSON.parse(localStorage.getItem(projectKey(p.id, 'scs-design', 'plan.v1')) || 'null');
+        const links = projectLoad(p.id, 'scs-design', 'links.v1', null);
+        const plan  = projectLoad(p.id, 'scs-design', 'plan.v1', null);
         return (Array.isArray(links) && links.length) || (plan && (plan.items || []).length);
       } catch { return false; }
     })();
@@ -3150,7 +3150,7 @@ function render() {
     const schemeConns = scheme?.conns ? (Array.isArray(scheme.conns) ? scheme.conns.length : Object.keys(scheme.conns).length) : 0;
     // 🏗 Технолог объекта
     const twVariants = _readJSON(projectKey(pid, 'tech-workspace', 'variants.v1'), []);
-    const twActiveId = (() => { try { return JSON.parse(localStorage.getItem(projectKey(pid, 'tech-workspace', 'activeVariantId.v1')) || '""'); } catch { return null; } })();
+    const twActiveId = (() => { try { return projectLoad(pid, 'tech-workspace', 'activeVariantId.v1', ''); } catch { return null; } })();
     const twActive = Array.isArray(twVariants) ? twVariants.find(v => v.id === twActiveId) || twVariants[0] : null;
     const twRacks = twActive?.concept?.rackGroups ? twActive.concept.rackGroups.reduce((s, rg) => s + (Number(rg.count) || 0), 0) : 0;
     const twUps = twActive?.concept?.upsSystems ? twActive.concept.upsSystems.reduce((s, u) => s + (Number(u.count) || 0), 0) : 0;
@@ -3240,7 +3240,7 @@ function render() {
   if (summaryHost) {
     const pid = p.id;
     let schemeRaw = null;
-    try { schemeRaw = JSON.parse(localStorage.getItem(projectKey(pid, 'engine', 'scheme.v1')) || 'null'); }
+    try { schemeRaw = projectLoad(pid, 'engine', 'scheme.v1', null); }
     catch { schemeRaw = null; }
     let nodes = [];
     if (schemeRaw && schemeRaw.nodes) {
@@ -3327,7 +3327,7 @@ function render() {
       if (saveBtn) saveBtn.addEventListener('click', () => {
         const setStatus = (m, ok) => { if (statusEl) { statusEl.textContent = m; statusEl.style.color = ok ? '#166534' : '#b91c1c'; } };
         let fresh = null;
-        try { fresh = JSON.parse(localStorage.getItem(projectKey(pid, 'engine', 'scheme.v1')) || 'null'); }
+        try { fresh = projectLoad(pid, 'engine', 'scheme.v1', null); }
         catch { fresh = null; }
         if (!fresh || !fresh.nodes) { setStatus('Схема не найдена или изменилась — обновите страницу.', false); return; }
         const isArr = Array.isArray(fresh.nodes);
@@ -3414,7 +3414,7 @@ function render() {
         const elSt = summaryHost.querySelector('#xdc-status');
         const cStat = (m, ok) => { elSt.textContent = m; elSt.style.color = ok ? '#166534' : '#b91c1c'; };
         const nodeById = id => calcNodes.find(n => String(n.id) === String(id));
-        const readScheme = () => { try { return JSON.parse(localStorage.getItem(projectKey(pid, 'engine', 'scheme.v1')) || 'null'); } catch { return null; } };
+        const readScheme = () => { try { return projectLoad(pid, 'engine', 'scheme.v1', null); } catch { return null; } };
         const savedParams = (nid, disc, mid) => {
           const fr = readScheme(); if (!fr || !fr.nodes) return null;
           const arr = Array.isArray(fr.nodes) ? fr.nodes : Object.values(fr.nodes);
@@ -3576,7 +3576,7 @@ function render() {
     const pid = p.id;
     const scheme = _readJSON(projectKey(pid, 'engine', 'scheme.v1'), null);
     const twVariants = _readJSON(projectKey(pid, 'tech-workspace', 'variants.v1'), []);
-    const twActiveId = (() => { try { return JSON.parse(localStorage.getItem(projectKey(pid, 'tech-workspace', 'activeVariantId.v1')) || '""'); } catch { return null; } })();
+    const twActiveId = (() => { try { return projectLoad(pid, 'tech-workspace', 'activeVariantId.v1', ''); } catch { return null; } })();
     const twActive = Array.isArray(twVariants) ? twVariants.find(v => v.id === twActiveId) || twVariants[0] : null;
 
     // ── 1. Из Конструктора схем ──
@@ -3750,7 +3750,7 @@ function render() {
     const pid = p.id;
     const scheme = _readJSON(projectKey(pid, 'engine', 'scheme.v1'), null);
     const twVariants = _readJSON(projectKey(pid, 'tech-workspace', 'variants.v1'), []);
-    const twActiveId = (() => { try { return JSON.parse(localStorage.getItem(projectKey(pid, 'tech-workspace', 'activeVariantId.v1')) || '""'); } catch { return null; } })();
+    const twActiveId = (() => { try { return projectLoad(pid, 'tech-workspace', 'activeVariantId.v1', ''); } catch { return null; } })();
     const twActive = Array.isArray(twVariants) ? twVariants.find(v => v.id === twActiveId) || twVariants[0] : null;
 
     const issues = []; // { level: 'error'|'warn'|'info', area, msg, hint }

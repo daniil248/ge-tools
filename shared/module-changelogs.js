@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.713', date: '2026-05-18', items: [
+      '🧱 <b>Разделение ядро/модули — Фаза 2 R2: чтение projects/project.js завершено</b>. Оставшиеся 8 cross-module чтений (scs-design links/plan, engine scheme×3, tech-workspace activeVariantId×3) переведены с JSON.parse(localStorage.getItem(projectKey(...))) на шов-аксессор projectLoad. Теперь 0 сырых cross-module read-чтений в project.js (17 через projectLoad). Поведение идентично (projectLoad=loadJson(projectKey)). Мутации (3 setItem(projectKey) — merge/migrate) намеренно оставлены: по плану — отдельными изолированными PR с round-trip-проверкой (высокий риск). audit-contracts --strict зелёный. Файлы: apps/projects/project.js, js/engine/constants.js.',
+    ] },
     { version: '0.60.712', date: '2026-05-18', items: [
       '📑 <b>Picker шаблонов: только шаблоны ДЛЯ ЭТОГО отчёта</b> (требование Пользователя «запомни: только шаблоны для этого отчёта»). pickTemplate при заданных tags по умолчанию показывает ТОЛЬКО релевантные (теги пересекаются с запрошенными) — для пояснительной записки это «Инженерный отчёт»/«Техническая записка» (+копии), без «Конфигурация ИБП/Расчёт АКБ/кабель/трансформатор». Тумблер «Показать все шаблоны (N) ↔ Только для этого отчёта» — на случай нестандартного выбора. Если релевантных нет — показываются все (без пустого списка). Базовые по-прежнему скрыты. Файлы: shared/report/picker.js, js/engine/constants.js.',
     ] },
