@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.678', date: '2026-05-17', items: [
+      '📚 <b>Живые документы синк (memory feedback_modules_index): modules/index.html техсписок</b>. Обновлён под reports-редизайн: shared/report/ — flow-документ (cover/firstPage/sectionBreak/flow/floating, migrateToFlow/effectiveFlow/flowSegments, flow-редактор WYSIWYG, export-docx мульти-Section, compose=единый composeReport для ВСЕХ отчётов). В shared-инфра добавлены отсутствовавшие: shared/report-catalog.js (per-user каталог шаблонов), shared/money.js (locale-aware fmtMoney/Number/Date/Unit), shared/i18n/ (Фаза 5 инфра t/tAsync/loadNamespace, ru-fallback, ленивая загрузка — плейсхолдер). Фаза 5 (i18n-инфра + money locale-утилиты) подтверждена выполненной (из прошлого чата). Аудит: *-bridge.js без сырых raschet.*-литералов (шов чист). Файл: modules/index.html.',
+    ] },
     { version: '0.60.677', date: '2026-05-17', items: [
       '🔧 <b>Фаза 2 (мин. безопасный шаг) — деплой B: project.js через loadSketchList</b>. projects/project.js: сырой литерал localStorage.getItem(`raschet.sketch.${pid}.list.v1`)+try/parse заменён на шовный loadSketchList(pid) (edge с деплоя A — cache-safe). Поведение идентично (тот же ключ/parse/array-fallback). Последний внешовный sketch-литерал в project.js убран; миграция/projectKey не тронуты. Файл: apps/projects/project.js (import + renderProjectSketchRefs).',
     ] },

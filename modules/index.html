@@ -476,7 +476,7 @@
         <li><code>lib/hydraulic-methods/</code> — Дарси–Вейсбах + Свами–Джейн + NPSH + свойства воды/ROUGHNESS (<b>kind:'calc-lib'</b>, дисциплина hydraulic, X.4.1 v0.60.570)</li>
         <li><code>lib/hvac-methods/</code> — воздухообмен (кратность/явная теплота/сан.норма) + теплопритоки + психрометрия (<b>kind:'calc-lib'</b>, дисциплина hvac, X.4.1 v0.60.575)</li>
         <li><code>lib/gas-methods/</code> — потери давления ПО НОРМАМ отдельными отключаемыми/версионируемыми файлами (СП 42-101 РФ · СН/СП РК · Renouard EU · Weymouth US) + пропускная способность (<b>kind:'calc-lib'</b>, дисциплина gas, X.4.1/X.4.5.4 v0.60.576-589)</li>
-        <li><code>shared/report/</code> — template, blocks, preview, editor, export-pdf, export-docx, picker, cross-discipline</li>
+        <li><code>shared/report/</code> — <b>flow-документ (редизайн X.6.3)</b>: template (cover/firstPage/sectionBreak/flow/floating, migrateToFlow/effectiveFlow/flowSegments — Word-style разделы), blocks, preview, editor (flow-редактор WYSIWYG), export-pdf, export-docx (мульти-Section), picker, <b>compose</b> (единый конвейер composeReport — ВСЕ отчёты), cross-discipline</li>
       </ul>
 
       <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Shared-инфраструктура (cross-module)</h3>
@@ -502,6 +502,9 @@
         <li><code>shared/module-changelogs.js</code> — централизованный changelog всех модулей</li>
         <li><code>shared/dialog.js</code> — rsToast / rsConfirm / rsPrompt / rsPickOne (без browser dialogs, по правилу memory)</li>
         <li><code>shared/configurator-shell.css</code> — единый CSS-shell конфигураторов</li>
+        <li><code>shared/report-catalog.js</code> — per-user каталог шаблонов отчётов (save/clone/import/export)</li>
+        <li><code>shared/money.js</code> — locale-aware: CURRENCIES + fmtMoney/fmtNumber/fmtDate/fmtUnit</li>
+        <li><code>shared/i18n/</code> — i18n-инфра (Фаза 5): t()/tAsync/loadNamespace, ru-fallback, ленивая загрузка каталогов (плейсхолдер, no-op без каталогов)</li>
       </ul>
 
       <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Plugins (расширяемые источники данных)</h3>
