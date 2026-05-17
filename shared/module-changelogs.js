@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.569', date: '2026-05-17', items: [
+      '✅ <b>Закрепление: регресс-верификация HEAD + verify-методология</b>. Консолидированная проверка после серии v0.60.532→568 (importmap-развязка, apps/lib-переезд, R2 63-доступа, APP_NS-seam, 4 reports-миграции, i18n-инфра, инцидент cache-skew откат+передел): 11 наиболее изменённых модулей + project-storage seam — РЕГРЕССИЙ НЕТ (собственные страницы console-clean, seam байт-идентичен, APP_NS=raschet). Выявлена и устранена ловушка верификации: import чужого entry-скрипта cross-page авто-запускает init()/wire() против чужого DOM → ложные Cannot-set-null/Failed-to-fetch (не регрессия). Зафиксировано: CONTRIBUTING §6 (проверять только естественной загрузкой apps/<id>/index.html; clear+reload перед read_console; сверять таймстемпы) + memory feedback_verify_methodology. audit-manifest OK (requires-дрейф 0). Migration-скрипты сохранены намеренно (ARCHITECTURE §0, провенанс). Только документация.',
+    ] },
     { version: '0.60.568', date: '2026-05-17', items: [
       '🧭 <b>X.1.5 owner-board: точное состояние готовности</b>. Аудит: поле owner присутствует в схеме всех 29 manifest.json (значение unassigned — назначение владельцев это орг-решение, не код). UI-чип не делается спекулятивно: генератор tools/gen-modules-json.mjs НАМЕРЕННО исключает owner из проекции modules.json (карточки /modules/ читают modules.json), расширение проекции требует осознанного контракт-изменения + регенерации + парити-check (Node, недоступен в окружении); плюс при всех unassigned ценность чипа нулевая. ROADMAP X.1.5 → [~] с явным планом разблокировки (назначить владельцев → расширить проекцию → one-liner рендера на готовой meta-строке). Только документация.',
     ] },
