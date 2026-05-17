@@ -27,7 +27,7 @@ import * as Report from './index.js';
 
 // Смена версии → переcев встроенных (пользовательские не трогаем).
 // v3 — все шаблоны на чистой canvas-модели (overlays в margin).
-export const BUILTIN_VERSION = 6;
+export const BUILTIN_VERSION = 7;
 
 // ——— палитра ———
 const INK       = '#1f2430';
@@ -255,6 +255,24 @@ export const BUILTIN_TEMPLATES = [
         zone('ftr-first', 'first', 25, 282, 165, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
         zone('ftr-other', 'other', 25, 282, 165, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
+      pageSections: [
+        { id: 'ps-title', name: 'Титул',
+          page: { format: 'A4', orientation: 'portrait',
+            margins: { top: 15, right: 25, bottom: 20, left: 20 } },
+          header: { enabled: false, blocks: [] },
+          footer: { enabled: true, height: 8, width: 'print', valign: 'middle',
+            blocks: [{ type: 'paragraph', style: 'caption', align: 'center',
+              text: '{{date}}  ·  стр. {{page}} из {{pages}}' }] },
+          logo: null, repeat: false },
+        { id: 'ps-main', name: 'Основной',
+          page: { format: 'A4', orientation: 'portrait',
+            margins: { top: 15, right: 25, bottom: 20, left: 20 } },
+          header: { enabled: false, blocks: [] },
+          footer: { enabled: true, height: 8, width: 'print', valign: 'middle',
+            blocks: [{ type: 'paragraph', style: 'caption', align: 'center',
+              text: 'стр. {{page}} из {{pages}}' }] },
+          logo: null, repeat: true },
+      ],
     }),
   },
 
@@ -281,6 +299,18 @@ export const BUILTIN_TEMPLATES = [
         zone('hdr-title', 'all', 20, 8,   165, 6, '{{meta.title}}', 'caption', 'left'),
         zone('ftr-main',  'all', 20, 283, 165, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
+      pageSections: [{
+        id: 'ps-main', name: 'Основной',
+        page: { format: 'A4', orientation: 'portrait',
+          margins: { top: 15, right: 25, bottom: 20, left: 20 } },
+        header: { enabled: true, height: 8, width: 'print', valign: 'middle',
+          blocks: [{ type: 'paragraph', style: 'caption', align: 'left',
+            text: '{{meta.title}}' }] },
+        footer: { enabled: true, height: 8, width: 'print', valign: 'middle',
+          blocks: [{ type: 'paragraph', style: 'caption', align: 'center',
+            text: '{{date}}  ·  стр. {{page}} из {{pages}}' }] },
+        logo: null, repeat: true,
+      }],
     }),
   },
 
