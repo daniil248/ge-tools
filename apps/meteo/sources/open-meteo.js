@@ -79,6 +79,24 @@ register({
       dateFrom: yearAgo, dateTo: today, stationId: null,
     });
   },
+
+  // v0.60.601: обновление существующего датасета — те же координаты,
+  // СОХРАНЯЕМ историческую глубину (dateFrom прежний), РАСШИРЯЕМ до
+  // сегодня + освежаем недавние данные. Результат коммитится на месте
+  // (commitDataset forceUpdateId), дубль не создаётся.
+  async refetch(ctx, prev) {
+    const today = new Date().toISOString().slice(0, 10);
+    const from = prev && prev.dateFrom
+      ? prev.dateFrom
+      : new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+    return fetchOpenMeteo({
+      ctx,
+      name: `${prev.locationName || prev.name || 'Локация'} ${from}..${today}`,
+      lat: Number(prev.lat), lon: Number(prev.lon),
+      locationName: prev.locationName || '',
+      dateFrom: from, dateTo: today, stationId: prev.stationId || null,
+    });
+  },
 });
 
 /** Высота над уровнем моря по координатам (Open-Meteo Elevation API).

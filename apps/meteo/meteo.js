@@ -170,9 +170,68 @@ async function importViaSource(srcId) {
   util.toast(`Загружено ${(ds.hourly || []).length} строк (${ds.stats?.tmin}…${ds.stats?.tmax} °C)`, 'ok');
 }
 
-// v0.60.594: единый коммит датасета (импорт ИЛИ авто-подхват) —
-// id/active/persist/render/history + пропагация elevation в проект.
-async function commitDataset(ds, { action = 'import' } = {}) {
+// v0.60.601: ключ дедупликации запроса = источник + координаты
+// (округл. 3 знака ≈ 100 м). Один и тот же запрос не плодим.
+function _dedupKey(d) {
+  if (!d) return '';
+  const la = Number(d.lat), lo = Number(d.lon);
+  return [d.source || '?',
+    Number.isFinite(la) ? la.toFixed(3) : '?',
+    Number.isFinite(lo) ? lo.toFixed(3) : '?'].join('|');
+}
+// Покрывает ли диапазон A диапазон B (строки YYYY-MM-DD сравнимы лексикографически).
+function _covers(aFrom, aTo, bFrom, bTo) {
+  return (aFrom || '') <= (bFrom || '') && (aTo || '') >= (bTo || '');
+}
+
+// v0.60.594/601: единый коммит датасета (импорт/авто/refresh) с
+// ДЕДУПЛИКАЦИЕЙ. Правила (по запросу Пользователя):
+//  • такой запрос уже есть и покрывает новый → НЕ создаём дубль,
+//    активируем существующий;
+//  • существующий ýже нового (или forceUpdateId) → ОБНОВЛЯЕМ на месте
+//    (тот же id/activeForProject/createdAt, новые данные/диапазон);
+//  • иначе → создаём новый.
+async function commitDataset(ds, { action = 'import', forceUpdateId = null } = {}) {
+  const key = _dedupKey(ds);
+  let ex = null;
+  if (forceUpdateId) ex = _datasets.find(d => d.id === forceUpdateId) || null;
+  if (!ex && key && key.indexOf('?') === -1) ex = _datasets.find(d => _dedupKey(d) === key) || null;
+
+  if (ex && !forceUpdateId &&
+      _covers(ex.dateFrom, ex.dateTo, ds.dateFrom, ds.dateTo) &&
+      (ex.hourly || []).length >= (ds.hourly || []).length) {
+    // Дубль: запрос уже есть и покрывает запрошенное — не плодим.
+    _activeId = ex.id;
+    await persist();
+    renderDatasetsList(); renderActive();
+    util.toast(`Такой запрос уже есть (${ex.source}, ${ex.dateFrom}…${ex.dateTo}) — открыт существующий, дубль не создан.`, 'info');
+    return ex;
+  }
+
+  if (ex) {
+    // Обновление на месте: сохраняем id/активность/создание.
+    const merged = {
+      ...ex, ...ds,
+      id: ex.id,
+      activeForProject: ex.activeForProject,
+      createdAt: ex.createdAt,
+      updatedAt: Date.now(),
+    };
+    const i = _datasets.findIndex(d => d.id === ex.id);
+    if (i >= 0) _datasets[i] = merged;
+    _activeId = ex.id;
+    await persist();
+    renderDatasetsList(); renderActive();
+    if (_pid) historyAppend(_pid, {
+      module: 'meteo', action: 'update', itemKind: 'meteo-dataset',
+      itemId: merged.id, itemName: merged.name, source: merged.source,
+      payload: { dataset: merged },
+    });
+    _propagateElevation(ds);
+    util.toast(`Обновлён существующий датасет: ${merged.dateFrom}…${merged.dateTo}, ${(merged.hourly||[]).length} строк.`, 'ok');
+    return merged;
+  }
+
   const dataset = {
     id: util.newId('ds'),
     activeForProject: !_datasets.some(d => d.activeForProject),
@@ -191,11 +250,16 @@ async function commitDataset(ds, { action = 'import' } = {}) {
       source: dataset.source, payload: { dataset },
     });
   }
-  // Point 1: высота площадки из открытых карт по координатам →
-  // project.location.elevationM. Preserve-on-miss (user-params-sacred):
-  // не перезаписываем, если Пользователь задал высоту вручную.
+  _propagateElevation(ds);
+  return dataset;
+}
+
+// Point 1: высота площадки из открытых карт по координатам →
+// project.location.elevationM. Preserve-on-miss (user-params-sacred):
+// не перезаписываем, если Пользователь задал высоту вручную.
+function _propagateElevation(ds) {
   try {
-    if (_pid && Number.isFinite(ds.elevation)) {
+    if (_pid && ds && Number.isFinite(ds.elevation)) {
       const p = getProject(_pid);
       const loc = (p && p.location) || {};
       if (loc.elevationM == null || loc.elevationM === '') {
@@ -203,7 +267,6 @@ async function commitDataset(ds, { action = 'import' } = {}) {
       }
     }
   } catch (e) { console.warn('[meteo] elevation propagate failed', e); }
-  return dataset;
 }
 
 // ─── Render: список датасетов
@@ -225,6 +288,7 @@ function renderDatasetsList() {
       <span class="mt-dataset-meta">${srcIcon} ${util.escHtml(d.source)} · ${util.escHtml(period)}</span>
       <span class="mt-dataset-actions">
         <button type="button" data-act="activate" data-id="${util.escAttr(d.id)}" title="Сделать активным для проекта">⭐</button>
+        <button type="button" data-act="refresh" data-id="${util.escAttr(d.id)}" title="Обновить данные: перезапрос источника по тем же координатам, диапазон расширяется до сегодня (обновление на месте, без дубля)">🔄</button>
         <button type="button" data-act="rename" data-id="${util.escAttr(d.id)}" title="Переименовать">✏</button>
         <button type="button" data-act="delete" data-id="${util.escAttr(d.id)}" title="Удалить">🗑</button>
       </span>
@@ -647,6 +711,27 @@ async function init() {
         for (const d of _datasets) d.activeForProject = (d.id === id);
         persist(); renderDatasetsList(); renderActive();
         util.toast('Датасет помечен ⭐ для проекта', 'ok');
+      } else if (act === 'refresh') {
+        // v0.60.601: обновление данных — перезапрос источника по тем же
+        // координатам, диапазон до сегодня, ОБНОВЛЕНИЕ НА МЕСТЕ (без дубля).
+        const prev = _datasets.find(x => x.id === id);
+        if (!prev) return;
+        const src = getSources().find(s => s.id === prev.source);
+        if (!src || typeof src.refetch !== 'function') {
+          util.toast(`Источник «${prev.source}» не поддерживает обновление — пересоздайте через панель «Импорт».`, 'warn');
+          return;
+        }
+        util.toast(`Обновление «${prev.name}»…`, 'info');
+        try {
+          const fresh = await src.refetch({ util }, prev);
+          if (fresh && Array.isArray(fresh.hourly) && fresh.hourly.length) {
+            await commitDataset(fresh, { action: 'refresh', forceUpdateId: prev.id });
+          } else {
+            util.toast('Обновление не удалось (источник вернул пусто).', 'warn');
+          }
+        } catch (err) {
+          util.toast('Ошибка обновления: ' + (err && err.message || err), 'warn');
+        }
       } else if (act === 'rename') {
         const d = _datasets.find(x => x.id === id);
         if (!d) return;
