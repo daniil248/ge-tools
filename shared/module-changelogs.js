@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.572', date: '2026-05-17', items: [
+      '🧾 <b>/modules/ техсписок синхронизирован</b>. Раздел «📚 Все модули»: (1) <code>elements/</code> переописан как редирект-заглушка→apps/catalog/ (не «Element-library editor», не модуль); (2) добавлен <code>lib/hydraulic-methods/</code> в Calc-библиотеки (memory:modules_index — обязательная регистрация нового модуля в /modules/, ретро для v0.60.570); (3) исправлен stale-путь <code>suppression-methods/</code> → <code>lib/suppression-methods/</code>. Прод-верификация v0.60.571: elements/ редирект жив (старые закладки ловятся), elements-editor.js → 404, карточка из реестра убрана, modules/ console-clean. Только лаунчер-страница/документация.',
+    ] },
     { version: '0.60.571', date: '2026-05-17', items: [
       '🧹 <b>Чистка остатков старого модуля elements/</b>. Диагноз: index.html — живая редирект-заглушка (meta-refresh 2с → ../catalog/, модуль объединён с «Каталог и библиотека»), elements.css используется заглушкой, elements-editor.js — мёртвый legacy (0 живых импортёров, заглушка его не подключает), /modules/ имел вводящую в заблуждение карточку «Element-library editor» на 2-сек-редирект. Решение: (1) git rm elements/elements-editor.js (устаревший MVP-CRUD, дублировал catalog/, история в git — обратимо); (2) удалена лишняя карточка из modules/index.html (реальная функция уже в карточке catalog/); (3) elements/README.md переписан — постоянная редирект-заглушка для старых закладок (НЕ модуль, удалять не нужно: ловит старые URL /raschet/elements/); (4) ARCHITECTURE §0 легенда уточнена (elements/ — редирект-заглушка→catalog/). index.html+elements.css сохранены намеренно (живой редирект).',
     ] },

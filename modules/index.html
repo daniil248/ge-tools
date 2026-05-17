@@ -457,7 +457,7 @@
       <h3 style="font-size:13px;margin:14px 0 6px;color:#475569">Dev / экспериментальные с UI</h3>
       <ul class="muted" style="font-size:12px;column-count:2;column-gap:24px;margin:0;padding-left:18px">
         <li><code>dev/por-playground.html</code> — POR Playground (project objects)</li>
-        <li><code>elements/</code> — Element-library editor</li>
+        <li><code>elements/</code> — редирект-заглушка → <code>apps/catalog/</code> (модуль объединён; не модуль)</li>
         <li><code>configurator3d/</code> — 3D-конфигуратор шкафа</li>
       </ul>
 
@@ -475,7 +475,8 @@
         <li><code>js/calc/</code> — hvac-derate, прочие электрические калькуляторы</li>
         <li><code>js/engine/</code> — constants, inspector, ports, render</li>
         <li><code>js/methods/</code> — iec / pue / nec (Phase auto-norm v0.60.123) / rtm + vdrop + economic</li>
-        <li><code>suppression-methods/</code> — СП РК 2022 / СП 485-2020 (+Прил. Д) / NFPA 2001 / ISO 14520 + agents + hydraulics (<b>kind:'calc-lib'</b>, зарегистрирован в modules.json — первый calc-lib)</li>
+        <li><code>lib/suppression-methods/</code> — СП РК 2022 / СП 485-2020 (+Прил. Д) / NFPA 2001 / ISO 14520 + agents + hydraulics (<b>kind:'calc-lib'</b>, первый calc-lib)</li>
+        <li><code>lib/hydraulic-methods/</code> — Дарси–Вейсбах + Свами–Джейн + NPSH + свойства воды/ROUGHNESS (<b>kind:'calc-lib'</b>, дисциплина hydraulic, X.4.1 v0.60.570)</li>
         <li><code>shared/report/</code> — template, blocks, preview, editor, export-pdf, export-docx, picker</li>
       </ul>
 
