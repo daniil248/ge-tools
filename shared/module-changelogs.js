@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.634', date: '2026-05-17', items: [
+      '📋 <b>Фаза 1 (хвост): манифест suppression-config честный</b>. apps/suppression-config/manifest.json: storageKeys = raschet.sup.installations.v1 (собственные данные — namespace СОЗНАТЕЛЬНО raschet.sup.*, не suppression-config.*; lsNamespacesOwned дополнен «sup» — непроецируемое поле, как dgu для genset) + raschet.activeProject.v1/raschet.projects.v1 (чтение активного проекта legacy-flat) + raschet.mdcToSuppression.v1 (handoff: mdc-config пишет, suppression читает на init). Исключён raschet.suppression-config.v1 — schema-id (wire-format, RENAME.md §3). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/suppression-config/manifest.json.',
+    ] },
     { version: '0.60.633', date: '2026-05-17', items: [
       '📋 <b>Фаза 1 (хвост): манифест cable честный</b>. apps/cable/manifest.json: storageKeys +raschet.cable.autoNormHint.shown (флаг показа подсказки авто-нормы, cable-calc.js); urlParams без изменений — аудитор пометил economic ЛОЖНО (moduleEnabled.get(economic) это Map.get, не URLSearchParams.get → не url-param, исключено по человеческому суждению). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/cable/manifest.json.',
     ] },
