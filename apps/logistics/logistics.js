@@ -117,7 +117,9 @@ function renderShipmentsTab() {
 // Phase 1.6.5: печать проформы/ТТН. Открывается новое окно с печатной
 // версткой — пользователь печатает через браузер (Ctrl+P) в PDF или на
 // принтер. Минимальный шаблон: шапка, реквизиты, таблица позиций, итоги.
-function printShipment(id) {
+// v0.60.563 (Фаза 3, memory:reports_via_module): проформа формируется
+// через модуль reports/ (blocks[] API) вместо прямого HTML+window.open.
+async function printShipment(id) {
   const sh = getShipment(id);
   if (!sh) { flash('Отправление не найдено', 'error'); return; }
   const origin = sh.originId ? getWarehouse(sh.originId) : null;
@@ -126,102 +128,96 @@ function printShipment(id) {
   const st = SHIPMENT_STATUSES[sh.status] || SHIPMENT_STATUSES.draft;
   const items = sh.items || [];
   let totalQty = 0, totalKg = 0, totalM3 = 0, totalPrice = 0;
-  const rows = items.map((it, i) => {
+  const itemRows = items.map((it, i) => {
     const lineQty = Number(it.qty) || 0;
     const lineKg = (Number(it.unitKg) || 0) * lineQty;
     const lineM3 = (Number(it.unitM3) || 0) * lineQty;
     const linePrice = (Number(it.unitPriceRUB) || 0) * lineQty;
     totalQty += lineQty; totalKg += lineKg; totalM3 += lineM3; totalPrice += linePrice;
-    return `<tr>
-      <td>${i + 1}</td>
-      <td>${esc(it.label || '')}</td>
-      <td class="num">${lineQty}</td>
-      <td class="num">${lineKg ? lineKg.toFixed(2) : '—'}</td>
-      <td class="num">${lineM3 ? lineM3.toFixed(3) : '—'}</td>
-      <td class="num">${it.unitPriceRUB ? Number(it.unitPriceRUB).toLocaleString('ru-RU') : '—'}</td>
-      <td class="num">${linePrice ? linePrice.toLocaleString('ru-RU') : '—'}</td>
-    </tr>`;
-  }).join('');
+    return [
+      String(i + 1),
+      it.label || '',
+      String(lineQty),
+      lineKg ? lineKg.toFixed(2) : '—',
+      lineM3 ? lineM3.toFixed(3) : '—',
+      it.unitPriceRUB ? Number(it.unitPriceRUB).toLocaleString('ru-RU') : '—',
+      linePrice ? linePrice.toLocaleString('ru-RU') : '—',
+    ];
+  });
+  if (!itemRows.length) itemRows.push(['', '— нет позиций —', '', '', '', '', '']);
+  itemRows.push([
+    'ИТОГО', '', String(totalQty),
+    totalKg ? totalKg.toFixed(2) : '—',
+    totalM3 ? totalM3.toFixed(3) : '—',
+    '', totalPrice ? totalPrice.toLocaleString('ru-RU') : '—',
+  ]);
 
   const dateStr = new Date().toLocaleDateString('ru-RU');
   const plannedStr = sh.plannedAt ? new Date(sh.plannedAt).toLocaleDateString('ru-RU') : '—';
   const shipmentCostStr = fmtRub(sh.cost);
   const grandTotal = totalPrice + (Number(sh.cost) || 0);
 
-  const html = `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
-<title>Проформа — ${esc(sh.label || sh.id)}</title>
-<style>
-  @page { size: A4; margin: 15mm; }
-  body { font: 11pt/1.4 "Times New Roman", serif; color: #000; margin: 0; padding: 20px; }
-  h1 { font-size: 16pt; text-align: center; margin: 0 0 4px; }
-  h2 { font-size: 13pt; margin: 14px 0 6px; border-bottom: 1px solid #000; padding-bottom: 2px; }
-  .sub { text-align: center; color: #555; font-size: 10pt; margin-bottom: 16px; }
-  .meta-grid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 10px; font-size: 10.5pt; margin-bottom: 14px; }
-  .meta-grid .k { color: #555; }
-  .meta-grid .v { font-weight: bold; }
-  table.items { width: 100%; border-collapse: collapse; font-size: 10pt; margin-top: 6px; }
-  table.items th, table.items td { border: 1px solid #000; padding: 4px 6px; text-align: left; }
-  table.items th { background: #eee; font-weight: bold; }
-  table.items td.num, table.items th.num { text-align: right; }
-  .totals { margin-top: 10px; text-align: right; font-size: 11pt; }
-  .totals .line { margin: 2px 0; }
-  .totals .grand { font-size: 13pt; font-weight: bold; border-top: 2px solid #000; padding-top: 4px; margin-top: 4px; }
-  .sign { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; font-size: 10.5pt; }
-  .sign .slot { border-top: 1px solid #000; padding-top: 2px; }
-  @media print { .no-print { display: none !important; } }
-  .no-print { position: fixed; top: 10px; right: 10px; }
-  .no-print button { padding: 8px 14px; font-size: 12pt; cursor: pointer; }
-  .notes { margin-top: 10px; font-size: 10pt; white-space: pre-wrap; border: 1px dashed #999; padding: 6px; }
-</style>
-</head><body>
-<div class="no-print"><button onclick="window.print()">🖨 Печать / PDF</button></div>
-<h1>ПРОФОРМА ОТПРАВЛЕНИЯ ${esc(sh.label || sh.id)}</h1>
-<div class="sub">Дата формирования: ${dateStr} · Статус: ${esc(st.label)}</div>
+  let Report;
+  try {
+    Report = await import('shared/report/index.js');
+  } catch (e) {
+    flash('Не удалось загрузить модуль отчётов: ' + (e.message || e), 'error');
+    return;
+  }
+  const B = Report.blocks;
+  const content = [
+    B.h1(`ПРОФОРМА ОТПРАВЛЕНИЯ ${sh.label || sh.id}`),
+    B.caption(`Дата формирования: ${dateStr} · Статус: ${st.label}`),
+    B.h2('Реквизиты отправления'),
+    B.table(
+      [{ text: 'Параметр', width: 40 }, 'Значение'],
+      [
+        ['Режим', `${mode.icon} ${mode.label}`],
+        ['Плановая дата', plannedStr],
+        ['Откуда', origin ? origin.name + (origin.address ? ` (${origin.address})` : '') : '—'],
+        ['Куда', dest ? dest.name + (dest.address ? ` (${dest.address})` : '') : '—'],
+      ],
+    ),
+    B.h2('Спецификация'),
+    B.table(
+      [
+        { text: '№', align: 'right', width: 12 },
+        'Наименование',
+        { text: 'Кол-во', align: 'right' },
+        { text: 'Масса, кг', align: 'right' },
+        { text: 'Объём, м³', align: 'right' },
+        { text: 'Цена, ₽/шт', align: 'right' },
+        { text: 'Сумма, ₽', align: 'right' },
+      ],
+      itemRows,
+    ),
+    B.spacer(3),
+    B.paragraph(`Стоимость товаров: ${totalPrice ? totalPrice.toLocaleString('ru-RU') + ' ₽' : '—'}`),
+    B.paragraph(`Стоимость перевозки: ${shipmentCostStr}`),
+    B.paragraph(`Всего к оплате: ${grandTotal ? grandTotal.toLocaleString('ru-RU') + ' ₽' : '—'}`),
+  ];
+  if (sh.notes) {
+    content.push(B.h3('Примечания'), B.paragraph(String(sh.notes)));
+  }
+  content.push(
+    B.spacer(12),
+    B.table(
+      ['Отправитель', 'Получатель'],
+      [['_______________ / ____________', '_______________ / ____________']],
+    ),
+  );
 
-<h2>Реквизиты отправления</h2>
-<div class="meta-grid">
-  <div class="k">Режим:</div><div class="v">${mode.icon} ${esc(mode.label)}</div>
-  <div class="k">Плановая дата:</div><div class="v">${plannedStr}</div>
-  <div class="k">Откуда:</div><div class="v">${origin ? esc(origin.name) + (origin.address ? ' (' + esc(origin.address) + ')' : '') : '—'}</div>
-  <div class="k">Куда:</div><div class="v">${dest ? esc(dest.name) + (dest.address ? ' (' + esc(dest.address) + ')' : '') : '—'}</div>
-</div>
-
-<h2>Спецификация</h2>
-<table class="items">
-  <thead><tr>
-    <th style="width:30px">№</th><th>Наименование</th>
-    <th class="num">Кол-во</th><th class="num">Масса, кг</th><th class="num">Объём, м³</th>
-    <th class="num">Цена, ₽/шт</th><th class="num">Сумма, ₽</th>
-  </tr></thead>
-  <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#999">— нет позиций —</td></tr>'}</tbody>
-  <tfoot><tr style="font-weight:bold;background:#f5f5f5">
-    <td colspan="2">ИТОГО</td>
-    <td class="num">${totalQty}</td>
-    <td class="num">${totalKg ? totalKg.toFixed(2) : '—'}</td>
-    <td class="num">${totalM3 ? totalM3.toFixed(3) : '—'}</td>
-    <td></td>
-    <td class="num">${totalPrice ? totalPrice.toLocaleString('ru-RU') : '—'}</td>
-  </tr></tfoot>
-</table>
-
-<div class="totals">
-  <div class="line">Стоимость товаров: <b>${totalPrice ? totalPrice.toLocaleString('ru-RU') + ' ₽' : '—'}</b></div>
-  <div class="line">Стоимость перевозки: <b>${shipmentCostStr}</b></div>
-  <div class="grand">Всего к оплате: ${grandTotal ? grandTotal.toLocaleString('ru-RU') + ' ₽' : '—'}</div>
-</div>
-
-${sh.notes ? `<div class="notes"><b>Примечания:</b>\n${esc(sh.notes)}</div>` : ''}
-
-<div class="sign">
-  <div class="slot">Отправитель<br>_______________________ / ________________</div>
-  <div class="slot">Получатель<br>_______________________ / ________________</div>
-</div>
-</body></html>`;
-
-  const w = window.open('', '_blank', 'width=900,height=1200');
-  if (!w) { flash('Окно печати заблокировано браузером', 'error'); return; }
-  w.document.open(); w.document.write(html); w.document.close();
+  const tpl = Report.createTemplate({
+    meta: { title: `Проформа — ${sh.label || sh.id}`, kind: 'shipment-proforma' },
+  });
+  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
+  tpl.margins = { top: 15, right: 15, bottom: 15, left: 15 };
+  tpl.content = content;
+  try {
+    Report.exportPDF(tpl, `proforma-${String(sh.label || sh.id).replace(/[^\w-]+/g, '_')}.pdf`);
+  } catch (e) {
+    flash('Ошибка экспорта PDF: ' + (e.message || e), 'error');
+  }
 }
 
 function openShipmentModal(editId) {

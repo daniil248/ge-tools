@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.563', date: '2026-05-17', items: [
+      '📄 <b>Фаза 3 / 1.7: logistics «Проформа отправления» — direct-HTML → reports/ blocks[]</b>. printShipment() переписан с window.open(empty)+document.write(захардкоженный proforma HTML) на blocks[]: h1/caption + таблица реквизитов + таблица спецификации (итоговая строка ИТОГО в rows[]) + параграфы итогов + таблица подписей; Report.createTemplate + exportPDF (паттерн export-offer). Динамический import shared/report (cache-safe). window.open в logistics = 0. Ошибки → flash (in-page, не молчат). Остаток 1.7: battery:3787, ups-config:2221.',
+    ] },
     { version: '0.60.562', date: '2026-05-17', items: [
       '📄 <b>Фаза 3 / 1.7: pdu-config «Требования к PDU» — direct-HTML → reports/ blocks[]</b>. printRequirements() переписан: вместо window.open(empty).document.write(захардкоженный HTML+CSS)+w.print() — парсинг markdown-текста в blocks[] (h1/h3/list/caption/paragraph через shared/report/blocks), Report.createTemplate + Report.exportPDF (паттерн service/export-offer). Подпрограмма отдаёт структуру, стили/поля страницы — на стороне reports/ (memory:reports_via_module). Динамический import shared/report/index.js (lazy, cache-safe — новых shared-export нет). window.open в pdu-config = 0. Ошибки — rsToast (memory:no-dialogs), не молчат как раньше. Остаток direct-HTML отчётов: battery:3787, logistics:222, ups-config:2221.',
     ] },
