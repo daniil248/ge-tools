@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.568', date: '2026-05-17', items: [
+      '🧭 <b>X.1.5 owner-board: точное состояние готовности</b>. Аудит: поле owner присутствует в схеме всех 29 manifest.json (значение unassigned — назначение владельцев это орг-решение, не код). UI-чип не делается спекулятивно: генератор tools/gen-modules-json.mjs НАМЕРЕННО исключает owner из проекции modules.json (карточки /modules/ читают modules.json), расширение проекции требует осознанного контракт-изменения + регенерации + парити-check (Node, недоступен в окружении); плюс при всех unassigned ценность чипа нулевая. ROADMAP X.1.5 → [~] с явным планом разблокировки (назначить владельцев → расширить проекцию → one-liner рендера на готовой meta-строке). Только документация.',
+    ] },
     { version: '0.60.567', date: '2026-05-17', items: [
       '🌐 <b>Фаза 5: i18n-инфраструктура (плейсхолдер, без извлечения)</b>. Новый shared/i18n/index.js: t(ns,key,params,fallbackText)/tAsync/getLocale/setLocale/availableLocales/loadNamespace. Контракт ключа ns.section.key (ns=id модуля из manifest), ru=источник+fallback, резолюция loaded[lang][ns][key]→ru→fallbackText→key, ленивый fetch shared/i18n/<lang>/<ns>.json (document-relative, Pages+file://, отсутствие файла=тихий фолбэк). Каталогов пока нет → t()=fallbackText‖key — полный no-op, UI не меняется, ничего не ломается. setLocale эмитит rs-locale-change. + shared/i18n/README.md. shared/money.js аддитивно расширен fmtNumber/fmtDate/fmtUnit (Intl, locale BCP-47 default ru-RU, zero-dep, NO DOM, безопасный фолбэк) — единственная locale-aware утилита; i18n намеренно НЕ импортится из money.js (zero-dep, без рисков цикла/§6a). Cache-safe: i18n никто не импортирует (чистое добавление), новые money-export без потребителей этим деплоем. Извлечение строк (codemod→ru-каталоги, en, переключатель локали) — отложенная X.3.2.',
     ] },
