@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.623', date: '2026-05-17', items: [
+      '📋 <b>Фаза 1: манифест genset-config честный (с учётом backward-compat dgu)</b>. apps/genset-config/manifest.json: storageKeys по коду — namespace СОЗНАТЕЛЬНО dgu-config (lsNamespacesOwned уже [dgu-config] — переименование dgu→genset намеренно сохранило LS/протокол, memory feedback): raschet.project.&lt;pid&gt;.dgu-config.state/selected .v1 + кросс-оконный LS-bridge raschet.dgu.bridge.*; events.emits postMessage:raschet.dgu.apply (window.opener.postMessage в инспектор/Технолог); urlParams расширены (project/pid/capacityKw/capacityKva/nodeId/mode/redundancy/cosPhi/tamb/altitude/rh/breakdown/vendor/autonomy); version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Девятый модуль ревизии. Файл: apps/genset-config/manifest.json.',
+    ] },
     { version: '0.60.622', date: '2026-05-17', items: [
       '📋 <b>Фаза 1: манифест rack-config честный</b>. apps/rack-config/manifest.json: storageKeys заполнен по коду (raschet.project.&lt;pid&gt;.rack-config.instances/templates .v1); urlParams +pid/embedded/mode/nodeId; bridges shared/catalog-bridge.js (фактический импорт — верен); version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Восьмой модуль ревизии «manifest честен» (meteo/cooling/tech-workspace/service/projects/scs-design/scs-config/rack-config). Файл: apps/rack-config/manifest.json.',
     ] },

@@ -2,7 +2,7 @@
   "id": "genset-config",
   "name": "ДГУ-конфигуратор",
   "description": "Подбор дизель-генераторной установки по нагрузке с учётом режима (ESP/PRP/COP), резервирования, высоты над уровнем моря, температуры наружного воздуха и автономии.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -17,9 +17,13 @@
   "permissions": ["genset-config.use"],
   "lsNamespacesOwned": ["dgu-config"],
   "dependsOnContracts": {
-    "storageKeys": [],
-    "events": { "emits": [], "consumes": [] },
-    "urlParams": ["project", "capacityKw"],
+    "storageKeys": [
+      "raschet.project.<pid>.dgu-config.state.v1",
+      "raschet.project.<pid>.dgu-config.selected.v1",
+      "raschet.dgu.bridge.*"
+    ],
+    "events": { "emits": ["postMessage:raschet.dgu.apply"], "consumes": [] },
+    "urlParams": ["project", "pid", "capacityKw", "capacityKva", "nodeId", "mode", "redundancy", "cosPhi", "tamb", "altitude", "rh", "breakdown", "vendor", "autonomy"],
     "bridges": []
   }
 }
