@@ -61,7 +61,7 @@ export function openTemplateEditor(tpl, opts = {}) {
 
   // Документ открывается на «Основе» (обязательный выбор базы),
   // базовый — на «Колонтитулах». renderTabs всё равно подстрахует.
-  const state = { tab: working.level === 'base' ? 'chrome' : 'base', sel: -1, zoom: 1 };
+  const state = { tab: working.level === 'base' ? 'psections' : 'base', sel: -1, zoom: 1 };
 
   const backdrop = el('div', 'rpt-modal-backdrop');
   const modal = el('div', 'rpt-modal rpt-modal--canvas');
@@ -153,6 +153,7 @@ export function openTemplateEditor(tpl, opts = {}) {
   const TAB_LABEL = {
     base: 'Основа', structure: 'Структура', sections: 'Разделы',
     chrome: 'Колонтитулы', floating: 'Слой', page: 'Лист', styles: 'Стили',
+    psections: 'Разделы',
   };
   // Двухуровневая модель (требование Пользователя):
   //  • БАЗОВЫЙ шаблон = только оформление: поля/размер страницы,
@@ -162,7 +163,7 @@ export function openTemplateEditor(tpl, opts = {}) {
   //    него нет оформления) + свой порядок блоков и разделы + слой.
   //    Поля/колонтитулы/стили НЕ редактируются здесь — они из базы.
   const visibleTabs = () => (working.level === 'base'
-    ? ['chrome', 'page', 'styles']
+    ? ['psections', 'styles']
     : ['base', 'structure', 'sections', 'floating']
   ).map(id => [id, TAB_LABEL[id]]);
   const tabBtns = {};
@@ -224,7 +225,8 @@ export function openTemplateEditor(tpl, opts = {}) {
     renderTabs();
     for (const id of Object.keys(tabBtns)) tabBtns[id].classList.toggle('active', id === state.tab);
     tabContent.innerHTML = '';
-    if (state.tab === 'base') buildBase(tabContent);
+    if (state.tab === 'psections') buildPSections(tabContent);
+    else if (state.tab === 'base') buildBase(tabContent);
     else if (state.tab === 'structure') buildStructure(tabContent);
     else if (state.tab === 'sections') buildSections(tabContent);
     else if (state.tab === 'chrome') buildChrome(tabContent);
@@ -864,6 +866,169 @@ export function openTemplateEditor(tpl, opts = {}) {
         [['portrait', 'Книжная'], ['landscape', 'Альбомная']],
         fp.orientation || 'portrait', v => { working.firstPage.page.orientation = v; renderPane(); }));
     }
+  }
+
+  // ——— Вкладка «Разделы» БАЗОВОГО шаблона (pageSections) ———
+  // База владеет массивом разделов: у каждого своя геометрия + свой
+  // колонтитул (шапка/подвал) + опц. свой логотип. Документы наследуют.
+  function ensurePageSections() {
+    if (Array.isArray(working.pageSections) && working.pageSections.length) return;
+    // Первичная инициализация из legacy (page + footer/header.otherPages
+    // + logo) — один раздел «Основной», чтобы существующая база не
+    // потеряла оформление.
+    const fo = (working.footer && working.footer.otherPages) || {};
+    const ho = (working.header && working.header.otherPages) || {};
+    working.pageSections = [{
+      id: 'ps1', name: 'Основной',
+      page: JSON.parse(JSON.stringify(working.page || {})),
+      header: { enabled: ho.enabled !== false && (ho.blocks || []).length > 0,
+        height: ho.height || 10, width: 'print', valign: 'middle',
+        blocks: JSON.parse(JSON.stringify(ho.blocks || [])) },
+      footer: { enabled: fo.enabled !== false && (fo.blocks || []).length > 0,
+        height: fo.height || 10, width: 'print', valign: 'middle',
+        blocks: JSON.parse(JSON.stringify(fo.blocks || [])) },
+      logo: (working.logo && working.logo.src)
+        ? JSON.parse(JSON.stringify(working.logo)) : null,
+      repeat: true,
+    }];
+  }
+
+  function bandEditor(parent, label, band) {
+    sect(parent, label);
+    const lbl = el('label', 'chk');
+    const cb = document.createElement('input'); cb.type = 'checkbox';
+    cb.checked = band.enabled !== false;
+    cb.addEventListener('change', () => { band.enabled = cb.checked; rebuild(); });
+    lbl.appendChild(cb);
+    const sp = document.createElement('span'); sp.textContent = ' включён';
+    lbl.appendChild(sp);
+    fld(parent, '', lbl);
+    if (band.enabled === false) return;
+    fld(parent, 'Высота, мм', numInput(band.height || 10, v => { band.height = v; renderPane(); }));
+    fld(parent, 'Ширина', selectInput(
+      [['print', 'В пределах полей'], ['page', 'Вся ширина листа'],
+       ['bleed', 'За край листа (вылет)']],
+      band.width || 'print', v => { band.width = v; rebuild(); }));
+    if (band.width === 'bleed') {
+      fld(parent, 'Вылет за край, мм', numInput(
+        band.bleed != null ? band.bleed : 10, v => { band.bleed = v; renderPane(); }));
+    }
+    const first = (band.blocks && band.blocks[0]) || null;
+    fld(parent, 'Текст (можно несколько строк)', textArea(first && first.text || '', v => {
+      band.blocks = v ? [{ type: 'paragraph', style: 'caption',
+        align: (first && first.align) || 'center', text: v }] : [];
+      renderPane();
+    }));
+    fld(parent, 'Выравнивание по горизонтали', selectInput(
+      [['left', 'Слева'], ['center', 'По центру'], ['right', 'Справа']],
+      (first && first.align) || 'center', v => {
+        if (band.blocks && band.blocks[0]) { band.blocks[0].align = v; renderPane(); }
+      }));
+    fld(parent, 'Выравнивание по вертикали', selectInput(
+      [['top', 'Сверху'], ['middle', 'По центру'], ['bottom', 'Снизу']],
+      band.valign || 'middle', v => { band.valign = v; renderPane(); }));
+  }
+
+  function buildPSections(p) {
+    ensurePageSections();
+    const hint = el('div', 'rpt-hint');
+    hint.innerHTML = 'Базовый шаблон состоит из <b>разделов</b>. У каждого ' +
+      'своя геометрия, своя шапка/подвал и опц. свой логотип (напр. ' +
+      'крупный на «Титуле», мелкий на «Основном»). Документы наследуют ' +
+      'эти разделы и выбирают, в какой переключиться.';
+    p.appendChild(hint);
+
+    const addRow = el('div', 'rpt-zone-add');
+    const aBtn = btn('+ Добавить раздел');
+    aBtn.className = 'rpt-zone-add-btn';
+    aBtn.addEventListener('click', () => {
+      const n = working.pageSections.length;
+      const DEF = ['Титул', 'Основной', 'Приложение'];
+      working.pageSections.push({
+        id: 'ps' + (n + 1), name: DEF[n] || ('Раздел ' + (n + 1)),
+        page: JSON.parse(JSON.stringify(working.page || { format: 'A4', orientation: 'portrait', margins: { top: 15, right: 25, bottom: 20, left: 20 } })),
+        header: { enabled: false, height: 10, width: 'print', valign: 'middle', blocks: [] },
+        footer: { enabled: false, height: 10, width: 'print', valign: 'middle', blocks: [] },
+        logo: null, repeat: true,
+      });
+      rebuild();
+    });
+    addRow.appendChild(aBtn);
+    p.appendChild(addRow);
+
+    working.pageSections.forEach((s, i) => {
+      const card = el('div', 'rpt-style-card');
+      const h = document.createElement('h4');
+      h.textContent = '§ ' + (i + 1) + '. ' + (s.name || ('Раздел ' + (i + 1)));
+      card.appendChild(h);
+
+      fld(card, 'Название раздела', textInput(s.name || '', v => { s.name = v; rebuild(); }));
+      if (!s.page || typeof s.page !== 'object') s.page = {};
+      fld(card, 'Формат', selectInput(
+        [...Object.keys(PAGE_SIZES).map(f => [f, f]), ['Custom', 'Custom']],
+        s.page.format || 'A4', v => { s.page.format = v; renderPane(); }));
+      fld(card, 'Ориентация', selectInput(
+        [['portrait', 'Книжная'], ['landscape', 'Альбомная']],
+        s.page.orientation || 'portrait', v => { s.page.orientation = v; renderPane(); }));
+      const m = s.page.margins || (s.page.margins = { top: 15, right: 25, bottom: 20, left: 20 });
+      const r1 = el('div', 'rpt-row');
+      fld(r1, 'Поле верх', numInput(m.top, v => { m.top = v; renderPane(); }));
+      fld(r1, 'Поле низ', numInput(m.bottom, v => { m.bottom = v; renderPane(); }));
+      card.appendChild(r1);
+      const r2 = el('div', 'rpt-row');
+      fld(r2, 'Поле лево', numInput(m.left, v => { m.left = v; renderPane(); }));
+      fld(r2, 'Поле право', numInput(m.right, v => { m.right = v; renderPane(); }));
+      card.appendChild(r2);
+
+      if (!s.header || typeof s.header !== 'object') s.header = { enabled: false, blocks: [] };
+      if (!s.footer || typeof s.footer !== 'object') s.footer = { enabled: false, blocks: [] };
+      bandEditor(card, 'Шапка раздела', s.header);
+      bandEditor(card, 'Подвал раздела', s.footer);
+
+      // Логотип раздела (свой размер на титуле/др.)
+      sect(card, 'Логотип раздела');
+      const lEn = el('label', 'chk');
+      const lCb = document.createElement('input'); lCb.type = 'checkbox';
+      lCb.checked = !!(s.logo && s.logo.src);
+      lCb.addEventListener('change', () => {
+        s.logo = lCb.checked ? (s.logo || { src: null, width: 40, height: 20, position: 'header-left' }) : null;
+        rebuild();
+      });
+      lEn.appendChild(lCb);
+      const lSp = document.createElement('span'); lSp.textContent = ' свой логотип в этом разделе';
+      lEn.appendChild(lSp);
+      fld(card, '', lEn);
+      if (s.logo) {
+        const pk = btn(s.logo.src ? '📷 Заменить логотип' : '📷 Выбрать логотип');
+        pk.addEventListener('click', () => pickImage(src => { s.logo.src = src; rebuild(); }));
+        card.appendChild(pk);
+        const lr = el('div', 'rpt-row');
+        fld(lr, 'Ширина, мм', numInput(s.logo.width || 40, v => { s.logo.width = v; renderPane(); }));
+        fld(lr, 'Высота, мм', numInput(s.logo.height || 20, v => { s.logo.height = v; renderPane(); }));
+        card.appendChild(lr);
+        fld(card, 'Позиция', selectInput(
+          [['header-left', 'Шапка слева'], ['header-center', 'Шапка центр'], ['header-right', 'Шапка справа'],
+           ['footer-left', 'Подвал слева'], ['footer-center', 'Подвал центр'], ['footer-right', 'Подвал справа']],
+          s.logo.position || 'header-left', v => { s.logo.position = v; renderPane(); }));
+      }
+
+      const act = el('div', 'rpt-row');
+      const up = btn('▲'); up.disabled = i === 0; up.style.padding = '2px 8px';
+      up.addEventListener('click', () => {
+        const a = working.pageSections;[a[i - 1], a[i]] = [a[i], a[i - 1]]; rebuild();
+      });
+      const dn = btn('▼'); dn.disabled = i === working.pageSections.length - 1; dn.style.padding = '2px 8px';
+      dn.addEventListener('click', () => {
+        const a = working.pageSections;[a[i + 1], a[i]] = [a[i], a[i + 1]]; rebuild();
+      });
+      const del = btn('✕ Удалить раздел', 'danger');
+      del.disabled = working.pageSections.length <= 1;
+      del.addEventListener('click', () => { working.pageSections.splice(i, 1); rebuild(); });
+      act.appendChild(up); act.appendChild(dn); act.appendChild(del);
+      card.appendChild(act);
+
+      p.appendChild(card);
+    });
   }
 
   // ——— Вкладка «Стили» ———
