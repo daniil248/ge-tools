@@ -236,8 +236,12 @@ export function mountHeader(opts = {}) {
     helpBtn.addEventListener('click', () => {
       const mid = (typeof moduleId === 'string' && moduleId) || inferModuleId();
       const article = MODULE_TO_ARTICLE[mid] || 'intro';
-      const inSub = location.pathname.split('/').filter(Boolean).length > 1;
-      const helpHref = (inSub ? '../help/' : './help/') + '#' + article;
+      // Резолвим от URL ЭТОГО модуля (shared/app-header.js → ../help/
+      // = корневой /help/), а не от pathname страницы — иначе из
+      // apps/<mod>/ получался apps/help/ → 404 (репорт Пользователя).
+      let helpHref;
+      try { helpHref = new URL('../help/', import.meta.url).href + '#' + article; }
+      catch { helpHref = '../help/#' + article; }
       try { window.open(helpHref, '_blank', 'noopener'); }
       catch { location.href = helpHref; }
     });
