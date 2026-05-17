@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.717', date: '2026-05-18', items: [
+      '🧱 <b>Разделение ядро/модули — Фаза 2 R2: запись схемы из cross-discipline-редакторов (Инкремент C2)</b>. Две write-точки engine.scheme.v1 в карточке проекта (сохранение назначенных дисциплин узлам #xd-disc-save; сохранение параметров методики в узел #xdc-save) переведены с localStorage.setItem(projectKey)+JSON.stringify на шов projectSave (read уже шёл через projectLoad/readScheme). Bump updatedAt теперь корректно фиксирует правку схемы. Окружающий try/catch (quota) сохранён. Остаются изолированными PR: cooling multi-create (C3), legacy-миграции scs-design/rack (C4/C5). Файлы: apps/projects/project.js, js/engine/constants.js.',
+    ] },
     { version: '0.60.716', date: '2026-05-18', items: [
       '🧱 <b>Разделение ядро/модули — Фаза 2 R2: мост глобальной↔проектной схемы (Инкремент C1)</b>. Кнопки «⬇ Взять глобальную схему» и «⬆ Применить схему проекта»: запись/чтение project-scoped engine.scheme.v1 переведены на шов projectSave/projectLoad. «Взять»: JSON.parse под guard (повреждённую глобальную схему не записываем) + projectSave (bump updatedAt встроен, убран дублирующий updateProject). «Применить»: projectLoad → JSON.stringify в собственный global-ключ engine raschet.scheme (задокументированный мост, не project-scoped). Семантика для валидного JSON идентична (parse↔stringify round-trip). Файлы: apps/projects/project.js, js/engine/constants.js.',
     ] },

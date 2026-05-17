@@ -3354,7 +3354,8 @@ function render() {
         }
         if (!changed) { setStatus('Изменений нет.', true); return; }
         try {
-          localStorage.setItem(projectKey(pid, 'engine', 'scheme.v1'), JSON.stringify(fresh));
+          // Фаза 2 (R2): запись через шов projectSave (bump updatedAt).
+          projectSave(pid, 'engine', 'scheme.v1', fresh);
           setStatus(`✓ Сохранено: затронуто узлов — ${changed}. Применится при следующей загрузке Конструктора.`, true);
         } catch (e) {
           setStatus('Ошибка записи в хранилище: ' + (e && e.message || e), false);
@@ -3499,7 +3500,8 @@ function render() {
           if (!nd.disciplineParams[disc] || typeof nd.disciplineParams[disc] !== 'object') nd.disciplineParams[disc] = {};
           nd.disciplineParams[disc][mid] = gather();
           try {
-            localStorage.setItem(projectKey(pid, 'engine', 'scheme.v1'), JSON.stringify(fr));
+            // Фаза 2 (R2): запись через шов projectSave (bump updatedAt).
+            projectSave(pid, 'engine', 'scheme.v1', fr);
             cStat('✓ Параметры сохранены в узел (применятся при загрузке Конструктора).', true);
           } catch (e) { cStat('Ошибка записи: ' + (e && e.message || e), false); }
         });
