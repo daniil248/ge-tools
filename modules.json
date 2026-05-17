@@ -654,6 +654,21 @@
       "kind": "calc-lib",
       "subscriptionPlan": "free",
       "internalOnly": false
+    },
+    {
+      "id": "gas-methods",
+      "name": "Методики газового расчёта",
+      "description": "Переиспользуемая библиотека газоснабжения (без UI): потери давления в газопроводе с авто-выбором режима (низкое ≤5 кПа — линейная; среднее/высокое — изотермическое сжимаемое P1²−P2²), пропускная способность (обратная задача с итерацией λ(Re)), свойства газов (природный/СУГ/воздух), шероховатости. Единый интерфейс { META, compute(input) }. Дисциплина gas (47.4.1). Третий из per-discipline движков X.4.1.",
+      "path": "lib/gas-methods/",
+      "icon": "amber",
+      "badge": "lib",
+      "requires": [],
+      "dbCollections": [],
+      "permissions": [],
+      "enabled": true,
+      "kind": "calc-lib",
+      "subscriptionPlan": "free",
+      "internalOnly": false
     }
   ]
 }
