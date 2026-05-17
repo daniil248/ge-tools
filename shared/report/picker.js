@@ -43,7 +43,12 @@ function ensureCss() {
 export function pickTemplate(opts = {}) {
   return new Promise((resolve) => {
     ensureCss();
-    const all = listTemplates();
+    // Базовые шаблоны (level==='base') — это только оформление
+    // (поля/колонтитулы/стили), у них нет своих блоков информации.
+    // Их нельзя выбирать для вывода отчёта напрямую: документ берёт
+    // их как наследуемую базу. В picker показываем ТОЛЬКО шаблоны
+    // документов.
+    const all = listTemplates().filter(t => !(t.template && t.template.level === 'base'));
     const tags = Array.isArray(opts.tags) ? opts.tags : null;
 
     // В picker показываем ВСЕГДА все шаблоны — чтобы пользователь мог

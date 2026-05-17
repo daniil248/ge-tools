@@ -487,7 +487,13 @@ function setFont(doc, s) {
 
 function drawText(doc, text, box, s, alignOverride) {
   setFont(doc, s);
-  const lines = doc.splitTextToSize(text || '', box.width);
+  // Перенос строк — ТОЙ ЖЕ функцией wrapCell, что использует пагинатор
+  // (estimateBlockHeight → wrapLines → wrapCell). Раньше тут был
+  // doc.splitTextToSize: его перенос отличался от оценщика, число строк
+  // расходилось, контент накапливал вертикальный сдвиг и наезжал на
+  // колонтитул (репорт Пользователя: «колонтитул на таблице наложен»).
+  // Единый источник переноса → раскладка PDF = расчёт пагинатора.
+  const lines = wrapCell(text || '', box.width, s);
   const lineH = ptToMm(s.size * s.lineHeight);
   const align = alignOverride || s.align || 'left';
   let x = box.x;
