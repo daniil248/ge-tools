@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.566', date: '2026-05-17', items: [
+      '🔎 <b>Фаза 4 аудит: точное состояние calc/ui-разделения</b>. Критерий «папка calc/» давал ложные сигналы — псевдо-монолиты по факту уже разделены старым паттерном module-core.js/lib: psychrometrics (psychrometrics-core.js + psy-calculators.js), suppression-config (calc вынесен в lib/suppression-methods), cable (js/methods + shared/calc-modules). Цель Фазы 4 (DOM-free reusable calc) по ним достигнута; переименование в calc/index.js — косметика с path-hazard, низкая ценность (ARCHITECTURE §1). Genuine остаток переплетённого calc+DOM (будущие фокус-инкременты по одному): battery(4296)/panel-config(1201)/mdc-config(943). catalog/projects/schematic — data/CRUD/canvas, чистого calc мало. ROADMAP X.1.4 синхронизирован: архитектурная цель Фазы 4 по основным расчётным модулям достигнута. Только документация.',
+    ] },
     { version: '0.60.565', date: '2026-05-17', items: [
       '📄 <b>Фаза 3 / 1.7 ЗАВЕРШЕНО: ups-config отчёт конфигурации ИБП → reports/ blocks[]</b>. _printUpsReport (172 строки direct-HTML window.open+document.write) → 146 строк blocks[]: h1/caption + 5 секций (h2 + table Параметр/Значение/Ед.) + 2 BOM-таблицы (ИБП-комплект, АКБ-комплект) + коэффициенты derate; pageBreak перед секцией АКБ; Report.createTemplate+exportPDF, динамический import shared/report (cache-safe). Вся data-логика сохранена 1:1, условные строки через .filter(Boolean). window.open(empty) в ups-config = 0. <b>Все 4 direct-HTML отчёта Фазы 3/1.7 мигрированы</b>: pdu-config (v0.60.562) + logistics (v0.60.563) + battery (v0.60.564) + ups-config (v0.60.565). Анти-паттерн window.open+захардкоженный HTML-документ в проекте устранён; отчёты только через reports/ blocks API (memory:reports_via_module).',
     ] },
