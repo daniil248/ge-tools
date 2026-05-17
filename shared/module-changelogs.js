@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.558', date: '2026-05-17', items: [
+      '🧱 <b>R2-финал, ДЕПЛОЙ A (cache-safe §6a): только export helper в shared</b>. В shared/project-storage.js добавлены projectPrefix(pid) и projectModulePrefix(pid,module) (через APP_NS; байт-идентичны прежним сырым префиксам). Потребители их ещё НЕ импортируют — поэтому деплой нерушим при любом edge-кэш-скью Pages (старые потребители новый символ не упоминают, остальное project-storage байт-в-байт). После полного распространения (curl голого URL отдаёт символ на всех PoP) — отдельный ДЕПЛОЙ B переключит 5 модулей (cooling/meteo/service/scs-design/scs-config) на helper + остаток full-key. Реализация правила, выведенного из инцидента v0.60.556→557.',
+    ] },
     { version: '0.60.557', date: '2026-05-17', items: [
       '↩️ <b>Откат v0.60.556 + правило cache-safe (CONTRIBUTING §6a)</b>. v0.60.556 добавил projectModulePrefix/projectPrefix в shared/project-storage.js И в том же деплое импортировал их из 5 модулей. В окне edge-кэша Fastly Pages (ключ=URL, PoP расходятся не синхронно) часть клиентов получала новый-потребитель + старый-shared → жёсткий SyntaxError does not provide an export named projectModulePrefix (рушит модуль; статический import мягким не сделать). Исходник был корректен (curl+cb-импорт байт-идентичны) — сбой транзиентный, но user-facing. Применена rollback-дисциплина плана: чистый git revert 0c3b13ef → все клиенты возвращены к рабочему v0.60.555. Зафиксировано системное правило: новый export в unversioned shared + немедленный импорт = ДВА деплоя (сначала export, ждать распространения; потом потребители). CONTRIBUTING §6a + memory feedback_cache_safe_exports. R2-финал будет переделан правильно (деплой A: только helper в shared; деплой B: 5 модулей).',
     ] },
