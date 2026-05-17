@@ -59,7 +59,9 @@ export function openTemplateEditor(tpl, opts = {}) {
   if (!Array.isArray(working.sections.hidden)) working.sections.hidden = [];
   if (!Array.isArray(working.sections.manifest)) working.sections.manifest = [];
 
-  const state = { tab: 'structure', sel: -1, zoom: 1 };
+  // Документ открывается на «Основе» (обязательный выбор базы),
+  // базовый — на «Колонтитулах». renderTabs всё равно подстрахует.
+  const state = { tab: working.level === 'base' ? 'chrome' : 'base', sel: -1, zoom: 1 };
 
   const backdrop = el('div', 'rpt-modal-backdrop');
   const modal = el('div', 'rpt-modal rpt-modal--canvas');
@@ -148,18 +150,21 @@ export function openTemplateEditor(tpl, opts = {}) {
   window.addEventListener('mousemove', onPanMove);
   window.addEventListener('mouseup', onPanUp);
 
-  const ALL_TABS = [
-    ['structure', 'Структура'],
-    ['sections',  'Разделы'],
-    ['chrome',    'Колонтитулы'],
-    ['floating',  'Слой'],
-    ['page',      'Лист'],
-    ['styles',    'Стили'],
-  ];
-  // Базовый шаблон = только chrome → без «Структуры»/«Разделов»/«Слоя».
-  const visibleTabs = () => working.level === 'base'
-    ? ALL_TABS.filter(([id]) => id !== 'structure' && id !== 'sections' && id !== 'floating')
-    : ALL_TABS;
+  const TAB_LABEL = {
+    base: 'Основа', structure: 'Структура', sections: 'Разделы',
+    chrome: 'Колонтитулы', floating: 'Слой', page: 'Лист', styles: 'Стили',
+  };
+  // Двухуровневая модель (требование Пользователя):
+  //  • БАЗОВЫЙ шаблон = только оформление: поля/размер страницы,
+  //    колонтитулы, стили. Никакого выбора «типа» (тип задаётся при
+  //    создании вкладкой Документы/Базовые) и никакой структуры.
+  //  • Шаблон ДОКУМЕНТА = выбор базового шаблона (обязателен — без
+  //    него нет оформления) + свой порядок блоков и разделы + слой.
+  //    Поля/колонтитулы/стили НЕ редактируются здесь — они из базы.
+  const visibleTabs = () => (working.level === 'base'
+    ? ['chrome', 'page', 'styles']
+    : ['base', 'structure', 'sections', 'floating']
+  ).map(id => [id, TAB_LABEL[id]]);
   const tabBtns = {};
   function renderTabs() {
     tabsEl.innerHTML = '';
@@ -219,7 +224,8 @@ export function openTemplateEditor(tpl, opts = {}) {
     renderTabs();
     for (const id of Object.keys(tabBtns)) tabBtns[id].classList.toggle('active', id === state.tab);
     tabContent.innerHTML = '';
-    if (state.tab === 'structure') buildStructure(tabContent);
+    if (state.tab === 'base') buildBase(tabContent);
+    else if (state.tab === 'structure') buildStructure(tabContent);
     else if (state.tab === 'sections') buildSections(tabContent);
     else if (state.tab === 'chrome') buildChrome(tabContent);
     else if (state.tab === 'floating') buildFloating(tabContent);
@@ -695,53 +701,73 @@ export function openTemplateEditor(tpl, opts = {}) {
   }
 
   // ——— Вкладка «Лист» ———
-  function buildPage(p) {
-    // ——— Тип шаблона (двухуровневая модель) ———
-    sect(p, 'Тип шаблона');
-    fld(p, 'Уровень', selectInput(
-      [['document', 'Документ (свой порядок блоков, наследует базу)'],
-       ['base', 'Базовый (только поля/колонтитулы/стили)']],
-      working.level || 'document', v => {
-        working.level = v;
-        if (v === 'base') working.baseTemplateId = null;
-        rebuild();
-      }));
-    if (working.level !== 'base') {
-      const baseFld = fld(p, 'Базовый шаблон', selectInput(
-        [['', '— без базы (свой chrome) —']],
-        working.baseTemplateId || '', null));
-      const sel = baseFld.querySelector('select');
-      sel.disabled = true;
-      import('../report-catalog.js').then(Cat => {
-        const bases = (Cat.listTemplates() || [])
-          .filter(t => t.template && t.template.level === 'base');
-        sel.innerHTML = '';
-        const o0 = document.createElement('option');
-        o0.value = ''; o0.textContent = '— без базы (свой chrome) —';
-        sel.appendChild(o0);
-        for (const t of bases) {
-          const o = document.createElement('option');
-          o.value = t.id; o.textContent = t.name;
-          sel.appendChild(o);
-        }
-        sel.value = working.baseTemplateId || '';
-        sel.disabled = false;
-        sel.addEventListener('change', () => {
-          working.baseTemplateId = sel.value || null;
-          if (working.baseTemplateId) {
-            try {
-              const b = Cat.getTemplate(working.baseTemplateId);
-              if (b && b.template) applyBaseChrome(working, b.template);
-            } catch (e) { /* ignore */ }
-          }
-          rebuild();
-        });
-      }).catch(() => { sel.disabled = false; });
-      const h = el('div', 'rpt-hint');
-      h.textContent = 'Документ наследует поля/колонтитулы/стили/обложку из базы. Ниже — те же значения (chrome из базы; здесь же можно посмотреть/локально править для предпросмотра).';
-      p.appendChild(h);
-    }
+  // ——— Вкладка «Основа» (только для шаблона ДОКУМЕНТА) ———
+  // Документ обязан ссылаться на базовый шаблон: из него берутся
+  // поля/размер/колонтитулы/стили/обложка. Без базы документ
+  // нерабочий — поэтому выбор обязателен и при отсутствии
+  // авто-подставляется первый доступный базовый.
+  function buildBase(p) {
+    sect(p, 'Базовый шаблон (обязателен)');
+    const hint = el('div', 'rpt-hint');
+    hint.textContent = 'Документ наследует поля, размер страницы, колонтитулы и стили из выбранного базового шаблона. Здесь — только выбор базы; сами поля/стили правятся в базовом шаблоне.';
+    p.appendChild(hint);
 
+    const warn = el('div', 'rpt-hint');
+    warn.style.cssText = 'color:#b91c1c;font-weight:600';
+
+    const baseFld = fld(p, 'База', selectInput([['', '— выберите базовый шаблон —']],
+      working.baseTemplateId || '', null));
+    const sel = baseFld.querySelector('select');
+    sel.disabled = true;
+    p.appendChild(warn);
+
+    const syncWarn = () => {
+      warn.style.color = working.baseTemplateId ? '#15803d' : '#b45309';
+      warn.textContent = working.baseTemplateId
+        ? '✓ Оформление наследуется из выбранной базы.'
+        : '⚠ База не выбрана — пока используется собственное оформление документа. Рекомендуется выбрать базовый шаблон.';
+    };
+    syncWarn();
+
+    import('../report-catalog.js').then(Cat => {
+      const bases = (Cat.listTemplates() || [])
+        .filter(t => t.template && t.template.level === 'base');
+      sel.innerHTML = '';
+      const o0 = document.createElement('option');
+      o0.value = ''; o0.textContent = '— выберите базовый шаблон —';
+      sel.appendChild(o0);
+      for (const t of bases) {
+        const o = document.createElement('option');
+        o.value = t.id; o.textContent = t.name;
+        sel.appendChild(o);
+      }
+      // Без авто-подстановки: произвольная база исказила бы
+      // оформление (напр. альбомная «Ведомость» сломала бы книжный
+      // «Инженерный отчёт»). База выбирается осознанно; до выбора
+      // документ использует собственное встроенное оформление.
+      sel.value = working.baseTemplateId || '';
+      sel.disabled = false;
+      syncWarn();
+      if (!bases.length) {
+        warn.textContent = '⚠ Базовых шаблонов нет. Создайте базовый шаблон во вкладке «Базовые».';
+      }
+      sel.addEventListener('change', () => {
+        working.baseTemplateId = sel.value || null;
+        if (working.baseTemplateId) {
+          try {
+            const b = Cat.getTemplate(working.baseTemplateId);
+            if (b && b.template) applyBaseChrome(working, b.template);
+          } catch (e) { /* ignore */ }
+        }
+        rebuild();
+      });
+    }).catch(() => { sel.disabled = false; });
+  }
+
+  // ——— Вкладка «Лист» (только для БАЗОВОГО шаблона) ———
+  // Тип шаблона здесь не выбирается: уровень задаётся при создании
+  // (вкладки Документы/Базовые). Базовый = поля/размер/стили/чрома.
+  function buildPage(p) {
     sect(p, 'Формат');
     const fmt = Object.keys(PAGE_SIZES).concat(['Custom']);
     fld(p, 'Размер', selectInput(fmt.map(f => [f, f]), working.page.format || 'A4',
