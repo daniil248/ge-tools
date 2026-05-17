@@ -14,7 +14,7 @@
 //   tpl.logo            → ImageRun в соответствующем колонтитуле
 // ======================================================================
 
-import { pageSizeMm, substitute, effectiveContent } from './template.js';
+import { pageSizeMm, substitute, effectiveFlow } from './template.js';
 
 const DOCX_URL = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.min.js';
 const FILE_SAVER_URL = 'https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js';
@@ -86,7 +86,7 @@ export async function exportDOCX(tpl, filename) {
       first:   tpl.footer.firstPage.enabled  ? new Footer({ children: blocksToDocx(tpl.footer.firstPage.blocks,  tpl, D, { first: true,  footer: true }) }) : undefined,
       default: tpl.footer.otherPages.enabled ? new Footer({ children: blocksToDocx(tpl.footer.otherPages.blocks, tpl, D, { first: false, footer: true }) }) : undefined,
     },
-    children: blocksToDocx(effectiveContent(tpl), tpl, D, {}),
+    children: blocksToDocx(effectiveFlow(tpl), tpl, D, {}),
   };
 
   // Overlay-зоны: DOCX не поддерживает свободное позиционирование

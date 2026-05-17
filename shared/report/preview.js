@@ -12,7 +12,7 @@
 // tpl.meta + ctx (дата, номер страницы / общее число страниц).
 // ======================================================================
 
-import { pageSizeMm, contentBox, substitute, overlaysForPage, effectiveContent } from './template.js';
+import { pageSizeMm, contentBox, substitute, overlaysForPage, effectiveFlow } from './template.js';
 
 /** Рендер всего шаблона в переданный контейнер. */
 export function renderPreview(tpl, container, opts = {}) {
@@ -56,7 +56,7 @@ export function paginate(tpl) {
 
   const availH = () => contentBox(tpl, pageIdx === 0).height;
 
-  for (const block of effectiveContent(tpl)) {
+  for (const block of effectiveFlow(tpl)) {
     if (block.type === 'pagebreak') {
       pushPage();
       continue;

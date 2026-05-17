@@ -497,22 +497,84 @@ export function migrateToFlow(tpl) {
 export function effectiveFlow(tpl) {
   const flow = Array.isArray(tpl?.flow) ? tpl.flow : [];
   if (!flow.length) return effectiveContent(tpl);
-  if (!flow.every(b => b && b.section)) return flow;
-  const sec = tpl.sections || {};
-  const hidden = new Set(Array.isArray(sec.hidden) ? sec.hidden : []);
-  const groups = new Map();
-  const natural = [];
-  for (const b of flow) {
-    if (!groups.has(b.section)) { groups.set(b.section, []); natural.push(b.section); }
-    groups.get(b.section).push(b);
+
+  // 1) порядок/видимость разделов (если поток полностью секционирован)
+  let ordered = flow;
+  if (flow.every(b => b && b.section)) {
+    const sec = tpl.sections || {};
+    const hidden = new Set(Array.isArray(sec.hidden) ? sec.hidden : []);
+    const groups = new Map();
+    const natural = [];
+    for (const b of flow) {
+      if (!groups.has(b.section)) { groups.set(b.section, []); natural.push(b.section); }
+      groups.get(b.section).push(b);
+    }
+    const wanted = Array.isArray(sec.order) && sec.order.length ? sec.order : natural;
+    const finalIds = [];
+    for (const id of wanted) if (groups.has(id) && !finalIds.includes(id)) finalIds.push(id);
+    for (const id of natural) if (!finalIds.includes(id)) finalIds.push(id);
+    ordered = [];
+    for (const id of finalIds) { if (hidden.has(id)) continue; ordered.push(...groups.get(id)); }
   }
-  const wanted = Array.isArray(sec.order) && sec.order.length ? sec.order : natural;
-  const finalIds = [];
-  for (const id of wanted) if (groups.has(id) && !finalIds.includes(id)) finalIds.push(id);
-  for (const id of natural) if (!finalIds.includes(id)) finalIds.push(id);
+
+  // 2) разворачиваем структурные блоки в базовые примитивы
+  // (heading/paragraph/list/image/...), которые умеют рендерить все
+  // три рендерера — без новых экспортов и без правок drawBlock.
   const out = [];
-  for (const id of finalIds) { if (hidden.has(id)) continue; out.push(...groups.get(id)); }
+  for (const b of ordered) {
+    if (b && STRUCT_FLOW_TYPES.has(b.type)) out.push(...expandStructural(b, tpl));
+    else out.push(b);
+  }
   return out;
+}
+
+/** Структурный flow-блок → массив базовых блоков. Текст со
+ *  {{плейсхолдерами}} резолвится здесь (meta/date; page/pages в
+ *  структурных не используются). section/sectionLabel наследуются. */
+function expandStructural(b, tpl) {
+  const sec = { section: b.section, sectionLabel: b.sectionLabel };
+  const S = (txt) => substitute(txt == null ? '' : txt, tpl, {});
+  const wrap = (o) => Object.assign(o, sec);
+  switch (b.type) {
+    case 'docTitle':
+      return [wrap({ type: 'heading', level: 1,
+        text: S(b.text || '{{meta.title}}'), align: b.align || 'left' })];
+    case 'companyInfo':
+      return [wrap({ type: 'paragraph', style: 'caption',
+        text: S(b.text || ''), align: b.align || 'left' })];
+    case 'addressee':
+      return [wrap({ type: 'paragraph',
+        text: S(b.text || ''), align: b.align || 'left' })];
+    case 'metaLine':
+      return [wrap({ type: 'paragraph', style: 'caption',
+        text: S(b.text || '{{date}}'), align: b.align || 'right' })];
+    case 'tocAuto': {
+      const items = (tpl.sections?.manifest || []).map(s => s.label);
+      const arr = [wrap({ type: 'heading', level: 2, text: b.title || 'Содержание' })];
+      if (items.length) arr.push(wrap({ type: 'list', ordered: false, items }));
+      return arr;
+    }
+    case 'signature': {
+      const arr = [wrap({ type: 'spacer', height: b.gap || 8 })];
+      const txt = b.text != null && b.text !== ''
+        ? b.text
+        : [b.role || 'Должность',
+           '_______________ / ' + (b.name || '') + ' /',
+           '«___» __________ 20__ г.' + (b.mp === false ? '' : '\nМ.П.')].join('\n');
+      arr.push(wrap({ type: 'paragraph', style: 'caption',
+        text: S(txt), align: b.align || 'left' }));
+      if (b.scanSrc) arr.push(wrap({ type: 'image', src: b.scanSrc,
+        width: b.width || 50, height: b.height || 20, align: b.align || 'left' }));
+      return arr;
+    }
+    case 'stamp':
+      return b.src
+        ? [wrap({ type: 'image', src: b.src, width: b.width || 38,
+            height: b.height || 38, align: b.align || 'left' })]
+        : [];
+    default:
+      return [b];
+  }
 }
 
 /** Подстановка плейсхолдеров {{meta.title}}, {{page}}, {{pages}}, {{date}}. */
