@@ -2,7 +2,7 @@
   "id": "service",
   "name": "Сервис: монтаж и ТО",
   "description": "Расчёт стоимости технического обслуживания и монтажных работ: формирование себестоимости и цены для клиента по нарядам (проектным или разовым), генерация КП. Импорт позиций из любого инженерного модуля.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -27,13 +27,23 @@
     "service"
   ],
   "dependsOnContracts": {
-    "storageKeys": [],
+    "storageKeys": [
+      "raschet.project.<pid>.service.orders.v1",
+      "raschet.project.<pid>.service.activeOrderId.v1",
+      "raschet.project.<pid>.service.currency.v1",
+      "raschet.project.<pid>.service.numberCounters.v1",
+      "raschet.service.standalone.*"
+    ],
     "events": {
       "emits": [],
       "consumes": []
     },
     "urlParams": [
-      "project"
+      "project",
+      "pid",
+      "standalone",
+      "return",
+      "navResult"
     ],
     "bridges": [
       "shared/service-bridge.js"

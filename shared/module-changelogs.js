@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.618', date: '2026-05-17', items: [
+      '📋 <b>Фаза 1: манифест service честный (dependsOnContracts по факту)</b>. apps/service/manifest.json: storageKeys был пуст — заполнен по service.js: 4 per-project ключа (raschet.project.&lt;pid&gt;.service.orders/activeOrderId/currency/numberCounters .v1) + raschet.service.standalone.*; urlParams дополнены (project/pid/standalone/return/navResult — service использует module-nav detectNavMode); bridges shared/service-bridge.js (фронт-мост, через который cooling/tech-workspace создают наряды) — оставлен; version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Четвёртый модуль ревизии (meteo v615, cooling v616, tech-workspace v617). Файл: apps/service/manifest.json.',
+    ] },
     { version: '0.60.617', date: '2026-05-17', items: [
       '📋 <b>Фаза 1: манифест tech-workspace честный (dependsOnContracts + bridges по факту)</b>. apps/tech-workspace/manifest.json: storageKeys дополнен по коду — owned (raschet.project.&lt;pid&gt;.tech-workspace.variants/activeVariantId/layoutMode/railOpenSec .v1) + фактические кросс-namespace контракты (write raschet.cooling.prefill.v1; write meteo.datasets/activeId при «Загрузить метео»; read cooling.selections/activeSelectionId для сводки; write engine.scheme.v1 при «Передать в проектирование»); urlParams +navResult (round-trip из cooling v0.60.614); bridges «scheme-rack-bridge» (устаревший/неиспользуемый — в коде нет ссылок) → реальный shared/service-bridge.js; version 1.0.0→1.1.0. Изменены ТОЛЬКО непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Документирует связи для Фазы 2 (burndown мостов). Третий модуль ревизии (meteo v615, cooling v616). Файл: apps/tech-workspace/manifest.json.',
     ] },
