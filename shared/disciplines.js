@@ -91,3 +91,49 @@ export function calcLibSpecifier(id) {
 
 /** id дисциплины по умолчанию (== CORE serialization default). */
 export const DEFAULT_DISCIPLINE = 'electrical';
+
+/* -------------------------------------------------------------------------
+   X.4.2 — членство узла в дисциплинах (cross-discipline node).
+   Контракт: узел МОЖЕТ нести опциональный массив `node.disciplines`
+   (id-строки). Поле аддитивно и сохраняется в проекте «бесплатно»
+   (serialization.stripRuntime пропускает любые не-`_` поля → round-trip
+   без миграции). Если поля нет/пусто — узел принадлежит дисциплине
+   проекта (как было до 47.4.1). НИКАКОЙ авто-записи: отсутствие поля
+   ≠ ошибка (см. memory: user-params-sacred, typeof-guard).
+   ------------------------------------------------------------------------- */
+
+/** Нормализовать сырой список id → только известные, без дублей. */
+function _sanitizeIds(arr) {
+  if (!Array.isArray(arr)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const x of arr) {
+    const id = typeof x === 'string' ? x : '';
+    if (id && _byId[id] && !seen.has(id)) { seen.add(id); out.push(id); }
+  }
+  return out;
+}
+
+/**
+ * Эффективное членство узла в дисциплинах.
+ * @param {object} node             узел схемы (может быть null)
+ * @param {string} projectDiscipline текущая дисциплина проекта
+ * @returns {string[]} непустой список id (fallback — [project|electrical])
+ */
+export function nodeDisciplines(node, projectDiscipline) {
+  const explicit = _sanitizeIds(node && node.disciplines);
+  if (explicit.length) return explicit;
+  const base = (typeof projectDiscipline === 'string' && _byId[projectDiscipline])
+    ? projectDiscipline : DEFAULT_DISCIPLINE;
+  return [base];
+}
+
+/** Принадлежит ли узел дисциплине (с учётом fallback на проект). */
+export function isNodeInDiscipline(node, disciplineId, projectDiscipline) {
+  return nodeDisciplines(node, projectDiscipline).includes(disciplineId);
+}
+
+/** true → узел явно мультидисциплинарный (членство в ≥2 дисциплинах). */
+export function isMultiDiscipline(node) {
+  return _sanitizeIds(node && node.disciplines).length >= 2;
+}
