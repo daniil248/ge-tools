@@ -4626,6 +4626,19 @@ function renderProjectBadge() {
       location.href = url.toString();
     });
   }
+  // Ф-F1b (X.4.5.3 §5.1): read-only индикатор дисциплины-контекста.
+  // СКС работает в дисциплине `data` единого Конструктора. Только
+  // индикатор: движок (компоновка/контент/матрица) и владение
+  // СКС-данными НЕ затронуты (§5.1 — оболочка, не движок).
+  // Идемпотентно: вставляем один раз соседом #sc-project-badge.
+  if (el && !document.getElementById('sc-disc-ctx')) {
+    const d = document.createElement('div');
+    d.id = 'sc-disc-ctx';
+    d.className = 'sc-disc-ctx';
+    d.title = 'Этот модуль работает в дисциплине «СКС / слаботочка» (data) единого Конструктора схем. Индикатор только для координации — компоновка шкафа, контент, матрица и владение СКС-данными не изменены (контракт §5.1).';
+    d.innerHTML = '🔌 Контекст: <b>СКС / слаботочка</b> <span style="opacity:.65">· дисциплина data · только индикатор</span>';
+    el.insertAdjacentElement('afterend', d);
+  }
 }
 
 function init() {

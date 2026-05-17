@@ -413,3 +413,10 @@ tr.rl-draft { background: #fffbeb; }
 tr.rl-draft:hover { background: #fef3c7; }
 tr.rl-draft td { color: #78716c; }
 .sc-err { border-color: #ef4444 !important; background: #fee2e2 !important; }
+/* Ф-F1b (§5.1): read-only индикатор дисциплины-контекста (СКС=data). */
+.sc-disc-ctx {
+  padding: 5px 12px; margin: 6px 0 10px; border-radius: 8px;
+  background: #0e1726; border: 1px solid #1e3a5f; color: #93c5fd;
+  font-size: 12px; display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}

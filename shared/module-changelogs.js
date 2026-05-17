@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.735', date: '2026-05-18', items: [
+      '📐 <b>Конструктор/дисциплины — Ф-F1b: read-only индикатор дисциплины-контекста в scs-config (X.4.5.3 §5.1)</b>. apps/scs-config/scs-config.js renderProjectBadge() +идемпотентная вставка бейджа #sc-disc-ctx соседом #sc-project-badge: «🔌 Контекст: СКС / слаботочка · data · только индикатор» + tooltip; +.sc-disc-ctx CSS. Идемпотентно (guard по id, не дублируется на rerender). <b>0 изменений движка</b>: компоновка шкафа/контент/матрица/превью и владение СКС-данными НЕ затронуты (контракт §5.1 — оболочка, не движок). Парный к Ф-F1 (scs-design). Файлы: apps/scs-config/scs-config.js, apps/scs-config/scs-config.css, shared/module-changelogs.js, ROADMAP.md, js/engine/constants.js.',
+    ] },
     { version: '0.60.734', date: '2026-05-18', items: [
       '📐 <b>Конструктор/дисциплины — Ф-F1: read-only индикатор дисциплины-контекста в scs-design (X.4.5.3 §5.1)</b>. apps/scs-design/index.html +статичный бейдж под project-bar: «🔌 Контекст: СКС / слаботочка · дисциплина data · только индикатор» + tooltip-пояснение. Чисто HTML+CSS (новый класс .sd-disc-ctx в scs-design.css), <b>0 JS, 0 поведенческих изменений движка</b>: «План зала»/связи/авто-раскладка/длины и владение СКС-данными НЕ затронуты (контракт §5.1 — оболочка, не движок). Самый низкорисковый инкремент Ф-F. scs-config (тонкая HTML-оболочка, UI строит JS) — следующим ходом через JS-корень. Файлы: apps/scs-design/index.html, apps/scs-design/scs-design.css, shared/module-changelogs.js, ROADMAP.md, js/engine/constants.js.',
     ] },
