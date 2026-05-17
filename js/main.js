@@ -30,6 +30,11 @@ import {
 } from '../shared/table-presets.js';
 import { listProjects as _listProjectCtx, createProject as _createProjectCtx, projectKey } from '../shared/project-storage.js';
 import { state as _engineState } from './engine/state.js';
+// D3 X.4.5.3 Inc.2: Конструктор читает реестр контекст-палитр по
+// state.project.discipline. Электро-контекст (сентинел) =
+// #palette-sections БЕЗ изменений (регрессия-сейф). Прочие — scaffold-
+// превью (display-toggle, обратимо). CORE/constructor→shared разрешён.
+import { getContext, usesCurrentPalette } from '../shared/discipline-context.js';
 import { selectNode as _engineSelectNode } from './engine/inspector.js';
 
 (function () {
@@ -2756,6 +2761,53 @@ function presetDisplayName(p) {
 
 // Рендер пресетов в левой палитре по type-секциям.
 // Базовые пресеты + пользовательские (PRESETS из presets.js)
+// D3 X.4.5.3 Inc.2 (v0.60.603): индикатор контекста дисциплины в
+// палитре Конструктора + обратимое scaffold-превью. ИНВАРИАНТ: для
+// electrical (сентинел CURRENT_ELECTRICAL_PALETTE) #palette-sections
+// НЕ трогаем (display не меняем) — нулевая регрессия для всех реальных
+// проектов. Для не-electrical (scaffold; реальных проектов нет) —
+// скрываем #palette-sections (display:none, обратимо) и показываем
+// read-only scaffold-палитру из реестра. Идемпотентно.
+function applyDisciplineContextUI() {
+  const pal = document.getElementById('palette');
+  if (!pal) return;
+  const disc = (_engineState.project && _engineState.project.discipline) || 'electrical';
+  const ctx = getContext(disc);
+  let bar = document.getElementById('rs-disc-ctx');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'rs-disc-ctx';
+    bar.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 10px;font-size:11.5px;border-bottom:1px solid #e5e7eb;background:#f8fafc;color:#475569;flex:0 0 auto';
+    pal.insertBefore(bar, pal.firstChild);
+  }
+  bar.innerHTML = `<span title="Контекст Конструктора по дисциплине проекта (свойства проекта → Дисциплина схемы). Электро-контекст = текущая палитра без изменений; прочие дисциплины — каркас (в разработке).">${ctx.icon} <b>${escHtml(ctx.label)}</b>${ctx.status === 'scaffold' ? ' · <span style="color:#b45309">каркас</span>' : ''}</span>`;
+  const sections = document.getElementById('palette-sections');
+  let scaffold = document.getElementById('rs-scaffold-palette');
+  if (usesCurrentPalette(disc)) {
+    // ЭЛЕКТРИКА: ничего не трогаем (только бейдж сверху).
+    if (sections && sections.style.display === 'none') sections.style.display = '';
+    if (scaffold) scaffold.style.display = 'none';
+    return;
+  }
+  if (!scaffold) {
+    scaffold = document.createElement('div');
+    scaffold.id = 'rs-scaffold-palette';
+    scaffold.style.cssText = 'padding:8px 10px;font-size:12px;overflow:auto';
+    if (sections && sections.parentNode) sections.parentNode.insertBefore(scaffold, sections.nextSibling);
+    else pal.appendChild(scaffold);
+  }
+  const groups = Array.isArray(ctx.palette) ? ctx.palette : [];
+  scaffold.innerHTML =
+    `<div style="color:#b45309;font-size:11px;margin-bottom:8px;line-height:1.5">Палитра «${escHtml(ctx.label)}» — <b>каркас</b>. Инструменты этой дисциплины ещё не разведены; редактор схем работает в электро-контексте. Палитра ниже — превью набора (D3, ROADMAP X.4.5.3).</div>` +
+    groups.map(g =>
+      `<div style="margin:8px 0"><div style="font-weight:600;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px">${escHtml(g.group)}</div>` +
+      (g.items || []).map(it =>
+        `<div class="pal-item" style="opacity:.65;cursor:not-allowed;padding:4px 6px" title="каркас — инструмент в разработке (D3)"><span style="display:inline-block;width:1.4em">${it.icon || '•'}</span>${escHtml(it.label)}</div>`).join('') +
+      `</div>`).join('');
+  if (sections) sections.style.display = 'none';
+  scaffold.style.display = '';
+}
+
 function renderPalettePresets() {
   if (!window.Presets) return;
   const presets = window.Presets.all || [];
@@ -3200,6 +3252,7 @@ function editPresetViaModal(preset) {
     if (typeof renderPalettePresets === 'function') {
       renderPalettePresets();
     }
+    try { applyDisciplineContextUI(); } catch (e) { console.warn('[applyDisciplineContextUI]', e); }
     flash('Параметры обновлены');
     R._presetEditCallback = null;
   };
@@ -8902,6 +8955,7 @@ async function init() {
   // Рендер библиотечных пресетов в палитру + поиск + ресайз
   // Каждый вызов в try/catch — одиночный сбой не должен ломать всю инициализацию.
   try { renderPalettePresets(); } catch (e) { console.warn('[renderPalettePresets]', e); }
+  try { applyDisciplineContextUI(); } catch (e) { console.warn('[applyDisciplineContextUI]', e); }
   try { wirePaletteSearch(); } catch (e) { console.warn('[wirePaletteSearch]', e); }
   try { wirePaletteResizer(); } catch (e) { console.warn('[wirePaletteResizer]', e); }
   if (els.btnOpenPresets) els.btnOpenPresets.addEventListener('click', openPresetsModal);
