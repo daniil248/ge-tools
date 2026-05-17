@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.683', date: '2026-05-17', items: [
+      '🧩 <b>Двухуровневые шаблоны — B1b+B2: подключение базы + редактор</b>. compose.js: после createTemplate, если у шаблона задан baseTemplateId — грузит базу из report-catalog и applyBaseChrome (документ наследует поля/колонтитулы/стили/логотип/обложку базы); без базы — no-op (нулевая регрессия). editor.js: вкладка «Лист» → секция «Тип шаблона» — селектор уровня (Документ / Базовый) и для документа дропдаун «Базовый шаблон» (список шаблонов с level базовый из каталога, смена → подхват chrome + перерисовка превью). Базовый уровень скрывает вкладки «Структура»/«Слой» (база = только chrome); набор вкладок строится динамически по уровню (renderTabs). applyBaseChrome на edge с B1a. changelog-lint проверен по exit-коду без маски (после P0). Файлы: shared/report/compose.js, editor.js.',
+    ] },
     { version: '0.60.682', date: '2026-05-17', items: [
       '🚑 <b>HOTFIX changelog-escaping (P0, site-wide footer)</b>. В записи v0.60.681 были сырые апострофы «document»/«base» в JS-строке changelog → ранний обрыв строки → SyntaxError парсинга shared/module-changelogs.js → падение динамического импорта футера на ВСЕХ страницах (маскируется edge-кэшем; инцидент-класс memory feedback_changelog_escaping). Причина пропуска: команда деплоя использовала changelog-lint.py | tail -1, что маскировало exit 1 (lint фактически FAIL). Исправлено: апострофы → «ёлочки», changelog-lint EXIT=0 проверен БЕЗ маски. Впредь запускать changelog-lint без | tail (или с проверкой $?). Файл: shared/module-changelogs.js.',
     ] },

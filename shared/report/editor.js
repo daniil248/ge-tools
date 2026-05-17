@@ -12,7 +12,7 @@
 //   openTemplateEditor(tpl, { onSave(newTpl){...}, onCancel(){...} });
 // ======================================================================
 
-import { PAGE_SIZES, FONT_FAMILIES, createTemplate, pageSizeMm, migrateToFlow }
+import { PAGE_SIZES, FONT_FAMILIES, createTemplate, pageSizeMm, migrateToFlow, applyBaseChrome }
   from './template.js';
 import { renderPreview } from './preview.js';
 
@@ -119,24 +119,45 @@ export function openTemplateEditor(tpl, opts = {}) {
     setZoom(state.zoom + (ev.deltaY < 0 ? 0.1 : -0.1));
   }, { passive: false });
 
-  const TABS = [
+  const ALL_TABS = [
     ['structure', 'Структура'],
     ['chrome',    'Колонтитулы'],
     ['floating',  'Слой'],
     ['page',      'Лист'],
     ['styles',    'Стили'],
   ];
+  // Базовый шаблон = только chrome → без «Структуры»/«Слоя».
+  const visibleTabs = () => working.level === 'base'
+    ? ALL_TABS.filter(([id]) => id !== 'structure' && id !== 'floating')
+    : ALL_TABS;
   const tabBtns = {};
-  for (const [id, label] of TABS) {
-    const b = btn(label);
-    b.className = '';
-    b.addEventListener('click', () => { state.tab = id; rebuild(); });
-    tabBtns[id] = b;
-    tabsEl.appendChild(b);
+  function renderTabs() {
+    tabsEl.innerHTML = '';
+    for (const k of Object.keys(tabBtns)) delete tabBtns[k];
+    const vis = visibleTabs();
+    if (!vis.some(([id]) => id === state.tab)) state.tab = vis[0][0];
+    for (const [id, label] of vis) {
+      const b = btn(label);
+      b.className = '';
+      b.addEventListener('click', () => { state.tab = id; rebuild(); });
+      tabBtns[id] = b;
+      tabsEl.appendChild(b);
+    }
   }
 
   document.body.appendChild(backdrop);
   rebuild();
+
+  // Двухуровневая модель: документ наследует chrome базы (превью
+  // отражает реальную геометрию/колонтитулы/стили базы).
+  if (working.baseTemplateId) {
+    import('../report-catalog.js').then(Cat => {
+      try {
+        const b = Cat.getTemplate(working.baseTemplateId);
+        if (b && b.template) { applyBaseChrome(working, b.template); rebuild(); }
+      } catch (e) { /* база недоступна */ }
+    }).catch(() => {});
+  }
 
   const close = (save) => {
     backdrop.remove();
@@ -159,7 +180,8 @@ export function openTemplateEditor(tpl, opts = {}) {
 
   // ——————————————————————————————————————————————————————
   function rebuild() {
-    for (const [id] of TABS) tabBtns[id].classList.toggle('active', id === state.tab);
+    renderTabs();
+    for (const id of Object.keys(tabBtns)) tabBtns[id].classList.toggle('active', id === state.tab);
     tabContent.innerHTML = '';
     if (state.tab === 'structure') buildStructure(tabContent);
     else if (state.tab === 'chrome') buildChrome(tabContent);
@@ -506,6 +528,52 @@ export function openTemplateEditor(tpl, opts = {}) {
 
   // ——— Вкладка «Лист» ———
   function buildPage(p) {
+    // ——— Тип шаблона (двухуровневая модель) ———
+    sect(p, 'Тип шаблона');
+    fld(p, 'Уровень', selectInput(
+      [['document', 'Документ (свой порядок блоков, наследует базу)'],
+       ['base', 'Базовый (только поля/колонтитулы/стили)']],
+      working.level || 'document', v => {
+        working.level = v;
+        if (v === 'base') working.baseTemplateId = null;
+        rebuild();
+      }));
+    if (working.level !== 'base') {
+      const baseFld = fld(p, 'Базовый шаблон', selectInput(
+        [['', '— без базы (свой chrome) —']],
+        working.baseTemplateId || '', null));
+      const sel = baseFld.querySelector('select');
+      sel.disabled = true;
+      import('../report-catalog.js').then(Cat => {
+        const bases = (Cat.listTemplates() || [])
+          .filter(t => t.template && t.template.level === 'base');
+        sel.innerHTML = '';
+        const o0 = document.createElement('option');
+        o0.value = ''; o0.textContent = '— без базы (свой chrome) —';
+        sel.appendChild(o0);
+        for (const t of bases) {
+          const o = document.createElement('option');
+          o.value = t.id; o.textContent = t.name;
+          sel.appendChild(o);
+        }
+        sel.value = working.baseTemplateId || '';
+        sel.disabled = false;
+        sel.addEventListener('change', () => {
+          working.baseTemplateId = sel.value || null;
+          if (working.baseTemplateId) {
+            try {
+              const b = Cat.getTemplate(working.baseTemplateId);
+              if (b && b.template) applyBaseChrome(working, b.template);
+            } catch (e) { /* ignore */ }
+          }
+          rebuild();
+        });
+      }).catch(() => { sel.disabled = false; });
+      const h = el('div', 'rpt-hint');
+      h.textContent = 'Документ наследует поля/колонтитулы/стили/обложку из базы. Ниже — те же значения (chrome из базы; здесь же можно посмотреть/локально править для предпросмотра).';
+      p.appendChild(h);
+    }
+
     sect(p, 'Формат');
     const fmt = Object.keys(PAGE_SIZES).concat(['Custom']);
     fld(p, 'Размер', selectInput(fmt.map(f => [f, f]), working.page.format || 'A4',

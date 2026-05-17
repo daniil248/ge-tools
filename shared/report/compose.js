@@ -30,7 +30,7 @@ export async function composeReport(opts = {}) {
 
   const Report = await import('./index.js');
   const B      = await import('./blocks.js');
-  const { migrateToFlow } = await import('./template.js');
+  const { migrateToFlow, applyBaseChrome } = await import('./template.js');
 
   let rec = null;
   if (Array.isArray(tags) && tags.length) {
@@ -42,6 +42,16 @@ export async function composeReport(opts = {}) {
   }
 
   const tpl = Report.createTemplate(rec ? rec.template : {});
+  // Двухуровневая модель: документный шаблон наследует chrome
+  // (поля/колонтитулы/стили/логотип/обложка) из базового по
+  // baseTemplateId. Без baseTemplateId — no-op (нулевая регрессия).
+  if (tpl.baseTemplateId) {
+    try {
+      const Cat = await import('../report-catalog.js');
+      const base = Cat.getTemplate(tpl.baseTemplateId);
+      if (base && base.template) applyBaseChrome(tpl, base.template);
+    } catch (e) { /* база недоступна — рендерим как есть */ }
+  }
   tpl.meta = {
     ...(tpl.meta || {}),
     ...(title  ? { title }  : {}),
