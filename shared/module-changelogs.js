@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.561', date: '2026-05-17', items: [
+      '📋 <b>Фаза 3 аудит: точное состояние reports/catalogs/history</b>. ROADMAP 1.6/1.7/1.8 синхронизированы с реальностью (план устарел): 1.6 history-log append-only+soft-delete ✅ ПЛАТФОРМЕННО (shared/history-log.js полный API: append/list/trash/restore/purge/clear/size/stats); 1.8 WORK_TEMPLATES ✅ уже вынесен в apps/service/catalog/work-templates.js (re-export shim, @deprecated v0.60.36); 1.7 Service export-offer ✅ мигрирован (v0.60.26 blocks API), SCS-BOM/TW-PUE прямого HTML не имеют. Остаток 1.7 (genuine direct-HTML window.open document.write анти-паттерн): battery-calc.js:3787, logistics.js:222, pdu-config.js:637, ups-config.js:2221 — мигрировать в reports/ blocks[] по одному с визуальным diff-парити. Только документация.',
+    ] },
     { version: '0.60.560', date: '2026-05-17', items: [
       '✅ <b>Фаза 2 / R2 ЗАКРЫТО полностью (бриджи проверены)</b>. Скан всех shared/*-bridge.js + legacy-rack-migration: 0 raw raschet.project/sketch литералов — все проектные ключи через projectKey (scheme-rack/service/inventory/meteo/catalog/legacy все импортируют project-storage helper). Остаток raschet.* = санкционированные НЕ-проектные глобальные неймспейсы: catalog-bridge storage-event prefix (raschet.<X>Catalog, глобальные каталоги), service-bridge raschet.service.standalone (standalone-режим), legacy-rack-migration FLAG raschet.legacy-rack-migration.v3 (одноразовый флаг) — это не foreign-project LS, не R2. Итог Фазы 2 R2: project.js 36 + батч 18 + финал 9 = 63 сырых доступа погашены + бриджи чисты. lint-allowlist.json / contracts/README.md §5 / ROADMAP X.1.3 синхронизированы: R2 ЗАКРЫТО, готово к graduation advisory→enforced (CI, Фаза F). Только документация/контракт-метаданные.',
     ] },
