@@ -136,7 +136,31 @@ export async function openOfferPreview(order, displayCurrency, convertFn, opts =
   tpl.sections.manifest = Report.sectionManifestFromContent(content);
   if (!Array.isArray(tpl.sections.order))  tpl.sections.order  = [];
   if (!Array.isArray(tpl.sections.hidden)) tpl.sections.hidden = [];
+  await persistPickedManifest(rec.id, tpl.sections.manifest);
 
   const fname = `kp-${(order.id || 'order').replace(/[^\w-]+/g, '_')}.pdf`;
   await Report.previewPDF(tpl, fname);
+}
+
+// Записывает состав разделов КП в выбранный шаблон каталога — чтобы
+// standalone-редактор «Разделы» был сразу заполнен, а порядок/
+// видимость применялись при следующих генерациях. Идемпотентно,
+// order/hidden шаблона не трогаем. Использует уже задеплоенный
+// shared/report-catalog.js (без новых экспортов — cache-safe).
+async function persistPickedManifest(recId, manifest) {
+  if (!recId) return;
+  try {
+    const Cat = await import('shared/report-catalog.js');
+    const stored = Cat.getTemplate(recId);
+    if (!stored) return;
+    const cur = stored.template?.sections?.manifest || [];
+    if (JSON.stringify(cur) === JSON.stringify(manifest)) return;
+    const t = stored.template || {};
+    t.sections = {
+      order:  Array.isArray(t.sections?.order)  ? t.sections.order  : [],
+      hidden: Array.isArray(t.sections?.hidden) ? t.sections.hidden : [],
+      manifest,
+    };
+    Cat.saveTemplate({ ...stored, template: t });
+  } catch (e) { /* персист опционален — не блокируем КП */ }
 }

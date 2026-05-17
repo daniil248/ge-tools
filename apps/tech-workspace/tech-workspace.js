@@ -5199,6 +5199,30 @@ function tagReportSections(blocks) {
   return blocks;
 }
 
+// Записывает состав разделов в выбранный шаблон каталога — чтобы
+// standalone-редактор «Разделы» был сразу заполнен, а заданный
+// пользователем порядок/видимость применялись при следующих
+// генерациях. Идемпотентно (пишем только при изменении), order/
+// hidden сохранённого шаблона не трогаем. Использует уже задеплоенный
+// shared/report-catalog.js (без новых экспортов — cache-safe).
+async function persistPickedManifest(recId, manifest) {
+  if (!recId) return;
+  try {
+    const Cat = await import('shared/report-catalog.js');
+    const stored = Cat.getTemplate(recId);
+    if (!stored) return;
+    const cur = stored.template?.sections?.manifest || [];
+    if (JSON.stringify(cur) === JSON.stringify(manifest)) return;
+    const t = stored.template || {};
+    t.sections = {
+      order:  Array.isArray(t.sections?.order)  ? t.sections.order  : [],
+      hidden: Array.isArray(t.sections?.hidden) ? t.sections.hidden : [],
+      manifest,
+    };
+    Cat.saveTemplate({ ...stored, template: t });
+  } catch (e) { /* персист опционален — не блокируем отчёт */ }
+}
+
 function bindReport() {
   const btn = $('tw-report');
   if (!btn) return;
@@ -5233,6 +5257,7 @@ function bindReport() {
       tpl.sections.manifest = Report.sectionManifestFromContent(blocks);
       if (!Array.isArray(tpl.sections.order))  tpl.sections.order  = [];
       if (!Array.isArray(tpl.sections.hidden)) tpl.sections.hidden = [];
+      await persistPickedManifest(rec.id, tpl.sections.manifest);
       twToast('📄 Открываю предпросмотр пояснительной записки…', 'info');
       await Report.previewPDF(tpl);
     } catch (e) {
