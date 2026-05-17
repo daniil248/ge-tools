@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.658', date: '2026-05-17', items: [
+      '🏗 <b>Редизайн отчётов — R5d: клиентское КП (service/export-offer) на единый flow</b>. Тот же паттерн, что для ТЗ (R5a-c): openOfferPreview импортирует shared/report/template.js, после createTemplate(rec.template)+tpl.content=buildOfferBlocks вызывает Tpl.migrateToFlow(tpl) → структура выбранного шаблона (заголовок/адресат/реквизиты) сворачивается в ПОТОК (нет наложения на тело КП), печать/скан-подпись → floating с привязкой к подписанту, колонтитул-номер остаётся overlay в полях, структурные overlay съедены (R5c). sections.manifest строится из tpl.flow. Импорт template.js напрямую (migrateToFlow на edge с R1 — cache-safe). Логика идентична верифицированному end-to-end ТЗ-паттерну. Файл: apps/service/calc/export-offer.js (openOfferPreview → migrateToFlow).',
+    ] },
     { version: '0.60.657', date: '2026-05-17', items: [
       '🩹 <b>Редизайн отчётов — R5c: migrateToFlow съедает структурные overlay (фикс дубля/наложения)</b>. Диагностика in-page: после R5b flow корректен (1 docTitle+1 addressee), НО tpl.overlays сохранял исходные структурные overlay, и drawOverlays рисовал их absolute ПОВЕРХ потока → заголовок/адресат двоились и наложение возвращалось легаси-путём. Фикс: migrateToFlow теперь перезаписывает tpl.overlays, оставляя ТОЛЬКО колонтитулы (page-number/{{pages}}) — структурные overlay съедены потоком, drawOverlays больше их не дублирует. Инвариант соблюдён: за поля печати absolute остаются лишь колонтитулы; структура — в потоке. Файл: shared/report/template.js (migrateToFlow: keptOverlays → tpl.overlays).',
     ] },

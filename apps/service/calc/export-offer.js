@@ -108,10 +108,11 @@ export function buildOfferBlocks(order, displayCurrency = '₽', convertFn = nul
  * шаблона.
  */
 export async function openOfferPreview(order, displayCurrency, convertFn, opts = {}) {
-  let Report, blocks;
+  let Report, blocks, Tpl;
   try {
     Report = await import('shared/report/index.js');
     blocks = await import('shared/report/blocks.js');
+    Tpl    = await import('shared/report/template.js');
   } catch (e) {
     throw new Error('Не удалось загрузить модуль отчётов: ' + e.message);
   }
@@ -132,8 +133,12 @@ export async function openOfferPreview(order, displayCurrency, convertFn, opts =
   };
   const content = buildOfferBlocks(order, displayCurrency, convertFn, { ...opts, blocks });
   tpl.content = content;
+  // Редизайн: единый поток (структура шаблона + тело КП в одном
+  // flow → нет наложения; печать/подпись → floating с привязкой к
+  // подписанту; колонтитул-номер остаётся overlay в полях).
+  Tpl.migrateToFlow(tpl);
   if (!tpl.sections || typeof tpl.sections !== 'object') tpl.sections = {};
-  tpl.sections.manifest = Report.sectionManifestFromContent(content);
+  tpl.sections.manifest = Report.sectionManifestFromContent(tpl.flow);
   if (!Array.isArray(tpl.sections.order))  tpl.sections.order  = [];
   if (!Array.isArray(tpl.sections.hidden)) tpl.sections.hidden = [];
   await persistPickedManifest(rec.id, tpl.sections.manifest);
