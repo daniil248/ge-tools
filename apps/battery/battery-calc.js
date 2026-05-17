@@ -2334,6 +2334,29 @@ function doCalc() {
     : (Number(get('calc-target')?.value) || 10);
   const capacityAh = Number(get('calc-capAh').value) || 100;
 
+  // v0.60.612 (репорт Пользователя: литиевый вариант считался с VRLA
+  // k_age=1.25 и показывал VRLA-пресеты/текст «VRLA требует замены ~5
+  // лет»). Причина: авто-пресет дерейтинга срабатывал только при ВЫБОРЕ
+  // модели из каталога; при восстановлении сохранённого варианта /
+  // standalone S³ форма оставалась с дефолтом IEEE 485 (VRLA), и литиевая
+  // система считалась с VRLA-коэффициентами. Гарантируем соответствие
+  // дерейтинга ЭФФЕКТИВНОЙ химии перед чтением коэффициентов. Тот же
+  // guard _lastAutoDerateChemistry: срабатывает только при СМЕНЕ химии,
+  // ручные правки в пределах одной химии не перетираются.
+  {
+    const _ch = String((battery && battery.chemistry) || chemistry || '').toLowerCase();
+    const _eff = /li|lfp|nmc|lto|ион/.test(_ch) ? 'li-ion'
+      : /nicd|ni-cd|никель/.test(_ch) ? 'nicd' : 'vrla';
+    if (_eff !== _lastAutoDerateChemistry) {
+      _lastAutoDerateChemistry = _eff;
+      if (_eff === 'li-ion') _applyDeratingPreset('lfp');
+      else if (_eff === 'vrla') _applyDeratingPreset('ieee485');
+      const _bl = document.getElementById('calc-batt-life');
+      if (_bl) _bl.value = _defaultBattLife(_eff);
+    }
+    _refreshDerateLabel();
+  }
+
   // v0.59.417: S³-модуль идёт по отдельной ветке через ЕДИНЫЙ shared-модуль
   // (тот же, что в инспекторе ИБП). Авто-N=maxPerCabinet, авто-C по мощности.
   if (battery && isS3Module(battery)) {
@@ -2570,6 +2593,19 @@ function doCalc() {
     _lcRefreshLabel();
     const lc = _calcLifecycle({ designLife, battLife, chemistry, setCost: _lct.setCost, currency: _lcState.currency });
     html += _lifecycleHtml(lc);
+    // v0.60.612: подпись «Жизненный цикл» — по ЭФФЕКТИВНОЙ химии (была
+    // зашита «VRLA требует замены каждые ~5 лет» при любой химии).
+    {
+      const _n = document.getElementById('calc-lc-chem-note');
+      if (_n) {
+        const _c = String(chemistry || '').toLowerCase();
+        _n.textContent = /li|lfp|nmc|lto|ион/.test(_c)
+          ? `· Li-ion/LFP: ~${battLife} лет, замена обычно не требуется`
+          : /nicd|ni-cd|никель/.test(_c)
+            ? `· NiCd: ~${battLife} лет`
+            : `· VRLA: замена ~каждые ${battLife} лет`;
+      }
+    }
   }
   // Контейнер для графика разряда с отметкой рассчитанной точки
   html += `<div class="result-block" style="margin-top:14px"><div class="result-title" style="margin-bottom:8px">График разряда АКБ</div><div id="calc-chart-mount" style="background:#fafbfc;border:1px solid #e0e3ea;border-radius:6px;padding:12px"></div><div class="muted" style="font-size:11px;margin-top:6px">Красный маркер — рассчитанная рабочая точка (мощность на блок и время разряда). Оранжевый — экстраполированная (за пределами таблицы производителя).</div></div>`;
