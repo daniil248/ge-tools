@@ -2,7 +2,7 @@
   "id": "meteo",
   "name": "Метеоданные",
   "description": "Stand-alone модуль метеоданных: хранит наборы почасовых метеоизмерений («датасеты») внутри активного проекта, загрузка из источников (Open-Meteo, ASHRAE, RP5, CSV), графики и годовые таблицы.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -17,9 +17,16 @@
   "permissions": ["meteo.use"],
   "lsNamespacesOwned": ["meteo"],
   "dependsOnContracts": {
-    "storageKeys": [],
+    "storageKeys": [
+      "raschet.project.<pid>.meteo.datasets.v1",
+      "raschet.project.<pid>.meteo.activeId.v1",
+      "raschet.project.<pid>.meteo.annualCols.v1",
+      "raschet.project.<pid>.meteo.globalFilter.v1",
+      "raschet.project.<pid>.meteo.autoFetchOk.v1",
+      "idb:meteo.datasets.<pid>"
+    ],
     "events": { "emits": [], "consumes": [] },
-    "urlParams": ["project"],
-    "bridges": []
+    "urlParams": ["project", "pid", "return", "navResult"],
+    "bridges": ["shared/meteo-bridge.js"]
   }
 }
