@@ -45,6 +45,8 @@ export {
   pageSizeMm,
   contentBox,
   substitute,
+  effectiveContent,
+  sectionManifestFromContent,
   PAGE_SIZES,
   FONT_FAMILIES,
 } from './template.js';
