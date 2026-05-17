@@ -5026,7 +5026,11 @@ function _readServiceSummary() {
   }
 }
 
-function generateReportHtml(v) {
+// v0.60.641 (Фаза 3, feedback_reports_via_module): «Пояснительная
+// записка» формируется как blocks[] и рендерится модулем shared/report
+// (предпросмотр + PDF/DOCX). Никаких window.open + захардкоженного
+// HTML/CSS. Подпрограмма ТОЛЬКО собирает blocks[]; reports — рисует.
+function generateReportBlocks(v, B) {
   const c = v.concept;
   const itKw = calcITTotal(c);
   const upsByPurpose = calcUpsByPurpose(c);
@@ -5036,257 +5040,162 @@ function generateReportHtml(v) {
   const sumM2 = areas.reduce((s, a) => s + a.m2, 0);
   const totalRacks = (c.rackGroups || []).reduce((s, rg) => s + (Number(rg.count) || 0), 0);
   const date = new Date().toLocaleDateString('ru-RU');
-  // Phase 30.7: cross-module data
   const coolSummary = _readCoolingSummary();
   const serviceSummary = _readServiceSummary();
-  // PUE breakdown (from Phase 30.4)
   const meteoSum = _readMeteoSummary();
   const pueData = (c.pue?.mode === 'manual') ? null : calcPueAutoBreakdown(c, meteoSum);
   const pueValue = pueData ? pueData.pue : (Number(c.pue?.manualPue) || 1.4);
+  const R = (t) => ({ text: t, align: 'right' });
+  const blk = [];
 
-  return `<!doctype html>
-<html lang="ru"><head><meta charset="utf-8">
-<title>Пояснительная записка — ${escHtml(v.name)}</title>
-<style>
-  @page { size: A4; margin: 20mm; }
-  body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.4; color: #000; max-width: 800px; margin: 0 auto; padding: 20px; }
-  h1 { font-size: 20pt; text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; }
-  h2 { font-size: 14pt; margin-top: 24px; border-bottom: 1px solid #888; padding-bottom: 4px; }
-  h3 { font-size: 12pt; margin-top: 16px; }
-  table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 11pt; }
-  table th, table td { border: 1px solid #888; padding: 5px 8px; text-align: left; }
-  table th { background: #f0f0f0; font-weight: bold; }
-  table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .meta { color: #555; font-size: 10pt; text-align: center; margin-bottom: 24px; }
-  .badge { display: inline-block; padding: 1px 6px; background: #f0f0f0; border: 1px solid #888; border-radius: 3px; font-size: 10pt; }
-  .summary { background: #f9f9f9; border: 1px solid #ccc; padding: 10px 14px; margin: 12px 0; border-radius: 4px; }
-  .summary b { color: #000; }
-  .toc { background: #f9f9f9; padding: 10px 14px; border: 1px solid #ddd; margin: 16px 0; }
-  .toc ul { margin: 4px 0; padding-left: 24px; }
-  .print-actions { position: fixed; top: 8px; right: 8px; }
-  .print-actions button { padding: 6px 12px; font-size: 11pt; cursor: pointer; }
-  @media print { .print-actions { display: none; } body { padding: 0; max-width: 100%; } }
-</style>
-</head><body>
-<div class="print-actions">
-  <button onclick="window.print()">🖨 Печать / PDF</button>
-  <button onclick="window.close()">✕ Закрыть</button>
-</div>
+  blk.push(B.caption(`Концепция объекта ЦОД · Вариант «${v.name}»${v.primary ? ' (основной)' : ''} · сформировано ${date} · Технолог ЦОД, Raschet`));
 
-<h1>Пояснительная записка</h1>
-<div class="meta">
-  Концепция объекта ЦОД · Вариант «${escHtml(v.name)}»${v.primary ? ' (основной)' : ''}<br>
-  Сформировано: ${date} · Технолог ЦОД, Raschet
-</div>
+  const toc = ['1. Описание объекта', '2. Концепция стоек', '3. Электроснабжение (ИБП)',
+    '4. Климатическое обеспечение'];
+  if (coolSummary) toc.push('4a. Подбор холодильных систем (связанный)');
+  toc.push('5. Ввод (ТП и ДГУ)', '6. Площади помещений');
+  if (pueData) toc.push('6a. Расчёт PUE (per-component breakdown)');
+  if (serviceSummary) toc.push('6b. Сервис: монтаж и ТО (связанные наряды)');
+  toc.push('7. Перечень ТЗ для смежных дисциплин');
+  blk.push(B.h2('Содержание'), B.list(toc));
 
-<div class="toc">
-  <b>Содержание:</b>
-  <ul>
-    <li>1. Описание объекта</li>
-    <li>2. Концепция стоек</li>
-    <li>3. Электроснабжение (ИБП)</li>
-    <li>4. Климатическое обеспечение</li>
-    ${coolSummary ? `<li>4a. Подбор холодильных систем (связанный)</li>` : ''}
-    <li>5. Ввод (ТП и ДГУ)</li>
-    <li>6. Площади помещений</li>
-    ${pueData ? `<li>6a. Расчёт PUE (per-component breakdown)</li>` : ''}
-    ${serviceSummary ? `<li>6b. Сервис: монтаж и ТО (связанные наряды)</li>` : ''}
-    <li>7. Перечень ТЗ для смежных дисциплин</li>
-  </ul>
-</div>
+  blk.push(B.h2('1. Описание объекта'));
+  blk.push(B.paragraph(`Объект — центр обработки данных (ЦОД) с IT-нагрузкой ${itKw.toFixed(1)} кВт и общей площадью ${sumM2} м². Концепция включает ${totalRacks} серверных стоек, ${(c.upsSystems || []).length} систем(ы) ИБП, ${(c.coolingUnits || []).length} групп(ы) кондиционирования.`));
+  blk.push(B.list([
+    `IT-нагрузка: ${itKw.toFixed(1)} кВт (${totalRacks} стоек)`,
+    `Подключённая мощность ИБП: IT ${(upsByPurpose.it + upsByPurpose.mixed).toFixed(1)} кВт · климат ${(upsByPurpose.cooling + upsByPurpose.mixed).toFixed(1)} кВт`,
+    `Холодопроизводительность: ${coolKw.toFixed(1)} кВт`,
+    `Принятая мощность объекта: ${feedKw.toFixed(1)} кВт`,
+    `Общая площадь: ${sumM2} м²`,
+  ]));
 
-<h2>1. Описание объекта</h2>
-<p>Объект — центр обработки данных (ЦОД) с IT-нагрузкой <b>${itKw.toFixed(1)} кВт</b>
-и общей площадью <b>${sumM2} м²</b>. Концепция включает ${totalRacks} серверных стоек,
-${(c.upsSystems || []).length} систем(ы) ИБП,
-${(c.coolingUnits || []).length} групп(ы) кондиционирования.</p>
-<div class="summary">
-  <b>Ключевые параметры:</b><br>
-  • IT-нагрузка: ${itKw.toFixed(1)} кВт (${totalRacks} стоек)<br>
-  • Подключённая мощность ИБП: ⚡ IT ${(upsByPurpose.it + upsByPurpose.mixed).toFixed(1)} кВт · ❄ климат ${(upsByPurpose.cooling + upsByPurpose.mixed).toFixed(1)} кВт<br>
-  • Холодопроизводительность: ${coolKw.toFixed(1)} кВт<br>
-  • Принятая мощность объекта: ${feedKw.toFixed(1)} кВт<br>
-  • Общая площадь: ${sumM2} м²
-</div>
-
-<h2>2. Концепция стоек</h2>
-<p>Объект включает ${(c.rackGroups || []).length} групп(ы) серверных стоек:</p>
-<table>
-  <thead><tr><th>Группа</th><th>Профиль</th><th class="num">Кол-во</th><th class="num">кВт/стойка</th><th class="num">Σ кВт</th><th>Размеры (Ш × Г)</th><th>PDU</th></tr></thead>
-  <tbody>
-    ${(c.rackGroups || []).map(rg => {
+  blk.push(B.h2('2. Концепция стоек'));
+  blk.push(B.paragraph(`Объект включает ${(c.rackGroups || []).length} групп(ы) серверных стоек:`));
+  blk.push(B.table(
+    ['Группа', 'Профиль', R('Кол-во'), R('кВт/стойка'), R('Σ кВт'), 'Размеры (Ш × Г)', 'PDU'],
+    (c.rackGroups || []).map(rg => {
       const sumKw = (Number(rg.count) || 0) * (Number(rg.kwPerRack) || 0);
-      const pduSummary = `${rg.pdu?.kind || ''} ${rg.pdu?.phases || ''} ${rg.pdu?.ratingA || ''}А ×${rg.pdu?.inputsPerRack || 1}`;
-      return `<tr>
-        <td>${escHtml(rg.name)}</td>
-        <td>${_profileLabel(rg.profile)}</td>
-        <td class="num">${rg.count}</td>
-        <td class="num">${rg.kwPerRack}</td>
-        <td class="num"><b>${sumKw.toFixed(1)}</b></td>
-        <td>${rg.widthMm} × ${rg.depthMm} мм</td>
-        <td>${escHtml(pduSummary)}</td>
-      </tr>`;
-    }).join('')}
-    <tr><td colspan="2"><b>Итого:</b></td><td class="num"><b>${totalRacks}</b></td><td></td><td class="num"><b>${itKw.toFixed(1)}</b></td><td></td><td></td></tr>
-  </tbody>
-</table>
+      const pdu = `${rg.pdu?.kind || ''} ${rg.pdu?.phases || ''} ${rg.pdu?.ratingA || ''}А ×${rg.pdu?.inputsPerRack || 1}`;
+      return [rg.name, _profileLabel(rg.profile), String(rg.count), String(rg.kwPerRack), sumKw.toFixed(1), `${rg.widthMm} × ${rg.depthMm} мм`, pdu.trim()];
+    }).concat([['Итого', '', String(totalRacks), '', itKw.toFixed(1), '', '']])));
 
-<h2>3. Электроснабжение (ИБП)</h2>
-<p>Питание IT-нагрузки и систем климата обеспечивается ${(c.upsSystems || []).length} системами ИБП:</p>
-<table>
-  <thead><tr><th>Система</th><th>Назначение</th><th class="num">Кол-во</th><th class="num">кВА/шт.</th><th>Резерв</th><th class="num">Доступно, кВт</th><th class="num">Автономия, мин</th><th>АКБ</th></tr></thead>
-  <tbody>
-    ${(c.upsSystems || []).map(us => `<tr>
-      <td>${escHtml(us.name)}</td>
-      <td>${_purposeLabel(us.purpose)}</td>
-      <td class="num">${us.count}</td>
-      <td class="num">${us.ratedKva}</td>
-      <td>${_redundancyLabel(us.redundancy)}</td>
-      <td class="num">${_upsAvail(us).toFixed(1)}</td>
-      <td class="num">${us.autonomyMin}</td>
-      <td>${us.batteryTech === 'vrla' ? 'VRLA' : 'Li-Ion (LFP)'}</td>
-    </tr>`).join('')}
-  </tbody>
-</table>
-<div class="summary">
-  <b>Σ доступная мощность ИБП:</b> ⚡ IT ${(upsByPurpose.it + upsByPurpose.mixed).toFixed(1)} кВт ·
-  ❄ климат ${(upsByPurpose.cooling + upsByPurpose.mixed).toFixed(1)} кВт ·
-  итого ${upsByPurpose.total.toFixed(1)} кВт
-</div>
+  blk.push(B.h2('3. Электроснабжение (ИБП)'));
+  blk.push(B.paragraph(`Питание IT-нагрузки и систем климата обеспечивается ${(c.upsSystems || []).length} системами ИБП:`));
+  blk.push(B.table(
+    ['Система', 'Назначение', R('Кол-во'), R('кВА/шт.'), 'Резерв', R('Доступно, кВт'), R('Автономия, мин'), 'АКБ'],
+    (c.upsSystems || []).map(us => [us.name, _purposeLabel(us.purpose), String(us.count), String(us.ratedKva), _redundancyLabel(us.redundancy), _upsAvail(us).toFixed(1), String(us.autonomyMin), us.batteryTech === 'vrla' ? 'VRLA' : 'Li-Ion (LFP)'])));
+  blk.push(B.paragraph(`Σ доступная мощность ИБП: IT ${(upsByPurpose.it + upsByPurpose.mixed).toFixed(1)} кВт · климат ${(upsByPurpose.cooling + upsByPurpose.mixed).toFixed(1)} кВт · итого ${upsByPurpose.total.toFixed(1)} кВт`));
 
-<h2>4. Климатическое обеспечение</h2>
-<p>Для отвода тепла IT-нагрузки (${itKw.toFixed(1)} кВт) предусмотрены:</p>
-<table>
-  <thead><tr><th>Группа</th><th>Тип</th><th class="num">Кол-во</th><th class="num">кВт/шт.</th><th>Резерв</th><th class="num">Доступно, кВт</th></tr></thead>
-  <tbody>
-    ${(c.coolingUnits || []).map(cu => `<tr>
-      <td>${escHtml(cu.name)}</td>
-      <td>${_coolTypeLabel(cu.type)}</td>
-      <td class="num">${cu.count}</td>
-      <td class="num">${cu.kwPerUnit}</td>
-      <td>${_redundancyLabel(cu.redundancy)}</td>
-      <td class="num">${_coolAvail(cu).toFixed(1)}</td>
-    </tr>`).join('')}
-    <tr><td colspan="5"><b>Итого:</b></td><td class="num"><b>${coolKw.toFixed(1)}</b></td></tr>
-  </tbody>
-</table>
-${coolKw < itKw ? `<p style="color:#c62828"><b>⚠ Внимание:</b> Холодопроизводительность (${coolKw.toFixed(1)} кВт) меньше IT-нагрузки (${itKw.toFixed(1)} кВт). Требуется доукомплектование на ${(itKw - coolKw).toFixed(1)} кВт.</p>` : ''}
+  blk.push(B.h2('4. Климатическое обеспечение'));
+  blk.push(B.paragraph(`Для отвода тепла IT-нагрузки (${itKw.toFixed(1)} кВт) предусмотрены:`));
+  blk.push(B.table(
+    ['Группа', 'Тип', R('Кол-во'), R('кВт/шт.'), 'Резерв', R('Доступно, кВт')],
+    (c.coolingUnits || []).map(cu => [cu.name, _coolTypeLabel(cu.type), String(cu.count), String(cu.kwPerUnit), _redundancyLabel(cu.redundancy), _coolAvail(cu).toFixed(1)]).concat([['Итого', '', '', '', '', coolKw.toFixed(1)]])));
+  if (coolKw < itKw) blk.push(B.paragraph(`⚠ Внимание: холодопроизводительность (${coolKw.toFixed(1)} кВт) меньше IT-нагрузки (${itKw.toFixed(1)} кВт). Требуется доукомплектование на ${(itKw - coolKw).toFixed(1)} кВт.`));
 
-${coolSummary ? `
-<h2>4a. Подбор холодильных систем (связанный)</h2>
-<p>В проекте создан связанный подбор холодильных систем «<b>${escHtml(coolSummary.selectionName)}</b>» (модуль <a href="../cooling/?project=${escAttr(_pid)}" target="_blank">«Подбор холодильных систем»</a>) с ${coolSummary.optionCount} варианта${coolSummary.optionCount === 1 ? 'ом' : 'ми'} оборудования.</p>
-<div class="summary">
-  <b>Основной вариант:</b> «${escHtml(coolSummary.mainOptionName)}» (★)<br>
-  • Тип системы: <b>${escHtml(coolSummary.systemType)}</b>, COP rated: <b>${(coolSummary.ratedCop || 0).toFixed(2)}</b><br>
-  • Требуемая холодопроизводительность: <b>${coolSummary.requiredCoolingKw.toFixed(1)} кВт</b> (с запасом ${coolSummary.safetyMarginPct}%)<br>
-  • Σ установлено системой: <b>${coolSummary.installedKw.toFixed(1)} кВт</b> в ${coolSummary.totalQty} единиц${coolSummary.totalQty === 1 ? 'е' : ''}<br>
-  • CAPEX (per-unit × Σ qty): оборудование <b>${(coolSummary.eco.equipmentCost * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}</b> + монтаж <b>${(coolSummary.eco.installationCost * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}</b><br>
-  • OPEX обслуживания: <b>${(coolSummary.eco.maintenanceRubPerYear * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}/год</b><br>
-  • Lifetime для TCO: ${coolSummary.eco.projectLifetimeYears} лет
-</div>
-<p class="muted" style="font-size:10pt">📊 Подробное TCO с дисконтированием, OPEX-электричество и сравнение с baseline — в табе «📊 Сравнение» модуля cooling. PUE концепции (см. раздел 6a) использует данные из этого подбора.</p>
-` : ''}
+  if (coolSummary) {
+    blk.push(B.h2('4a. Подбор холодильных систем (связанный)'));
+    blk.push(B.paragraph(`В проекте создан связанный подбор холодильных систем «${coolSummary.selectionName}» (модуль «Подбор холодильных систем») с ${coolSummary.optionCount} варианта${coolSummary.optionCount === 1 ? 'ом' : 'ми'} оборудования.`));
+    blk.push(B.list([
+      `Основной вариант: «${coolSummary.mainOptionName}» (★)`,
+      `Тип системы: ${coolSummary.systemType}, COP rated: ${(coolSummary.ratedCop || 0).toFixed(2)}`,
+      `Требуемая холодопроизводительность: ${coolSummary.requiredCoolingKw.toFixed(1)} кВт (с запасом ${coolSummary.safetyMarginPct}%)`,
+      `Σ установлено системой: ${coolSummary.installedKw.toFixed(1)} кВт в ${coolSummary.totalQty} единиц${coolSummary.totalQty === 1 ? 'е' : ''}`,
+      `CAPEX: оборудование ${(coolSummary.eco.equipmentCost * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency} + монтаж ${(coolSummary.eco.installationCost * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}`,
+      `OPEX обслуживания: ${(coolSummary.eco.maintenanceRubPerYear * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}/год`,
+      `Lifetime для TCO: ${coolSummary.eco.projectLifetimeYears} лет`,
+    ]));
+    blk.push(B.caption('Подробное TCO с дисконтированием и сравнение с baseline — в табе «Сравнение» модуля cooling. PUE концепции (раздел 6a) использует данные из этого подбора.'));
+  }
 
-<h2>5. Ввод (ТП и ДГУ)</h2>
-${c.feed?.tp?.needed ? `<p><b>Трансформаторная подстанция (ТП):</b> ${c.feed.tp.kva} кВА, резервирование — ${_redundancyLabel(c.feed.tp.redundancy)}.</p>` : '<p><i>ТП не предусмотрена.</i></p>'}
-${c.feed?.dgu?.needed ? `<p><b>Дизель-генераторная установка (ДГУ):</b> ${c.feed.dgu.kw} кВт, режим — ${_redundancyLabel(c.feed.dgu.mode)}, резервирование — ${_redundancyLabel(c.feed.dgu.redundancy)}.</p>` : '<p><i>ДГУ не предусмотрена.</i></p>'}
-<div class="summary">
-  <b>Σ принятая мощность объекта:</b> ${feedKw.toFixed(1)} кВт (с учётом потерь и климата ~30%)
-</div>
+  blk.push(B.h2('5. Ввод (ТП и ДГУ)'));
+  blk.push(B.paragraph(c.feed?.tp?.needed ? `Трансформаторная подстанция (ТП): ${c.feed.tp.kva} кВА, резервирование — ${_redundancyLabel(c.feed.tp.redundancy)}.` : 'ТП не предусмотрена.'));
+  blk.push(B.paragraph(c.feed?.dgu?.needed ? `Дизель-генераторная установка (ДГУ): ${c.feed.dgu.kw} кВт, режим — ${_redundancyLabel(c.feed.dgu.mode)}, резервирование — ${_redundancyLabel(c.feed.dgu.redundancy)}.` : 'ДГУ не предусмотрена.'));
+  blk.push(B.paragraph(`Σ принятая мощность объекта: ${feedKw.toFixed(1)} кВт (с учётом потерь и климата ~30%)`));
 
-<h2>6. Площади помещений</h2>
-<p>Расчётная разбивка площадей (по ТКП 308-2011 / TIA-942):</p>
-<table>
-  <thead><tr><th>Помещение</th><th class="num">Площадь, м²</th></tr></thead>
-  <tbody>
-    ${areas.map(a => `<tr><td>${escHtml(a.name)}</td><td class="num">${a.m2}</td></tr>`).join('')}
-    <tr><td><b>Σ Итого</b></td><td class="num"><b>${sumM2}</b></td></tr>
-  </tbody>
-</table>
+  blk.push(B.h2('6. Площади помещений'));
+  blk.push(B.paragraph('Расчётная разбивка площадей (по ТКП 308-2011 / TIA-942):'));
+  blk.push(B.table(['Помещение', R('Площадь, м²')],
+    areas.map(a => [a.name, String(a.m2)]).concat([['Σ Итого', String(sumM2)]])));
 
-${pueData ? `
-<h2>6a. Расчёт PUE (per-component breakdown)</h2>
-<p>Расчётный <b>PUE = ${pueValue.toFixed(2)}</b> ${c.pue?.mode === 'cooling-module' ? '(из связанного подбора cooling)' : '(автоматически по топологии и meteo)'}.
-Раскладка не-IT потребления (Phase 30.4):</p>
-<table>
-  <thead><tr><th>Компонент</th><th class="num">кВт</th><th class="num">% от P<sub>IT</sub></th><th>Источник</th></tr></thead>
-  <tbody>
-    <tr><td><b>P<sub>IT</sub></b> (нагрузка серверов)</td><td class="num"><b>${pueData.breakdown.itKw.toFixed(1)}</b></td><td class="num">100.0%</td><td>Σ rackGroups[].count × kwPerRack</td></tr>
-    <tr><td>P<sub>cooling</sub></td><td class="num">${pueData.breakdown.coolKwAvg.toFixed(1)}</td><td class="num">${(pueData.breakdown.coolKwAvg/pueData.breakdown.itKw*100).toFixed(1)}%</td><td>Σ топология × COP × FreeCool fraction</td></tr>
-    <tr><td>P<sub>ups-loss</sub></td><td class="num">${pueData.breakdown.upsLossKw.toFixed(2)}</td><td class="num">${(pueData.breakdown.upsLossKw/pueData.breakdown.itKw*100).toFixed(1)}%</td><td>(1 − η<sub>UPS</sub>)/η<sub>UPS</sub> × P<sub>IT</sub>; η = ${(pueData.breakdown.etaUps * 100).toFixed(0)}%</td></tr>
-    <tr><td>P<sub>tp-loss</sub></td><td class="num">${pueData.breakdown.tpLossKw.toFixed(2)}</td><td class="num">${(pueData.breakdown.tpLossKw/pueData.breakdown.itKw*100).toFixed(1)}%</td><td>(1 − η<sub>TP</sub>)/η<sub>TP</sub> × P<sub>downstream</sub>; η = ${(pueData.breakdown.etaTp * 100).toFixed(0)}%</td></tr>
-    <tr><td>P<sub>aux</sub> (свет, ОПС, СКУД-CCTV)</td><td class="num">${pueData.breakdown.auxKw.toFixed(2)}</td><td class="num">${(pueData.breakdown.auxFraction * 100).toFixed(1)}%</td><td>aux_fraction × P<sub>IT</sub></td></tr>
-    <tr style="border-top:2px solid #888"><td><b>Σ не-IT</b></td><td class="num"><b>${pueData.breakdown.totalNonItKw.toFixed(1)}</b></td><td class="num"><b>${(pueData.breakdown.totalNonItKw/pueData.breakdown.itKw*100).toFixed(1)}%</b></td><td>P<sub>cool</sub> + P<sub>ups</sub> + P<sub>tp</sub> + P<sub>aux</sub></td></tr>
-    <tr style="background:#e0f2fe"><td><b>PUE</b></td><td class="num" colspan="3"><b>1 + Σ не-IT / P<sub>IT</sub> = ${pueValue.toFixed(2)}</b></td></tr>
-  </tbody>
-</table>
-<p class="muted" style="font-size:10pt">P<sub>cooling</sub> ≈ среднегодовое (учитывает freecool fraction × COP<sub>fc</sub> + (1−ff) × COP<sub>base</sub>). Default-КПД (η<sub>UPS</sub>=96%, η<sub>TP</sub>=99%, aux=2%) можно overridить в tab «📊 Расчёт PUE».</p>
-` : ''}
+  if (pueData) {
+    blk.push(B.h2('6a. Расчёт PUE (per-component breakdown)'));
+    blk.push(B.paragraph(`Расчётный PUE = ${pueValue.toFixed(2)} ${c.pue?.mode === 'cooling-module' ? '(из связанного подбора cooling)' : '(автоматически по топологии и meteo)'}. Раскладка не-IT потребления:`));
+    const bd = pueData.breakdown;
+    blk.push(B.table(['Компонент', R('кВт'), R('% от P_IT'), 'Источник'], [
+      ['P_IT (нагрузка серверов)', bd.itKw.toFixed(1), '100.0%', 'Σ rackGroups[].count × kwPerRack'],
+      ['P_cooling', bd.coolKwAvg.toFixed(1), (bd.coolKwAvg / bd.itKw * 100).toFixed(1) + '%', 'Σ топология × COP × FreeCool fraction'],
+      ['P_ups-loss', bd.upsLossKw.toFixed(2), (bd.upsLossKw / bd.itKw * 100).toFixed(1) + '%', `(1−η_UPS)/η_UPS × P_IT; η = ${(bd.etaUps * 100).toFixed(0)}%`],
+      ['P_tp-loss', bd.tpLossKw.toFixed(2), (bd.tpLossKw / bd.itKw * 100).toFixed(1) + '%', `(1−η_TP)/η_TP × P_downstream; η = ${(bd.etaTp * 100).toFixed(0)}%`],
+      ['P_aux (свет, ОПС, СКУД-CCTV)', bd.auxKw.toFixed(2), (bd.auxFraction * 100).toFixed(1) + '%', 'aux_fraction × P_IT'],
+      ['Σ не-IT', bd.totalNonItKw.toFixed(1), (bd.totalNonItKw / bd.itKw * 100).toFixed(1) + '%', 'P_cool + P_ups + P_tp + P_aux'],
+      ['PUE', `1 + Σ не-IT / P_IT = ${pueValue.toFixed(2)}`, '', ''],
+    ]));
+    blk.push(B.caption('P_cooling ≈ среднегодовое (freecool fraction × COP_fc + (1−ff) × COP_base). Default-КПД (η_UPS=96%, η_TP=99%, aux=2%) можно overridить в табе «Расчёт PUE».'));
+  }
 
-${serviceSummary ? `
-<h2>6b. Сервис: монтаж и ТО (связанные наряды)</h2>
-<p>В проекте создано <b>${serviceSummary.installCount + serviceSummary.maintCount}</b> связанных наряд${(serviceSummary.installCount + serviceSummary.maintCount) === 1 ? '' : 'ов'} в модуле <a href="../service/?project=${escAttr(_pid)}" target="_blank">«Сервис: монтаж и ТО»</a>:</p>
-<table>
-  <thead><tr><th>Тип наряда</th><th class="num">Кол-во</th><th class="num">Σ стоимость для клиента</th></tr></thead>
-  <tbody>
-    ${serviceSummary.installCount > 0 ? `<tr><td>🔧 Монтажные работы</td><td class="num">${serviceSummary.installCount}</td><td class="num">${serviceSummary.installTotal.toLocaleString('ru-RU')} ${serviceSummary.currency}</td></tr>` : ''}
-    ${serviceSummary.maintCount > 0 ? `<tr><td>⚙ ТО (техническое обслуживание)</td><td class="num">${serviceSummary.maintCount}</td><td class="num">${serviceSummary.maintTotal.toLocaleString('ru-RU')} ${serviceSummary.currency}/год</td></tr>` : ''}
-    <tr style="border-top:2px solid #888"><td><b>Σ Итого</b></td><td class="num"><b>${serviceSummary.installCount + serviceSummary.maintCount}</b></td><td class="num"><b>${(serviceSummary.installTotal + serviceSummary.maintTotal).toLocaleString('ru-RU')} ${serviceSummary.currency}</b></td></tr>
-  </tbody>
-</table>
-<p class="muted" style="font-size:10pt">Подробные позиции (материалы, работы, командировочные) — в КП каждого наряда. ТО — повторяющиеся работы за год; для многолетнего OPEX × lifetime см. cooling раздел 4a.</p>
-` : ''}
+  if (serviceSummary) {
+    blk.push(B.h2('6b. Сервис: монтаж и ТО (связанные наряды)'));
+    blk.push(B.paragraph(`В проекте создано ${serviceSummary.installCount + serviceSummary.maintCount} связанных наряд${(serviceSummary.installCount + serviceSummary.maintCount) === 1 ? '' : 'ов'} в модуле «Сервис: монтаж и ТО»:`));
+    const srows = [];
+    if (serviceSummary.installCount > 0) srows.push(['Монтажные работы', String(serviceSummary.installCount), `${serviceSummary.installTotal.toLocaleString('ru-RU')} ${serviceSummary.currency}`]);
+    if (serviceSummary.maintCount > 0) srows.push(['ТО (техническое обслуживание)', String(serviceSummary.maintCount), `${serviceSummary.maintTotal.toLocaleString('ru-RU')} ${serviceSummary.currency}/год`]);
+    srows.push(['Σ Итого', String(serviceSummary.installCount + serviceSummary.maintCount), `${(serviceSummary.installTotal + serviceSummary.maintTotal).toLocaleString('ru-RU')} ${serviceSummary.currency}`]);
+    blk.push(B.table(['Тип наряда', R('Кол-во'), R('Σ стоимость для клиента')], srows));
+    blk.push(B.caption('Подробные позиции — в КП каждого наряда. ТО — повторяющиеся работы за год; многолетний OPEX × lifetime см. cooling раздел 4a.'));
+  }
 
-<h2>7. Перечень ТЗ для смежных дисциплин</h2>
-
-<h3>7.1. Электрик</h3>
-<ul>
-  <li>Подобрать конкретные модели ИБП (${(c.upsSystems || []).length} шт.) под параметры из раздела 3.</li>
-  <li>Подобрать автоматические выключатели и сечения кабелей по нагрузкам стоек (${itKw.toFixed(1)} кВт IT).</li>
-  <li>Предусмотреть распределительный щит ГРЩ под ${(c.upsSystems || []).length + (c.coolingUnits || []).length} вводов.</li>
-  ${c.feed?.tp?.needed ? `<li>Подобрать трансформатор ${c.feed.tp.kva} кВА.</li>` : ''}
-  ${c.feed?.dgu?.needed ? `<li>Подобрать ДГУ ${c.feed.dgu.kw} кВт (${_redundancyLabel(c.feed.dgu.mode)}).</li>` : ''}
-</ul>
-
-<h3>7.2. СКС-инженер</h3>
-<ul>
-  <li>Расположить ${totalRacks} стоек по группам (раздел 2) в машзале (≈ ${areas.find(a => a.name.startsWith('Машзал'))?.m2 || 0} м²).</li>
-  <li>Спроектировать межшкафные связи и кабельные трассы.</li>
-  <li>Подобрать конкретные модели стоек (${(c.rackGroups || []).filter(rg => rg.modelRef?.id).length} из ${(c.rackGroups || []).length} групп уже привязаны к каталогу).</li>
-</ul>
-
-<h3>7.3. Климатик</h3>
-<ul>
-  <li>Подобрать конкретные модели кондиционеров (${(c.coolingUnits || []).length} групп(ы) на ${coolKw.toFixed(1)} кВт холода).</li>
-  <li>Расположить кондиционеры в климат-зале (≈ ${areas.find(a => a.name.startsWith('Климат'))?.m2 || 0} м²).</li>
-  <li>${coolKw < itKw ? 'Доукомплектовать на ' + (itKw - coolKw).toFixed(1) + ' кВт.' : 'Проверить запас при максимальных температурах окружающей среды.'}</li>
-</ul>
-
-<h3>7.4. Архитектор</h3>
-<ul>
-  <li>Скомпоновать помещения общей площадью ${sumM2} м² (см. раздел 6).</li>
-  <li>Учесть требования по электротехническим свойствам (двери, кабельные проходки), пожарной безопасности (АГПТ для машзала и АКБ-зала), ИБП-залу — отдельная вентиляция.</li>
-</ul>
-
-<p style="margin-top:32px;border-top:1px solid #888;padding-top:8px;font-size:10pt;color:#888;text-align:center">
-  Документ сгенерирован автоматически в Raschet · Технолог ЦОД · ${date}
-</p>
-
-</body></html>`;
+  blk.push(B.h2('7. Перечень ТЗ для смежных дисциплин'));
+  blk.push(B.h3('7.1. Электрик'));
+  const elItems = [
+    `Подобрать конкретные модели ИБП (${(c.upsSystems || []).length} шт.) под параметры из раздела 3.`,
+    `Подобрать автоматические выключатели и сечения кабелей по нагрузкам стоек (${itKw.toFixed(1)} кВт IT).`,
+    `Предусмотреть распределительный щит ГРЩ под ${(c.upsSystems || []).length + (c.coolingUnits || []).length} вводов.`,
+  ];
+  if (c.feed?.tp?.needed) elItems.push(`Подобрать трансформатор ${c.feed.tp.kva} кВА.`);
+  if (c.feed?.dgu?.needed) elItems.push(`Подобрать ДГУ ${c.feed.dgu.kw} кВт (${_redundancyLabel(c.feed.dgu.mode)}).`);
+  blk.push(B.list(elItems));
+  blk.push(B.h3('7.2. СКС-инженер'));
+  blk.push(B.list([
+    `Расположить ${totalRacks} стоек по группам (раздел 2) в машзале (≈ ${areas.find(a => a.name.startsWith('Машзал'))?.m2 || 0} м²).`,
+    'Спроектировать межшкафные связи и кабельные трассы.',
+    `Подобрать конкретные модели стоек (${(c.rackGroups || []).filter(rg => rg.modelRef?.id).length} из ${(c.rackGroups || []).length} групп уже привязаны к каталогу).`,
+  ]));
+  blk.push(B.h3('7.3. Климатик'));
+  blk.push(B.list([
+    `Подобрать конкретные модели кондиционеров (${(c.coolingUnits || []).length} групп(ы) на ${coolKw.toFixed(1)} кВт холода).`,
+    `Расположить кондиционеры в климат-зале (≈ ${areas.find(a => a.name.startsWith('Климат'))?.m2 || 0} м²).`,
+    coolKw < itKw ? `Доукомплектовать на ${(itKw - coolKw).toFixed(1)} кВт.` : 'Проверить запас при максимальных температурах окружающей среды.',
+  ]));
+  blk.push(B.h3('7.4. Архитектор'));
+  blk.push(B.list([
+    `Скомпоновать помещения общей площадью ${sumM2} м² (см. раздел 6).`,
+    'Учесть требования: двери/кабельные проходки, пожарная безопасность (АГПТ для машзала и АКБ-зала), отдельная вентиляция ИБП-зала.',
+  ]));
+  blk.push(B.caption(`Документ сгенерирован автоматически в Raschet · Технолог ЦОД · ${date}`));
+  return blk;
 }
 
 function bindReport() {
   const btn = $('tw-report');
   if (!btn) return;
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     const v = _variants.find(x => x.id === _activeId);
     if (!v) { twToast('Сначала выберите вариант.', 'warn'); return; }
-    const html = generateReportHtml(v);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const w = window.open(url, '_blank');
-    if (!w) { twToast('Браузер заблокировал открытие. Разрешите попапы для этого сайта.', 'warn'); }
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    try {
+      const [{ createTemplate, previewPDF }, B] = await Promise.all([
+        import('shared/report/index.js'),
+        import('shared/report/blocks.js'),
+      ]);
+      const blocks = generateReportBlocks(v, B);
+      const tpl = createTemplate({ meta: { title: `Пояснительная записка — ${v.name}`, author: v.concept?.projectData?.designer || '' } });
+      tpl.content = blocks;
+      twToast('📄 Открываю предпросмотр пояснительной записки…', 'info');
+      await previewPDF(tpl);
+    } catch (e) {
+      console.error('[tw-report]', e);
+      twToast('Ошибка формирования отчёта: ' + (e && e.message || e), 'warn');
+    }
   });
 }
 
