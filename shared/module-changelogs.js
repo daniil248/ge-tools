@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.667', date: '2026-05-17', items: [
+      '📍 <b>Отчёты — финиш: ROADMAP-синк, composeReport verified e2e</b>. Проверка единого конвейера на проде: import compose.js → composeReport({tags,title,build}) → picker (12 шаблонов) → previewPDF: заголовок/адресат/тело/таблица в потоке БЕЗ наложения, кнопка «⚙ Шаблон» (R4) присутствует, консоль чистая. Все отчёты проекта унифицированы (RR1-3 ✅ в X.6.3). status-header ROADMAP → v0.60.667. «Добить по отчётам» закрыто: flow-редизайн (R1–R5) + редактор (R3b) + правка из превью (R4) + общий конвейер для ВСЕХ отчётов (RR1-3); остаётся опц. R6 (косметическая чистка legacy, без функц. пробела). Файл: ROADMAP.md.',
+    ] },
     { version: '0.60.666', date: '2026-05-17', items: [
       '🧩 <b>Отчёты — RR3: cable + battery на composeReport (конвейер унифицирован полностью)</b>. cable-calc.exportReport и battery-calc.exportBatteryReport (имели pickTemplate, но без flow/preview — exportPDF напрямую) → composeReport (теперь flow + предпросмотр + manifest/persist). battery-calc.printBatteryReport («быстрая печать без выбора шаблона») → composeReport БЕЗ tags (picker пропускается по задумке) но через общий конвейер: flow + previewPDF (раньше exportPDF сразу). Итог: ВСЕ отчёты проекта (tech-workspace ТЗ, service КП, ups-config, pdu-config, logistics, projects-мультидисц., cable, battery×2) идут через единый composeReport / flow-модель — кастомный сохраняемый шаблон, предпросмотр перед сохранением, без наложения структуры на контент. Файлы: apps/cable/cable-calc.js, apps/battery/battery-calc.js.',
     ] },
