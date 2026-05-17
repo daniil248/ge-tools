@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.633', date: '2026-05-17', items: [
+      '📋 <b>Фаза 1 (хвост): манифест cable честный</b>. apps/cable/manifest.json: storageKeys +raschet.cable.autoNormHint.shown (флаг показа подсказки авто-нормы, cable-calc.js); urlParams без изменений — аудитор пометил economic ЛОЖНО (moduleEnabled.get(economic) это Map.get, не URLSearchParams.get → не url-param, исключено по человеческому суждению). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/cable/manifest.json.',
+    ] },
     { version: '0.60.632', date: '2026-05-17', items: [
       '📋 <b>Фаза 1 (хвост): манифест battery честный</b>. apps/battery/manifest.json: storageKeys +raschet.battery.lifecycleCostItems.v1 (глобальная форма LC_KEY) +raschet.battery.lastCalcInputs.v1 (кэш входов калькулятора, +::ctx суффикс) +raschet.battActiveSel +raschet.battHandoffSeeded (флаги handoff из ИБП); urlParams +vdcMin/vdcMax/invEff/capacityKw (приём из ?fromUps-handoff). Базовые ключи/события (battery:configs-changed) уже верны. version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/battery/manifest.json.',
     ] },

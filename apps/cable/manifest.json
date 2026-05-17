@@ -2,7 +2,7 @@
   "id": "cable",
   "name": "Расчёт кабельной линии",
   "description": "Подбор сечения кабеля по IEC / ПУЭ с учётом температуры, группирования, способа прокладки, экономической плотности тока и падения напряжения",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -28,7 +28,8 @@
   ],
   "dependsOnContracts": {
     "storageKeys": [
-      "raschet.global.v1"
+      "raschet.global.v1",
+      "raschet.cable.autoNormHint.shown"
     ],
     "events": {
       "emits": [],
