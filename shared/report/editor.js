@@ -58,6 +58,19 @@ export function openTemplateEditor(tpl, opts = {}) {
   if (!Array.isArray(working.sections.order))  working.sections.order = [];
   if (!Array.isArray(working.sections.hidden)) working.sections.hidden = [];
   if (!Array.isArray(working.sections.manifest)) working.sections.manifest = [];
+  // Базовый шаблон: pageSections — ЕДИНСТВЕННЫЙ источник колонтитулов.
+  // Инициализируем СРАЗУ при открытии (а не лениво во вкладке
+  // «Разделы»), иначе превью рендерит legacy-колонтитул из overlays,
+  // игнорируя чекбокс «включён» (репорт «шапка отключена, но
+  // отображается»). После init чистим legacy header/footer — чтобы
+  // не было второго источника.
+  if (working.level === 'base') {
+    ensurePageSections();
+    working.header = { firstPage: { enabled: false, blocks: [] },
+      otherPages: { enabled: false, blocks: [] } };
+    working.footer = { firstPage: { enabled: false, blocks: [] },
+      otherPages: { enabled: false, blocks: [] } };
+  }
 
   // Документ открывается на «Основе» (обязательный выбор базы),
   // базовый — на «Колонтитулах». renderTabs всё равно подстрахует.

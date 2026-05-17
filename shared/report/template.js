@@ -804,14 +804,22 @@ function expandStructural(b, tpl) {
       return [wrap({ type: 'paragraph', style: 'caption',
         text: S(b.text || '{{date}}'), align: b.align || 'right' })];
     case 'tocAuto': {
-      // Содержание строится ИЗ ПОРЯДКА РАЗДЕЛОВ документа, без
-      // служебных псевдо-разделов (шапка/содержание/подписи) —
-      // только содержательные разделы (репорт Пользователя).
-      const STRUCT = new Set(['doc-head', 'doc-sign', 'doc-toc']);
+      // Содержание = РЕАЛЬНЫЕ заголовки тела документа в их порядке
+      // (h1/h2), а НЕ служебные псевдо-разделы манифеста
+      // (Шапка/Содержание/Подписи) — это и есть «демо из шаблона»,
+      // на которое жаловался Пользователь. Структурные блоки
+      // (docTitle/companyInfo/addressee/signature) — не заголовки,
+      // поэтому в оглавление не попадают.
       const title = b.title || 'Содержание';
-      const items = (tpl.sections?.manifest || [])
-        .filter(s => s && !STRUCT.has(s.id) && s.label && s.label !== title)
-        .map(s => s.label);
+      const src = (Array.isArray(tpl.flow) && tpl.flow.length)
+        ? tpl.flow : (Array.isArray(tpl.content) ? tpl.content : []);
+      const items = [];
+      for (const x of src) {
+        if (x && x.type === 'heading' && (x.level == null || x.level <= 2)) {
+          const t = String(x.text || '').trim();
+          if (t && t !== title && !items.includes(t)) items.push(t);
+        }
+      }
       const arr = [wrap({ type: 'heading', level: 2, text: title })];
       if (items.length) arr.push(wrap({ type: 'list', ordered: false, items }));
       return arr;
