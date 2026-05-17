@@ -199,9 +199,15 @@ export async function exportPDF(tpl, filename) {
  * Возвращает Promise, который резолвится 'saved' / 'cancelled'.
  */
 export async function previewPDF(tpl, filename) {
-  const doc = await buildPdfDoc(tpl);
-  const blob = doc.output('blob');
-  const blobUrl = URL.createObjectURL(blob);
+  let cur = tpl;
+  let doc, blobUrl;
+  const rebuild = async () => {
+    doc = await buildPdfDoc(cur);
+    const blob = doc.output('blob');
+    if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch {} }
+    blobUrl = URL.createObjectURL(blob);
+  };
+  await rebuild();
   const name = filename || (tpl.meta && tpl.meta.title) || 'report';
   const fileName = name.endsWith('.pdf') ? name : name + '.pdf';
   const totalPages = doc.internal?.getNumberOfPages?.() || 1;
@@ -217,10 +223,11 @@ export async function previewPDF(tpl, filename) {
             <div style="font-weight:700;font-size:15px;color:#0f172a">Превью PDF</div>
             <div style="font-size:11.5px;color:#64748b">${(tpl.meta?.title || 'Документ')} · ${totalPages} стр. · файл: <code>${fileName}</code></div>
           </div>
+          <button type="button" id="rs-pdf-tpl" style="padding:8px 14px;background:#fff;border:1px solid #cbd5e1;color:#475569;border-radius:5px;cursor:pointer;font:inherit" title="Открыть редактор шаблона — правки сразу в превью">⚙ Шаблон</button>
           <button type="button" id="rs-pdf-save" style="padding:8px 16px;background:#16a34a;color:#fff;border:0;border-radius:5px;cursor:pointer;font:inherit;font-weight:600">💾 Скачать PDF</button>
           <button type="button" id="rs-pdf-close" style="padding:8px 14px;background:#fff;border:1px solid #cbd5e1;color:#475569;border-radius:5px;cursor:pointer;font:inherit" title="Отменить — документ не будет сохранён">✕ Закрыть</button>
         </div>
-        <iframe src="${blobUrl}" style="flex:1;border:0;width:100%;background:#525659"></iframe>
+        <iframe id="rs-pdf-frame" src="${blobUrl}" style="flex:1;border:0;width:100%;background:#525659"></iframe>
         <div style="padding:8px 16px;background:#f1f5f9;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b">
           ⚠ Проверьте перед скачиванием: правильный шаблон, все блоки заполнены, нет «Lorem ipsum» / placeholder'ов, шапка/подвал корректны.
         </div>
@@ -237,6 +244,33 @@ export async function previewPDF(tpl, filename) {
     overlay.querySelector('#rs-pdf-save').addEventListener('click', () => {
       doc.save(fileName);
       cleanup('saved');
+    });
+    // Быстрая правка шаблона прямо из превью (R4): открыть flow-
+    // редактор; по сохранению — пересобрать PDF и обновить кадр.
+    overlay.querySelector('#rs-pdf-tpl').addEventListener('click', async () => {
+      const tplBtn = overlay.querySelector('#rs-pdf-tpl');
+      try {
+        const { openTemplateEditor } = await import('./editor.js');
+        openTemplateEditor(cur, {
+          onSave: async (upd) => {
+            cur = upd;
+            tplBtn.textContent = '⏳ Пересборка…';
+            tplBtn.disabled = true;
+            try {
+              await rebuild();
+              const fr = overlay.querySelector('#rs-pdf-frame');
+              if (fr) fr.src = blobUrl;
+            } finally {
+              tplBtn.textContent = '⚙ Шаблон';
+              tplBtn.disabled = false;
+            }
+          },
+        });
+      } catch (e) {
+        tplBtn.textContent = '⚙ Шаблон';
+        tplBtn.disabled = false;
+        console.error('[previewPDF] editor open failed', e);
+      }
     });
   });
 }
