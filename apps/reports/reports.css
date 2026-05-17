@@ -107,6 +107,46 @@ main {
 }
 .rpt-cat-item__badge.builtin { background: #e8f5e9; color: #2e7d32; }
 .rpt-cat-item__badge.user    { background: #e3f2fd; color: #1976d2; }
+.rpt-cat-item__badge.base    { background: #ede7f6; color: #5e35b1; }
+
+/* Заголовок группы списка (Документы / Базовые) */
+.rpt-cat-group {
+  padding: 10px 16px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  background: #f7f9fc;
+  border-bottom: 1px solid #eef1f6;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Тулбар просмотрщика шаблона */
+.rpt-prev-tools {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f4f6f9;
+  border-bottom: 1px solid #d8dde6;
+}
+.rpt-prev-tools .rpt-prev-sep {
+  width: 1px; height: 18px; background: #d0d6e0; margin: 0 2px;
+}
+.rpt-prev-zoom {
+  min-width: 44px; text-align: center;
+  font: 12px system-ui, sans-serif; color: #475569;
+}
+.rpt-prev-pages {
+  margin-left: auto;
+  font: 12px system-ui, sans-serif; color: #6b7280;
+}
 
 .rpt-cat-empty {
   padding: 20px 16px;

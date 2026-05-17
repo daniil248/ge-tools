@@ -26,6 +26,8 @@ const BUILTIN_VER_KEY = 'raschet.reportCatalog.builtinVersion';
 const state = {
   selectedId: null,
   filterText: '',
+  prevGuides: false,   // показывать направляющие полей в превью
+  prevZoom: 1,         // масштаб превью (1 = вписать по ширине)
 };
 
 // ——— DOM-ссылки ———
@@ -113,40 +115,64 @@ function renderList() {
     return;
   }
 
-  for (const t of filtered) {
-    const item = document.createElement('div');
-    item.className = 'rpt-cat-item';
-    if (t.id === state.selectedId) item.classList.add('active');
+  // Базовые шаблоны (level==='base' — задают только поля/колонтитулы/
+  // стили) отделены от шаблонов документов (свой порядок блоков,
+  // наследуют базу). Документы показываем первыми.
+  const isBase = (t) => t.template && t.template.level === 'base';
+  const docs  = filtered.filter(t => !isBase(t));
+  const bases = filtered.filter(isBase);
 
-    const name = document.createElement('div');
-    name.className = 'rpt-cat-item__name';
-    const badge = document.createElement('span');
-    badge.className = 'rpt-cat-item__badge ' + (t.source === 'builtin' ? 'builtin' : 'user');
-    badge.textContent = t.source === 'builtin' ? 'Встроенный' : 'Мой';
-    name.appendChild(document.createTextNode(t.name));
-    name.appendChild(badge);
-    item.appendChild(name);
+  const addGroup = (title, arr) => {
+    if (!arr.length) return;
+    const h = document.createElement('div');
+    h.className = 'rpt-cat-group';
+    h.textContent = title + '  (' + arr.length + ')';
+    $list.appendChild(h);
+    for (const t of arr) $list.appendChild(buildCatItem(t));
+  };
+  addGroup('Шаблоны документов', docs);
+  addGroup('Базовые шаблоны', bases);
+}
 
-    if (t.description) {
-      const d = document.createElement('div');
-      d.className = 'rpt-cat-item__desc';
-      d.textContent = t.description;
-      item.appendChild(d);
-    }
+function buildCatItem(t) {
+  const item = document.createElement('div');
+  item.className = 'rpt-cat-item';
+  if (t.id === state.selectedId) item.classList.add('active');
 
-    const meta = document.createElement('div');
-    meta.className = 'rpt-cat-item__meta';
-    const pg = Report.pageSizeMm(t.template.page || {});
-    meta.textContent = `${t.template.page?.format || 'A4'} · ${pg.width.toFixed(0)}×${pg.height.toFixed(0)} мм`;
-    item.appendChild(meta);
-
-    item.addEventListener('click', () => {
-      state.selectedId = t.id;
-      renderList();
-      renderDetail();
-    });
-    $list.appendChild(item);
+  const name = document.createElement('div');
+  name.className = 'rpt-cat-item__name';
+  name.appendChild(document.createTextNode(t.name));
+  if (t.template && t.template.level === 'base') {
+    const lv = document.createElement('span');
+    lv.className = 'rpt-cat-item__badge base';
+    lv.textContent = 'База';
+    name.appendChild(lv);
   }
+  const badge = document.createElement('span');
+  badge.className = 'rpt-cat-item__badge ' + (t.source === 'builtin' ? 'builtin' : 'user');
+  badge.textContent = t.source === 'builtin' ? 'Встроенный' : 'Мой';
+  name.appendChild(badge);
+  item.appendChild(name);
+
+  if (t.description) {
+    const d = document.createElement('div');
+    d.className = 'rpt-cat-item__desc';
+    d.textContent = t.description;
+    item.appendChild(d);
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'rpt-cat-item__meta';
+  const pg = Report.pageSizeMm(t.template.page || {});
+  meta.textContent = `${t.template.page?.format || 'A4'} · ${pg.width.toFixed(0)}×${pg.height.toFixed(0)} мм`;
+  item.appendChild(meta);
+
+  item.addEventListener('click', () => {
+    state.selectedId = t.id;
+    renderList();
+    renderDetail();
+  });
+  return item;
 }
 
 // ——— рендер детали ———
@@ -187,11 +213,92 @@ function renderDetail() {
   }
   window.__rptResetBtn.style.display = rec.source === 'builtin' ? '' : 'none';
 
-  // Превью: клонируем шаблон, вливаем демо-контент (если контент пуст).
-  // Для встроенных шаблонов demoContentFor отдаёт персональный набор —
-  // так пользователь видит реалистичное представление отчёта под задачу.
+  renderPreviewPane(rec);
+}
+
+// Просмотрщик шаблона: тулбар (поля вкл/выкл, масштаб, многостранич.)
+// + лист(ы). mode:'final' + pageLabel:false → нет дубля колонтитула-
+// номера («2 колонтитула» в демо). Поля показываются по тумблеру.
+function renderPreviewPane(rec) {
+  if (!rec) return;
   const previewTpl = prepTpl(rec);
-  Report.renderPreview(previewTpl, $preview, { mode: 'edit' });
+  $preview.innerHTML = '';
+
+  const tools = document.createElement('div');
+  tools.className = 'rpt-prev-tools';
+
+  const mkBtn = (txt, title) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn btn-sm';
+    b.textContent = txt; if (title) b.title = title;
+    return b;
+  };
+
+  const gBtn = mkBtn(state.prevGuides ? '🔲 Поля: вкл' : '⬜ Поля: выкл',
+    'Показать/скрыть направляющие полей печати');
+  gBtn.addEventListener('click', () => {
+    state.prevGuides = !state.prevGuides;
+    renderPreviewPane(rec);
+  });
+
+  const zMinus = mkBtn('−', 'Уменьшить');
+  const zLabel = document.createElement('span');
+  zLabel.className = 'rpt-prev-zoom';
+  zLabel.textContent = Math.round(state.prevZoom * 100) + '%';
+  const zPlus = mkBtn('+', 'Увеличить');
+  const zFit  = mkBtn('⤢ Вписать', 'Вписать по ширине (100%)');
+  const setZoom = (z) => {
+    state.prevZoom = Math.max(0.4, Math.min(4, Math.round(z * 100) / 100));
+    renderPreviewPane(rec);
+  };
+  zMinus.addEventListener('click', () => setZoom(state.prevZoom - 0.1));
+  zPlus .addEventListener('click', () => setZoom(state.prevZoom + 0.1));
+  zFit  .addEventListener('click', () => setZoom(1));
+
+  const pages = document.createElement('span');
+  pages.className = 'rpt-prev-pages';
+
+  tools.appendChild(gBtn);
+  const sep = document.createElement('span'); sep.className = 'rpt-prev-sep';
+  tools.appendChild(sep);
+  tools.appendChild(zMinus); tools.appendChild(zLabel); tools.appendChild(zPlus);
+  tools.appendChild(zFit);
+  tools.appendChild(pages);
+  $preview.appendChild(tools);
+
+  const host = document.createElement('div');
+  host.className = 'rpt-prev-host';
+  $preview.appendChild(host);
+
+  // Масштаб: вписываем страницу по ширине области, затем × zoom.
+  let scale = 2.4;
+  try {
+    const pg = Report.pageSizeMm(previewTpl.page || {});
+    const avail = Math.max(360, ($preview.clientWidth || 760) - 36);
+    const fit = Math.max(0.8, Math.min(6, avail / (pg.width || 210)));
+    scale = fit * (state.prevZoom || 1);
+  } catch (e) { /* дефолт */ }
+
+  Report.renderPreview(previewTpl, host, {
+    mode: 'final', guides: state.prevGuides, pageLabel: false, scale });
+
+  const n = host.querySelectorAll('.rpt-page').length;
+  pages.textContent = n > 1 ? ('Страниц: ' + n) : '1 страница';
+
+  // Ctrl+колесо — зум с шагом (общие правила: без Ctrl — нативный
+  // скролл/пан). Навешиваем один раз на $preview.
+  if (!$preview.__rptWheel) {
+    $preview.addEventListener('wheel', (ev) => {
+      if (!ev.ctrlKey) return;
+      ev.preventDefault();
+      const r = state.selectedId ? Catalog.getTemplate(state.selectedId) : null;
+      if (!r) return;
+      state.prevZoom = Math.max(0.4, Math.min(4,
+        Math.round((state.prevZoom + (ev.deltaY < 0 ? 0.1 : -0.1)) * 100) / 100));
+      renderPreviewPane(r);
+    }, { passive: false });
+    $preview.__rptWheel = true;
+  }
 }
 
 // Каталог-превью/экспорт ДОЛЖНЫ идти тем же конвейером, что и реальная

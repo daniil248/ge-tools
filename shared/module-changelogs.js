@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.689', date: '2026-05-17', items: [
+      '📑 <b>Отчёты: разделение базовых/документных шаблонов + просмотрщик</b> (репорт Пользователя). 1) Список (apps/reports/reports.js renderList) сгруппирован: «Шаблоны документов» и «Базовые шаблоны» (level===base) с заголовками групп и бейджем «База». 2) Превью каталога перестроено в просмотрщик: тулбар с тумблером «Поля вкл/выкл» (направляющие полей печати), масштаб −/%/+/«Вписать», Ctrl+колесо-зум, индикатор «Страниц: N» (многостраничный просмотр). 3) Устранён дубль колонтитула в демо: shared/report/preview.js — guides и pageLabel отвязаны от mode (renderPreview opts.guides/opts.pageLabel; обратная совместимость: при отсутствии — поведение по mode); просмотрщик зовёт mode:final + pageLabel:false → подпись «Стр. N из M» больше не двоит номер из футера. Файлы: shared/report/preview.js, apps/reports/reports.js, apps/reports/reports.css, js/engine/constants.js.',
+    ] },
     { version: '0.60.688', date: '2026-05-17', items: [
       '🧾 <b>Фаза 1: манифесты приведены к коду (honest contracts)</b>. tools/audit-contracts.py показывал drift в 16 из 33 модулей (storageKeys/urlParams, фактически используемые в коде, не были объявлены в manifest.json.dependsOnContracts). Сверка автоматизирована и устранена: constructor +20 sk, service +9, projects +5, rack-config +4, help +2, ups/panel/mv/scs/mdc/pdu/suppression-config +собственный ns, scs-config +6 url (id/new/prefill*), cable/scs-design +url. Только метаданные контрактов — НЕ runtime (modules.json не затронут: dependsOnContracts туда не проецируется), нулевая регрессия. audit-contracts.py --strict теперь EXIT=0 (0 drift из 33). Файлы: manifest.json 16 модулей, js/engine/constants.js.',
     ] },

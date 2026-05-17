@@ -19,9 +19,14 @@ import { pageSizeMm, contentBox, substitute, overlaysForPage, effectiveFlow,
 export function renderPreview(tpl, container, opts = {}) {
   const mode  = opts.mode || 'edit';
   const scale = opts.scale || 2.8;  // px на 1 мм — даёт ~80% от экранного A4
+  // Направляющие полей и подпись «Стр. N из M» — отвязаны от mode:
+  // их можно включать/выключать независимо (просмотрщик каталога
+  // показывает поля по тумблеру, но без дубля колонтитула-номера).
+  const guides    = opts.guides    !== undefined ? !!opts.guides    : (guides);
+  const pageLabel = opts.pageLabel !== undefined ? !!opts.pageLabel : (guides);
   container.innerHTML = '';
   container.classList.add('rpt-preview');
-  if (mode === 'edit') container.classList.add('rpt-preview--edit');
+  container.classList.toggle('rpt-preview--edit', guides);
 
   // Разбиваем content по страницам (упрощённая пагинация: считаем высоту
   // каждого блока и кладём в текущую страницу, пока влезает).
@@ -29,7 +34,7 @@ export function renderPreview(tpl, container, opts = {}) {
   const totalPages = Math.max(1, pages.length);
 
   pages.forEach((pg, i) => {
-    const pageEl = buildPageShell(tpl, scale, mode, pg, i + 1, totalPages);
+    const pageEl = buildPageShell(tpl, scale, guides, pg, i + 1, totalPages, pageLabel);
     const body   = pageEl.querySelector('.rpt-page__body');
     (pg.blocks || []).forEach(block => {
       const bel = renderBlock(block, tpl, { page: i + 1, pages: totalPages });
@@ -296,7 +301,7 @@ export function tableLayout(block, tpl) {
 // ——————————————————————————————————————————————————————————————————————
 // Каркас страницы: лист + поля + колонтитулы + область body + логотип.
 // ——————————————————————————————————————————————————————————————————————
-function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
+function buildPageShell(tpl, scale, guides, pg, pageNum, totalPages, pageLabel) {
   const geom = (pg && pg.geom) || tpl.page;
   const isFirst = !!(pg && pg.isFirst);
   const chromeOn = !pg || pg.chrome !== false;
@@ -310,7 +315,7 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
   page.style.height = (height * scale) + 'px';
 
   // Направляющие полей (только в edit-режиме)
-  if (mode === 'edit') {
+  if (guides) {
     const guide = div('rpt-page__margins');
     guide.style.left   = (m.left   * scale) + 'px';
     guide.style.right  = (m.right  * scale) + 'px';
@@ -326,7 +331,7 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
     h.style.right  = (m.right * scale) + 'px';
     h.style.top    = (m.top   * scale) + 'px';
     h.style.height = (hdr.height * scale) + 'px';
-    if (mode === 'edit') h.classList.add('rpt-zone--edit');
+    if (guides) h.classList.add('rpt-zone--edit');
     (hdr.blocks || []).forEach(b =>
       h.appendChild(renderBlock(b, tpl, { page: pageNum, pages: totalPages })));
     page.appendChild(h);
@@ -339,7 +344,7 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
     f.style.right  = (m.right * scale) + 'px';
     f.style.bottom = (m.bottom * scale) + 'px';
     f.style.height = (ftr.height * scale) + 'px';
-    if (mode === 'edit') f.classList.add('rpt-zone--edit');
+    if (guides) f.classList.add('rpt-zone--edit');
     (ftr.blocks || []).forEach(b =>
       f.appendChild(renderBlock(b, tpl, { page: pageNum, pages: totalPages })));
     page.appendChild(f);
@@ -352,7 +357,7 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
   body.style.top    = (cb.y * scale) + 'px';
   body.style.width  = (cb.width  * scale) + 'px';
   body.style.height = (cb.height * scale) + 'px';
-  if (mode === 'edit') body.classList.add('rpt-body--edit');
+  if (guides) body.classList.add('rpt-body--edit');
   page.appendChild(body);
 
   // Логотип
@@ -375,7 +380,7 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
     el.style.top    = (ov.y * scale) + 'px';
     el.style.width  = (ov.width  * scale) + 'px';
     el.style.height = (ov.height * scale) + 'px';
-    if (mode === 'edit') el.classList.add('rpt-overlay--edit');
+    if (guides) el.classList.add('rpt-overlay--edit');
     if (ov.type === 'image') {
       el.style.overflow = 'hidden';
       if (ov.content?.src) {
@@ -386,7 +391,7 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
         im.style.objectFit = ov.content.fit === 'fill' ? 'fill' : 'contain';
         im.draggable = false;
         el.appendChild(im);
-      } else if (mode === 'edit') {
+      } else if (guides) {
         el.style.border = '1px dashed #b0b6c2';
         el.style.display = 'flex';
         el.style.alignItems = 'center';
@@ -411,8 +416,9 @@ function buildPageShell(tpl, scale, mode, pg, pageNum, totalPages) {
     page.appendChild(el);
   }
 
-  // Номер страницы внизу-по-центру в edit-режиме
-  if (mode === 'edit') {
+  // Номер страницы внизу-по-центру (опц.; в просмотрщике каталога
+  // выключен — номер уже есть в колонтитуле, чтобы не двоился).
+  if (pageLabel) {
     const lbl = div('rpt-page__label');
     lbl.textContent = `Стр. ${pageNum} из ${totalPages}`;
     page.appendChild(lbl);
