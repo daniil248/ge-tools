@@ -130,15 +130,22 @@ export function defaultTemplate() {
     // Каждый overlay:
     //   {
     //     id:      string,
-    //     type:    'text',                 // пока только текст
+    //     type:    'text' | 'image',       // текст или изображение
     //     scope:   'first' | 'all' | 'other',  // на каких страницах
     //     x, y, width, height: number,     // мм, внутри поля печати
-    //     content: {
+    //     content: {                       // для type==='text':
     //       text:     string,              // с поддержкой {{...}}
     //       styleRef: 'body'|'h1'|'h2'|'h3'|'caption',
     //       align:    'left'|'center'|'right',
+    //     } | {                            // для type==='image':
+    //       src:   string,                 // data URL (PNG/JPEG) | null
+    //       fit:   'contain' | 'fill',
+    //       label: string,                 // напр. «Печать организации»
     //     },
     //   }
+    //   Image-зоны используются для печати организации и скан-подписи
+    //   ответственного лица (текстовые подписи/контакты — type 'text'
+    //   с пресетами respSign / executor).
     overlays: [],
   };
 }
@@ -293,7 +300,7 @@ export function contentBox(tpl, isFirstPage) {
 export function overlaysForPage(tpl, isFirstPage) {
   const list = Array.isArray(tpl?.overlays) ? tpl.overlays : [];
   return list.filter(o => {
-    if (!o || o.type !== 'text') return false;
+    if (!o || (o.type !== 'text' && o.type !== 'image')) return false;
     if (o.scope === 'all') return true;
     if (o.scope === 'first') return isFirstPage;
     if (o.scope === 'other') return !isFirstPage;

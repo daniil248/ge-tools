@@ -215,6 +215,17 @@ function drawOverlays(doc, tpl, isFirst, pageNum, total) {
   const ovs = overlaysForPage(tpl, isFirst);
   const ctx = { page: pageNum, pages: total };
   for (const ov of ovs) {
+    if (ov.type === 'image') {
+      const src = ov.content?.src;
+      if (!src) continue;
+      try {
+        const m = /^data:image\/(png|jpe?g)/i.exec(src);
+        const type = m && /jp/i.test(m[1]) ? 'JPEG' : 'PNG';
+        doc.addImage(src, type, ov.x, ov.y, ov.width, ov.height,
+          undefined, 'FAST');
+      } catch (e) { /* битый dataURL — пропускаем */ }
+      continue;
+    }
     const s = tpl.styles[ov.content?.styleRef || 'body'] || tpl.styles.body;
     // Через общий setFont — гарантированно RPT_FONT_FAMILY с кириллицей
     setFont(doc, s);

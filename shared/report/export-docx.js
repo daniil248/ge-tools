@@ -347,11 +347,26 @@ function injectOverlays(section, tpl, D, pageHeightMm) {
   const top = [];    // { ov, scope }
   const bot = [];
   for (const ov of ovs) {
-    if (!ov || ov.type !== 'text') continue;
+    if (!ov || (ov.type !== 'text' && ov.type !== 'image')) continue;
+    if (ov.type === 'image' && !ov.content?.src) continue;
     const target = (ov.y + ov.height / 2) < pageHeightMm / 2 ? top : bot;
     target.push(ov);
   }
   const mkPara = (ov) => {
+    if (ov.type === 'image') {
+      const bytes = dataUrlToUint8(ov.content.src);
+      const align = ov.content?.align === 'center' ? D.AlignmentType.CENTER
+                 : ov.content?.align === 'right'  ? D.AlignmentType.RIGHT
+                 :                                    D.AlignmentType.LEFT;
+      if (!bytes) return new D.Paragraph({ children: [] });
+      return new D.Paragraph({
+        alignment: align,
+        children: [ new D.ImageRun({
+          data: bytes,
+          transformation: { width: ov.width, height: ov.height },
+        }) ],
+      });
+    }
     const s = tpl.styles[ov.content?.styleRef || 'body'] || tpl.styles.body;
     const align = ov.content?.align === 'center' ? D.AlignmentType.CENTER
                : ov.content?.align === 'right'  ? D.AlignmentType.RIGHT

@@ -295,6 +295,28 @@ function buildPageShell(tpl, scale, mode, isFirst, pageNum, totalPages) {
     el.style.width  = (ov.width  * scale) + 'px';
     el.style.height = (ov.height * scale) + 'px';
     if (mode === 'edit') el.classList.add('rpt-overlay--edit');
+    if (ov.type === 'image') {
+      el.style.overflow = 'hidden';
+      if (ov.content?.src) {
+        const im = document.createElement('img');
+        im.src = ov.content.src;
+        im.style.width = '100%';
+        im.style.height = '100%';
+        im.style.objectFit = ov.content.fit === 'fill' ? 'fill' : 'contain';
+        im.draggable = false;
+        el.appendChild(im);
+      } else if (mode === 'edit') {
+        el.style.border = '1px dashed #b0b6c2';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.style.font = '10px system-ui';
+        el.style.color = '#9aa1ad';
+        el.textContent = '🖼 нет изображения';
+      }
+      page.appendChild(el);
+      continue;
+    }
     const s = tpl.styles[ov.content?.styleRef || 'body'] || tpl.styles.body;
     el.style.fontFamily = s.font;
     el.style.fontSize   = s.size + 'pt';

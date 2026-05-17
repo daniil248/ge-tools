@@ -44,6 +44,10 @@ const ZONE_PRESETS = [
   { id: 'pageNum',     label: 'Номер страницы',      w: 40, h:  6, styleRef: 'caption', text: 'стр. {{page}} из {{pages}}',      align: 'center' },
   { id: 'author',      label: 'Автор',               w: 60, h:  6, styleRef: 'caption', text: '{{meta.author}}',                 align: 'left'   },
   { id: 'freeText',    label: 'Свободный текст',     w: 80, h: 10, styleRef: 'body',    text: 'Текст',                           align: 'left'   },
+  { id: 'respSign',    label: 'Подпись ответственного лица', w: 90, h: 22, styleRef: 'caption', text: '{{meta.custom.respRole}}\n_______________ / {{meta.custom.respName}} /\n«___» __________ 20__ г.', align: 'left' },
+  { id: 'executor',    label: 'Контакты исполнителя', w: 80, h: 16, styleRef: 'caption', text: 'Исполнитель: {{meta.custom.execName}}\nтел. {{meta.custom.execPhone}} · {{meta.custom.execEmail}}', align: 'left' },
+  { id: 'seal',        label: 'Печать организации',   w: 38, h: 38, kind: 'image' },
+  { id: 'signScan',    label: 'Подпись (скан)',      w: 50, h: 20, kind: 'image' },
 ];
 
 // ——————————————————————————————————————————————————————————————————————
@@ -402,7 +406,11 @@ export function openTemplateEditor(tpl, opts = {}) {
     const items = [];
     if (working.logo.src) items.push({ id: 'logo', label: '📷 Логотип' });
     for (const ov of working.overlays) {
-      items.push({ id: ov.id, label: '▦ ' + shortText(ov.content?.text || '(пусто)') });
+      if (ov.type === 'image') {
+        items.push({ id: ov.id, label: '🖼 ' + (ov.content?.label || 'Изображение') + (ov.content?.src ? '' : ' (нет файла)') });
+      } else {
+        items.push({ id: ov.id, label: '▦ ' + shortText(ov.content?.text || '(пусто)') });
+      }
     }
     return items;
   }
@@ -420,6 +428,21 @@ export function openTemplateEditor(tpl, opts = {}) {
     const x = Math.max(m.left, m.left + (pw - p.w) / 2);
     const y = Math.max(m.top,  m.top  + (ph - p.h) / 2);
     const id = 'ov-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    if (p.kind === 'image') {
+      working.overlays.push({
+        id, type: 'image', scope: 'all',
+        x: round1(x), y: round1(y),
+        width: p.w, height: p.h,
+        content: { src: null, fit: 'contain', label: p.label },
+      });
+      state.selectedId = id;
+      state.activeTab  = 'props';
+      rebuildTab();
+      updateTabButtons();
+      redrawCanvas();
+      pickOverlayImage(id);
+      return;
+    }
     working.overlays.push({
       id, type: 'text', scope: 'all',
       x: round1(x), y: round1(y),
@@ -431,6 +454,23 @@ export function openTemplateEditor(tpl, opts = {}) {
     rebuildTab();
     updateTabButtons();
     redrawCanvas();
+  }
+
+  function pickOverlayImage(ovId) {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/png,image/jpeg';
+    inp.addEventListener('change', async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      const ov = working.overlays.find(o => o.id === ovId);
+      if (!ov) return;
+      if (!ov.content) ov.content = {};
+      ov.content.src = await readAsDataUrl(f);
+      rebuildTab();
+      redrawCanvas();
+    });
+    inp.click();
   }
 
   function pickLogo() {
@@ -586,7 +626,8 @@ export function openTemplateEditor(tpl, opts = {}) {
     }
     const ov = working.overlays.find(o => o.id === id);
     if (ov) {
-      buildOverlayProps(parent, ov);
+      if (ov.type === 'image') buildImageOverlayProps(parent, ov);
+      else buildOverlayProps(parent, ov);
       return;
     }
     const hint = el('div', 'rpt-hint');
@@ -637,6 +678,72 @@ export function openTemplateEditor(tpl, opts = {}) {
       redrawCanvas();
     });
     parent.appendChild(rm);
+  }
+
+  function buildImageOverlayProps(parent, ov) {
+    sectionTitle(parent, ov.content?.label || 'Изображение');
+
+    if (ov.content?.src) {
+      const img = document.createElement('img');
+      img.src = ov.content.src;
+      img.className = 'rpt-logo-preview';
+      parent.appendChild(img);
+    } else {
+      const hint = el('div', 'rpt-hint');
+      hint.textContent = 'Файл не выбран. Поддерживаются PNG/JPEG. Для печати и подписи рекомендуется PNG с прозрачным фоном.';
+      parent.appendChild(hint);
+    }
+
+    const pick = buttonEl(ov.content?.src ? '📷 Заменить изображение…' : '+ 📷 Выбрать изображение…');
+    pick.className = 'rpt-zone-add-btn';
+    pick.addEventListener('click', () => pickOverlayImage(ov.id));
+    parent.appendChild(pick);
+
+    const fFit = field(parent, 'Вписывание');
+    const fitSel = document.createElement('select');
+    [['contain', 'Сохранять пропорции'], ['fill', 'Растягивать']].forEach(([v, l]) => {
+      const o = document.createElement('option'); o.value = v; o.textContent = l; fitSel.appendChild(o);
+    });
+    fitSel.value = ov.content?.fit || 'contain';
+    fitSel.addEventListener('change', () => {
+      if (!ov.content) ov.content = {};
+      ov.content.fit = fitSel.value; redrawCanvas();
+    });
+    fFit.appendChild(fitSel);
+
+    const fSc = field(parent, 'На каких страницах');
+    const scSel = document.createElement('select');
+    [['all', 'На всех'], ['first', 'Только на первой'], ['other', 'На всех кроме первой']].forEach(([v, l]) => {
+      const o = document.createElement('option'); o.value = v; o.textContent = l; scSel.appendChild(o);
+    });
+    scSel.value = ov.scope || 'all';
+    scSel.addEventListener('change', () => { ov.scope = scSel.value; redrawCanvas(); });
+    fSc.appendChild(scSel);
+
+    sectionTitle(parent, 'Положение и размер');
+    const row1 = el('div', 'rpt-row');
+    const fx = field(row1, 'X, мм');
+    fx.appendChild(numInput(round1(ov.x), v => { ov.x = clampX(v, ov); redrawCanvas(); }));
+    const fy = field(row1, 'Y, мм');
+    fy.appendChild(numInput(round1(ov.y), v => { ov.y = clampY(v, ov); redrawCanvas(); }));
+    parent.appendChild(row1);
+    const row2 = el('div', 'rpt-row');
+    const fw = field(row2, 'Ширина, мм');
+    fw.appendChild(numInput(round1(ov.width), v => { ov.width = Math.max(8, v); redrawCanvas(); }));
+    const fh = field(row2, 'Высота, мм');
+    fh.appendChild(numInput(round1(ov.height), v => { ov.height = Math.max(8, v); redrawCanvas(); }));
+    parent.appendChild(row2);
+
+    const rmBtn = buttonEl('Удалить зону', 'danger');
+    rmBtn.addEventListener('click', () => {
+      working.overlays = working.overlays.filter(o => o.id !== ov.id);
+      state.selectedId = null;
+      state.activeTab = 'zones';
+      rebuildTab();
+      updateTabButtons();
+      redrawCanvas();
+    });
+    parent.appendChild(rmBtn);
   }
 
   function buildOverlayProps(parent, ov) {
@@ -771,6 +878,35 @@ export function openTemplateEditor(tpl, opts = {}) {
 
     // Overlay-зоны
     for (const ov of working.overlays) {
+      if (ov.type === 'image') {
+        const zd = el('div', 'rpt-cv-zone rpt-cv-zone--logo');
+        zd.style.left   = (ov.x * s) + 'px';
+        zd.style.top    = (ov.y * s) + 'px';
+        zd.style.width  = (ov.width  * s) + 'px';
+        zd.style.height = (ov.height * s) + 'px';
+        if (state.selectedId === ov.id) zd.classList.add('selected');
+        if (ov.content?.src) {
+          const img = document.createElement('img');
+          img.src = ov.content.src;
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = ov.content.fit === 'fill' ? 'fill' : 'contain';
+          img.draggable = false;
+          zd.appendChild(img);
+        } else {
+          const ph = el('div', 'rpt-cv-zone__text');
+          ph.style.font = '10px system-ui';
+          ph.style.color = '#9aa1ad';
+          ph.textContent = '🖼 ' + (ov.content?.label || 'Изображение');
+          zd.appendChild(ph);
+        }
+        const rzi = el('div', 'rpt-cv-resize');
+        zd.appendChild(rzi);
+        attachZoneHandlers(zd, ov.id);
+        attachResizeHandlers(rzi, ov.id);
+        page.appendChild(zd);
+        continue;
+      }
       const zd = el('div', 'rpt-cv-zone rpt-cv-zone--text');
       zd.style.left   = (ov.x * s) + 'px';
       zd.style.top    = (ov.y * s) + 'px';
