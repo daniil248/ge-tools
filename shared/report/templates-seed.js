@@ -148,6 +148,10 @@ export const BUILTIN_TEMPLATES = [
         body: { size: 11, lineHeight: 1.4 },
       },
       overlays: [
+        zone('doc-title',  'all', 22, 30, 170, 9, '{{meta.title}}', 'h1', 'left'),
+        zone('doc-company','all', 22, 42, 95, 14, 'Компания: {{meta.custom.companyName}}\n{{meta.custom.companyAddr}} · {{meta.custom.companyPhone}}', 'caption', 'left'),
+        zone('doc-to',     'all', 120, 42, 70, 14, 'Кому: {{meta.custom.recipient}}\n{{meta.custom.recipientPost}}', 'caption', 'right'),
+        zone('doc-sign',   'all', 22, 250, 110, 22, '{{meta.custom.signRole}}\n_______________ / {{meta.custom.signName}} /\n«___» __________ 20__ г.  М.П.', 'caption', 'left'),
         zone('hdr-title', 'all', 22, 11, 170, 6, '{{meta.title}}', 'caption', 'left'),
         zone('ftr-date',  'all', 22, 283, 170, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
@@ -282,10 +286,12 @@ export const BUILTIN_TEMPLATES = [
         table:   { font: 'Times', size: 11, headBg: TABLE_HEAD, borderColor: BORDER },
       },
       overlays: [
-        // На первой странице только футер с датой — шапка пустая
-        zone('ftr-first', 'first', 25, 282, 165, 6, '{{date}}', 'caption', 'center'),
-        // На последующих — шапка с заголовком и футер с номером страницы
-        zone('hdr-other', 'other', 25, 14, 165, 6, '{{meta.title}}', 'caption', 'center'),
+        zone('doc-company','all', 25, 32, 95, 14, 'Компания: {{meta.custom.companyName}}\n{{meta.custom.companyAddr}}', 'caption', 'left'),
+        zone('doc-to',     'all', 122, 32, 63, 16, 'Кому: {{meta.custom.recipient}}\n{{meta.custom.recipientPost}}', 'caption', 'left'),
+        zone('doc-title',  'all', 25, 50, 165, 10, '{{meta.title}}', 'h1', 'center'),
+        zone('doc-sign',   'all', 25, 248, 140, 24, '{{meta.custom.signRole}}\n_______________ / {{meta.custom.signName}} /\n«___» __________ 20__ г.  М.П.', 'caption', 'left'),
+        // Колонтитулы (остаются absolute в полях)
+        zone('ftr-first', 'first', 25, 282, 165, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
         zone('ftr-other', 'other', 25, 282, 165, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
     }),
@@ -308,7 +314,10 @@ export const BUILTIN_TEMPLATES = [
         caption: { size: 9, italic: true },
       },
       overlays: [
-        zone('hdr', 'other', 20, 10, 172, 6, '{{meta.title}}  ·  {{date}}', 'caption', 'right'),
+        zone('doc-title',  'all', 20, 28, 172, 8, '{{meta.title}}', 'h1', 'left'),
+        zone('doc-company','all', 20, 38, 100, 12, 'Компания: {{meta.custom.companyName}} · {{meta.custom.companyPhone}}', 'caption', 'left'),
+        zone('doc-to',     'all', 124, 38, 68, 12, 'Кому: {{meta.custom.recipient}}', 'caption', 'right'),
+        zone('doc-sign',   'all', 20, 258, 110, 20, '{{meta.custom.signRole}}\n______ / {{meta.custom.signName}} /  М.П.', 'caption', 'left'),
         zone('ftr', 'all',   20, 285, 172, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
     }),

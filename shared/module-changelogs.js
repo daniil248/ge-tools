@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.659', date: '2026-05-17', items: [
+      '🏗 <b>Редизайн отчётов — R5e: комплектные встроенные шаблоны</b> (поглощает прежнее «обогащение сидов»). В 3 документ-ориентированных встроенных шаблона (Инженерный отчёт, Официальный документ, Техническая записка) добавлены зоны: doc-title (h1, {{meta.title}}), doc-company (Компания: {{meta.custom.companyName/Addr/Phone}}), doc-to (Кому: {{meta.custom.recipient/Post}}), doc-sign (должность/линия/ФИО/дата/М.П.). Тексты подобраны под classifyOverlay → после migrateToFlow становятся структурными блоками ПОТОКА (заголовок/реквизиты/адресат сверху, подпись снизу — без наложения), футер с {{page}} остаётся колонтитулом в полях. Документы комплектны «из коробки» без ручной настройки. Данные-правка (zone()-зоны), без новых экспортов, cache-safe. Замечание: builtin сидятся в LS по id однократно — у существующих пользователей старые копии сохраняются (это поведение сид-каталога; не перезаписываем пользовательские данные). Файл: shared/report/templates-seed.js (engineering/formal/technical overlays).',
+    ] },
     { version: '0.60.658', date: '2026-05-17', items: [
       '🏗 <b>Редизайн отчётов — R5d: клиентское КП (service/export-offer) на единый flow</b>. Тот же паттерн, что для ТЗ (R5a-c): openOfferPreview импортирует shared/report/template.js, после createTemplate(rec.template)+tpl.content=buildOfferBlocks вызывает Tpl.migrateToFlow(tpl) → структура выбранного шаблона (заголовок/адресат/реквизиты) сворачивается в ПОТОК (нет наложения на тело КП), печать/скан-подпись → floating с привязкой к подписанту, колонтитул-номер остаётся overlay в полях, структурные overlay съедены (R5c). sections.manifest строится из tpl.flow. Импорт template.js напрямую (migrateToFlow на edge с R1 — cache-safe). Логика идентична верифицированному end-to-end ТЗ-паттерну. Файл: apps/service/calc/export-offer.js (openOfferPreview → migrateToFlow).',
     ] },
