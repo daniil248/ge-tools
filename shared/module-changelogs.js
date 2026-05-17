@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.698', date: '2026-05-17', items: [
+      '📑 <b>Базовые шаблоны: единые поля 15/20/20/25</b> (требование Пользователя «для базовых задай поля по 20 и 25 с боков и 15 и 20 сверху/снизу»). Все 5 базовых seed (blank/simple/formal/bom-landscape/compact-a5) приведены к margins {верх 15, низ 20, лево 20, право 25}. BUILTIN_VERSION 4→5 (пересев builtin, пользовательские шаблоны не затрагиваются). Файлы: shared/report/templates-seed.js, js/engine/constants.js.',
+    ] },
     { version: '0.60.697', date: '2026-05-17', items: [
       '📑 <b>Колонтитулы вынесены в поля страницы (вне области печати) + режим ширины</b> (репорт Пользователя «колонтитулы должны быть отдельно, за пределами полей печати, иногда шире»). Новый template.colontitleBox(geom,band,where): шапка — в ВЕРХНЕМ поле (над областью печати), подвал — в НИЖНЕМ поле (под областью печати); ширина band.width: print (между полями, по умолч.) / page (вся ширина листа) / bleed (за край листа на band.bleed мм, по умолч.10). contentBoxFor больше НЕ урезает тело под колонтитулы (тело = строго прямоугольник печати) — устранено визуальное слипание подвала с границей печати/направляющей. preview.js и export-pdf.js рисуют колонтитулы по colontitleBox; в редакторе (вкладка «Колонтитулы») добавлен выбор «Ширина» + «Вылет за край, мм». Файлы: shared/report/template.js, shared/report/preview.js, shared/report/export-pdf.js, shared/report/editor.js, js/engine/constants.js.',
     ] },

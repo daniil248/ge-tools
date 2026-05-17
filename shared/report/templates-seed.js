@@ -27,7 +27,7 @@ import * as Report from './index.js';
 
 // Смена версии → переcев встроенных (пользовательские не трогаем).
 // v3 — все шаблоны на чистой canvas-модели (overlays в margin).
-export const BUILTIN_VERSION = 4;
+export const BUILTIN_VERSION = 5;
 
 // ——— палитра ———
 const INK       = '#1f2430';
@@ -108,7 +108,7 @@ export const BUILTIN_TEMPLATES = [
     template: T({
       level: 'base',
       meta: { title: 'Отчёт' },
-      page: { margins: { top: 20, right: 18, bottom: 20, left: 22 } },
+      page: { margins: { top: 15, right: 25, bottom: 20, left: 20 } },
       overlays: [],
     }),
   },
@@ -123,7 +123,7 @@ export const BUILTIN_TEMPLATES = [
     template: T({
       level: 'base',
       meta: { title: 'Отчёт' },
-      page: { margins: { top: 24, right: 18, bottom: 22, left: 22 } },
+      page: { margins: { top: 15, right: 25, bottom: 20, left: 20 } },
       overlays: [
         // Шапка, y=10 (в верхнем 24-мм поле)
         zone('hdr-title', 'all', 22, 10, 170, 6, '{{meta.title}}', 'caption', 'right'),
@@ -278,7 +278,7 @@ export const BUILTIN_TEMPLATES = [
     template: T({
       level: 'base',
       meta: { title: 'Пояснительная записка' },
-      page: { margins: { top: 30, right: 20, bottom: 28, left: 25 } },
+      page: { margins: { top: 15, right: 25, bottom: 20, left: 20 } },
       styles: {
         body:    { font: 'Times', size: 12, lineHeight: 1.5, align: 'justify', spaceAfter: 3 },
         h1:      { font: 'Times', size: 16, bold: true, align: 'center', spaceBefore: 6, spaceAfter: 6 },
@@ -338,7 +338,7 @@ export const BUILTIN_TEMPLATES = [
       meta: { title: 'Ведомость материалов' },
       page: {
         format: 'A4', orientation: 'landscape',
-        margins: { top: 16, right: 12, bottom: 16, left: 15 },
+        margins: { top: 15, right: 25, bottom: 20, left: 20 },
       },
       styles: {
         h1: { size: 14, bold: true, spaceBefore: 0, spaceAfter: 3 },
@@ -365,7 +365,7 @@ export const BUILTIN_TEMPLATES = [
       meta: { title: 'Справка' },
       page: {
         format: 'A5', orientation: 'portrait',
-        margins: { top: 14, right: 10, bottom: 14, left: 12 },
+        margins: { top: 15, right: 25, bottom: 20, left: 20 },
       },
       styles: {
         h1: { size: 13, bold: true, spaceBefore: 0, spaceAfter: 2 },
