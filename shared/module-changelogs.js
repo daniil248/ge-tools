@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.629', date: '2026-05-17', items: [
+      '📋 <b>Фаза 1 (хвост): манифест mv-config честный</b>. apps/mv-config/manifest.json: bridges [] → shared/catalog-bridge.js (фактический импорт, был пропущен); urlParams +name/Un_kV/loadA/In_A/mvType/cellsCount/lockedId (pre-fill подбора из ?nodeId-контекста). storageKeys (raschet.configurations.mv.v1, raschet.pendingMvSelection.v1) и events (rs-selection-change/rs-cs-focus) уже корректны. Исключён raschet.mv-config.v1 — schema-id импорта/экспорта (wire-format, RENAME.md §3). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/mv-config/manifest.json.',
+    ] },
     { version: '0.60.628', date: '2026-05-17', items: [
       '📋 <b>Фаза 1 (хвост): манифест pdu-config честный</b>. apps/pdu-config/manifest.json: storageKeys = raschet.lastPduConfig.v1 (handoff: pdu-config ПИШЕТ, rack-config/scs-config читают при подборе PDU); urlParams +embed (?embed=1 — встраиваемый режим); bridges shared/catalog-bridge.js (уже верно). Исключён raschet.pdu-config.v1 — schema-id импорта/экспорта (wire-format, RENAME.md §3). version 1.0.0→1.1.0. Непроецируемые поля → modules.json не меняется, паритет 33 OK, нулевой runtime-риск. Файл: apps/pdu-config/manifest.json.',
     ] },

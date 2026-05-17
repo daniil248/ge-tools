@@ -2,7 +2,7 @@
   "id": "mv-config",
   "name": "Конфигуратор РУ СН",
   "description": "Распределительные устройства среднего напряжения 6-35 кВ: моноблоки SF6 (RM6, FafeRing) и сборные (ЩО-70). Справочник + wizard-подбор с конфигурированием ячеек",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -41,8 +41,15 @@
     },
     "urlParams": [
       "project",
-      "nodeId"
+      "nodeId",
+      "name",
+      "Un_kV",
+      "loadA",
+      "In_A",
+      "mvType",
+      "cellsCount",
+      "lockedId"
     ],
-    "bridges": []
+    "bridges": ["shared/catalog-bridge.js"]
   }
 }
