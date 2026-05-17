@@ -610,44 +610,43 @@ function exportMarkdown() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-function printRequirements() {
+// v0.60.562 (Фаза 3, memory:reports_via_module): отчёт формируется
+// через модуль reports/ (blocks[] API), а не прямой HTML+window.open.
+// Подпрограмма отдаёт структуру, стили/поля — на стороне reports/.
+async function printRequirements() {
   const txt = buildRequirementsText();
-  const htmlLines = txt.split('\n').map(l => {
-    if (l.startsWith('# ')) return `<h1>${esc(l.slice(2))}</h1>`;
-    if (l.startsWith('**') && l.endsWith('**')) return `<h3>${esc(l.slice(2, -2))}</h3>`;
-    if (l.startsWith('- ')) return `<li>${l.slice(2).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</li>`;
-    if (l.startsWith('_') && l.endsWith('_')) return `<p class="footer-note"><i>${esc(l.slice(1, -1))}</i></p>`;
-    if (!l.trim()) return '';
-    return `<p>${l.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}</p>`;
-  });
-  // group consecutive <li> into <ul>
-  const grouped = [];
-  let inUl = false;
-  for (const line of htmlLines) {
-    if (line.startsWith('<li>')) {
-      if (!inUl) { grouped.push('<ul>'); inUl = true; }
-      grouped.push(line);
-    } else {
-      if (inUl) { grouped.push('</ul>'); inUl = false; }
-      grouped.push(line);
-    }
+  let Report;
+  try {
+    Report = await import('shared/report/index.js');
+  } catch (e) {
+    rsToast('Не удалось загрузить модуль отчётов: ' + (e.message || e), 'error');
+    return;
   }
-  if (inUl) grouped.push('</ul>');
-
-  const w = window.open('', '_blank', 'width=800,height=900');
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Требования к PDU</title>
-    <style>
-      body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 30px auto; padding: 0 30px; color: #222; }
-      h1 { font-size: 20px; border-bottom: 2px solid #1565c0; padding-bottom: 8px; }
-      h3 { font-size: 14px; color: #1565c0; margin-top: 18px; }
-      ul { padding-left: 22px; }
-      li { margin: 4px 0; }
-      .footer-note { margin-top: 28px; font-size: 11px; color: #777; border-top: 1px dashed #ccc; padding-top: 10px; }
-      @media print { body { margin: 0; } }
-    </style>
-    </head><body>${grouped.join('\n')}</body></html>`);
-  w.document.close();
-  setTimeout(() => { try { w.print(); } catch {} }, 300);
+  const B = Report.blocks;
+  const strip = s => String(s).replace(/\*\*(.+?)\*\*/g, '$1');
+  const blocks = [];
+  let listBuf = [];
+  const flush = () => { if (listBuf.length) { blocks.push(B.list(listBuf)); listBuf = []; } };
+  for (const l of txt.split('\n')) {
+    if (l.startsWith('- ')) { listBuf.push(strip(l.slice(2))); continue; }
+    flush();
+    if (l.startsWith('# ')) blocks.push(B.h1(l.slice(2)));
+    else if (l.startsWith('**') && l.endsWith('**')) blocks.push(B.h3(l.slice(2, -2)));
+    else if (l.startsWith('_') && l.endsWith('_')) blocks.push(B.caption(l.slice(1, -1)));
+    else if (l.trim()) blocks.push(B.paragraph(strip(l)));
+  }
+  flush();
+  const tpl = Report.createTemplate({
+    meta: { title: 'Требования к PDU', kind: 'pdu-requirements' },
+  });
+  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
+  tpl.margins = { top: 18, right: 15, bottom: 18, left: 18 };
+  tpl.content = blocks;
+  try {
+    Report.exportPDF(tpl, `pdu-requirements-${Date.now()}.pdf`);
+  } catch (e) {
+    rsToast('Ошибка экспорта PDF: ' + (e.message || e), 'error');
+  }
 }
 
 // ——— Wire ———

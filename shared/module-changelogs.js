@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.562', date: '2026-05-17', items: [
+      '📄 <b>Фаза 3 / 1.7: pdu-config «Требования к PDU» — direct-HTML → reports/ blocks[]</b>. printRequirements() переписан: вместо window.open(empty).document.write(захардкоженный HTML+CSS)+w.print() — парсинг markdown-текста в blocks[] (h1/h3/list/caption/paragraph через shared/report/blocks), Report.createTemplate + Report.exportPDF (паттерн service/export-offer). Подпрограмма отдаёт структуру, стили/поля страницы — на стороне reports/ (memory:reports_via_module). Динамический import shared/report/index.js (lazy, cache-safe — новых shared-export нет). window.open в pdu-config = 0. Ошибки — rsToast (memory:no-dialogs), не молчат как раньше. Остаток direct-HTML отчётов: battery:3787, logistics:222, ups-config:2221.',
+    ] },
     { version: '0.60.561', date: '2026-05-17', items: [
       '📋 <b>Фаза 3 аудит: точное состояние reports/catalogs/history</b>. ROADMAP 1.6/1.7/1.8 синхронизированы с реальностью (план устарел): 1.6 history-log append-only+soft-delete ✅ ПЛАТФОРМЕННО (shared/history-log.js полный API: append/list/trash/restore/purge/clear/size/stats); 1.8 WORK_TEMPLATES ✅ уже вынесен в apps/service/catalog/work-templates.js (re-export shim, @deprecated v0.60.36); 1.7 Service export-offer ✅ мигрирован (v0.60.26 blocks API), SCS-BOM/TW-PUE прямого HTML не имеют. Остаток 1.7 (genuine direct-HTML window.open document.write анти-паттерн): battery-calc.js:3787, logistics.js:222, pdu-config.js:637, ups-config.js:2221 — мигрировать в reports/ blocks[] по одному с визуальным diff-парити. Только документация.',
     ] },
