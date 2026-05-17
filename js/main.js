@@ -35,6 +35,10 @@ import { state as _engineState } from './engine/state.js';
 // #palette-sections БЕЗ изменений (регрессия-сейф). Прочие — scaffold-
 // превью (display-toggle, обратимо). CORE/constructor→shared разрешён.
 import { getContext, usesCurrentPalette, listContexts } from '../shared/discipline-context.js';
+// Ф-B2 (X.4.5.3, Вариант I): тип схемы immutable. Если в проекте есть
+// хоть одна типизированная страница — дисциплина задаётся в мастере
+// страницы, а dropdown в свойствах проекта 🔒 read-only.
+import { isPageTyped, getDiscipline } from '../shared/disciplines.js';
 import { selectNode as _engineSelectNode } from './engine/inspector.js';
 
 (function () {
@@ -2508,7 +2512,38 @@ function openProjectInfoModal() {
   set('pi-author',      pi.author);
   set('pi-description', pi.description);
   // v0.60.499 (Roadmap 47.4.1): дисциплина схемы (default electrical).
-  { const el = document.getElementById('pi-discipline'); if (el) el.value = pi.discipline || 'electrical'; }
+  // Ф-B2 (Вариант I): если в проекте есть типизированные страницы —
+  // тип задаётся в мастере страницы, dropdown 🔒 read-only (значение
+  // сохраняется: disabled select по-прежнему отдаёт .value при чтении,
+  // memory:user-params-sacred). Legacy-проект без типизированных
+  // страниц — dropdown остаётся редактируемым (старое поведение).
+  {
+    const el = document.getElementById('pi-discipline');
+    if (el) {
+      el.value = pi.discipline || 'electrical';
+      const pages = (window.Raschet?._state?.pages) || [];
+      const typed = Array.isArray(pages) && pages.some(p => isPageTyped(p));
+      el.disabled = typed;
+      const lbl = el.closest('.field')?.querySelector('label');
+      let badge = document.getElementById('pi-disc-lock');
+      if (typed) {
+        el.title = 'Тип схемы фиксируется при создании страницы и не '
+          + 'меняется. Дисциплина выбирается в мастере «+ страница».';
+        if (lbl && !badge) {
+          badge = document.createElement('span');
+          badge.id = 'pi-disc-lock';
+          badge.style.cssText = 'margin-left:6px;font-size:11px;opacity:.7';
+          lbl.appendChild(badge);
+        }
+        if (badge) {
+          const d = getDiscipline(el.value);
+          badge.textContent = `🔒 неизменяем${d ? ` · ${d.icon} ${d.label}` : ''}`;
+        }
+      } else if (badge) {
+        badge.remove();
+      }
+    }
+  }
   // v0.58.53 (1.22.4): рендер каталога изделий проекта
   renderProductCatalogList();
   openModal('modal-project-info');

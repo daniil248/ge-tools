@@ -14,7 +14,7 @@ import { getActiveProjectId, ensureDefaultProject, listProjects } from '../../sh
 // Ф-B (X.4.5.3, Вариант I): страница = типизированная схема. Дисциплина
 // штампуется ОДИН раз при создании (осознанное действие = создание
 // типизированной схемы) и далее immutable. Контракт — Ф-A pageDiscipline.
-import { pageDiscipline } from '../../shared/disciplines.js';
+import { pageDiscipline, DISCIPLINES, getDiscipline } from '../../shared/disciplines.js';
 // v0.60.258: file-based storage (drawio-style).
 // v0.60.260: + persistent handle через IndexedDB + reload helper.
 import { openProjectFile, saveProjectAsFile, writeProjectToHandle, buildFilePayload, isFileSystemAccessSupported, reloadFromHandle, rememberHandle, loadRememberedHandle, forgetHandle, ensurePermission } from '../../shared/file-sync.js';
@@ -794,7 +794,7 @@ export function initToolbar() {
     return String(mx + 1);
   };
 
-  const addPage = (type = 'independent', sourcePageId = null, kind = 'schematic') => {
+  const addPage = (type = 'independent', sourcePageId = null, kind = 'schematic', discipline = null) => {
     // Ссылочная страница ОБЯЗАНА быть привязана к существующей independent странице.
     if (type === 'linked') {
       const src = (state.pages || []).find(p => p.id === sourcePageId && p.type !== 'linked');
@@ -812,10 +812,14 @@ export function initToolbar() {
       name: `Страница ${nextNum}`,
       type,
       kind: PAGE_KINDS.includes(kind) ? kind : 'schematic',
-      // Ф-B: immutable-дисциплина новой страницы. По умолчанию —
-      // дисциплина проекта (Вариант I backward-compat); явный выбор
-      // в мастере — Ф-B2. Штамп при создании = разрешённая запись.
-      discipline: pageDiscipline(null, state.project && state.project.discipline),
+      // Ф-B2: immutable-дисциплина новой страницы. Явный выбор из
+      // мастера (discipline-аргумент) валидируется pageDiscipline
+      // (неизвестный id → fallback на дисциплину проекта → electrical);
+      // без выбора — дисциплина проекта (Вариант I backward-compat).
+      // Штамп при создании = осознанная типизация схемы.
+      discipline: pageDiscipline(
+        typeof discipline === 'string' ? { discipline } : null,
+        state.project && state.project.discipline),
       view: { x: 0, y: 0, zoom: 1 },
       sheetNo: _nextSheetNo(),
       title: '',
@@ -1080,25 +1084,61 @@ export function initToolbar() {
     closePageMenu();
     const menu = document.createElement('div');
     menu.className = 'page-tab-menu';
-    const g = document.createElement('div');
-    g.className = 'pm-group-label';
-    g.textContent = 'Новая страница — вид';
-    menu.appendChild(g);
-    const mkItem = (label, handler) => {
+    const mkItem = (label, handler, title) => {
       const it = document.createElement('div');
       it.className = 'pm-item';
       it.innerHTML = label;
+      if (title) it.title = title;
       it.onclick = (ev) => { ev.stopPropagation(); closePageMenu(); handler(); };
       menu.appendChild(it);
+      return it;
     };
-    // v0.58.7: прямо из меню «+» сразу выбирается ВИД страницы
-    // (schematic / layout / mechanical / ...). Все страницы —
-    // independent (разделение на independent/linked убрано из UX).
+    const mkGroup = (text) => {
+      const g = document.createElement('div');
+      g.className = 'pm-group-label';
+      g.textContent = text;
+      menu.appendChild(g);
+    };
+    // Ф-B2 (X.4.5.3, Вариант I): мастер выбора immutable-дисциплины
+    // страницы-схемы. Тип задаётся ТОЛЬКО здесь и НЕ меняется после
+    // создания (в свойствах проекта — 🔒 read-only). По умолчанию —
+    // дисциплина проекта (backward-compat). RBAC-гейт чужого типа —
+    // Ф-D (здесь не блокируем).
+    let _selDisc = pageDiscipline(null, state.project && state.project.discipline);
+    mkGroup('Дисциплина (тип схемы — 🔒 неизменяем)');
+    const _discRows = [];
+    const _paintDisc = () => {
+      for (const { row, id } of _discRows) {
+        const on = id === _selDisc;
+        row.style.fontWeight = on ? '600' : '';
+        row.style.background = on ? 'rgba(70,130,255,.12)' : '';
+      }
+    };
+    for (const d of DISCIPLINES) {
+      const row = document.createElement('div');
+      row.className = 'pm-item';
+      row.innerHTML = `<span style="margin-right:6px">${d.icon}</span>` +
+        `${escapePage(d.label)}` +
+        (d.ready ? '' : ' <span style="opacity:.55;font-size:11px">(каркас)</span>');
+      row.title = d.ready
+        ? `Тип схемы: ${d.label}. Расчётный движок реализован. Неизменяем после создания страницы.`
+        : `Тип схемы: ${d.label}. Движок ещё каркас — палитра/расчёт ограничены. Неизменяем после создания.`;
+      row.onclick = (ev) => { ev.stopPropagation(); _selDisc = d.id; _paintDisc(); };
+      menu.appendChild(row);
+      _discRows.push({ row, id: d.id });
+    }
+    _paintDisc();
+    // v0.58.7: ВИД страницы (schematic / layout / mechanical / ...).
+    // Клик по виду создаёт типизированную страницу с выбранной выше
+    // дисциплиной. Все страницы — independent (разделение
+    // independent/linked убрано из UX).
+    mkGroup('Новая страница — вид');
     for (const k of PAGE_KINDS) {
       const m = PAGE_KINDS_META[k];
       if (!m) continue;
       mkItem(`<span style="margin-right:6px">${m.icon}</span>${escapePage(m.label)}`,
-        () => addPage('independent', null, k));
+        () => addPage('independent', null, k, _selDisc),
+        'Создать страницу этого вида с выбранной дисциплиной (тип схемы фиксируется и не меняется).');
     }
     document.body.appendChild(menu);
     const mw = menu.offsetWidth, mh = menu.offsetHeight;
