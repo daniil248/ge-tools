@@ -36,6 +36,11 @@ import {
 // read-only индикатор в бейдже контекста. Только для internal-роли
 // (canCreateDiscipline → true для не-internal: нулевая регрессия).
 import { canCreateDiscipline } from 'shared/subscriptions.js';
+// Ф-F4 (X.4.5.3 §5.1, memory:reports_via_module): отчёт «План зала +
+// кабельный журнал» формируется blocks[] и рендерится модулем
+// reports/ (shared/report/*), НЕ локальный window.open/HTML.
+// Read-only: данные СКС/движок не меняются.
+import * as B from 'shared/report/blocks.js';
 
 const LS_RACK      = LS_TEMPLATES_GLOBAL;              // для совместимости storage-listener
 const LS_CATALOG   = 'scs-config.catalog.v1';          // глобальный каталог IT
@@ -4884,11 +4889,62 @@ function _applyDiscRoleGate() {
   }
 }
 
+// Ф-F4: blocks[] отчёта «План зала + кабельный журнал». Чистое
+// чтение тех же данных, что CSV-экспорт (getVisibleLinks/
+// getProjectInstances) — движок/данные не меняются.
+function buildScsReportBlocks() {
+  const cableLabel = id => (CABLE_TYPES.find(c => c.id === id)?.label) || id;
+  const racks = getProjectInstances() || [];
+  const links = getVisibleLinks() || [];
+  const blocks = [B.h1('План зала и кабельный журнал СКС')];
+  blocks.push(B.h2('Стойки проекта'));
+  blocks.push(B.table(
+    ['#', 'Шифр / имя', 'Габариты', 'U'],
+    racks.map((r, i) => [
+      String(i + 1),
+      getRackShortLabel(r.id) || r.name || r.id,
+      [r.width, r.depth].filter(Boolean).join('×') + (r.width || r.depth ? ' мм' : ''),
+      r.u != null ? String(r.u) : '',
+    ])));
+  blocks.push(B.h2('Меж-шкафные связи (кабельный журнал)'));
+  blocks.push(B.table(
+    ['#', 'Шкаф A', 'Устр. A', 'Порт A', 'Шкаф B', 'Устр. B', 'Порт B', 'Кабель', 'Длина, м', 'С запасом, м'],
+    links.map((l, i) => {
+      const len = l.lengthM != null && !Number.isNaN(+l.lengthM) ? +l.lengthM : null;
+      return [
+        String(i + 1),
+        getRackShortLabel(l.fromRackId), deviceLabel(l.fromRackId, l.fromDevId), l.fromPort || '',
+        getRackShortLabel(l.toRackId), deviceLabel(l.toRackId, l.toDevId), l.toPort || '',
+        cableLabel(l.cableType),
+        len == null ? '' : len.toFixed(1),
+        len == null ? '' : (len * BOM_RESERVE).toFixed(1),
+      ];
+    })));
+  blocks.push(B.hr());
+  blocks.push(B.caption('Сформировано модулем Отчётов из данных СКС (План зала). Данные не изменялись.'));
+  return blocks;
+}
+async function exportScsReport() {
+  try {
+    const { composeReport } = await import('shared/report/compose.js');
+    await composeReport({
+      tags: ['скс', 'план зала', 'кабельный журнал', 'инженерный', 'общее'],
+      pickTitle: 'Выбор шаблона для отчёта «План зала + кабельный журнал»',
+      title: 'План зала и кабельный журнал СКС',
+      build: () => buildScsReportBlocks(),
+      filename: 'СКС — план зала и кабельный журнал',
+    });
+  } catch (e) {
+    updateStatus('⚠ Не удалось сформировать отчёт: ' + (e && e.message ? e.message : e));
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const { pid, migrated } = rescopeToActiveProject();
   renderProjectBadge(pid);
   try { _initSidebarAccordion(); } catch (e) { console.warn('[sd accordion]', e); }
   try { _applyDiscRoleGate(); } catch (e) { console.warn('[sd role-gate]', e); }
+  document.getElementById('sd-plan-report')?.addEventListener('click', exportScsReport);
   if (migrated > 0) {
     updateStatus(`ℹ Данные СКС перенесены в активный проект (перенесено ключей: ${migrated}). Старые глобальные ключи оставлены как резерв.`);
   }
