@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.671', date: '2026-05-17', items: [
+      '🏗 <b>Отчёты — DS3: редактор для Word-style разделов/обложки</b>. editor.js: «Структура» → пресет «⮐ Разрыв раздела (ориентация)» (вставляет sectionBreak); свойства sectionBreak — формат/ориентация/поля (пусто=наследовать); метка блока показывает ориентацию/формат. «Лист» → секция «Обложка/титул»: вкл отдельной титульной страницы, её ориентация, колонтитулы на обложке (вкл/выкл), добавление блоков обложки (Заголовок/Текст) + правка/удаление; секция «Первая страница (геометрия)»: своя ориентация 1-й страницы контента. Опирается на DS1/DS2a (модель+рендереры flowSegments на edge — cache-safe). Файл: shared/report/editor.js (STRUCT_ADD, buildBlockProps sectionBreak, blockLabel, buildPage cover/firstPage).',
+    ] },
     { version: '0.60.670', date: '2026-05-17', items: [
       '🏗 <b>Отчёты — DS2a: рендереры на flowSegments (переменная геометрия страниц)</b>. preview.paginate переписан: итерирует flowSegments(tpl), пагинирует КАЖДЫЙ сегмент в его геометрии (contentBoxFor по seg.geom/chrome/isFirst), возвращает page-объекты {blocks,geom,chrome,isCover,isFirst}; table-split сохранён. preview.buildPageShell/renderPreview и export-pdf.buildPdfDoc/drawHeaderFooter/drawLogo/drawOverlays/drawBody принимают page-объект → размер листа, ориентация, поля и колонтитулы ПЕР-СТРАНИЧНО (jsPDF addPage по геометрии сегмента; обложка без колонтитулов при chrome:false). Нулевая регрессия: обычный документ (нет cover/sectionBreak, firstPage.page=null) → flowSegments даёт ОДИН контент-сегмент с базовой геометрией, contentBoxFor(base)≡contentBox → разбиение и вывод идентичны прежним. import contentBoxFor (edge с DS1, cache-safe). Файлы: shared/report/preview.js (paginate, buildPageShell, renderPreview), export-pdf.js (buildPdfDoc, drawHeaderFooter/drawLogo/drawOverlays/drawBody).',
     ] },

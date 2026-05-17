@@ -36,13 +36,14 @@ const STRUCT_ADD = [
   { type: 'signature',   label: 'Подпись ответственного', mk: () => ({ type: 'signature', role: 'Должность', name: '', mp: true }) },
   { type: 'heading',     label: 'Заголовок (текст)',   mk: () => ({ type: 'heading', level: 2, text: 'Заголовок' }) },
   { type: 'paragraph',   label: 'Абзац (текст)',       mk: () => ({ type: 'paragraph', text: 'Текст' }) },
+  { type: 'sectionBreak', label: '⮐ Разрыв раздела (ориентация)', mk: () => ({ type: 'sectionBreak', page: { orientation: 'landscape' } }) },
 ];
 
 const TYPE_LABEL = {
   docTitle: 'Заголовок документа', companyInfo: 'Реквизиты компании',
   addressee: 'Адресат', metaLine: 'Дата/№', tocAuto: 'Содержание',
   signature: 'Подпись ответственного', stamp: 'Печать',
-  heading: 'Заголовок', paragraph: 'Абзац', list: 'Список',
+  sectionBreak: 'Разрыв раздела', heading: 'Заголовок', paragraph: 'Абзац', list: 'Список',
   table: 'Таблица', image: 'Изображение', spacer: 'Отступ',
   hr: 'Линия', pagebreak: 'Разрыв страницы', custom: 'Блок',
 };
@@ -252,12 +253,39 @@ export function openTemplateEditor(tpl, opts = {}) {
     if (b.type === 'companyInfo' || b.type === 'addressee' || b.type === 'metaLine')
       return '🏢 ' + t;
     if (b.type === 'tocAuto') return '🗂 ' + t;
+    if (b.type === 'sectionBreak') {
+      const o = b.page && b.page.orientation;
+      return '⮐ Разрыв раздела' + (o ? ' · ' + (o === 'landscape' ? 'альбомная' : 'книжная') : '') +
+        (b.page && b.page.format ? ' · ' + b.page.format : '');
+    }
     if (b.section) return '▸ ' + (b.sectionLabel || t) + ' · ' + t;
     const txt = (b.text || (Array.isArray(b.items) ? b.items[0] : '') || '').toString();
     return '· ' + t + (txt ? ' — ' + txt.slice(0, 28) : '');
   }
 
   function buildBlockProps(p, b) {
+    if (b.type === 'sectionBreak') {
+      if (!b.page || typeof b.page !== 'object') b.page = {};
+      const h = el('div', 'rpt-hint');
+      h.textContent = 'С этого места начинается новый раздел документа (новая страница) с указанной геометрией — как разрыв раздела в Word. Пустое поле = наследовать от предыдущего.';
+      p.appendChild(h);
+      fld(p, 'Формат', selectInput(
+        [['', '(как было)'], ...Object.keys(PAGE_SIZES).map(f => [f, f]), ['Custom', 'Custom']],
+        b.page.format || '', v => { b.page.format = v || undefined; renderPane(); }));
+      fld(p, 'Ориентация', selectInput(
+        [['', '(как было)'], ['portrait', 'Книжная'], ['landscape', 'Альбомная']],
+        b.page.orientation || '', v => { b.page.orientation = v || undefined; renderPane(); }));
+      const m = b.page.margins || (b.page.margins = {});
+      const r = el('div', 'rpt-row');
+      fld(r, 'Поле верх', numInput(m.top != null ? m.top : '', v => { m.top = v; renderPane(); }));
+      fld(r, 'Поле низ', numInput(m.bottom != null ? m.bottom : '', v => { m.bottom = v; renderPane(); }));
+      p.appendChild(r);
+      const r2 = el('div', 'rpt-row');
+      fld(r2, 'Поле лево', numInput(m.left != null ? m.left : '', v => { m.left = v; renderPane(); }));
+      fld(r2, 'Поле право', numInput(m.right != null ? m.right : '', v => { m.right = v; renderPane(); }));
+      p.appendChild(r2);
+      return;
+    }
     if (b.type === 'signature') {
       fld(p, 'Должность', textInput(b.role || '', v => { b.role = v; renderPane(); }));
       fld(p, 'Ф.И.О.', textInput(b.name || '', v => { b.name = v; renderPane(); }));
@@ -440,6 +468,73 @@ export function openTemplateEditor(tpl, opts = {}) {
     fld(p, 'Автор', textInput(working.meta?.author || '', v => {
       working.meta = working.meta || {}; working.meta.author = v; renderPane();
     }));
+
+    // ——— Обложка (отдельная титульная страница) ———
+    sect(p, 'Обложка / титул');
+    if (!working.cover || typeof working.cover !== 'object') working.cover = { enabled: false, page: null, chrome: false, blocks: [] };
+    const cv = working.cover;
+    if (!Array.isArray(cv.blocks)) cv.blocks = [];
+    const cEn = el('label', 'chk');
+    const cCb = document.createElement('input'); cCb.type = 'checkbox';
+    cCb.checked = !!cv.enabled;
+    cCb.addEventListener('change', () => { cv.enabled = cCb.checked; rebuild(); });
+    cEn.appendChild(cCb);
+    const cSp = document.createElement('span'); cSp.textContent = ' отдельная первая страница (обложка)';
+    cEn.appendChild(cSp);
+    fld(p, '', cEn);
+    if (cv.enabled) {
+      const cg = cv.page || (cv.page = {});
+      fld(p, 'Ориентация обложки', selectInput(
+        [['', '(как документ)'], ['portrait', 'Книжная'], ['landscape', 'Альбомная']],
+        cg.orientation || '', v => { cg.orientation = v || undefined; renderPane(); }));
+      const ch = el('label', 'chk');
+      const chCb = document.createElement('input'); chCb.type = 'checkbox';
+      chCb.checked = !!cv.chrome;
+      chCb.addEventListener('change', () => { cv.chrome = chCb.checked; renderPane(); });
+      ch.appendChild(chCb);
+      const chSp = document.createElement('span'); chSp.textContent = ' колонтитулы на обложке';
+      ch.appendChild(chSp);
+      fld(p, '', ch);
+      const add = el('div', 'rpt-zone-add');
+      const aT = btn('+ Заголовок на обложку'); aT.className = 'rpt-zone-add-btn';
+      aT.addEventListener('click', () => { cv.blocks.push({ type: 'docTitle', text: '{{meta.title}}', align: 'center' }); renderPane(); });
+      const aP = btn('+ Текст на обложку'); aP.className = 'rpt-zone-add-btn';
+      aP.addEventListener('click', () => { cv.blocks.push({ type: 'paragraph', text: 'Текст обложки', align: 'center' }); renderPane(); });
+      add.appendChild(aT); add.appendChild(aP);
+      p.appendChild(add);
+      (cv.blocks || []).forEach((b, i) => {
+        const row = el('div', 'rpt-zone-list__item');
+        row.style.cssText = 'display:flex;align-items:center;gap:4px';
+        const ta = textInput(b.text || '', v => { b.text = v; renderPane(); });
+        ta.style.flex = '1';
+        row.appendChild(ta);
+        const rm = btn('✕', 'danger'); rm.style.padding = '2px 6px';
+        rm.addEventListener('click', () => { cv.blocks.splice(i, 1); rebuild(); });
+        row.appendChild(rm);
+        p.appendChild(row);
+      });
+    }
+
+    // ——— Особая первая страница контента ———
+    sect(p, 'Первая страница (геометрия)');
+    if (!working.firstPage || typeof working.firstPage !== 'object') working.firstPage = { page: null };
+    const fp = working.firstPage.page || {};
+    const fpEn = el('label', 'chk');
+    const fpCb = document.createElement('input'); fpCb.type = 'checkbox';
+    fpCb.checked = !!working.firstPage.page;
+    fpCb.addEventListener('change', () => {
+      working.firstPage.page = fpCb.checked ? { orientation: 'portrait' } : null;
+      rebuild();
+    });
+    fpEn.appendChild(fpCb);
+    const fpSp = document.createElement('span'); fpSp.textContent = ' своя геометрия 1-й страницы';
+    fpEn.appendChild(fpSp);
+    fld(p, '', fpEn);
+    if (working.firstPage.page) {
+      fld(p, 'Ориентация 1-й стр.', selectInput(
+        [['portrait', 'Книжная'], ['landscape', 'Альбомная']],
+        fp.orientation || 'portrait', v => { working.firstPage.page.orientation = v; renderPane(); }));
+    }
   }
 
   // ——— Вкладка «Стили» ———
