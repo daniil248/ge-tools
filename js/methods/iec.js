@@ -30,6 +30,12 @@ export const TERMS_IEC = {
 export default {
   id: 'iec',
   label: 'IEC 60364-5-52',
+  // D4/D5: harmonization-метаданные (аддитивно, не ломают потребителей).
+  standard: 'IEC 60364-5-52',
+  region: 'INT',
+  version: '1.0',
+  enabled: true,
+  discipline: 'electrical',
   terms: TERMS_IEC,
 
   materials: { Cu: 'Медь (Cu)', Al: 'Алюминий (Al)' },

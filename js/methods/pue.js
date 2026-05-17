@@ -228,6 +228,12 @@ export const TERMS_PUE = {
 export default {
   id: 'pue',
   label: 'ПУЭ 7',
+  // D4/D5: harmonization-метаданные (аддитивно).
+  standard: 'ПУЭ 7 (Правила устройства электроустановок, РФ)',
+  region: 'RU',
+  version: '1.0',
+  enabled: true,
+  discipline: 'electrical',
   terms: TERMS_PUE,
 
   materials: { Cu: 'Медь (Cu)', Al: 'Алюминий (Al)' },

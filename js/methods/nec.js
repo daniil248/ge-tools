@@ -30,6 +30,12 @@ export default {
   ...iec,
   id: 'nec',
   label: 'NEC (NFPA 70)',
+  // D4/D5: harmonization-метаданные (переопределяют ...iec).
+  standard: 'NEC / NFPA 70',
+  region: 'US',
+  version: '1.0',
+  enabled: true,
+  discipline: 'electrical',
   terms: TERMS_NEC,
 
   // NEC использует AWG, но т.к. внутри расчёт через IEC-таблицы — оставляем
