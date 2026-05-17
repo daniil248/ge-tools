@@ -158,7 +158,14 @@ function ptToMm(pt) { return pt * 0.3528; }
  * Длинные «слова» (шифры без пробелов) жёстко рубятся по perLine,
  * чтобы текст не вылезал за границу ячейки. */
 export function wrapCell(text, widthMm, style) {
-  const charsPerMm = Math.max(0.1, 3.2 - (style.size - 11) * 0.15);
+  // Реалистичная ширина глифа PT Sans ≈ 0.50·size(pt) → в мм
+  // 0.1764·size. Делим на 0.90 (×1.1 запас) — переносим чуть раньше,
+  // чтобы оценка ≥ факта (нет наезда на колонтитул) и текст НЕ
+  // вылезал за границу ячейки. Прежняя эвристика (~3.35 симв/мм при
+  // 10pt) была ~6× оптимистична → перенос не срабатывал, текст
+  // переполнял колонки и таблица недооценивалась по высоте.
+  const sz = style.size || 10;
+  const charsPerMm = Math.max(0.1, 1 / (0.196 * sz));
   const perLine    = Math.max(1, Math.floor(widthMm * charsPerMm));
   const out = [];
   for (const raw of String(text ?? '').split('\n')) {
