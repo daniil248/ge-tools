@@ -607,6 +607,17 @@ export function openTemplateEditor(tpl, opts = {}) {
     lbl.appendChild(sp);
     fld(p, '', lbl);
     fld(p, 'Высота, мм', numInput(band.height || 12, v => { band.height = v; renderPane(); }));
+    // Колонтитул в поле страницы; ширина — отдельно от области печати:
+    // в пределах полей / вся страница / за край листа.
+    fld(p, 'Ширина', selectInput(
+      [['print', 'В пределах полей'], ['page', 'Вся ширина листа'],
+       ['bleed', 'За край листа (вылет)']],
+      band.width || 'print', v => { band.width = v; rebuild(); }));
+    if (band.width === 'bleed') {
+      fld(p, 'Вылет за край, мм', numInput(
+        band.bleed != null ? band.bleed : 10,
+        v => { band.bleed = v; renderPane(); }));
+    }
     const first = (band.blocks && band.blocks[0]) || null;
     const txt = first && first.text || '';
     fld(p, 'Текст', textInput(txt, v => {

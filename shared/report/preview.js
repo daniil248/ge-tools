@@ -13,7 +13,7 @@
 // ======================================================================
 
 import { pageSizeMm, contentBox, substitute, overlaysForPage, effectiveFlow,
-         flowSegments, contentBoxFor } from './template.js';
+         flowSegments, contentBoxFor, colontitleBox } from './template.js';
 
 /** Рендер всего шаблона в переданный контейнер. */
 export function renderPreview(tpl, container, opts = {}) {
@@ -325,26 +325,29 @@ function buildPageShell(tpl, scale, guides, pg, pageNum, totalPages, pageLabel) 
     page.appendChild(guide);
   }
 
-  // Шапка
+  // Шапка — в верхнем поле (вне области печати), ширина по режиму
+  // band.width (print/page/bleed).
   if (hdr.enabled) {
+    const hb = colontitleBox(geom, hdr, 'header');
     const h = div('rpt-page__header');
-    h.style.left   = (m.left  * scale) + 'px';
-    h.style.right  = (m.right * scale) + 'px';
-    h.style.top    = (m.top   * scale) + 'px';
-    h.style.height = (hdr.height * scale) + 'px';
+    h.style.left   = (hb.x * scale) + 'px';
+    h.style.width  = (hb.width  * scale) + 'px';
+    h.style.top    = (hb.y * scale) + 'px';
+    h.style.height = (hb.height * scale) + 'px';
     if (guides) h.classList.add('rpt-zone--edit');
     (hdr.blocks || []).forEach(b =>
       h.appendChild(renderBlock(b, tpl, { page: pageNum, pages: totalPages })));
     page.appendChild(h);
   }
 
-  // Подвал
+  // Подвал — в нижнем поле (вне области печати).
   if (ftr.enabled) {
+    const fb = colontitleBox(geom, ftr, 'footer');
     const f = div('rpt-page__footer');
-    f.style.left   = (m.left  * scale) + 'px';
-    f.style.right  = (m.right * scale) + 'px';
-    f.style.bottom = (m.bottom * scale) + 'px';
-    f.style.height = (ftr.height * scale) + 'px';
+    f.style.left   = (fb.x * scale) + 'px';
+    f.style.width  = (fb.width  * scale) + 'px';
+    f.style.top    = (fb.y * scale) + 'px';
+    f.style.height = (fb.height * scale) + 'px';
     if (guides) f.classList.add('rpt-zone--edit');
     (ftr.blocks || []).forEach(b =>
       f.appendChild(renderBlock(b, tpl, { page: pageNum, pages: totalPages })));

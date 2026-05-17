@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.697', date: '2026-05-17', items: [
+      '📑 <b>Колонтитулы вынесены в поля страницы (вне области печати) + режим ширины</b> (репорт Пользователя «колонтитулы должны быть отдельно, за пределами полей печати, иногда шире»). Новый template.colontitleBox(geom,band,where): шапка — в ВЕРХНЕМ поле (над областью печати), подвал — в НИЖНЕМ поле (под областью печати); ширина band.width: print (между полями, по умолч.) / page (вся ширина листа) / bleed (за край листа на band.bleed мм, по умолч.10). contentBoxFor больше НЕ урезает тело под колонтитулы (тело = строго прямоугольник печати) — устранено визуальное слипание подвала с границей печати/направляющей. preview.js и export-pdf.js рисуют колонтитулы по colontitleBox; в редакторе (вкладка «Колонтитулы») добавлен выбор «Ширина» + «Вылет за край, мм». Файлы: shared/report/template.js, shared/report/preview.js, shared/report/export-pdf.js, shared/report/editor.js, js/engine/constants.js.',
+    ] },
     { version: '0.60.696', date: '2026-05-17', items: [
       '🩹 <b>Базовый шаблон больше не показывает данные документа</b> (репорт Пользователя «почему на базовом шаблоне есть какие-то данные?»). Причина: seed базовых (напр. «Официальный документ») содержал overlay-зоны doc-title/doc-company/doc-to/doc-sign, и migrateToFlow тянул их в тело + effectiveFlow при пустом flow синтезировал дефолтные docTitle/addressee/signature. Стало: для level===base migrateToFlow берёт ИЗ overlays только бегущие колонтитулы ({{page}}/{{pages}}) → band header/footer, а flow/content/overlays очищаются; effectiveFlow для базы возвращает [] (нет fallback на effectiveContent). Базовый шаблон = чистая страница + поля + колонтитулы + стили; структурные блоки относятся к шаблону документа. Без reseed (фикс централизован в template.js). Файлы: shared/report/template.js (applyColontitleBands, guard в migrateToFlow и effectiveFlow), js/engine/constants.js.',
     ] },

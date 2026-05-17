@@ -15,7 +15,7 @@
 // второй TTF.
 // ======================================================================
 
-import { pageSizeMm, contentBoxFor, substitute, overlaysForPage } from './template.js';
+import { pageSizeMm, contentBoxFor, substitute, overlaysForPage, colontitleBox } from './template.js';
 import { paginate, estimateBlockHeight, tableLayout, wrapCell } from './preview.js';
 
 const JSPDF_URL = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js';
@@ -289,20 +289,18 @@ function drawHeaderFooter(doc, tpl, pg, pageNum, total) {
 
   const hdr = isFirst ? tpl.header.firstPage : tpl.header.otherPages;
   if (hdr && hdr.enabled) {
-    drawBlocks(doc, tpl, hdr.blocks || [], {
-      x: m.left, y: m.top,
-      width: width - m.left - m.right,
-      height: hdr.height,
-    }, { page: pageNum, pages: total });
+    const hb = colontitleBox(geom, hdr, 'header');
+    drawBlocks(doc, tpl, hdr.blocks || [],
+      { x: hb.x, y: hb.y, width: hb.width, height: hb.height },
+      { page: pageNum, pages: total });
   }
 
   const ftr = isFirst ? tpl.footer.firstPage : tpl.footer.otherPages;
   if (ftr && ftr.enabled) {
-    drawBlocks(doc, tpl, ftr.blocks || [], {
-      x: m.left, y: height - m.bottom - ftr.height,
-      width: width - m.left - m.right,
-      height: ftr.height,
-    }, { page: pageNum, pages: total });
+    const fb = colontitleBox(geom, ftr, 'footer');
+    drawBlocks(doc, tpl, ftr.blocks || [],
+      { x: fb.x, y: fb.y, width: fb.width, height: fb.height },
+      { page: pageNum, pages: total });
   }
 }
 

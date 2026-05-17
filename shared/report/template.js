@@ -768,15 +768,38 @@ export function mergePageGeom(base, ov) {
 export function contentBoxFor(tpl, geom, chromeOn, isFirst) {
   const { width, height } = pageSizeMm(geom);
   const m = geom.margins || { top: 20, right: 15, bottom: 20, left: 20 };
-  const hdr = chromeOn ? (isFirst ? tpl.header?.firstPage : tpl.header?.otherPages) : null;
-  const ftr = chromeOn ? (isFirst ? tpl.footer?.firstPage : tpl.footer?.otherPages) : null;
-  const top    = m.top    + (hdr && hdr.enabled ? hdr.height : 0);
-  const bottom = m.bottom + (ftr && ftr.enabled ? ftr.height : 0);
+  // Колонтитулы живут В ПОЛЯХ страницы (вне области печати), поэтому
+  // НЕ урезают контент: тело = строго прямоугольник печати между
+  // полями. Если высота колонтитула больше своего поля — он визуально
+  // заходит к краю контента (осознанный выбор пользователя), но
+  // раскладка тела от этого не зависит. (Требование Пользователя:
+  // «колонтитулы отдельно, за пределами полей печати».)
   return {
-    x: m.left, y: top,
+    x: m.left, y: m.top,
     width:  width  - m.left - m.right,
-    height: height - top - bottom,
+    height: height - m.top - m.bottom,
   };
+}
+
+/** Геометрия band-колонтитула В ПОЛЯХ страницы (вне печати).
+ *  where: 'header' (в верхнем поле) | 'footer' (в нижнем поле).
+ *  band.width: 'print' (между лев/прав полями, по умолч.) |
+ *  'page' (вся ширина листа) | 'bleed' (за край листа на band.bleed
+ *  мм, по умолч. 10). Возврат — прямоугольник в мм. */
+export function colontitleBox(geom, band, where) {
+  const { width, height } = pageSizeMm(geom);
+  const m = geom.margins || { top: 20, right: 15, bottom: 20, left: 20 };
+  const h = Math.max(0, Number(band && band.height) || 0);
+  const mode = (band && band.width) || 'print';
+  const bleed = Math.max(0, Number(band && band.bleed != null ? band.bleed : 10));
+  let x, w;
+  if (mode === 'page') { x = 0; w = width; }
+  else if (mode === 'bleed') { x = -bleed; w = width + 2 * bleed; }
+  else { x = m.left; w = width - m.left - m.right; }
+  const y = where === 'header'
+    ? Math.max(0, m.top - h)                       // верхнее поле
+    : Math.min(height - m.bottom, height - h);     // нижнее поле
+  return { x, y, width: w, height: h };
 }
 
 /** Документ → сегменты с собственной геометрией:
