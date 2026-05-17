@@ -30,6 +30,13 @@ import {
   listDisciplines, nodeDisciplines, getDiscipline, DEFAULT_DISCIPLINE,
   calcLibSpecifier,
 } from 'shared/disciplines.js';
+// X.4.4-producer B2 (v0.60.583): сводный мультидисциплинарный отчёт
+// строго через reports-пайплайн (memory: reports-only-via-reports) —
+// cross-discipline.js собирает blocks[], shared/report рисует/экспортит.
+// Оба модуля давно развёрнуты (cross-discipline.js v0.60.579) → static
+// import cache-safe.
+import { createTemplate, previewPDF } from 'shared/report/index.js';
+import { buildCrossDisciplineReport } from 'shared/report/cross-discipline.js';
 // v0.60.171 (Phase 3.5): «🔗 Sketch'и проекта и их связи» — обзорный раздел
 // в карточке проекта. Перечисляет все sketch'и + entity, на которые они
 // ссылаются. resolveLabel — actual-label из исходного модуля (если
@@ -3378,6 +3385,11 @@ function render() {
               <span id="xdc-status" class="muted" style="font-size:11.5px"></span>
             </div>
             <div id="xdc-result" style="font-size:12px"></div>
+            <hr style="border:0;border-top:1px solid #eef1f5;margin:12px 0">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <button id="xdc-report" style="font-size:12px;padding:6px 14px;border:1px solid #7c3aed;background:#7c3aed;color:#fff;border-radius:4px;cursor:pointer">📑 Сводный мультидисциплинарный отчёт</button>
+              <span id="xdc-rep-status" class="muted" style="font-size:11.5px">Собирает сохранённые node.disciplineParams всех узлов → отчёт через модуль reports.</span>
+            </div>
           </div>
         `);
 
@@ -3478,6 +3490,55 @@ function render() {
             localStorage.setItem(projectKey(pid, 'engine', 'scheme.v1'), JSON.stringify(fr));
             cStat('✓ Параметры сохранены в узел (применятся при загрузке Конструктора).', true);
           } catch (e) { cStat('Ошибка записи: ' + (e && e.message || e), false); }
+        });
+
+        const repSt = (m, ok) => { const e = summaryHost.querySelector('#xdc-rep-status'); if (e) { e.textContent = m; e.style.color = ok == null ? '' : (ok ? '#166534' : '#b91c1c'); } };
+        summaryHost.querySelector('#xdc-report').addEventListener('click', async () => {
+          repSt('Сбор результатов…', null);
+          const fr = readScheme();
+          if (!fr || !fr.nodes) { repSt('Схема не найдена — обновите страницу.', false); return; }
+          const arr = Array.isArray(fr.nodes) ? fr.nodes : Object.values(fr.nodes);
+          const sections = [];
+          let errCount = 0;
+          for (const nd of arr) {
+            if (!nd || !nd.disciplineParams || typeof nd.disciplineParams !== 'object') continue;
+            const tag = nd.tag || nd.id || '—';
+            for (const [disc, methods] of Object.entries(nd.disciplineParams)) {
+              const spec = calcLibSpecifier(disc);
+              if (!spec || !methods || typeof methods !== 'object') continue;
+              let M; try { M = await loadLib(spec); } catch { errCount++; continue; }
+              for (const [mid, inputs] of Object.entries(methods)) {
+                try {
+                  const r = M.run(mid, inputs || {});
+                  const meta = (M.METHOD_LIST || []).find(x => x.id === mid);
+                  const rows = Object.entries(r).filter(([k, v]) =>
+                    k !== 'method' && k !== 'inputs' && k !== 'steps' &&
+                    (typeof v === 'number' || typeof v === 'string'))
+                    .map(([k, v]) => [k, (typeof v === 'number' && !Number.isInteger(v)) ? Math.round(v * 1e4) / 1e4 : v]);
+                  sections.push({
+                    disciplineId: disc,
+                    methodLabel: `${meta ? meta.label : mid} · узел ${tag}`,
+                    rows, steps: Array.isArray(r.steps) ? r.steps : [],
+                  });
+                } catch { errCount++; }
+              }
+            }
+          }
+          if (!sections.length) { repSt('Нет сохранённых параметров расчёта (сохраните их кнопкой выше хотя бы по одному узлу).', false); return; }
+          try {
+            const blocks = buildCrossDisciplineReport({
+              title: 'Сводный мультидисциплинарный расчёт',
+              intro: 'Автоматически сформировано из сохранённых параметров узлов схемы (node.disciplineParams). Дисциплины и движки — реестр shared/disciplines.js.',
+              project: { designation: p.designation || '', name: p.name || '' },
+              sections,
+            });
+            const tpl = createTemplate({ meta: { title: 'Сводный мультидисциплинарный расчёт', author: p.author || '' } });
+            tpl.content = blocks;
+            repSt(`✓ Отчёт собран: секций — ${sections.length}${errCount ? `, пропущено с ошибкой — ${errCount}` : ''}. Открываю предпросмотр…`, true);
+            await previewPDF(tpl);
+          } catch (e) {
+            repSt('Ошибка формирования отчёта: ' + (e && e.message || e), false);
+          }
         });
 
         fillDisc(); // инициализация цепочки селектов
