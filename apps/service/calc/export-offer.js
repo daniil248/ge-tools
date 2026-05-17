@@ -58,7 +58,17 @@ export function buildOfferBlocks(order, displayCurrency = '₽', convertFn = nul
     }
     try {
       const slotBlocks = builder(ctx, slot.options || {});
-      if (Array.isArray(slotBlocks)) blocks.push(...slotBlocks);
+      if (Array.isArray(slotBlocks)) {
+        // Помечаем разделом (= слот КП): редактор «Разделы» и
+        // effectiveContent() смогут менять порядок/видимость, а
+        // tpl.sections.manifest получит реальный состав.
+        const secId = 'slot-' + slot.id;
+        const secLabel = slot.title || slot.label || slot.name || slot.id;
+        for (const b of slotBlocks) {
+          if (b) { b.section = secId; b.sectionLabel = secLabel; }
+        }
+        blocks.push(...slotBlocks);
+      }
     } catch (e) {
       console.error(`[export-offer] Ошибка builder слота "${slot.id}":`, e);
     }
@@ -81,11 +91,21 @@ export function buildOfferBlocks(order, displayCurrency = '₽', convertFn = nul
 }
 
 /**
- * Экспорт КП напрямую в PDF (без template editor — он накладывал header-overlay
- * поверх контента, по репорту 2026-05-02 «содержимое попадает поверх шаблона»).
+ * КП формируется ТОЛЬКО на основе кастомного сохраняемого шаблона
+ * (требование Пользователя). Поток: pickTemplate (оформление —
+ * поля, колонтитулы, логотип, зоны адресата/контактов/печати/
+ * подписи, порядок и видимость разделов) → подпрограмма отдаёт
+ * лишь содержимое (KP-слоты) → previewPDF (предпросмотр перед
+ * сохранением — правило проекта). Состав body — из KP-слотов
+ * (порядок слотов задаётся в их редакторе); каждый слот помечен
+ * разделом, поэтому редактор шаблона «Разделы» и effectiveContent
+ * тоже могут переставлять/скрывать.
  *
- * Phase 29 (TODO в roadmap): полноценная slot-based template system для документов
- * с возможностью перестановки блоков. Сейчас — clean default template без overlays.
+ * Прежняя версия (v0.60.40) экспортировала сразу в файл и
+ * добавляла overlay нестандартной схемы (area/content вместо
+ * type/scope/x/y) + tpl.margins вместо tpl.page.margins — рендерер
+ * это игнорировал/ломал. Исправлено: chrome берётся из выбранного
+ * шаблона.
  */
 export async function openOfferPreview(order, displayCurrency, convertFn, opts = {}) {
   let Report, blocks;
@@ -96,31 +116,27 @@ export async function openOfferPreview(order, displayCurrency, convertFn, opts =
     throw new Error('Не удалось загрузить модуль отчётов: ' + e.message);
   }
   const profile = loadEffectiveCompanyProfile(opts.pid);
-  const tpl = Report.createTemplate({
-    meta: {
-      title: `КП №${order.id || ''} — ${order.name || ''}`,
-      author: profile.director || profile.name || '',
-      kind: 'commercial-offer',
-    },
+
+  const rec = await Report.pickTemplate({
+    title: 'Шаблон коммерческого предложения',
+    tags: ['service', 'кп', 'коммерческое', 'общее'],
   });
-  // v0.60.40: убираем default overlays (header/footer). Они накладывались
-  // ПОВЕРХ контента, искажая шапку. Только page-number footer оставим, и то
-  // через slim margin-bottom. Phase 29 даст полную слот-систему.
-  tpl.overlays = [
-    {
-      id: 'kp-page-number',
-      area: 'footer',
-      align: 'center',
-      content: 'стр. {{page}} из {{pages}}',
-      fontSize: 8,
-      color: '#888',
-    },
-  ];
-  // Page settings — A4, увеличенные поля чтобы контент не упирался в края.
-  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
-  tpl.margins = { top: 18, right: 15, bottom: 18, left: 18 };  // mm
-  tpl.content = buildOfferBlocks(order, displayCurrency, convertFn, { ...opts, blocks });
-  // Прямой экспорт PDF — без openTemplateEditor.
+  if (!rec) return;
+
+  const tpl = Report.createTemplate(rec.template);
+  tpl.meta = {
+    ...(tpl.meta || {}),
+    title:  `КП №${order.id || ''} — ${order.name || ''}`,
+    author: profile.director || profile.name || tpl.meta?.author || '',
+    kind:   'commercial-offer',
+  };
+  const content = buildOfferBlocks(order, displayCurrency, convertFn, { ...opts, blocks });
+  tpl.content = content;
+  if (!tpl.sections || typeof tpl.sections !== 'object') tpl.sections = {};
+  tpl.sections.manifest = Report.sectionManifestFromContent(content);
+  if (!Array.isArray(tpl.sections.order))  tpl.sections.order  = [];
+  if (!Array.isArray(tpl.sections.hidden)) tpl.sections.hidden = [];
+
   const fname = `kp-${(order.id || 'order').replace(/[^\w-]+/g, '_')}.pdf`;
-  Report.exportPDF(tpl, fname);
+  await Report.previewPDF(tpl, fname);
 }
