@@ -2,7 +2,7 @@
   "id": "scs-design",
   "name": "Проектирование СКС",
   "description": "Проектирование структурированной кабельной системы: мастер меж-шкафных связей (выбор стоек проекта, создание связей юнит↔юнит, список связей с типом кабеля).",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -17,9 +17,17 @@
   "permissions": ["scs-design.use"],
   "lsNamespacesOwned": ["scs-design"],
   "dependsOnContracts": {
-    "storageKeys": [],
+    "storageKeys": [
+      "raschet.project.<pid>.scs-design.links.v1",
+      "raschet.project.<pid>.scs-design.plan.v1",
+      "raschet.project.<pid>.scs-design.selection.v1",
+      "raschet.project.<pid>.scs-design.linksOverlay.overrack.v1",
+      "raschet.project.<pid>.scs-design.linksOverlay.sag.v1",
+      "raschet.project.<pid>.scs-design.linksOverlay.visible.v1",
+      "ss:raschet.scs-design.legacy-migrate-attempted.<pid>.session"
+    ],
     "events": { "emits": [], "consumes": [] },
-    "urlParams": ["project"],
+    "urlParams": ["project", "pid"],
     "bridges": ["shared/scheme-rack-bridge.js"]
   }
 }
