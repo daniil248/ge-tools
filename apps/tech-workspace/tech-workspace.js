@@ -38,6 +38,11 @@ import { pricesForElement } from 'shared/price-records.js';
 // По правилу feedback_role_based_access.md — canApproveVariants только
 // для manager / gip. Для engineer / viewer кнопка disabled.
 import { hasPermission, currentRole, ROLES } from 'shared/subscriptions.js';
+// Ф-E wiring (X.4.5.3 §6): read-only снимок общего реестра объектов
+// (порт-driven видимость). Технолог-ГИП = координатор всех дисциплин
+// (memory:architecture_layers D7) → координационная панель здесь.
+// deriveRegistry — ЧИСТОЕ чтение (источники остаются владельцами).
+import { deriveRegistry, objectPorts } from 'shared/object-registry-store.js';
 // v0.60.537: чистый расчётный слой нагрузок/площадей концепции выделен
 // в calc/ (без DOM, переиспользуемо: карточки, отчёты, сравнение, тесты).
 import {
@@ -1726,6 +1731,36 @@ function renderListRail(c, ro) {
             <span class="tw-rail-sub">${escHtml(sub)}</span>
             <span class="tw-rail-chip">${pueVal.toFixed(2)}</span>
           </button>`;
+        })()}
+      </div>
+    </div>
+
+    <div class="tw-rail-section" data-acc="objreg">
+      <div class="tw-rail-head">
+        <span class="tw-rail-title" title="Read-only снимок общего реестра объектов (Ф-E §6). Порт-driven видимость: ⚡ power → электрика, 🔌 data → СКС. Источники (rack-config/СКС) остаются владельцами — здесь только координация. deriveRegistry не мутирует данные.">📋 Реестр объектов</span>
+      </div>
+      <div class="tw-rail-list">
+        ${(() => {
+          try {
+            const reg = _pid ? deriveRegistry(_pid) : [];
+            if (!Array.isArray(reg) || !reg.length) {
+              return `<div class="tw-rail-item" style="cursor:default;opacity:.7"><span class="tw-rail-sub">Нет объектов (стойки появятся из Конфигуратора стоек / СКС)</span></div>`;
+            }
+            const PI = { power: '⚡', data: '🔌', fieldbus: '🛰', pipe: '🚰', duct: '🌬', gas: '⛽' };
+            return reg.slice(0, 60).map(o => {
+              const ports = objectPorts(o);
+              const badges = ports.map(p => PI[p.type] || '•').join(' ') || '—';
+              const ptitle = ports.map(p => `${PI[p.type] || '•'} ${p.type}${p.label ? ' · ' + p.label : ''}`).join('; ') || 'портов нет';
+              return `<div class="tw-rail-item" style="cursor:default" title="${escAttr('Объект: ' + (o.tag || o.id) + ' · владелец: ' + (o.ownerModule || '?') + ' · порты: ' + ptitle)}">
+                <span class="tw-rail-name">${escHtml(o.tag || o.id)}</span>
+                <span class="tw-rail-sub">${escHtml(o.kind || 'object')} · ${escHtml(o.ownerModule || '?')}</span>
+                <span class="tw-rail-chip">${badges}</span>
+              </div>`;
+            }).join('') + (reg.length > 60 ? `<div class="tw-rail-item" style="cursor:default;opacity:.6"><span class="tw-rail-sub">…ещё ${reg.length - 60}</span></div>` : '');
+          } catch (e) {
+            console.warn('[tw objreg]', e);
+            return `<div class="tw-rail-item" style="cursor:default;opacity:.7"><span class="tw-rail-sub">Реестр недоступен</span></div>`;
+          }
         })()}
       </div>
     </div>
