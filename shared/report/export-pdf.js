@@ -16,7 +16,7 @@
 // ======================================================================
 
 import { pageSizeMm, contentBox, substitute, overlaysForPage } from './template.js';
-import { paginate, estimateBlockHeight }       from './preview.js';
+import { paginate, estimateBlockHeight, tableLayout, wrapCell } from './preview.js';
 
 const JSPDF_URL = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js';
 
@@ -389,50 +389,58 @@ function drawText(doc, text, box, s, alignOverride) {
 
 function drawTable(doc, tpl, block, box, ctx) {
   const s = tpl.styles.table;
-  const cols = (block.columns || []).map(c => (typeof c === 'string' ? { text: c } : c));
-  const n = cols.length || 1;
-  // Ширины: если задано width — используем; остаток делим поровну
-  let fixed = 0, freeCnt = 0;
-  cols.forEach(c => { if (c.width) fixed += c.width; else freeCnt++; });
-  const freeW = Math.max(0, box.width - fixed);
-  const widths = cols.map(c => c.width || (freeCnt ? freeW / freeCnt : box.width / n));
+  // Единая геометрия с пагинатором (preview.tableLayout) — высоты и
+  // разбиение страниц сходятся, таблица не «уезжает» под колонтитул.
+  const lay = tableLayout(block, tpl);
+  const { widths, pad, lineH, cols } = lay;
+  const border = s.borderColor || '#c0c6d2';
 
-  const pad = s.cellPadding || 1.8;
-  const rowHBase = ptToMm(s.size * 1.4) + 2 * pad;
-
-  setFont(doc, { font: s.font, size: s.size, color: s.color,
-    bold: s.headBold, italic: false });
+  // jsPDF: для align:'right' x — ПРАВЫЙ край ячейки, для 'center' —
+  // центр. Прежде везде передавался x+pad → текст числовых колонок
+  // уезжал из ячейки (невидимые заголовки «Кол-во» и т.п.).
+  const drawRow = (cells, y, h, fill) => {
+    let x = box.x;
+    cells.forEach((raw, i) => {
+      const w = widths[i];
+      doc.setDrawColor(border);
+      doc.setLineWidth(0.2);
+      if (fill) {
+        doc.setFillColor(s.headBg || '#f1f3f7');
+        doc.rect(x, y, w, h, 'FD');
+      } else {
+        doc.rect(x, y, w, h);
+      }
+      const c = cols[i] || {};
+      const align = c.align === 'center' ? 'center'
+        : c.align === 'right' ? 'right' : 'left';
+      const tx = align === 'right' ? x + w - pad
+        : align === 'center' ? x + w / 2
+        : x + pad;
+      let ty = y + pad + ptToMm(s.size);
+      for (const ln of wrapCell(raw, w - 2 * pad, s)) {
+        doc.text(ln, tx, ty, { align: align === 'left' ? undefined : align });
+        ty += lineH;
+      }
+      x += w;
+    });
+  };
 
   let y = box.y;
-  let x = box.x;
 
-  // Заголовок
-  doc.setFillColor(s.headBg || '#f1f3f7');
-  doc.setDrawColor(s.borderColor || '#c0c6d2');
-  doc.setLineWidth(0.2);
-  cols.forEach((c, i) => {
-    doc.rect(x, y, widths[i], rowHBase, 'FD');
-    doc.text(String(c.text || ''), x + pad, y + pad + ptToMm(s.size), {
-      align: c.align === 'center' ? 'center' : c.align === 'right' ? 'right' : undefined,
-    });
-    x += widths[i];
-  });
-  y += rowHBase;
+  // Шапка: светлая заливка + жирный читаемый текст (контраст).
+  setFont(doc, { size: s.size, color: s.headColor || s.color || '#222222',
+    bold: s.headBold !== false, italic: false });
+  drawRow(cols.map(c => String(c.text || '')), y, lay.headH, true);
+  y += lay.headH;
 
-  // Строки
-  setFont(doc, { font: s.font, size: s.size, color: s.color, bold: false, italic: false });
-  (block.rows || []).forEach(row => {
-    x = box.x;
-    row.forEach((cell, i) => {
-      doc.setDrawColor(s.borderColor || '#c0c6d2');
-      doc.rect(x, y, widths[i], rowHBase);
-      const c = cols[i] || {};
-      doc.text(substitute(cell, tpl, ctx), x + pad, y + pad + ptToMm(s.size), {
-        align: c.align === 'center' ? 'center' : c.align === 'right' ? 'right' : undefined,
-      });
-      x += widths[i];
-    });
-    y += rowHBase;
+  // Тело — построчно, высота строки по перенесённому тексту.
+  setFont(doc, { size: s.size, color: s.color || '#222222',
+    bold: false, italic: false });
+  (block.rows || []).forEach((row, ri) => {
+    const cells = row.map(cell => substitute(cell, tpl, ctx));
+    const h = lay.rowHs[ri] || (2 * pad + lineH);
+    drawRow(cells, y, h, false);
+    y += h;
   });
 
   return y + 2;
