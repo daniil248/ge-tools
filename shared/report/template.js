@@ -489,8 +489,10 @@ function applyColontitleBands(tpl) {
   const pageH = pageSizeMm(tpl.page || {}).height || 297;
   const cts = [];
   for (const ov of overlays) {
-    if (ov && ov.type !== 'image' &&
-        /\{\{\s*pages?\s*\}\}/.test(String(ov.content?.text || ''))) {
+    // В БАЗОВОМ шаблоне любой текстовый overlay — это оформление
+    // (колонтитул), т.к. тела документа у базы нет. Классифицируем
+    // по вертикали: верхняя половина листа → шапка, нижняя → подвал.
+    if (ov && ov.type !== 'image' && ov.content && ov.content.text) {
       cts.push({
         where: (Number(ov.y) || 0) < pageH / 2 ? 'header' : 'footer',
         scope: ov.scope || 'all',
@@ -845,8 +847,18 @@ export function flowSegments(tpl) {
 export function applyBaseChrome(tpl, base) {
   if (!tpl || tpl.level === 'base' || !base) return tpl;
   const clone = (o) => { try { return JSON.parse(JSON.stringify(o)); } catch { return o; } };
+  // Базу нормализуем как базу: migrateToFlow(level:base) превращает
+  // её overlay-колонтитулы в band header/footer (и чистит тело).
+  // Без этого колонтитулы базы (хранятся в overlays) НЕ наследовались
+  // бы документом — applyBaseChrome копирует header/footer/page/стили,
+  // но не overlays. Теперь документ реально получает оформление базы.
+  let src = clone(base);
+  try {
+    src.level = 'base';
+    migrateToFlow(src);
+  } catch (e) { src = base; }
   for (const k of ['page', 'header', 'footer', 'styles', 'logo', 'cover', 'firstPage']) {
-    if (base[k] != null) tpl[k] = clone(base[k]);
+    if (src[k] != null) tpl[k] = clone(src[k]);
   }
   return tpl;
 }

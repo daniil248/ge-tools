@@ -27,7 +27,7 @@ import * as Report from './index.js';
 
 // Смена версии → переcев встроенных (пользовательские не трогаем).
 // v3 — все шаблоны на чистой canvas-модели (overlays в margin).
-export const BUILTIN_VERSION = 5;
+export const BUILTIN_VERSION = 6;
 
 // ——— палитра ———
 const INK       = '#1f2430';
@@ -141,21 +141,14 @@ export const BUILTIN_TEMPLATES = [
     tags: ['расчёты','инженерный','общее'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-base-technical',
       meta: { title: 'Инженерный отчёт' },
-      page: { margins: { top: 26, right: 18, bottom: 22, left: 22 } },
-      styles: {
-        h1: { size: 16, bold: true, spaceBefore: 2, spaceAfter: 4 },
-        h2: { size: 13, bold: true, spaceBefore: 5, spaceAfter: 2 },
-        h3: { size: 11, bold: true, spaceBefore: 3, spaceAfter: 1 },
-        body: { size: 11, lineHeight: 1.4 },
-      },
       overlays: [
         zone('doc-title',  'all', 22, 30, 170, 9, '{{meta.title}}', 'h1', 'left'),
         zone('doc-company','all', 22, 42, 95, 14, 'Компания: {{meta.custom.companyName}}\n{{meta.custom.companyAddr}} · {{meta.custom.companyPhone}}', 'caption', 'left'),
         zone('doc-to',     'all', 120, 42, 70, 14, 'Кому: {{meta.custom.recipient}}\n{{meta.custom.recipientPost}}', 'caption', 'right'),
         zone('doc-sign',   'all', 22, 250, 110, 22, '{{meta.custom.signRole}}\n_______________ / {{meta.custom.signName}} /\n«___» __________ 20__ г.  М.П.', 'caption', 'left'),
-        zone('hdr-title', 'all', 22, 11, 170, 6, '{{meta.title}}', 'caption', 'left'),
-        zone('ftr-date',  'all', 22, 283, 170, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
     }),
   },
@@ -168,18 +161,10 @@ export const BUILTIN_TEMPLATES = [
     tags: ['кабель','расчёты'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-base-technical',
       meta: { title: 'Расчёт кабельной линии' },
-      page: { margins: { top: 24, right: 18, bottom: 22, left: 22 } },
-      styles: {
-        h1: { size: 15, bold: true, spaceBefore: 2, spaceAfter: 4 },
-        h2: { size: 12, bold: true, spaceBefore: 4, spaceAfter: 2 },
-        h3: { size: 11, bold: true, spaceBefore: 3, spaceAfter: 1 },
-      },
-      overlays: [
-        zone('hdr-first', 'first', 22, 10, 170, 6, 'Расчёт кабельной линии  ·  {{date}}', 'caption', 'left'),
-        zone('hdr-other', 'other', 22, 10, 170, 6, 'Расчёт кабельной линии', 'caption', 'left'),
-        zone('ftr',       'all',   22, 283, 170, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
-      ],
+      overlays: [],
     }),
   },
 
@@ -191,17 +176,10 @@ export const BUILTIN_TEMPLATES = [
     tags: ['акб','батарея','расчёты'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-base-technical',
       meta: { title: 'Расчёт аккумуляторной батареи' },
-      page: { margins: { top: 24, right: 18, bottom: 22, left: 22 } },
-      styles: {
-        h1: { size: 15, bold: true, spaceBefore: 2, spaceAfter: 4 },
-        h2: { size: 12, bold: true, spaceBefore: 4, spaceAfter: 2 },
-      },
-      overlays: [
-        zone('hdr-first', 'first', 22, 10, 170, 6, 'Расчёт АКБ  ·  {{date}}', 'caption', 'left'),
-        zone('hdr-other', 'other', 22, 10, 170, 6, 'Расчёт АКБ', 'caption', 'left'),
-        zone('ftr',       'all',   22, 283, 170, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
-      ],
+      overlays: [],
     }),
   },
 
@@ -213,16 +191,10 @@ export const BUILTIN_TEMPLATES = [
     tags: ['ибп','ups','конфигурация'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-base-technical',
       meta: { title: 'Конфигурация ИБП' },
-      page: { margins: { top: 24, right: 18, bottom: 22, left: 22 } },
-      styles: {
-        h1: { size: 15, bold: true, spaceBefore: 2, spaceAfter: 4 },
-        h2: { size: 12, bold: true, spaceBefore: 4, spaceAfter: 2 },
-      },
-      overlays: [
-        zone('hdr-title', 'all', 22, 10, 170, 6, '{{meta.title}}', 'caption', 'left'),
-        zone('ftr',       'all', 22, 283, 170, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
-      ],
+      overlays: [],
     }),
   },
 
@@ -234,16 +206,10 @@ export const BUILTIN_TEMPLATES = [
     tags: ['щит','panel','конфигурация'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-base-technical',
       meta: { title: 'Конфигурация щита' },
-      page: { margins: { top: 24, right: 18, bottom: 22, left: 22 } },
-      styles: {
-        h1: { size: 15, bold: true, spaceBefore: 2, spaceAfter: 4 },
-        h2: { size: 12, bold: true, spaceBefore: 4, spaceAfter: 2 },
-      },
-      overlays: [
-        zone('hdr-title', 'all', 22, 10, 170, 6, '{{meta.title}}', 'caption', 'left'),
-        zone('ftr',       'all', 22, 283, 170, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
-      ],
+      overlays: [],
     }),
   },
 
@@ -255,16 +221,10 @@ export const BUILTIN_TEMPLATES = [
     tags: ['трансформатор','расчёты'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-base-technical',
       meta: { title: 'Расчёт силового трансформатора' },
-      page: { margins: { top: 24, right: 18, bottom: 22, left: 22 } },
-      styles: {
-        h1: { size: 15, bold: true, spaceBefore: 2, spaceAfter: 4 },
-        h2: { size: 12, bold: true, spaceBefore: 4, spaceAfter: 2 },
-      },
-      overlays: [
-        zone('hdr-title', 'all', 22, 10, 170, 6, '{{meta.title}}', 'caption', 'left'),
-        zone('ftr',       'all', 22, 283, 170, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
-      ],
+      overlays: [],
     }),
   },
 
@@ -288,40 +248,59 @@ export const BUILTIN_TEMPLATES = [
         caption: { font: 'Times', size: 10, italic: true },
         table:   { font: 'Times', size: 11, headBg: TABLE_HEAD, borderColor: BORDER },
       },
+      // База = только оформление: структурные блоки (заголовок/
+      // адресат/подпись) перенесены в шаблон документа «Техническая
+      // записка». Здесь — лишь колонтитулы.
       overlays: [
-        zone('doc-company','all', 25, 32, 95, 14, 'Компания: {{meta.custom.companyName}}\n{{meta.custom.companyAddr}}', 'caption', 'left'),
-        zone('doc-to',     'all', 122, 32, 63, 16, 'Кому: {{meta.custom.recipient}}\n{{meta.custom.recipientPost}}', 'caption', 'left'),
-        zone('doc-title',  'all', 25, 50, 165, 10, '{{meta.title}}', 'h1', 'center'),
-        zone('doc-sign',   'all', 25, 248, 140, 24, '{{meta.custom.signRole}}\n_______________ / {{meta.custom.signName}} /\n«___» __________ 20__ г.  М.П.', 'caption', 'left'),
-        // Колонтитулы (остаются absolute в полях)
         zone('ftr-first', 'first', 25, 282, 165, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
         zone('ftr-other', 'other', 25, 282, 165, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
     }),
   },
 
-  // 10. Техническая записка — компактная рабочая
+  // 9b. Технический отчёт (БАЗА) — оформление для расчётных и
+  // конфигурационных документов (Helvetica, шапка-название, подвал
+  // дата+нумерация). Документы-расчёты наследуют её.
+  {
+    id: 'builtin-base-technical',
+    name: 'Технический отчёт (база)',
+    description: 'База: A4, Helvetica, поля 15/20/20/25, шапка с названием, подвал с датой и нумерацией. Для расчётных и конфигурационных отчётов.',
+    tags: ['база','технический','расчёты'],
+    source: 'builtin',
+    template: T({
+      level: 'base',
+      meta: { title: 'Технический отчёт' },
+      page: { margins: { top: 15, right: 25, bottom: 20, left: 20 } },
+      styles: {
+        h1: { size: 15, bold: true, spaceBefore: 2, spaceAfter: 4 },
+        h2: { size: 12, bold: true, spaceBefore: 4, spaceAfter: 2 },
+        h3: { size: 11, bold: true, spaceBefore: 3, spaceAfter: 1 },
+        body: { size: 11, lineHeight: 1.4 },
+      },
+      overlays: [
+        zone('hdr-title', 'all', 20, 8,   165, 6, '{{meta.title}}', 'caption', 'left'),
+        zone('ftr-main',  'all', 20, 283, 165, 6, '{{date}}  ·  стр. {{page}} из {{pages}}', 'caption', 'center'),
+      ],
+    }),
+  },
+
+  // 10. Техническая записка (ДОКУМЕНТ) — наследует базу
+  // «Официальный документ»; своё = только структурные блоки.
   {
     id: 'builtin-technical-note',
     name: 'Техническая записка',
-    description: 'A4, Helvetica 11 pt, компактная вёрстка с подписью-предупреждением. Для рабочих заметок и черновых решений.',
+    description: 'Документ: рабочая записка с подписью. Оформление — из базы «Официальный документ (A4)».',
     tags: ['записка','рабочий','общее'],
     source: 'builtin',
     template: T({
+      level: 'document',
+      baseTemplateId: 'builtin-formal-a4',
       meta: { title: 'Техническая записка' },
-      page: { margins: { top: 22, right: 18, bottom: 20, left: 20 } },
-      styles: {
-        h1: { size: 14, bold: true, spaceBefore: 0, spaceAfter: 3 },
-        h2: { size: 11, bold: true, spaceBefore: 3, spaceAfter: 1 },
-        body: { size: 11, lineHeight: 1.35, spaceAfter: 2 },
-        caption: { size: 9, italic: true },
-      },
       overlays: [
         zone('doc-title',  'all', 20, 28, 172, 8, '{{meta.title}}', 'h1', 'left'),
         zone('doc-company','all', 20, 38, 100, 12, 'Компания: {{meta.custom.companyName}} · {{meta.custom.companyPhone}}', 'caption', 'left'),
         zone('doc-to',     'all', 124, 38, 68, 12, 'Кому: {{meta.custom.recipient}}', 'caption', 'right'),
         zone('doc-sign',   'all', 20, 258, 110, 20, '{{meta.custom.signRole}}\n______ / {{meta.custom.signName}} /  М.П.', 'caption', 'left'),
-        zone('ftr', 'all',   20, 285, 172, 6, 'стр. {{page}} из {{pages}}', 'caption', 'center'),
       ],
     }),
   },
