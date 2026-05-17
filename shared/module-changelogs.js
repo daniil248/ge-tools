@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.705', date: '2026-05-18', items: [
+      '🧱 <b>Фаза 2 (R2): упрочнение projects/project.js — шаг 1 (read-only предикаты)</b>. 9 чтений чужих module-scoped данных в checklist-предикатах жизненного цикла (tech-workspace variants, engine scheme, cooling selections, meteo datasets, service orders, facility-inventory items) переведены с JSON.parse(localStorage.getItem(projectKey(...))) на шов-аксессор projectLoad(pid,module,key,fallback) из shared/project-storage.js — централизованное типобезопасное чтение через контракт. Поведение идентично (projectLoad=loadJson(projectKey)); только read-only предикаты, мутационная merge/migrate-логика НЕ затронута (отдельными верифицируемыми шагами по плану). Файлы: apps/projects/project.js (+импорт projectLoad), js/engine/constants.js.',
+    ] },
     { version: '0.60.704', date: '2026-05-18', items: [
       '🏗 <b>По-раздельная модель — Этап 5: встроенные базы получили pageSections</b>. База «Технический отчёт» → раздел «Основной» (шапка=название, подвал=дата+нумерация). База «Официальный документ» → разделы «Титул» (подвал с датой) + «Основной» (подвал с нумерацией) — заменяет прежнюю логику first/other на явные разделы. Документы, привязанные к этим базам (Инженерный отчёт, Конфиг ИБП/щита, Кабель/АКБ/Трансформатор, Техническая записка), теперь наследуют pageSections и рендерятся по новой по-раздельной модели end-to-end. BUILTIN_VERSION 6→7 (пересев builtin; пользовательские не затрагиваются). Файлы: shared/report/templates-seed.js, js/engine/constants.js.',
     ] },

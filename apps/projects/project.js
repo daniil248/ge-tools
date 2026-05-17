@@ -10,6 +10,9 @@ import {
   listSubProjects, createSubProject,
   // v0.59.862: hide-when-empty — для определения «есть ли данные модуля».
   projectKey,
+  // Фаза 2 (R2): чтение чужих module-scoped данных через шов
+  // (projectLoad = loadJson(projectKey(...)) — централизовано, типобезоп.).
+  projectLoad,
   // Фаза 2: список sketch'ей через шов, не сырым литералом.
   loadSketchList,
 } from 'shared/project-storage.js';
@@ -1699,7 +1702,7 @@ const LCM_CHECKLISTS = {
     { label: 'Концепция в Технологе ЦОД', hint: 'Хотя бы один вариант с заполненным «🏷 Объект»',
       check: (pid) => {
         try {
-          const v = JSON.parse(localStorage.getItem(projectKey(pid, 'tech-workspace', 'variants.v1')) || '[]');
+          const v = projectLoad(pid, 'tech-workspace', 'variants.v1', []);
           return Array.isArray(v) && v.length > 0;
         } catch { return false; }
       } },
@@ -1715,7 +1718,7 @@ const LCM_CHECKLISTS = {
       hint: 'В TW есть variant с approvedAt',
       check: (pid) => {
         try {
-          const v = JSON.parse(localStorage.getItem(projectKey(pid, 'tech-workspace', 'variants.v1')) || '[]');
+          const v = projectLoad(pid, 'tech-workspace', 'variants.v1', []);
           return Array.isArray(v) && v.some(x => x.approvedAt);
         } catch { return false; }
       } },
@@ -1723,7 +1726,7 @@ const LCM_CHECKLISTS = {
       hint: 'rackGroups.count × kwPerRack > 0',
       check: (pid) => {
         try {
-          const v = JSON.parse(localStorage.getItem(projectKey(pid, 'tech-workspace', 'variants.v1')) || '[]');
+          const v = projectLoad(pid, 'tech-workspace', 'variants.v1', []);
           if (!Array.isArray(v)) return false;
           const primary = v.find(x => x.primary) || v[0];
           if (!primary?.concept?.rackGroups) return false;
@@ -1737,7 +1740,7 @@ const LCM_CHECKLISTS = {
       hint: 'Хотя бы один узел в схеме',
       check: (pid) => {
         try {
-          const sch = JSON.parse(localStorage.getItem(projectKey(pid, 'engine', 'scheme.v1')) || '{}');
+          const sch = projectLoad(pid, 'engine', 'scheme.v1', {});
           return Array.isArray(sch.nodes) && sch.nodes.length > 0;
         } catch { return false; }
       } },
@@ -1745,7 +1748,7 @@ const LCM_CHECKLISTS = {
       hint: 'Хотя бы один cooling-подбор с ★ вариантом',
       check: (pid) => {
         try {
-          const s = JSON.parse(localStorage.getItem(projectKey(pid, 'cooling', 'selections.v1')) || '[]');
+          const s = projectLoad(pid, 'cooling', 'selections.v1', []);
           return Array.isArray(s) && s.some(x => x.options?.length > 0);
         } catch { return false; }
       } },
@@ -1753,7 +1756,7 @@ const LCM_CHECKLISTS = {
       hint: 'Активный climate dataset в meteo',
       check: (pid) => {
         try {
-          const ds = JSON.parse(localStorage.getItem(projectKey(pid, 'meteo', 'datasets.v1')) || '[]');
+          const ds = projectLoad(pid, 'meteo', 'datasets.v1', []);
           return Array.isArray(ds) && ds.length > 0;
         } catch { return false; }
       } },
@@ -1771,7 +1774,7 @@ const LCM_CHECKLISTS = {
       hint: 'service.orders с type=install',
       check: (pid) => {
         try {
-          const o = JSON.parse(localStorage.getItem(projectKey(pid, 'service', 'orders.v1')) || '[]');
+          const o = projectLoad(pid, 'service', 'orders.v1', []);
           return Array.isArray(o) && o.some(x => x.type === 'install');
         } catch { return false; }
       } },
@@ -1786,7 +1789,7 @@ const LCM_CHECKLISTS = {
       hint: 'service.orders с type=maintenance',
       check: (pid) => {
         try {
-          const o = JSON.parse(localStorage.getItem(projectKey(pid, 'service', 'orders.v1')) || '[]');
+          const o = projectLoad(pid, 'service', 'orders.v1', []);
           return Array.isArray(o) && o.some(x => x.type === 'maintenance');
         } catch { return false; }
       } },
@@ -1794,7 +1797,7 @@ const LCM_CHECKLISTS = {
       hint: 'Реестр оборудования объекта заполнен',
       check: (pid) => {
         try {
-          const fi = JSON.parse(localStorage.getItem(projectKey(pid, 'facility-inventory', 'items.v1')) || '[]');
+          const fi = projectLoad(pid, 'facility-inventory', 'items.v1', []);
           return Array.isArray(fi) && fi.length > 0;
         } catch { return false; }
       }, optional: true },
