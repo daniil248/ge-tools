@@ -5252,13 +5252,34 @@ function bindReport() {
         tags: ['tech-workspace', 'концепция', 'общее'],
       });
       if (!rec) return;
+      // Реквизиты конкретного отчёта (кому/составил/компания/№/версия)
+      // → плейсхолдеры шаблона. Предзаполнение из проекта/варианта,
+      // запоминается per-project.
+      let _mf = null;
+      try {
+        const { collectReportMeta } = await import('shared/report/meta-form.js');
+        const pid = new URLSearchParams(location.search).get('project') || '';
+        const pd = v.concept?.projectData || {};
+        _mf = await collectReportMeta({
+          persistKey: pid || 'tech-workspace',
+          title: 'Реквизиты документа — пояснительная записка',
+          defaults: {
+            author: pd.designer || '',
+            companyName: pd.companyName || pd.customer || '',
+            recipient: pd.customer || '',
+            docNo: pd.docNo || '',
+          },
+        });
+        if (_mf === null) return;   // отменён
+      } catch (e) { _mf = null; }
       const blocks = tagReportSections(generateReportBlocks(v, B));
       const tpl = Report.createTemplate(rec.template);
       tpl.meta = {
         ...(tpl.meta || {}),
         title:  `Пояснительная записка — ${v.name}`,
-        author: v.concept?.projectData?.designer || tpl.meta?.author || '',
+        author: (_mf && _mf.meta && _mf.meta.author) || v.concept?.projectData?.designer || tpl.meta?.author || '',
       };
+      if (_mf && _mf.custom) tpl.meta.custom = { ...(tpl.meta.custom || {}), ..._mf.custom };
       tpl.content = blocks;
       // Редизайн: собираем ЕДИНЫЙ ПОТОК (структура шаблона + тело
       // в одном flow → структурные зоны не накладываются на контент;

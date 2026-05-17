@@ -41,6 +41,21 @@ export async function composeReport(opts = {}) {
     if (!rec) return 'cancelled';
   }
 
+  // Реквизиты КОНКРЕТНОГО документа (кому/составил/компания/№/версия)
+  // → плейсхолдеры шаблона. Пропускается opts.collectMeta===false.
+  let _metaFill = null;
+  if (opts.collectMeta !== false) {
+    try {
+      const { collectReportMeta } = await import('./meta-form.js');
+      _metaFill = await collectReportMeta({
+        defaults: opts.metaDefaults || {},
+        persistKey: opts.metaPersistKey || kind || 'global',
+        title: 'Реквизиты документа' + (title ? ' — ' + title : ''),
+      });
+      if (_metaFill === null) return 'cancelled';   // закрыли крестиком/фоном
+    } catch (e) { _metaFill = null; }
+  }
+
   const tpl = Report.createTemplate(rec ? rec.template : {});
   // Двухуровневая модель: документный шаблон наследует chrome
   // (поля/колонтитулы/стили/логотип/обложка) из базового по
@@ -57,7 +72,11 @@ export async function composeReport(opts = {}) {
     ...(title  ? { title }  : {}),
     ...(author ? { author } : {}),
     ...(kind   ? { kind }   : {}),
+    ...((_metaFill && _metaFill.meta) || {}),
   };
+  if (_metaFill && _metaFill.custom) {
+    tpl.meta.custom = { ...(tpl.meta.custom || {}), ..._metaFill.custom };
+  }
 
   const blocks = (typeof build === 'function' ? build(B) : build) || [];
   tpl.content = blocks;
