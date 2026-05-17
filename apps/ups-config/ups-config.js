@@ -2192,10 +2192,14 @@ async function _printUpsReport() {
 
   content.push(B.hr(), B.caption(`Документ сформирован автоматически Raschet · ${new Date().toLocaleDateString('ru-RU')}`));
 
-  const tpl = Report.createTemplate({ meta: { title: `Конфигурация ИБП — ${upsLabel}`, kind: 'ups-config' } });
-  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
-  tpl.margins = { top: 16, right: 15, bottom: 16, left: 16 };
-  tpl.content = content;
-  try { Report.exportPDF(tpl, `ups-config-${String(upsLabel).replace(/[^\w-]+/g, '_')}.pdf`); }
-  catch (e) { flash('Ошибка экспорта PDF: ' + (e.message || e), 'error'); }
+  try {
+    const { composeReport } = await import('shared/report/compose.js');
+    await composeReport({
+      tags: ['ups-config', 'конфигурация', 'общее'],
+      title: `Конфигурация ИБП — ${upsLabel}`,
+      kind: 'ups-config',
+      build: () => content,
+      filename: `ups-config-${String(upsLabel).replace(/[^\w-]+/g, '_')}.pdf`,
+    });
+  } catch (e) { flash('Ошибка экспорта PDF: ' + (e.message || e), 'error'); }
 }

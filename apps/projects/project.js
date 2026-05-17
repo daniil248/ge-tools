@@ -34,8 +34,8 @@ import {
 // строго через reports-пайплайн (memory: reports-only-via-reports) —
 // cross-discipline.js собирает blocks[], shared/report рисует/экспортит.
 // Оба модуля давно развёрнуты (cross-discipline.js v0.60.579) → static
-// import cache-safe.
-import { createTemplate, previewPDF } from 'shared/report/index.js';
+// import cache-safe. Отчёт — через общий конвейер shared/report/
+// compose.js (composeReport), грузится лениво при экспорте.
 import { buildCrossDisciplineReport } from 'shared/report/cross-discipline.js';
 // v0.60.171 (Phase 3.5): «🔗 Sketch'и проекта и их связи» — обзорный раздел
 // в карточке проекта. Перечисляет все sketch'и + entity, на которые они
@@ -3545,10 +3545,14 @@ function render() {
               project: { designation: p.designation || '', name: p.name || '' },
               sections,
             });
-            const tpl = createTemplate({ meta: { title: 'Сводный мультидисциплинарный расчёт', author: p.author || '' } });
-            tpl.content = blocks;
-            repSt(`✓ Отчёт собран: секций — ${sections.length}${errCount ? `, пропущено с ошибкой — ${errCount}` : ''}. Открываю предпросмотр…`, true);
-            await previewPDF(tpl);
+            repSt(`✓ Отчёт собран: секций — ${sections.length}${errCount ? `, пропущено с ошибкой — ${errCount}` : ''}. Выберите шаблон…`, true);
+            const { composeReport } = await import('shared/report/compose.js');
+            await composeReport({
+              tags: ['projects', 'мультидисциплина', 'общее'],
+              title: 'Сводный мультидисциплинарный расчёт',
+              author: p.author || '',
+              build: () => blocks,
+            });
           } catch (e) {
             repSt('Ошибка формирования отчёта: ' + (e && e.message || e), false);
           }

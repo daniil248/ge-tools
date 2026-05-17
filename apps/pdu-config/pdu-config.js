@@ -636,14 +636,15 @@ async function printRequirements() {
     else if (l.trim()) blocks.push(B.paragraph(strip(l)));
   }
   flush();
-  const tpl = Report.createTemplate({
-    meta: { title: 'Требования к PDU', kind: 'pdu-requirements' },
-  });
-  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
-  tpl.margins = { top: 18, right: 15, bottom: 18, left: 18 };
-  tpl.content = blocks;
   try {
-    Report.exportPDF(tpl, `pdu-requirements-${Date.now()}.pdf`);
+    const { composeReport } = await import('shared/report/compose.js');
+    await composeReport({
+      tags: ['pdu-config', 'требования', 'общее'],
+      title: 'Требования к PDU',
+      kind: 'pdu-requirements',
+      build: () => blocks,
+      filename: `pdu-requirements-${Date.now()}.pdf`,
+    });
   } catch (e) {
     rsToast('Ошибка экспорта PDF: ' + (e.message || e), 'error');
   }

@@ -207,14 +207,15 @@ async function printShipment(id) {
     ),
   );
 
-  const tpl = Report.createTemplate({
-    meta: { title: `Проформа — ${sh.label || sh.id}`, kind: 'shipment-proforma' },
-  });
-  tpl.page = { ...(tpl.page || {}), format: 'A4', orientation: 'portrait' };
-  tpl.margins = { top: 15, right: 15, bottom: 15, left: 15 };
-  tpl.content = content;
   try {
-    Report.exportPDF(tpl, `proforma-${String(sh.label || sh.id).replace(/[^\w-]+/g, '_')}.pdf`);
+    const { composeReport } = await import('shared/report/compose.js');
+    await composeReport({
+      tags: ['logistics', 'проформа', 'общее'],
+      title: `Проформа — ${sh.label || sh.id}`,
+      kind: 'shipment-proforma',
+      build: () => content,
+      filename: `proforma-${String(sh.label || sh.id).replace(/[^\w-]+/g, '_')}.pdf`,
+    });
   } catch (e) {
     flash('Ошибка экспорта PDF: ' + (e.message || e), 'error');
   }
