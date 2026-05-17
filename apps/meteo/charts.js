@@ -22,8 +22,19 @@ export function drawTempHistogram(cvs, hourly) {
   destroyExisting(cvs);
   const temps = (hourly || []).map(h => Number(h.T)).filter(Number.isFinite);
   if (!temps.length) return;
-  const tmin = Math.floor(Math.min(...temps));
-  const tmax = Math.ceil(Math.max(...temps));
+  // v0.60.602 FIX: Math.min/max(...temps) на больших рядах (напр.
+  // 20-летний open-meteo = 175224 точки) → RangeError «Maximum call
+  // stack size exceeded» (spread как аргументы превышает лимит стека) →
+  // падал весь рендер метео (симптом «open-meteo не загрузился»).
+  // Цикл O(n) без spread — безопасно для любого размера.
+  let _tmn = Infinity, _tmx = -Infinity;
+  for (let i = 0; i < temps.length; i++) {
+    const v = temps[i];
+    if (v < _tmn) _tmn = v;
+    if (v > _tmx) _tmx = v;
+  }
+  const tmin = Math.floor(_tmn);
+  const tmax = Math.ceil(_tmx);
   const labels = [];
   const counts = [];
   for (let t = tmin; t <= tmax; t++) { labels.push(t); counts.push(0); }
