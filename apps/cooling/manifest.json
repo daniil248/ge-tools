@@ -2,7 +2,7 @@
   "id": "cooling",
   "name": "Подбор холодильных систем",
   "description": "Подбор чиллеров/DX-систем, free-cooling, расчёт CAPEX/TCO/payback и технико-экономическое сравнение нескольких опций. Климат — из проекта (Meteo) через мост.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "owner": "unassigned",
   "kind": "ui",
   "standalone": true,
@@ -36,6 +36,8 @@
       "raschet.project.<pid>.cooling.tariffCurrency.v1",
       "raschet.project.<pid>.cooling.tariffProfile.v1",
       "raschet.project.<pid>.cooling.currency.v1",
+      "raschet.project.<pid>.cooling.options.v1",
+      "raschet.project.<pid>.cooling.activeId.v1",
       "raschet.cooling.ratesDate.v1",
       "raschet.cooling.standalone.*",
       "raschet.cooling.prefill.v1"
