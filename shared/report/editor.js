@@ -918,10 +918,14 @@ export function openTemplateEditor(tpl, opts = {}) {
     working.pageSections = [{
       id: 'ps1', name: 'Основной',
       page: JSON.parse(JSON.stringify(working.page || {})),
-      header: { enabled: ho.enabled !== false && (ho.blocks || []).length > 0,
+      // enabled отражает наличие колонтитула (есть блоки ИЛИ band
+      // явно включён) — чтобы чекбокс «включён» был связан с реальным
+      // колонтитулом, а не гас при пустом тексте (репорт Пользователя
+      // «связи между чекбоксом и колонтитулом нет»).
+      header: { enabled: (ho.blocks || []).length > 0 || ho.enabled === true,
         height: ho.height || 10, width: 'print', valign: 'middle',
         blocks: JSON.parse(JSON.stringify(ho.blocks || [])) },
-      footer: { enabled: fo.enabled !== false && (fo.blocks || []).length > 0,
+      footer: { enabled: (fo.blocks || []).length > 0 || fo.enabled === true,
         height: fo.height || 10, width: 'print', valign: 'middle',
         blocks: JSON.parse(JSON.stringify(fo.blocks || [])) },
       logo: (working.logo && working.logo.src)

@@ -5046,6 +5046,12 @@ function generateReportBlocks(v, B) {
   const pueData = (c.pue?.mode === 'manual') ? null : calcPueAutoBreakdown(c, meteoSum);
   const pueValue = pueData ? pueData.pue : (Number(c.pue?.manualPue) || 1.4);
   const R = (t) => ({ text: t, align: 'right' });
+  // Защитный форматтер: связанные сводки (cooling/pue/service) могут
+  // прийти с отсутствующими числовыми полями (старая схема данных,
+  // частичный подбор) → раньше undefined.toFixed рушил весь отчёт
+  // («Ошибка формирования отчёта: …reading toFixed», репорт
+  // Пользователя). f() нормализует к 0.
+  const f = (x, d = 1) => (Number(x) || 0).toFixed(d);
   const blk = [];
 
   blk.push(B.caption(`Концепция объекта ЦОД · Вариант «${v.name}»${v.primary ? ' (основной)' : ''} · сформировано ${date} · Технолог ЦОД, Raschet`));
@@ -5098,9 +5104,9 @@ function generateReportBlocks(v, B) {
     blk.push(B.paragraph(`В проекте создан связанный подбор холодильных систем «${coolSummary.selectionName}» (модуль «Подбор холодильных систем») с ${coolSummary.optionCount} варианта${coolSummary.optionCount === 1 ? 'ом' : 'ми'} оборудования.`));
     blk.push(B.list([
       `Основной вариант: «${coolSummary.mainOptionName}» (★)`,
-      `Тип системы: ${coolSummary.systemType}, COP rated: ${(coolSummary.ratedCop || 0).toFixed(2)}`,
-      `Требуемая холодопроизводительность: ${coolSummary.requiredCoolingKw.toFixed(1)} кВт (с запасом ${coolSummary.safetyMarginPct}%)`,
-      `Σ установлено системой: ${coolSummary.installedKw.toFixed(1)} кВт в ${coolSummary.totalQty} единиц${coolSummary.totalQty === 1 ? 'е' : ''}`,
+      `Тип системы: ${coolSummary.systemType}, COP rated: ${f(coolSummary.ratedCop, 2)}`,
+      `Требуемая холодопроизводительность: ${f(coolSummary.requiredCoolingKw)} кВт (с запасом ${coolSummary.safetyMarginPct}%)`,
+      `Σ установлено системой: ${f(coolSummary.installedKw)} кВт в ${coolSummary.totalQty} единиц${coolSummary.totalQty === 1 ? 'е' : ''}`,
       `CAPEX: оборудование ${(coolSummary.eco.equipmentCost * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency} + монтаж ${(coolSummary.eco.installationCost * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}`,
       `OPEX обслуживания: ${(coolSummary.eco.maintenanceRubPerYear * coolSummary.totalQty).toLocaleString('ru-RU')} ${coolSummary.eco.currency}/год`,
       `Lifetime для TCO: ${coolSummary.eco.projectLifetimeYears} лет`,
@@ -5121,15 +5127,17 @@ function generateReportBlocks(v, B) {
   if (pueData) {
     blk.push(B.h2('6a. Расчёт PUE (per-component breakdown)'));
     blk.push(B.paragraph(`Расчётный PUE = ${pueValue.toFixed(2)} ${c.pue?.mode === 'cooling-module' ? '(из связанного подбора cooling)' : '(автоматически по топологии и meteo)'}. Раскладка не-IT потребления:`));
-    const bd = pueData.breakdown;
+    const bd = pueData.breakdown || {};
+    const itRef = Number(bd.itKw) || 0;
+    const pct = (x) => itRef > 0 ? f((Number(x) || 0) / itRef * 100) + '%' : '—';
     blk.push(B.table(['Компонент', R('кВт'), R('% от P_IT'), 'Источник'], [
-      ['P_IT (нагрузка серверов)', bd.itKw.toFixed(1), '100.0%', 'Σ rackGroups[].count × kwPerRack'],
-      ['P_cooling', bd.coolKwAvg.toFixed(1), (bd.coolKwAvg / bd.itKw * 100).toFixed(1) + '%', 'Σ топология × COP × FreeCool fraction'],
-      ['P_ups-loss', bd.upsLossKw.toFixed(2), (bd.upsLossKw / bd.itKw * 100).toFixed(1) + '%', `(1−η_UPS)/η_UPS × P_IT; η = ${(bd.etaUps * 100).toFixed(0)}%`],
-      ['P_tp-loss', bd.tpLossKw.toFixed(2), (bd.tpLossKw / bd.itKw * 100).toFixed(1) + '%', `(1−η_TP)/η_TP × P_downstream; η = ${(bd.etaTp * 100).toFixed(0)}%`],
-      ['P_aux (свет, ОПС, СКУД-CCTV)', bd.auxKw.toFixed(2), (bd.auxFraction * 100).toFixed(1) + '%', 'aux_fraction × P_IT'],
-      ['Σ не-IT', bd.totalNonItKw.toFixed(1), (bd.totalNonItKw / bd.itKw * 100).toFixed(1) + '%', 'P_cool + P_ups + P_tp + P_aux'],
-      ['PUE', `1 + Σ не-IT / P_IT = ${pueValue.toFixed(2)}`, '', ''],
+      ['P_IT (нагрузка серверов)', f(bd.itKw), '100.0%', 'Σ rackGroups[].count × kwPerRack'],
+      ['P_cooling', f(bd.coolKwAvg), pct(bd.coolKwAvg), 'Σ топология × COP × FreeCool fraction'],
+      ['P_ups-loss', f(bd.upsLossKw, 2), pct(bd.upsLossKw), `(1−η_UPS)/η_UPS × P_IT; η = ${f(Number(bd.etaUps) * 100, 0)}%`],
+      ['P_tp-loss', f(bd.tpLossKw, 2), pct(bd.tpLossKw), `(1−η_TP)/η_TP × P_downstream; η = ${f(Number(bd.etaTp) * 100, 0)}%`],
+      ['P_aux (свет, ОПС, СКУД-CCTV)', f(bd.auxKw, 2), f(Number(bd.auxFraction) * 100) + '%', 'aux_fraction × P_IT'],
+      ['Σ не-IT', f(bd.totalNonItKw), pct(bd.totalNonItKw), 'P_cool + P_ups + P_tp + P_aux'],
+      ['PUE', `1 + Σ не-IT / P_IT = ${f(pueValue, 2)}`, '', ''],
     ]));
     blk.push(B.caption('P_cooling ≈ среднегодовое (freecool fraction × COP_fc + (1−ff) × COP_base). Default-КПД (η_UPS=96%, η_TP=99%, aux=2%) можно overridить в табе «Расчёт PUE».'));
   }

@@ -4,6 +4,10 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.706', date: '2026-05-18', items: [
+      '🩹 <b>Фикс: «Ошибка формирования отчёта: Cannot read properties of undefined (reading toFixed)»</b> (репорт Пользователя при выгрузке пояснительной записки в Технологе ЦОД). Причина: generateReportBlocks форматировал поля связанных сводок (cooling/pue-breakdown) через x.toFixed() без защиты — при отсутствующих числовых полях (старая схема данных / частичный подбор) весь отчёт падал. Стало: защитный форматтер f(x,d)=(Number(x)||0).toFixed(d); им обёрнуты coolSummary.requiredCoolingKw/installedKw/ratedCop и вся PUE-раскладка (bd.itKw/coolKwAvg/upsLossKw/tpLossKw/auxKw/totalNonItKw + проценты с guard деления на 0). Для валидных данных вывод идентичен. Файл: apps/tech-workspace/tech-workspace.js.',
+      '🩹 <b>Фикс: связь чекбокса «включён» колонтитула раздела с колонтитулом</b> (репорт Пользователя). ensurePageSections при инициализации базы из legacy гасил header/footer.enabled при пустом тексте (&& blocks.length>0), из-за чего чекбокс не отражал реальный колонтитул. Стало: enabled = есть блоки ИЛИ band явно включён — чекбокс достоверно связан с колонтитулом. Файл: shared/report/editor.js.',
+    ] },
     { version: '0.60.705', date: '2026-05-18', items: [
       '🧱 <b>Фаза 2 (R2): упрочнение projects/project.js — шаг 1 (read-only предикаты)</b>. 9 чтений чужих module-scoped данных в checklist-предикатах жизненного цикла (tech-workspace variants, engine scheme, cooling selections, meteo datasets, service orders, facility-inventory items) переведены с JSON.parse(localStorage.getItem(projectKey(...))) на шов-аксессор projectLoad(pid,module,key,fallback) из shared/project-storage.js — централизованное типобезопасное чтение через контракт. Поведение идентично (projectLoad=loadJson(projectKey)); только read-only предикаты, мутационная merge/migrate-логика НЕ затронута (отдельными верифицируемыми шагами по плану). Файлы: apps/projects/project.js (+импорт projectLoad), js/engine/constants.js.',
     ] },
