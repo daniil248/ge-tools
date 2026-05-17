@@ -585,8 +585,21 @@ async function init() {
   if (urlPid) {
     const proj = getProject(urlPid);
     if (proj) {
-      setActiveProjectId(urlPid);
-      _pid = urlPid;  // meteo использует pid как строку (не объект)
+      // v0.60.605: meteo — климат/локация-привязанный calc-модуль.
+      // Локация и метеоряд задаются ОДИН раз на ПОЛНОМ проекте и
+      // наследуются sketch-подпроектами (схемные варианты). Если из
+      // tech-workspace «Вариант — схемы» (или cooling-sketch) пришёл
+      // sketch-pid — поднимаемся к родительскому full-проекту: иначе
+      // у sketch нет location (=> «не задана локация», авто-подхват
+      // не срабатывает) и датасеты (ключ meteo.datasets.<pid>) не
+      // находятся (сохранены под parent full-проектом).
+      let effId = urlPid;
+      if (proj.kind === 'sketch' && proj.parentProjectId) {
+        const par = getProject(proj.parentProjectId);
+        if (par) effId = par.id;
+      }
+      setActiveProjectId(effId);
+      _pid = effId;  // meteo использует pid как строку (не объект)
     } else {
       _pid = ensureDefaultProject().id;
     }
