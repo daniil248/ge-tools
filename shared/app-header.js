@@ -18,7 +18,11 @@ import {
   getProjectContext, getPreviousStep, navigateBack, moduleLabel, pushNavStep,
   buildModuleHref,
 } from './project-context.js';
-import { getProject, getActiveProjectId, setActiveProjectId, listProjects, createProject, ensureDefaultProject } from './project-storage.js';
+import { getProject, getActiveProjectId, setActiveProjectId, listProjects, createProject, ensureDefaultProject,
+  // v0.60.756 (ROADMAP 8.0-B): variant-aware picker — варианты проекта
+  // показываются КАК ВАРИАНТЫ (сгруппированы под проектом, не плоско —
+  // согласуется с v0.60.349), с ролью ★/🔁 и переключением в одном месте.
+  listVariants, getVariantRole } from './project-storage.js';
 // v0.60.137 (Phase 44.2 final): plan-badge в шапке. По ROADMAP Phase 44.2.
 // planBadge возвращает строку «⭐ Pro · триал 13 дн.» или 'Free'.
 import { planBadge, getSubscription, isInternalUser } from './subscriptions.js';
@@ -618,6 +622,30 @@ function _openStandaloneProjectMenu(currentModuleId, opts = {}) {
   const activeNounPrep = activeIsVariant ? 'варианте' : 'проекте';   // «в …:»
   const activeNounIns  = activeIsVariant ? 'вариантом' : 'проектом'; // «под …»
 
+  // v0.60.756 (ROADMAP 8.0-B): variant-aware picker. Контекстный проект
+  // для вариантов: родитель активного варианта, либо сам активный full,
+  // либо linked-проект из URL. Варианты этого проекта в семействе текущего
+  // модуля показываем ОТДЕЛЬНОЙ секцией «Варианты проекта» (не плоско в
+  // общем списке — это согласуется с v0.60.349: sketch не как «проект»,
+  // а сгруппирован под своим проектом, с ролью ★/🔁 и переключением).
+  let _varParentId = null;
+  if (activeProj) _varParentId = activeProj.kind === 'sketch' ? (activeProj.parentProjectId || null) : activeProj.id;
+  if (!_varParentId && linkedPid) _varParentId = linkedPid;
+  let _variants = [];
+  try { if (_varParentId && currentModuleId) _variants = listVariants(_varParentId, currentModuleId) || []; } catch {}
+  const _varParentProj = _varParentId ? projects.find(x => x.id === _varParentId) : null;
+  const _varGlyph = (r) => r === 'selected' ? '★ ' : (r === 'reserve' ? '🔁 ' : '');
+  const variantsHtml = _variants.length ? `
+        <div style="font-size:11.5px;color:#475569;margin:4px 0;text-transform:uppercase;letter-spacing:0.4px">Варианты проекта${_varParentProj ? ' «' + esc(_varParentProj.name || _varParentProj.id) + '»' : ''}:</div>
+        <div class="rs-proj-variant-list" style="margin-bottom:12px">
+          ${_variants.map(v => {
+            const isAct = v.id === activeId;
+            return `<button type="button" class="rs-proj-variant-row" data-pid="${esc(v.id)}"${isAct ? ' style="background:#dbeafe;border-color:#93c5fd"' : ''} style="display:flex;align-items:center;width:100%;text-align:left;padding:7px 12px;border:1px solid #e2e8f0;background:${isAct ? '#dbeafe' : '#fff'};border-radius:5px;margin:4px 0;cursor:pointer;font:inherit">
+              <span style="font-weight:600;color:#0f172a">${_varGlyph(v.variantRole)}${esc(v.name || v.id)}</span>${v.designation ? `<span class="muted" style="font-size:11px;margin-left:6px">[${esc(v.designation)}]</span>` : ''}${isAct ? '<span style="color:#1d4ed8;font-weight:700;margin-left:auto">✓ Активен</span>' : '<span style="color:#64748b;font-size:11px;margin-left:auto">→ переключиться</span>'}
+            </button>`;
+          }).join('')}
+        </div>` : '';
+
   // v0.60.349 (по репорту Пользователя 2026-05-06: «что за проект Вариант 1
   // — схемы, если это схема в проекте, она не должна быть как проект, тоже
   // самое и с проектами СКС, может быть схема СКС в проекте»): в picker'е
@@ -692,7 +720,9 @@ function _openStandaloneProjectMenu(currentModuleId, opts = {}) {
           ${activeName ? '🔒 ' + esc(activeName) + (activeIsVariant ? ' <span style="font-weight:400;color:#64748b;font-size:11px">· вариант</span>' : '') : '<span style="color:#dc2626">Нет активного проекта</span>'}
         </div>
 
-        <div style="font-size:11.5px;color:#475569;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px">Переключиться на другой:</div>
+        ${variantsHtml}
+
+        <div style="font-size:11.5px;color:#475569;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px">Переключиться на другой проект:</div>
         <div class="rs-proj-menu-list" style="margin-bottom:12px">${rowsHtml}</div>
 
         <div style="display:flex;gap:8px;border-top:1px dashed #cbd5e1;padding-top:12px;flex-wrap:wrap">
@@ -717,6 +747,21 @@ function _openStandaloneProjectMenu(currentModuleId, opts = {}) {
       close();
       // Перезагружаем чтобы модуль перечитал данные с новым активным pid.
       // Сохраняем текущий путь без ?project= (чтобы не залипнуть в URL-mode).
+      const url = new URL(location.href);
+      url.searchParams.delete('project');
+      url.searchParams.delete('from');
+      location.href = url.toString();
+    });
+  });
+
+  // v0.60.756 (8.0-B): переключение между ВАРИАНТАМИ проекта прямо из
+  // единого picker'а (тот же механизм, что и смена проекта).
+  overlay.querySelectorAll('.rs-proj-variant-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.pid;
+      if (!pid || pid === activeId) { close(); return; }
+      try { setActiveProjectId(pid); } catch {}
+      close();
       const url = new URL(location.href);
       url.searchParams.delete('project');
       url.searchParams.delete('from');
