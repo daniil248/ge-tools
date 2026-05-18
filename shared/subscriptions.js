@@ -521,3 +521,69 @@ export async function requireModuleAccess(moduleId, moduleName, moduleManifest =
   // Если триал активировали — будет reload и второй проход.
   return hasModuleAccess(moduleId, manifest);
 }
+
+// ===========================================================================
+// v0.60.749 — Тестовый доступ к выбранным модулям (+связанным).
+// Запрос Пользователя: «давать доступ к модулям тестировщикам, но не всего
+// приложения а выбранным модулям и по необходимости связанным модулям».
+// Механизм поверх существующего: subscription.modules[] — аддитивный
+// allowlist (hasModuleAccess уже учитывает его независимо от плана).
+// «Связанные» = UI-модули из manifest.requires (рекурсивно). Calc-libs
+// (kind:'calc-lib') авто-включаются загрузчиком — в allowlist не нужны.
+// Действует для НЕ-internal пользователя (тестировщик); internal и так
+// имеет полный доступ, internalOnly-модули — только под internal-флагом.
+// ===========================================================================
+
+// Список UI-модулей из modules.json: [{id,name,internalOnly}].
+export async function listUiModules() {
+  const m = await _fetchManifest();
+  const mods = (m && Array.isArray(m.modules)) ? m.modules : [];
+  return mods
+    .filter(x => x && x.id && (x.kind === 'ui' || x.kind === undefined) && x.standalone !== false)
+    .map(x => ({ id: x.id, name: x.name || x.id, internalOnly: !!x.internalOnly }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+}
+
+// Раскрывает выбранные id, добавляя связанные UI-модули (manifest.requires,
+// рекурсивно — только те requires, что сами являются UI-модулями).
+// Чистая функция; manifestModules = массив объектов из modules.json.
+export function expandTesterModules(ids, manifestModules) {
+  const mods = Array.isArray(manifestModules) ? manifestModules : [];
+  const byId = new Map(mods.map(x => [x.id, x]));
+  const uiIds = new Set(mods
+    .filter(x => x && x.id && (x.kind === 'ui' || x.kind === undefined))
+    .map(x => x.id));
+  const out = new Set();
+  const queue = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean))];
+  while (queue.length) {
+    const id = queue.shift();
+    if (out.has(id)) continue;
+    out.add(id);
+    const req = (byId.get(id) || {}).requires;
+    if (Array.isArray(req)) {
+      for (const r of req) {
+        // requires может содержать shared/lib-строки — берём только те,
+        // что являются известными UI-модулями (id-в-id).
+        if (uiIds.has(r) && !out.has(r)) queue.push(r);
+      }
+    }
+  }
+  return [...out];
+}
+
+// Применяет тестовый доступ: subscription.modules = expand(ids).
+// План НЕ меняем (hasModuleAccess учитывает sub.modules при любом плане);
+// пометка isTester для UI. Возвращает итоговый раскрытый список.
+export async function setTesterModules(ids) {
+  const m = await _fetchManifest();
+  const mods = (m && Array.isArray(m.modules)) ? m.modules : [];
+  const expanded = expandTesterModules(ids, mods);
+  const sub = getSubscription();
+  saveSubscription({
+    ...sub,
+    modules: expanded,
+    isTester: expanded.length > 0,
+    testerSetAt: Date.now(),
+  });
+  return expanded;
+}
