@@ -200,7 +200,7 @@ function _renderProjectBadgeImpl(pid, host) {
           fullProjects.map(x => `<option value="${esc(x.id)}"${x.id === parent?.id ? ' selected' : ''}>${esc(x.name || '(без имени)')}</option>`).join('')
         }</optgroup>` : '')
       }${
-        (orphanSketches.length ? `<optgroup label="🧪 Мини-проекты СКС (без родителя)">${
+        (orphanSketches.length ? `<optgroup label="🧪 Варианты СКС (без проекта)">${
           orphanSketches.map(x => `<option value="${esc(x.id)}"${x.id === parent?.id ? ' selected' : ''}>${esc(x.name || '(без имени)')}</option>`).join('')
         }</optgroup>` : '')
       }</select>`;
@@ -336,9 +336,9 @@ function _renderProjectBadgeImpl(pid, host) {
   //   - subs.length >= 2: полноценный dropdown.
   let subBlockHtml;
   if (parentIsOrphan) {
-    subBlockHtml = `<span class="muted" style="margin-left:8px">— мини-проект (без подпроектов) —</span>`;
+    subBlockHtml = `<span class="muted" style="margin-left:8px">— вариант (вне проекта) —</span>`;
   } else if (subs.length === 0) {
-    subBlockHtml = `<button type="button" class="sd-btn-sel" id="sd-sub-new" style="margin-left:8px" title="Создать СКС-подпроект внутри выбранного проекта">＋ Создать СКС</button>`;
+    subBlockHtml = `<button type="button" class="sd-btn-sel" id="sd-sub-new" style="margin-left:8px" title="Создать вариант СКС внутри выбранного проекта">＋ Создать вариант СКС</button>`;
   } else if (subs.length === 1) {
     const s = subs[0];
     // v0.59.558: при одном sub без designation и с именем «СКС»
@@ -347,21 +347,21 @@ function _renderProjectBadgeImpl(pid, host) {
     // designation — добавляем его в скобках.
     const nm = (s.name || 'СКС').trim();
     const desigPart = s.designation ? ` <span class="muted" style="font-size:11px">[${esc(s.designation)}]</span>` : '';
-    subBlockHtml = `<span style="margin-left:14px;padding:2px 8px;background:#dbeafe;color:#1e3a8a;border-radius:4px;font-size:12px;font-weight:500" title="СКС-подпроект: ${esc(nm)}${s.designation ? ' (обозначение ' + esc(s.designation) + ')' : ''}">⊞ ${esc(nm)}${desigPart}</span>` +
+    subBlockHtml = `<span style="margin-left:14px;padding:2px 8px;background:#dbeafe;color:#1e3a8a;border-radius:4px;font-size:12px;font-weight:500" title="Вариант СКС: ${esc(nm)}${s.designation ? ' (обозначение ' + esc(s.designation) + ')' : ''}">⊞ ${esc(nm)}${desigPart}</span>` +
       `<button type="button" class="sd-btn-sel" id="sd-sub-new" title="Добавить ещё один вариант СКС в этом проекте (например, для альтернативного решения)" style="margin-left:6px;font-size:11px;padding:2px 8px">＋ ещё вариант СКС</button>`;
   } else {
     const subOpts = subs.map(s => {
       const labelDesig = s.designation ? `[${esc(s.designation)}] ` : '';
       return `<option value="${esc(s.id)}"${s.id === activeSubId ? ' selected' : ''}>${labelDesig}${esc(s.name || '(без имени)')}</option>`;
     }).join('');
-    subBlockHtml = `<span class="muted" style="margin-left:14px">СКС-проект:</span>
+    subBlockHtml = `<span class="muted" style="margin-left:14px">Вариант СКС:</span>
       <select id="sd-subproject-switcher" title="Выберите вариант СКС внутри проекта">${subOpts}</select>
       <button type="button" class="sd-btn-sel" id="sd-sub-new" title="Добавить ещё один вариант СКС">＋</button>`;
   }
 
   // v0.59.565: warning о застрявшем legacy + кнопка force-merge.
   const stuckBlockHtml = legacyStuckAfterAttempt && !parentIsOrphan && parent
-    ? `<button type="button" id="sd-force-merge-legacy" title="Перенести legacy-данные родителя в выбранный СКС-подпроект, перезаписав существующие. Используйте если auto-migration пропустил данные." style="margin-left:8px;font-size:11px;padding:3px 10px;background:#fbbf24;border:1px solid #f59e0b;color:#78350f;border-radius:4px;cursor:pointer">🔀 Принять legacy</button>`
+    ? `<button type="button" id="sd-force-merge-legacy" title="Перенести legacy-данные родителя в выбранный вариант СКС, перезаписав существующие. Используйте если auto-migration пропустил данные." style="margin-left:8px;font-size:11px;padding:3px 10px;background:#fbbf24;border:1px solid #f59e0b;color:#78350f;border-radius:4px;cursor:pointer">🔀 Принять legacy</button>`
     : '';
   host.innerHTML = `
     <span class="muted">Проект:</span>
@@ -406,9 +406,9 @@ function _renderProjectBadgeImpl(pid, host) {
       setTimeout(() => ph.remove(), 2500);
       return;
     }
-    const name = await sdPrompt('Новый СКС-подпроект', `Имя внутри проекта «${parent.name}»`, 'СКС');
+    const name = await sdPrompt('Новый вариант СКС', `Имя варианта внутри проекта «${parent.name}»`, 'СКС');
     if (!name) return;
-    const designation = await sdPrompt('Обозначение', 'Короткий код подпроекта (напр. СКС-1)', 'СКС-1');
+    const designation = await sdPrompt('Обозначение', 'Короткий код варианта (напр. СКС-1)', 'СКС-1');
     const sp = createSubProject(parent.id, 'scs-design', { name, designation: designation || '' });
     setActiveProjectId(sp.id);
     location.reload();
@@ -429,7 +429,7 @@ function _renderProjectBadgeImpl(pid, host) {
       } catch (e) {
         console.warn('[scs-design] force-merge: create sub failed:', e);
         const ph = document.createElement('div');
-        ph.textContent = 'Не удалось создать СКС-подпроект: ' + (e.message || e);
+        ph.textContent = 'Не удалось создать вариант СКС: ' + (e.message || e);
         ph.style.cssText = 'position:fixed;top:60px;right:20px;background:#0f172a;color:#fff;padding:10px 14px;border-radius:6px;z-index:9999';
         document.body.appendChild(ph);
         setTimeout(() => ph.remove(), 3500);
@@ -439,9 +439,9 @@ function _renderProjectBadgeImpl(pid, host) {
     if (!dest || !dest.id) return;
     // v0.60.139: replaced confirm() with sdConfirmInline (no browser dialogs).
     const ok = await sdConfirmInline(
-      `Принять legacy-данные из родителя «${parent.name}» в подпроект «${dest.name || dest.designation || 'СКС'}»? ` +
-      (createdSub ? 'СКС-подпроект будет создан автоматически. ' : '') +
-      `Существующие ключи подпроекта будут ПЕРЕЗАПИСАНЫ данными родителя.`
+      `Принять legacy-данные из родителя «${parent.name}» в вариант «${dest.name || dest.designation || 'СКС'}»? ` +
+      (createdSub ? 'Вариант СКС будет создан автоматически. ' : '') +
+      `Существующие ключи варианта будут ПЕРЕЗАПИСАНЫ данными родителя.`
     );
     if (!ok) {
       // Если только что создали sub, но юзер отменил merge — оставляем sub

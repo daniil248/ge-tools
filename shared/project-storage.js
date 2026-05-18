@@ -186,8 +186,8 @@ export function listSubProjects(parentProjectId, moduleId, opts = {}) {
 // откуда был открыт мастер.
 export function createSubProject(parentProjectId, moduleId, { name, designation = '' } = {}) {
   const sub = createProject({
-    name: name || `Подпроект ${moduleId}`,
-    description: `Подпроект «${designation || moduleId}» внутри проекта ${parentProjectId}.`,
+    name: name || `Вариант ${moduleId}`,
+    description: `Вариант «${designation || moduleId}» внутри проекта ${parentProjectId}.`,
     kind: 'sketch',
     ownerModule: moduleId,
     parentProjectId,
@@ -224,8 +224,8 @@ export function createSubProject(parentProjectId, moduleId, { name, designation 
 // обязательного создания полноценного проекта в /projects/.
 export function createSketchForModule(moduleId, name) {
   return createProject({
-    name: name || `Черновик ${moduleId}`,
-    description: `Мини-проект, созданный из модуля «${moduleId}» для быстрой прикидки без полноценного проекта.`,
+    name: name || `Вариант ${moduleId}`,
+    description: `Вариант, созданный из модуля «${moduleId}» для быстрой прикидки без полноценного проекта.`,
     kind: 'sketch',
     ownerModule: moduleId,
   });

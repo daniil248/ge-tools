@@ -1763,7 +1763,7 @@ const LCM_CHECKLISTS = {
           return Array.isArray(ds) && ds.length > 0;
         } catch { return false; }
       } },
-    { label: 'СКС-проект (если есть)',
+    { label: 'Вариант СКС (если есть)',
       hint: 'scs-design.scs (опционально для электр.-only)',
       check: (pid) => {
         try {
@@ -2205,12 +2205,12 @@ function render() {
       },
       {
         id: 'scs-design', type: 'multi',
-        title: '🔗 СКС-проекты', count: subScs.length,
+        title: '🔗 Варианты СКС', count: subScs.length,
         color: '#0d9488',
         href: '../scs-design/',
         visible: subScs.length > 0 || hasScsLegacy,
         latent: true,
-        addLabel: '🔗 Добавить СКС-проект',
+        addLabel: '🔗 Добавить вариант СКС',
         bodyHtml: renderSubList(subScs, '../scs-design/', '🔗'),
       },
       {
@@ -2313,7 +2313,7 @@ function render() {
           <button type="button" class="pr-btn-primary" id="pr-add-btn">＋ Добавить ▾</button>
           <div id="pr-add-menu" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.1);z-index:10;min-width:280px">
             ${addMenuItems.map((m, i) => `<button type="button" data-add="${esc(m.id)}" style="display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:transparent;cursor:pointer;font-size:13px;${i > 0 ? 'border-top:1px solid #f1f5f9;' : ''}">${esc(m.addLabel || m.title)}</button>`).join('')}
-            ${addMenuItems.length === 0 ? '<div class="muted" style="padding:10px 14px;font-size:12px">Все модули уже подключены — добавьте новый подпроект из карточки модуля.</div>' : ''}
+            ${addMenuItems.length === 0 ? '<div class="muted" style="padding:10px 14px;font-size:12px">Все модули уже подключены — добавьте новый вариант из карточки модуля.</div>' : ''}
           </div>
         </div>
       </div>
@@ -2370,7 +2370,7 @@ function render() {
     // navigate в модуль; данные создадутся при первом сейве).
     const addOpts = {
       'schematic':          { kind: 'multi-storage',    label: 'схема',         href: '../../index.html',     defaultDesig: 'Схема-1', defaultName: 'Схема' },
-      'scs-design':         { kind: 'multi-sub',        label: 'СКС-проект',    href: '../scs-design/',    defaultDesig: 'СКС-1',   defaultName: 'СКС-проект' },
+      'scs-design':         { kind: 'multi-sub',        label: 'вариант СКС',    href: '../scs-design/',    defaultDesig: 'СКС-1',   defaultName: 'Вариант СКС' },
       'scs-config':         { kind: 'multi-sub',        label: 'шкаф',          href: '../scs-config/',    defaultDesig: 'Ш-1',     defaultName: 'Компоновка шкафа' },
       'mdc-config':         { kind: 'multi-sub',        label: 'модульный ЦОД', href: '../mdc-config/',    defaultDesig: 'МЦОД-1',  defaultName: 'Модульный ЦОД' },
       'tech-workspace':     { kind: 'singleton',        label: 'Технолог ЦОД',  href: '../tech-workspace/' },
@@ -2448,7 +2448,7 @@ function render() {
         const designation = await prPrompt('Обозначение', `Короткий код в рамках проекта (напр. ${opt.defaultDesig})`, opt.defaultDesig);
         const sp = createSubProject(p.id, moduleId, { name, designation: designation || '' });
         setActiveProjectId(sp.id);
-        prToast(`✔ Создан подпроект «${sp.name}»`);
+        prToast(`✔ Создан вариант «${sp.name}»`);
         try { clearNavStack(); } catch {}
         location.href = buildModuleHref(opt.href, { projectId: sp.id, fromModule: 'projects' });
       });
@@ -2459,7 +2459,7 @@ function render() {
       b.addEventListener('click', async () => {
         const id = b.closest('.pr-sub-row')?.dataset.subId;
         const sp = id ? getProject(id) : null; if (!sp) return;
-        const name = await prPrompt('Переименовать подпроект', 'Имя', sp.name || '');
+        const name = await prPrompt('Переименовать вариант', 'Имя', sp.name || '');
         if (name == null) return;
         const designation = await prPrompt('Обозначение', 'Короткий код', sp.designation || '');
         updateProject(id, { name, designation: designation || '' });
@@ -2472,8 +2472,8 @@ function render() {
         const id = b.closest('.pr-sub-row')?.dataset.subId;
         const sp = id ? getProject(id) : null; if (!sp) return;
         const ok = await prConfirm(
-          `Удалить подпроект «${sp.name}»?`,
-          'Удалятся метаданные и все scoped-данные подпроекта (raschet.project.' + sp.id + '.*). Действие необратимо.'
+          `Удалить вариант «${sp.name}»?`,
+          'Удалятся метаданные и все scoped-данные варианта (' + sp.id + '). Действие необратимо.'
         );
         if (!ok) return;
         const { removedKeys } = deleteProject(id);
@@ -2652,7 +2652,7 @@ function render() {
         const rowHtml = `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;margin-bottom:4px">
           <span style="font-size:16px">🔗</span>
           <span style="flex:1;min-width:0">СКС <span class="muted" style="font-size:11px">· ${esc(meta)} (legacy в родителе)</span></span>
-          <button type="button" class="pr-btn-sel" data-act="merge-legacy-scs" data-pid="${esc(p.id)}" title="Перенести legacy-данные СКС родителя в существующий или новый подпроект СКС. Дубликаты «СКС» в карточке исчезнут — останется один с этими 11 связями." style="font-size:12px;padding:3px 10px;background:#fbbf24;border-color:#f59e0b;color:#78350f">🔀 Объединить</button>
+          <button type="button" class="pr-btn-sel" data-act="merge-legacy-scs" data-pid="${esc(p.id)}" title="Перенести legacy-данные СКС родителя в существующий или новый вариант СКС. Дубликаты «СКС» в карточке исчезнут — останется один с этими 11 связями." style="font-size:12px;padding:3px 10px;background:#fbbf24;border-color:#f59e0b;color:#78350f">🔀 Объединить</button>
           <a href="${esc(href)}" class="pr-btn-sel" style="font-size:12px;padding:3px 10px;text-decoration:none">Открыть →</a>
         </div>`;
         _enrichGroup('scs-design', rowHtml, 1);
@@ -2670,7 +2670,7 @@ function render() {
               dest = ps.createSubProject(p.id, 'scs-design', { name: 'СКС', designation: '' });
               createdSub = true;
             }
-            if (!dest || !dest.id) { prToast('Не удалось создать/найти СКС-подпроект', 'error'); return; }
+            if (!dest || !dest.id) { prToast('Не удалось создать/найти вариант СКС', 'error'); return; }
             // Force-merge: копируем все scs-design.* ключи parent → sub, удаляем источник.
             const prefix = projectModulePrefix(p.id, 'scs-design');
             const subPrefix = projectModulePrefix(dest.id, 'scs-design');
@@ -2691,7 +2691,7 @@ function render() {
             }
             // Сбросить session-flag scs-design'а, чтобы при заходе он не считал legacy «застрявшим».
             try { sessionStorage.removeItem('raschet.scs-design.legacy-migrate-attempted.' + p.id + '.session'); } catch {}
-            prToast(`✔ Объединено: перенесено ${moved} ключей в подпроект «${dest.name || 'СКС'}»${createdSub ? ' (создан)' : ''}`);
+            prToast(`✔ Объединено: перенесено ${moved} ключей в вариант «${dest.name || 'СКС'}»${createdSub ? ' (создан)' : ''}`);
             render();
           } catch (e) {
             console.error('[project.js] merge-legacy-scs failed:', e);

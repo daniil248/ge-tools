@@ -700,11 +700,11 @@ function renderSketches() {
   host.innerHTML = `
     <details class="pr-sketches-panel" ${sketchesOpen ? 'open' : ''} style="margin-top:24px;padding:10px 14px;background:#fafbfc;border:1px solid #e5e7eb;border-radius:8px">
       <summary style="cursor:pointer;font-weight:600;color:#475569;user-select:none">
-        🧪 Мини-проекты (${totalN}) <span class="muted" style="font-weight:400;font-size:12px">— черновики мастеров, живут в своих модулях</span>${emptyCount ? ` <span style="background:#fef3c7;color:#78350f;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:500;margin-left:6px">${emptyCount} пустых</span>` : ''}
+        🧪 Варианты (${totalN}) <span class="muted" style="font-weight:400;font-size:12px">— варианты мастеров, живут в своих модулях</span>${emptyCount ? ` <span style="background:#fef3c7;color:#78350f;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:500;margin-left:6px">${emptyCount} пустых</span>` : ''}
       </summary>
       <div style="margin-top:10px;color:#64748b;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <span>Мини-проекты создаются внутри конкретного мастера (scs-design, mv-config и т.п.) для быстрых прикидок без создания полноценного проекта. Они видны только в dropdown'е своего модуля.</span>
-        ${emptyCount ? `<button type="button" id="pr-delete-empty-sketches" style="background:#fbbf24;color:#78350f;border:1px solid #f59e0b;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap" title="Удалить ВСЕ пустые мини-проекты одним кликом (без данных в схеме/стойках/связях)">🧹 Удалить ${emptyCount} пустых</button>` : ''}
+        <span>Варианты создаются внутри конкретного мастера (scs-design, mv-config и т.п.) для быстрых прикидок без создания полноценного проекта. Видны в dropdown'е своего модуля.</span>
+        ${emptyCount ? `<button type="button" id="pr-delete-empty-sketches" style="background:#fbbf24;color:#78350f;border:1px solid #f59e0b;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:500;white-space:nowrap" title="Удалить ВСЕ пустые варианты одним кликом (без данных в схеме/стойках/связях)">🧹 Удалить ${emptyCount} пустых</button>` : ''}
       </div>
       ${Object.entries(byOwner).map(([owner, items]) => `
         <div style="margin-top:12px">
@@ -767,15 +767,15 @@ function renderSketches() {
       if (st.facility)  detailParts.push(`${st.facility} позиций реестра`);
       const dataDescr = total
         ? `<b style="color:#b91c1c">Будет удалено: ${detailParts.join(', ')}.</b><br>Действие необратимо!`
-        : 'Мини-проект пуст — удаление безопасно.';
+        : 'Вариант пуст — удаление безопасно.';
       const ok = await prConfirm(
-        `Удалить мини-проект «${s.name}»?`,
+        `Удалить вариант «${s.name}»?`,
         dataDescr,
         { okLabel: total ? 'Удалить (и потерять данные)' : 'Удалить', isHtml: true }
       );
       if (!ok) return;
       const { removedKeys } = deleteProject(id);
-      prToast(`✔ Мини-проект удалён${removedKeys ? ' (стёрто ' + removedKeys + ' ключей LS)' : ''}`);
+      prToast(`✔ Вариант удалён${removedKeys ? ' (стёрто ' + removedKeys + ' ключей LS)' : ''}`);
       render();
     });
   });
