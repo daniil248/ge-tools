@@ -31,7 +31,7 @@
    ========================================================================= */
 
 import {
-  ensureDefaultProject, getActiveProjectId, projectKey, projectPrefix, listProjects
+  ensureDefaultProject, getActiveProjectId, setActiveProjectId, projectKey, projectPrefix, listProjects
 } from 'shared/project-storage.js';
 // v0.59.278: единая точка доступа к стойкам. Шаблоны — глобальные
 // (rack-config.templates.v1), экземпляры — project-scoped.
@@ -117,6 +117,21 @@ const OLD_SCS_KEYS = {
 };
 
 function rescopeToActiveProject() {
+  // v0.60.751 (репорт Пользователя: пустой CR01 при переходе из scs-design).
+  // Корень: scs-design работает в выбранном проекте/под-проекте (его pid),
+  // а scs-config резолвил активный только из LS — при расхождении контент
+  // читался из ЧУЖОГО namespace → стойка пустая. Фикс: соблюдаем ?project=
+  // из URL (санкционированный паттерн project-context.js / card-to-card
+  // v0.59.587) — синкаем активный проект ДО ensureDefaultProject, чтобы
+  // оба модуля читали ОДИН namespace. Идемпотентно, без побочных эффектов
+  // если параметра нет или проект не найден.
+  try {
+    const qProject = (new URLSearchParams(location.search).get('project') || '').trim();
+    if (qProject && qProject !== getActiveProjectId()) {
+      const exists = (listProjects() || []).some(p => p && p.id === qProject);
+      if (exists) setActiveProjectId(qProject);
+    }
+  } catch {}
   ensureDefaultProject();
   const pid = getActiveProjectId();
   LS_CONTENTS  = projectKey(pid, 'scs-config', 'contents.v1');
