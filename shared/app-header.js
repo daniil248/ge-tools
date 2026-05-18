@@ -160,7 +160,7 @@ export function mountHeader(opts = {}) {
   const projBadgeHtml = proj
     ? `<button type="button" class="rs-proj-badge" data-proj-mode="linked" title="Активный проект (через ссылку из /projects/): ${esc(proj.name || proj.id)}\nКликните чтобы открыть меню переключения / создания.">📁&nbsp;${esc(proj.name || proj.id)}</button>`
     : (standaloneProj
-        ? `<button type="button" class="rs-proj-badge rs-proj-badge-standalone" data-proj-mode="standalone" title="Standalone-режим. Все локальные данные пишутся в проект «${esc(standaloneProj.name || standaloneProj.id)}». Кликните чтобы переключить проект, создать новый или работать в режиме «без проекта».">🔒&nbsp;${esc(standaloneProj.name || standaloneProj.id)}</button>`
+        ? `<button type="button" class="rs-proj-badge rs-proj-badge-standalone" data-proj-mode="standalone" title="Standalone-режим. Все локальные данные пишутся в ${standaloneProj.kind === 'sketch' ? 'вариант' : 'проект'} «${esc(standaloneProj.name || standaloneProj.id)}». Кликните чтобы переключить, создать новый или работать в режиме «без проекта».">🔒&nbsp;${esc(standaloneProj.name || standaloneProj.id)}</button>`
         : `<button type="button" class="rs-proj-badge rs-proj-badge-empty" data-proj-mode="empty" title="Активный проект не выбран. Кликните чтобы выбрать или создать локальный проект.">📂&nbsp;Без проекта</button>`);
 
   // v0.60.137 (Phase 44.2 final): plan-badge — отображает текущий план
@@ -609,11 +609,14 @@ function _openStandaloneProjectMenu(currentModuleId, opts = {}) {
   let projects = [];
   try { projects = listProjects() || []; } catch {}
   const activeId = (() => { try { return getActiveProjectId(); } catch { return null; } })();
-  const activeName = (() => {
-    if (!activeId) return null;
-    const p = projects.find(x => x.id === activeId);
-    return p ? (p.name || p.id) : null;
-  })();
+  const activeProj = activeId ? projects.find(x => x.id === activeId) : null;
+  const activeName = activeProj ? (activeProj.name || activeProj.id) : null;
+  // v0.60.753 (директива Пользователя: sketch/под-проект = ВАРИАНТ, не
+  // «проект»). Label-only: если активен sketch — называем «вариант».
+  // Модель данных НЕ трогаем (рефактор — отложенная фаза ROADMAP 8.0).
+  const activeIsVariant = !!(activeProj && activeProj.kind === 'sketch');
+  const activeNounPrep = activeIsVariant ? 'варианте' : 'проекте';   // «в …:»
+  const activeNounIns  = activeIsVariant ? 'вариантом' : 'проектом'; // «под …»
 
   // v0.60.349 (по репорту Пользователя 2026-05-06: «что за проект Вариант 1
   // — схемы, если это схема в проекте, она не должна быть как проект, тоже
@@ -678,15 +681,15 @@ function _openStandaloneProjectMenu(currentModuleId, opts = {}) {
       <div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;align-items:center;gap:10px">
         <span style="font-size:18px">📁</span>
         <div>
-          <div style="font-weight:700;font-size:14px;color:#0f172a">Активный проект</div>
-          <div style="font-size:11.5px;color:#64748b">Все локальные данные этого модуля сохраняются под выбранным проектом.</div>
+          <div style="font-weight:700;font-size:14px;color:#0f172a">${activeIsVariant ? 'Активный вариант' : 'Активный проект'}</div>
+          <div style="font-size:11.5px;color:#64748b">Все локальные данные этого модуля сохраняются под выбранным ${activeNounIns}.</div>
         </div>
         <button type="button" class="rs-proj-menu-close" style="margin-left:auto;background:transparent;border:0;font-size:20px;cursor:pointer;color:#64748b" title="Закрыть">×</button>
       </div>
       <div style="padding:14px 16px;overflow-y:auto;flex:1">
-        <div style="font-size:11.5px;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px">Сейчас работаем в проекте:</div>
+        <div style="font-size:11.5px;color:#475569;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px">Сейчас работаем в ${activeNounPrep}:</div>
         <div style="font-size:13px;font-weight:600;color:#0f172a;padding:8px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;margin-bottom:14px">
-          ${activeName ? '🔒 ' + esc(activeName) : '<span style="color:#dc2626">Нет активного проекта</span>'}
+          ${activeName ? '🔒 ' + esc(activeName) + (activeIsVariant ? ' <span style="font-weight:400;color:#64748b;font-size:11px">· вариант</span>' : '') : '<span style="color:#dc2626">Нет активного проекта</span>'}
         </div>
 
         <div style="font-size:11.5px;color:#475569;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px">Переключиться на другой:</div>
