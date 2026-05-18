@@ -38,7 +38,7 @@
    ```
 
 3. **Задать URL приложения** (если отличается от
-   `https://daniil248.github.io/ge-tools/`):
+   `https://daniil248.github.io/raschet/`):
    ```bash
    firebase functions:config:set app.url="https://your-domain/raschet/"
    ```
