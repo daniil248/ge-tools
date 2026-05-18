@@ -137,11 +137,22 @@ function arrayUnion(v) { return firebase.firestore.FieldValue.arrayUnion(v); }
 function arrayRemove(v) { return firebase.firestore.FieldValue.arrayRemove(v); }
 function fieldDelete() { return firebase.firestore.FieldValue.delete(); }
 
+// v0.60.748: допустимые дисциплинарные роли участника проекта (мультироль).
+// Уровень доступа Firestore (editor|viewer) выводится отдельно из набора.
+const PROJECT_DISC_ROLES = ['admin', 'gip', 'electrician', 'mechanic', 'technologist', 'scs', 'viewer'];
+// Нормализует вход (массив | строка | undefined) в чистый массив валидных
+// дисциплинарных ролей без дублей. Пусто → ['viewer'] (минимум привилегий).
+function normProjectRoles(roles) {
+  let arr = Array.isArray(roles) ? roles : (roles ? [roles] : []);
+  arr = [...new Set(arr.map(r => String(r || '').trim()).filter(r => PROJECT_DISC_ROLES.includes(r)))];
+  return arr.length ? arr : ['viewer'];
+}
+
 function computeRole(project, user) {
   if (!user) return 'guest';
   if (project.ownerId === user.uid) return 'owner';
   const m = project.members?.[user.uid];
-  if (m) return m.role; // 'editor' | 'viewer'
+  if (m) return m.role; // 'editor' | 'viewer' (Firestore-уровень доступа)
   return 'guest';
 }
 
@@ -447,10 +458,20 @@ const Fs = {
     await fsDb().collection('projects').doc(id).delete();
   },
 
-  async shareProject(projectId, email, role) {
+  // v0.60.748: участник проекта может иметь НЕСКОЛЬКО дисциплинарных ролей
+  // (репорт Пользователя: «один пользователь может иметь несколько ролей —
+  // это касается только проекта»). roles[] — дисциплины (admin/gip/
+  // electrician/mechanic/technologist/scs/viewer). Поле role (editor|viewer)
+  // СОХРАНЕНО как уровень доступа Firestore — firestore.rules:55 проверяет
+  // members[uid].role=='editor' для записи; НЕ меняем семантику/правила.
+  // Любая не-viewer дисциплина ⇒ нужен write ⇒ role:'editor'; только
+  // viewer ⇒ role:'viewer' (read-only). В standalone это НЕ применяется
+  // (там доступ по подписке / уровню глобального доступа).
+  async shareProject(projectId, email, roles) {
     email = (email || '').toLowerCase().trim();
     if (!email) throw new Error('Укажите email');
-    if (!['viewer', 'editor'].includes(role)) role = 'viewer';
+    const arr = normProjectRoles(roles);
+    const accessLevel = arr.some(r => r !== 'viewer') ? 'editor' : 'viewer';
 
     // Ищем пользователя по email в userIndex
     const snap = await fsDb().collection('userIndex').doc(email).get();
@@ -466,7 +487,8 @@ const Fs = {
       [`members.${targetUid}`]: {
         email,
         name: target.name || email,
-        role,
+        roles: arr,
+        role: accessLevel, // Firestore-уровень доступа (rules), backward-compat
         addedAt: Date.now(),
       },
       memberUids: arrayUnion(targetUid),
@@ -495,9 +517,10 @@ const Fs = {
     });
   },
 
-  async requestAccess(projectId, role = 'viewer') {
+  async requestAccess(projectId, roles = 'viewer') {
     const u = window.Auth.currentUser;
     if (!u) throw new Error('Войдите через Gmail, чтобы запросить доступ');
+    const rolesArr = normProjectRoles(roles);
     // Нужен ownerId проекта — но read может не пройти у неучастника.
     // Для 'link' visibility надо бы разрешить чтение имени и ownerId.
     // Fallback: используем отдельное облегчённое чтение через метаданные.
@@ -514,22 +537,25 @@ const Fs = {
       requesterUid: u.uid,
       requesterEmail: u.email,
       requesterName: u.name,
-      role,
+      roles: rolesArr,
+      role: rolesArr.some(x => x !== 'viewer') ? 'editor' : 'viewer',
       status: 'pending',
       createdAt: ts(),
     });
   },
 
-  async approveRequest(reqId, role) {
+  async approveRequest(reqId, roles) {
     const reqDoc = await fsDb().collection('accessRequests').doc(reqId).get();
     if (!reqDoc.exists) throw new Error('Запрос не найден');
     const r = reqDoc.data();
-    const useRole = role || r.role || 'viewer';
+    const arr = normProjectRoles(roles != null ? roles : (r.roles || r.role));
+    const accessLevel = arr.some(x => x !== 'viewer') ? 'editor' : 'viewer';
     await fsDb().collection('projects').doc(r.projectId).update({
       [`members.${r.requesterUid}`]: {
         email: r.requesterEmail,
         name: r.requesterName,
-        role: useRole,
+        roles: arr,
+        role: accessLevel,
         addedAt: Date.now(),
       },
       memberUids: arrayUnion(r.requesterUid),

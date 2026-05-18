@@ -2895,6 +2895,32 @@ function render() {
       { id: 'viewer',       icon: '👁', label: 'Viewer (только просмотр)', desc: 'Read-only во всех модулях' },
     ];
     const ROLE_LABEL = Object.fromEntries(ROLE_OPTS.map(r => [r.id, r.icon + ' ' + r.label]));
+    const ROLE_IDS = ROLE_OPTS.map(r => r.id);
+    // v0.60.748: участник проекта может иметь НЕСКОЛЬКО ролей (мультироль —
+    // только в рамках ПРОЕКТА; в standalone доступ по подписке/глоб.уровню).
+    // Чтение с backward-compat: новый массив roles[] → он; legacy одиночное
+    // role-дисциплина → [role]; legacy editor/viewer (Firestore-уровень) →
+    // ['viewer'] для отображения (сам Firestore-доступ хранится в m.role и
+    // не меняется, пока владелец не переназначит роли в новом UI).
+    const memberRoles = (m) => {
+      if (m && Array.isArray(m.roles) && m.roles.length) {
+        const f = m.roles.filter(r => ROLE_IDS.includes(r));
+        if (f.length) return f;
+      }
+      if (m && m.role && ROLE_IDS.includes(m.role)) return [m.role];
+      return ['viewer'];
+    };
+    const rolesLabel = (m) => memberRoles(m).map(r => ROLE_LABEL[r] || r).join(', ');
+    // Чекбокс-группа ролей (мультивыбор). selected — массив id.
+    const rolesCheckboxes = (groupAttr, selected) => `
+      <div ${groupAttr} style="display:flex;flex-wrap:wrap;gap:4px 12px">
+        ${ROLE_OPTS.map(r => `
+          <label title="${esc(r.desc)}" style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap">
+            <input type="checkbox" value="${esc(r.id)}"${selected.includes(r.id) ? ' checked' : ''} style="margin:0">
+            <span>${r.icon} ${esc(r.label)}</span>
+          </label>
+        `).join('')}
+      </div>`;
     const members = p.members || {};
     const memberRows = Object.entries(members);
     const ownerUid = p.ownerId;
@@ -2959,7 +2985,7 @@ function render() {
                 <thead style="background:#f8fafc">
                   <tr>
                     <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569">Email / UID</th>
-                    <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569;width:240px">Роль</th>
+                    <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #cbd5e1;font-weight:600;color:#475569;width:360px">Роли (можно несколько)</th>
                     <th style="text-align:right;padding:8px 10px;border-bottom:1px solid #cbd5e1;width:80px"></th>
                   </tr>
                 </thead>
@@ -2977,10 +3003,8 @@ function render() {
                         <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">${esc(m.email || uid.slice(0, 12))}</td>
                         <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9">
                           ${isOwner
-                            ? `<select data-team-role="${esc(uid)}" style="font:inherit;font-size:12px;padding:3px 6px;border:1px solid #cbd5e1;border-radius:3px;width:100%">
-                                ${ROLE_OPTS.map(r => `<option value="${esc(r.id)}"${r.id === (m.role || 'viewer') ? ' selected' : ''}>${r.icon} ${esc(r.label)}</option>`).join('')}
-                              </select>`
-                            : esc(ROLE_LABEL[m.role] || m.role || 'viewer')
+                            ? rolesCheckboxes(`data-team-roles="${esc(uid)}"`, memberRoles(m))
+                            : esc(rolesLabel(m))
                           }
                         </td>
                         <td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;text-align:right">
@@ -3001,12 +3025,10 @@ function render() {
                     <div style="font-size:11.5px;color:#475569;margin-bottom:3px">Email участника:</div>
                     <input type="email" id="pr-team-invite-email" placeholder="user@example.com" style="width:100%;padding:6px 8px;border:1px solid #0ea5e9;border-radius:3px;font:inherit;font-size:13px">
                   </label>
-                  <label style="min-width:200px">
-                    <div style="font-size:11.5px;color:#475569;margin-bottom:3px">Роль:</div>
-                    <select id="pr-team-invite-role" style="width:100%;padding:6px 8px;border:1px solid #0ea5e9;border-radius:3px;font:inherit;font-size:13px">
-                      ${ROLE_OPTS.map(r => `<option value="${esc(r.id)}"${r.id === 'electrician' ? ' selected' : ''}>${r.icon} ${esc(r.label)}</option>`).join('')}
-                    </select>
-                  </label>
+                  <div style="min-width:240px;flex:1">
+                    <div style="font-size:11.5px;color:#475569;margin-bottom:3px">Роли (можно несколько):</div>
+                    ${rolesCheckboxes('id="pr-team-invite-roles"', ['electrician'])}
+                  </div>
                   <button type="button" id="pr-team-invite-btn" style="padding:6px 14px;background:#0ea5e9;color:#fff;border:0;border-radius:3px;cursor:pointer;font:inherit;font-size:13px;font-weight:500">+ Пригласить</button>
                 </div>
               </div>
@@ -3070,12 +3092,13 @@ function render() {
       if (inviteBtn) {
         inviteBtn.addEventListener('click', async () => {
           const email = (teamHost.querySelector('#pr-team-invite-email')?.value || '').trim().toLowerCase();
-          const role = teamHost.querySelector('#pr-team-invite-role')?.value || 'electrician';
+          const rolesArr = Array.from(teamHost.querySelectorAll('#pr-team-invite-roles input:checked')).map(c => c.value);
           if (!email) { prToast('Введите email', 'warn'); return; }
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { prToast('Неверный формат email', 'err'); return; }
+          if (!rolesArr.length) { prToast('Выберите хотя бы одну роль', 'warn'); return; }
           try {
-            await window.Storage.shareProject(p.id, email, role);
-            prToast(`✔ Приглашён: ${email} (${ROLE_LABEL[role] || role})`, 'ok');
+            await window.Storage.shareProject(p.id, email, rolesArr);
+            prToast(`✔ Приглашён: ${email} (${rolesArr.map(r => ROLE_LABEL[r] || r).join(', ')})`, 'ok');
             // Reload project meta to get updated members.
             const fresh = await window.Storage.getProject(p.id);
             if (fresh) Object.assign(p, fresh);
@@ -3096,17 +3119,19 @@ function render() {
           } catch (e) { prToast('Ошибка: ' + (e.message || e), 'err'); }
         });
       });
-      teamHost.querySelectorAll('[data-team-role]').forEach(sel => {
-        sel.addEventListener('change', async () => {
-          const uid = sel.getAttribute('data-team-role');
-          const newRole = sel.value;
-          // Существующий API shareProject принимает (pid, email, role) — для смены роли
-          // нужен email. Достаём из members[uid].email.
+      // v0.60.748: мультироль — слушаем изменение чекбоксов в группе ролей
+      // участника; собираем ВСЕ отмеченные → массив → shareProject.
+      teamHost.querySelectorAll('[data-team-roles]').forEach(box => {
+        box.addEventListener('change', async (ev) => {
+          if (!ev.target || ev.target.type !== 'checkbox') return;
+          const uid = box.getAttribute('data-team-roles');
           const m = (p.members || {})[uid];
           if (!m || !m.email) { prToast('Email участника не найден — переоткройте проект', 'warn'); return; }
+          const rolesArr = Array.from(box.querySelectorAll('input:checked')).map(c => c.value);
+          if (!rolesArr.length) { prToast('У участника должна быть хотя бы одна роль', 'warn'); render(); return; }
           try {
-            await window.Storage.shareProject(p.id, m.email, newRole);
-            prToast(`✔ Роль изменена: ${ROLE_LABEL[newRole] || newRole}`, 'ok');
+            await window.Storage.shareProject(p.id, m.email, rolesArr);
+            prToast(`✔ Роли обновлены: ${rolesArr.map(r => ROLE_LABEL[r] || r).join(', ')}`, 'ok');
             const fresh = await window.Storage.getProject(p.id);
             if (fresh) Object.assign(p, fresh);
             render();
