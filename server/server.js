@@ -29,6 +29,14 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '12mb' })); // проектные JSON бывают крупные
 
+// v0.60.776: одобрение админом. ADMIN_EMAILS (через запятую) — авто-admin
+// + авто-approved (бутстрап; защита от локаута: эти аккаунты всегда
+// проходят). Остальные регистрируются approved=false → доступ только
+// после одобрения админом (admin.html → /api/admin/approve).
+const ADMIN_EMAILS = String(process.env.ADMIN_EMAILS || '')
+  .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+const isAdminEmail = (e) => ADMIN_EMAILS.includes(String(e || '').toLowerCase());
+
 function sign(u) { return jwt.sign({ uid: u.uid, email: u.email }, JWT_SECRET, { expiresIn: JWT_TTL }); }
 function auth(req, res, next) {
   const h = req.headers.authorization || '';
@@ -36,6 +44,16 @@ function auth(req, res, next) {
   if (!t) return res.status(401).json({ error: 'no token' });
   try { req.user = jwt.verify(t, JWT_SECRET); next(); }
   catch { return res.status(401).json({ error: 'bad token' }); }
+}
+// admin-гард: токен валиден И (роль admin ИЛИ email в ADMIN_EMAILS).
+async function adminOnly(req, res, next) {
+  try {
+    if (isAdminEmail(req.user && req.user.email)) return next();
+    const r = await pool.query('SELECT role,is_internal FROM users WHERE uid=$1', [req.user.uid]);
+    const u = r.rows[0];
+    if (u && (u.role === 'admin' || u.is_internal === true)) return next();
+    return res.status(403).json({ error: 'admin only' });
+  } catch (e) { return res.status(500).json({ error: String(e && e.message || e) }); }
 }
 
 // --- health -----------------------------------------------------------------
@@ -70,9 +88,13 @@ app.post('/api/auth/google', async (req, res) => {
          photo=COALESCE(EXCLUDED.photo, users.photo),
          google_sub=COALESCE(users.google_sub, EXCLUDED.google_sub),
          last_login=now()
-       RETURNING uid,email,name,photo,is_internal,role`,
+       RETURNING uid,email,name,photo,is_internal,role,approved`,
       [email, p.name || null, p.picture || null, p.sub || null]);
     const u = r.rows[0];
+    if (isAdminEmail(u.email) && (u.role !== 'admin' || !u.approved)) {
+      await pool.query("UPDATE users SET approved=true, role='admin', is_internal=true WHERE uid=$1", [u.uid]);
+      u.approved = true; u.role = 'admin'; u.is_internal = true;
+    }
     res.json({ token: sign(u), user: u });
   } catch (e) { res.status(401).json({ error: 'google verify failed: ' + String(e && e.message || e) }); }
 });
@@ -82,11 +104,15 @@ app.post('/api/auth/register', async (req, res) => {
   const { email, password, name } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email/password' });
   try {
+    const em = String(email).toLowerCase().trim();
+    const adm = isAdminEmail(em);
     const hash = await bcrypt.hash(password, 10);
     const r = await pool.query(
-      `INSERT INTO users(email,name,pass_hash) VALUES($1,$2,$3)
-       ON CONFLICT (email) DO NOTHING RETURNING uid,email,name`,
-      [String(email).toLowerCase().trim(), name || null, hash]);
+      `INSERT INTO users(email,name,pass_hash,approved,role,is_internal)
+       VALUES($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (email) DO NOTHING
+       RETURNING uid,email,name,approved,role,is_internal`,
+      [em, name || null, hash, adm, adm ? 'admin' : null, adm]);
     if (!r.rows[0]) return res.status(409).json({ error: 'email exists' });
     res.json({ token: sign(r.rows[0]), user: r.rows[0] });
   } catch (e) { res.status(500).json({ error: String(e) }); }
@@ -98,13 +124,41 @@ app.post('/api/auth/login', async (req, res) => {
     const u = r.rows[0];
     if (!u || !u.pass_hash || !(await bcrypt.compare(password || '', u.pass_hash)))
       return res.status(401).json({ error: 'invalid credentials' });
+    // бутстрап-админ: если email в ADMIN_EMAILS — гарантируем admin/approved
+    if (isAdminEmail(u.email) && (u.role !== 'admin' || !u.approved)) {
+      await pool.query("UPDATE users SET approved=true, role='admin', is_internal=true WHERE uid=$1", [u.uid]);
+      u.approved = true; u.role = 'admin'; u.is_internal = true;
+    }
     await pool.query('UPDATE users SET last_login=now() WHERE uid=$1', [u.uid]);
-    res.json({ token: sign(u), user: { uid: u.uid, email: u.email, name: u.name } });
+    res.json({ token: sign(u), user: { uid: u.uid, email: u.email, name: u.name, approved: u.approved, role: u.role, is_internal: u.is_internal } });
   } catch (e) { res.status(500).json({ error: String(e) }); }
 });
 app.get('/api/auth/me', auth, async (req, res) => {
-  const r = await pool.query('SELECT uid,email,name,is_internal,role FROM users WHERE uid=$1', [req.user.uid]);
-  res.json(r.rows[0] || null);
+  try {
+    const r = await pool.query('SELECT uid,email,name,photo,is_internal,role,approved FROM users WHERE uid=$1', [req.user.uid]);
+    res.json(r.rows[0] || null);
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
+});
+
+// --- Admin: одобрение пользователей (admin.html) ---------------------------
+app.get('/api/admin/users', auth, adminOnly, async (_req, res) => {
+  try {
+    const r = await pool.query(
+      'SELECT uid,email,name,approved,role,is_internal,created_at,last_login FROM users ORDER BY approved ASC, created_at DESC');
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
+});
+app.post('/api/admin/approve', auth, adminOnly, async (req, res) => {
+  try {
+    const { uid, email, approved } = req.body || {};
+    if (!uid && !email) return res.status(400).json({ error: 'uid|email' });
+    const r = await pool.query(
+      `UPDATE users SET approved=$1 WHERE ${uid ? 'uid=$2' : 'lower(email)=lower($2)'}
+       RETURNING uid,email,approved`,
+      [approved !== false, uid || email]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json(r.rows[0]);
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
 });
 
 // --- KV: зеркало project-storage (ключ → JSON), облачная синхронизация -----

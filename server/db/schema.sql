@@ -18,14 +18,16 @@ CREATE TABLE IF NOT EXISTS users (
   pass_hash    TEXT,                 -- bcrypt/scrypt; NULL если только OAuth
   google_sub   TEXT UNIQUE,          -- Google OAuth subject
   photo        TEXT,                 -- аватар из Google-профиля
+  approved     BOOLEAN NOT NULL DEFAULT FALSE,  -- одобрен админом
   is_internal  BOOLEAN NOT NULL DEFAULT FALSE,
   role         TEXT,                 -- internal RBAC (manager/gip/engineer/viewer)
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login   TIMESTAMPTZ
 );
--- идемпотентно для уже существующей БД (Google-вход добавлен позже):
+-- идемпотентно для уже существующей БД (Google-вход / одобрение позже):
 ALTER TABLE users ADD COLUMN IF NOT EXISTS photo TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS sessions (
   token       TEXT PRIMARY KEY,      -- случайный/JWT-jti

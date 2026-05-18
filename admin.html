@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GE Tools — Админ: одобрение пользователей</title>
+  <style>
+    body{font:14px system-ui,sans-serif;margin:0;background:#f1f5f9;color:#0f172a}
+    .wrap{max-width:860px;margin:30px auto;padding:0 16px}
+    h1{font-size:20px}
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    th,td{padding:9px 12px;border-bottom:1px solid #f1f5f9;text-align:left;font-size:13px}
+    th{background:#f8fafc;color:#475569}
+    .b{padding:5px 10px;border:0;border-radius:5px;cursor:pointer;font:600 12px system-ui}
+    .ok{background:#16a34a;color:#fff}.no{background:#fff;color:#b91c1c;border:1px solid #fecaca}
+    .pill{padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600}
+    .pa{background:#dcfce7;color:#15803d}.pp{background:#fef3c7;color:#92400e}
+    #msg{margin:10px 0;color:#b91c1c;font-size:13px;min-height:18px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>👤 Одобрение пользователей — GE Tools (сервер)</h1>
+    <div id="msg"></div>
+    <table id="t"><thead><tr><th>Email</th><th>Имя</th><th>Статус</th><th>Роль</th><th>Создан</th><th></th></tr></thead><tbody id="b"></tbody></table>
+  </div>
+  <script>
+  (async function(){
+    var TOK='getools.srvToken', msg=document.getElementById('msg'), b=document.getElementById('b');
+    function tok(){ try{return localStorage.getItem(TOK)||''}catch(e){return ''} }
+    async function api(p,body){
+      var r=await fetch('/api'+p,{method:body?'POST':'GET',headers:Object.assign({'Content-Type':'application/json'},tok()?{Authorization:'Bearer '+tok()}:{}),body:body?JSON.stringify(body):undefined});
+      var d=await r.json().catch(function(){return{}}); if(!r.ok) throw new Error(d&&d.error||('HTTP '+r.status)); return d;
+    }
+    if(!tok()){ location.replace('login.html?next=%2Fadmin.html'); return; }
+    async function load(){
+      msg.textContent='';
+      try{
+        var us=await api('/admin/users');
+        b.innerHTML=us.map(function(u){
+          return '<tr><td>'+ (u.email||'') +'</td><td>'+(u.name||'')+'</td>'
+            +'<td><span class="pill '+(u.approved?'pa':'pp')+'">'+(u.approved?'одобрен':'ожидает')+'</span></td>'
+            +'<td>'+(u.role||(u.is_internal?'internal':'—'))+'</td>'
+            +'<td>'+ (u.created_at? new Date(u.created_at).toLocaleDateString('ru-RU'):'') +'</td>'
+            +'<td>'+(u.approved
+                ? '<button class="b no" data-u="'+u.uid+'" data-a="0">Отозвать</button>'
+                : '<button class="b ok" data-u="'+u.uid+'" data-a="1">Одобрить</button>')+'</td></tr>';
+        }).join('');
+        b.querySelectorAll('button[data-u]').forEach(function(btn){
+          btn.addEventListener('click', async function(){
+            btn.disabled=true;
+            try{ await api('/admin/approve',{uid:btn.dataset.u,approved:btn.dataset.a==='1'}); await load(); }
+            catch(e){ msg.textContent='Ошибка: '+(e.message||e); btn.disabled=false; }
+          });
+        });
+      }catch(e){
+        msg.textContent='Доступ только для админа. '+(e.message||e);
+        if(String(e.message||'').indexOf('403')<0 && String(e.message||'').indexOf('admin')<0){
+          // невалидный токен → на login
+          try{localStorage.removeItem(TOK)}catch(_){}
+          location.replace('login.html?next=%2Fadmin.html');
+        }
+      }
+    }
+    load();
+  })();
+  </script>
+</body>
+</html>
