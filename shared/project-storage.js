@@ -354,6 +354,58 @@ export function projectDisciplineOf(p) {
   return fam[0] || m;
 }
 
+// ===========================================================================
+// v0.60.764 — Матрица ответственности по разделам (ГИП). Запрос Пользователя:
+// ГИП указывает, какие разделы проекта разрабатываются у нас, а какие —
+// внешние (только ссылка/требования: мощность, подключение к сети,
+// расстановка), либо частично наши (напр. шкафы внешние, но компоновка/
+// подключение/расстановка — наши). Аддитивно: p.sectionScopes = {
+// <disciplineId>: { mode, owner, reqPowerKw, reqNetwork, reqPlacement,
+// oursNote, link } }. Отсутствие = 'own' (разрабатываем — backward-compat,
+// существующие проекты поведение не меняют). Только метаданные проекта;
+// namespace/данные дисциплин НЕ трогаются. 0 потребителей (cache-safe §6a).
+// ===========================================================================
+export const SECTION_SCOPE_MODES = ['own', 'external', 'partial'];
+// own — разрабатываем полностью; external — внешняя разработка, у нас
+// только ключевые требования (read-only); partial — частично наше
+// (oursNote: что именно наше; остальное — внешние требования).
+
+export function getSectionScope(pid, disciplineId) {
+  if (!pid || !disciplineId) return { mode: 'own' };
+  const p = getProject(pid);
+  const m = p && p.sectionScopes && typeof p.sectionScopes === 'object'
+    ? p.sectionScopes[disciplineId] : null;
+  if (!m || typeof m !== 'object') return { mode: 'own' };
+  const mode = SECTION_SCOPE_MODES.includes(m.mode) ? m.mode : 'own';
+  return { mode, owner: m.owner || '', reqPowerKw: m.reqPowerKw || '',
+    reqNetwork: m.reqNetwork || '', reqPlacement: m.reqPlacement || '',
+    oursNote: m.oursNote || '', link: m.link || '' };
+}
+
+// Патч скоупа раздела. patch.mode валидируется; mode==='own' с пустыми
+// полями → удаляем запись (чтобы не копить дефолты). preserve-on-miss:
+// прочие разделы не трогаем (user-params-sacred).
+export function setSectionScope(pid, disciplineId, patch) {
+  if (!pid || !disciplineId) return null;
+  const p = getProject(pid);
+  if (!p) return null;
+  const cur = (p.sectionScopes && typeof p.sectionScopes === 'object') ? { ...p.sectionScopes } : {};
+  const prev = (cur[disciplineId] && typeof cur[disciplineId] === 'object') ? cur[disciplineId] : {};
+  const next = { ...prev, ...(patch || {}) };
+  if (next.mode && !SECTION_SCOPE_MODES.includes(next.mode)) next.mode = 'own';
+  const isEmptyOwn = (next.mode || 'own') === 'own' &&
+    !next.owner && !next.reqPowerKw && !next.reqNetwork &&
+    !next.reqPlacement && !next.oursNote && !next.link;
+  if (isEmptyOwn) delete cur[disciplineId];
+  else cur[disciplineId] = next;
+  return updateProject(pid, { sectionScopes: cur });
+}
+
+export function listSectionScopes(pid) {
+  const p = pid ? getProject(pid) : null;
+  return (p && p.sectionScopes && typeof p.sectionScopes === 'object') ? p.sectionScopes : {};
+}
+
 // v0.59.278: копирование проекта. Копирует метаданные (name + «(копия)») и
 // ВСЕ scoped-данные (raschet.project.<srcPid>.* → raschet.project.<dstPid>.*).
 // Возвращает объект созданного проекта. Не переносит неявные зависимости
