@@ -72,47 +72,65 @@ app.get('/api/auth/me', auth, async (req, res) => {
 });
 
 // --- KV: зеркало project-storage (ключ → JSON), облачная синхронизация -----
+// v0.60.773 (фикс прод-падения): node-pg НЕ сериализует JS-объект/массив
+// в jsonb (массив превращается в PG-array-литерал → invalid json →
+// необработанная ошибка → краш процесса). ВСЕГДА JSON.stringify для
+// jsonb-параметров + try/catch в каждом маршруте (плохой payload =
+// 400/500, НЕ падение сервера). Чтение jsonb node-pg отдаёт уже
+// распарсенным (объект) — res.json как есть.
 app.get('/api/kv', auth, async (req, res) => {           // ?prefix=getools.project.
-  const prefix = String(req.query.prefix || '');
-  const r = await pool.query(
-    'SELECT k,v FROM kv WHERE owner_uid=$1 AND k LIKE $2 ORDER BY k',
-    [req.user.uid, prefix.replace(/[%_]/g, '\\$&') + '%']);
-  res.json(Object.fromEntries(r.rows.map(x => [x.k, x.v])));
+  try {
+    const prefix = String(req.query.prefix || '');
+    const r = await pool.query(
+      'SELECT k,v FROM kv WHERE owner_uid=$1 AND k LIKE $2 ORDER BY k',
+      [req.user.uid, prefix.replace(/[%_]/g, '\\$&') + '%']);
+    res.json(Object.fromEntries(r.rows.map(x => [x.k, x.v])));
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
 });
 app.get('/api/kv/:key', auth, async (req, res) => {
-  const r = await pool.query('SELECT v FROM kv WHERE owner_uid=$1 AND k=$2', [req.user.uid, req.params.key]);
-  res.json(r.rows[0] ? r.rows[0].v : null);
+  try {
+    const r = await pool.query('SELECT v FROM kv WHERE owner_uid=$1 AND k=$2', [req.user.uid, req.params.key]);
+    res.json(r.rows[0] ? r.rows[0].v : null);
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
 });
 app.put('/api/kv/:key', auth, async (req, res) => {
-  await pool.query(
-    `INSERT INTO kv(owner_uid,k,v,updated_at) VALUES($1,$2,$3,now())
-     ON CONFLICT (owner_uid,k) DO UPDATE SET v=EXCLUDED.v, updated_at=now()`,
-    [req.user.uid, req.params.key, req.body ?? null]);
-  res.json({ ok: true });
+  try {
+    await pool.query(
+      `INSERT INTO kv(owner_uid,k,v,updated_at) VALUES($1,$2,$3::jsonb,now())
+       ON CONFLICT (owner_uid,k) DO UPDATE SET v=EXCLUDED.v, updated_at=now()`,
+      [req.user.uid, req.params.key, JSON.stringify(req.body ?? null)]);
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ error: String(e && e.message || e) }); }
 });
 app.delete('/api/kv/:key', auth, async (req, res) => {
-  await pool.query('DELETE FROM kv WHERE owner_uid=$1 AND k=$2', [req.user.uid, req.params.key]);
-  res.json({ ok: true });
+  try {
+    await pool.query('DELETE FROM kv WHERE owner_uid=$1 AND k=$2', [req.user.uid, req.params.key]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
 });
 
 // --- Projects (collab; финализация authz/members при миграции Firestore) ---
 app.get('/api/projects', auth, async (req, res) => {
-  const r = await pool.query(
-    `SELECT id,owner_uid,meta,members,visibility,updated_at FROM projects
-     WHERE owner_uid=$1 OR members ? $1 ORDER BY updated_at DESC`,
-    [req.user.uid]);
-  res.json(r.rows);
+  try {
+    const r = await pool.query(
+      `SELECT id,owner_uid,meta,members,visibility,updated_at FROM projects
+       WHERE owner_uid=$1 OR members ? $1 ORDER BY updated_at DESC`,
+      [req.user.uid]);
+    res.json(r.rows);
+  } catch (e) { res.status(500).json({ error: String(e && e.message || e) }); }
 });
 app.put('/api/projects/:id', auth, async (req, res) => {
-  const { meta, members, visibility } = req.body || {};
-  await pool.query(
-    `INSERT INTO projects(id,owner_uid,meta,members,visibility,updated_at)
-     VALUES($1,$2,$3,$4,$5,now())
-     ON CONFLICT (id) DO UPDATE SET meta=EXCLUDED.meta,
-       members=EXCLUDED.members, visibility=EXCLUDED.visibility, updated_at=now()
-     WHERE projects.owner_uid=$2`, // TODO: + members-admin authz при миграции
-    [req.params.id, req.user.uid, meta || {}, members || {}, visibility || 'private']);
-  res.json({ ok: true });
+  try {
+    const { meta, members, visibility } = req.body || {};
+    await pool.query(
+      `INSERT INTO projects(id,owner_uid,meta,members,visibility,updated_at)
+       VALUES($1,$2,$3::jsonb,$4::jsonb,$5,now())
+       ON CONFLICT (id) DO UPDATE SET meta=EXCLUDED.meta,
+         members=EXCLUDED.members, visibility=EXCLUDED.visibility, updated_at=now()
+       WHERE projects.owner_uid=$2`, // TODO: + members-admin authz при миграции
+      [req.params.id, req.user.uid, JSON.stringify(meta || {}), JSON.stringify(members || {}), visibility || 'private']);
+    res.json({ ok: true });
+  } catch (e) { res.status(400).json({ error: String(e && e.message || e) }); }
 });
 
 // --- Mail (замена Cloud Functions Trigger Email) ---------------------------
@@ -149,5 +167,15 @@ async function mailWorker() {
   } catch (e) { console.error('[mailWorker]', e); }
 }
 setInterval(mailWorker, 30000);
+
+// Crash-proof: одиночная ошибка/реджект НЕ должна ронять весь сервер
+// (иначе 502 для всех при рестарте). Логируем, продолжаем работу.
+process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e));
+process.on('uncaughtException', (e) => console.error('[uncaughtException]', e));
+// express error-handler (на случай sync-throw в маршруте)
+app.use((err, _req, res, _next) => {
+  console.error('[express-error]', err);
+  if (!res.headersSent) res.status(500).json({ error: String(err && err.message || err) });
+});
 
 app.listen(PORT, HOST, () => console.log(`[getools-server] listening on ${HOST}:${PORT}`));
