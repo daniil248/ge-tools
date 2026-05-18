@@ -8,6 +8,8 @@ import {
   setActiveProjectId, getActiveProjectId, exportProject,
   // v0.59.373: подпроекты — артефакты внутри родителя (схемы, СКС, шкафы).
   listSubProjects, createSubProject,
+  // v0.60.755 (8.0-A2): роли варианта — выбранный ★ / резервный 🔁.
+  getVariantRole, setVariantRole,
   // Фаза 2 (R2): чтение/запись чужих module-scoped данных через шов
   // (projectLoad/projectSave — централизовано, типобезоп., bump updatedAt).
   projectLoad,
@@ -2164,11 +2166,22 @@ function render() {
       return subs.map(sp => {
         const href = buildModuleHref(modHref, { projectId: sp.id, fromModule: 'projects' });
         const desig = sp.designation ? `<span style="background:#1d4ed8;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;margin-right:6px">${esc(sp.designation)}</span>` : '';
+        // v0.60.755 (8.0-A2): роль варианта — выбранный ★ / резервный 🔁
+        // (как в подборе холода/ИБП). Бейдж + кнопки назначения (single-
+        // select в рамках родитель+семейство, повторно — снять).
+        let _vrole = null; try { _vrole = getVariantRole(sp.id); } catch {}
+        const roleBadge = _vrole === 'selected'
+          ? '<span title="Выбранный (основной) вариант" style="background:#fde68a;color:#92400e;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700;margin-right:6px">★ выбранный</span>'
+          : (_vrole === 'reserve'
+            ? '<span title="Резервный вариант" style="background:#bfdbfe;color:#1e40af;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700;margin-right:6px">🔁 резервный</span>'
+            : '');
         return `
         <div class="pr-sub-row" data-sub-id="${esc(sp.id)}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:4px">
           <span style="font-size:16px">${icon}</span>
           ${desig}
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(sp.name || '(без имени)')}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${roleBadge}${esc(sp.name || '(без имени)')}</span>
+          <button type="button" class="pr-btn-sel" data-act="var-selected" title="Отметить ВЫБРАННЫМ (★ основной). Повторно — снять." style="font-size:12px;padding:3px 7px${_vrole === 'selected' ? ';background:#fde68a;border-color:#f59e0b' : ''}">★</button>
+          <button type="button" class="pr-btn-sel" data-act="var-reserve" title="Отметить РЕЗЕРВНЫМ (🔁). Повторно — снять." style="font-size:12px;padding:3px 7px${_vrole === 'reserve' ? ';background:#bfdbfe;border-color:#3b82f6' : ''}">🔁</button>
           <a href="${esc(href)}" class="pr-btn-sel" style="font-size:12px;padding:3px 10px">Открыть →</a>
           <button type="button" class="pr-btn-sel" data-act="rename-sub" style="font-size:12px;padding:3px 8px">✎</button>
           <button type="button" class="pr-btn-danger" data-act="delete-sub" style="font-size:12px;padding:3px 8px">✕</button>
@@ -2451,6 +2464,22 @@ function render() {
         prToast(`✔ Создан вариант «${sp.name}»`);
         try { clearNavStack(); } catch {}
         location.href = buildModuleHref(opt.href, { projectId: sp.id, fromModule: 'projects' });
+      });
+    });
+
+    // v0.60.755 (8.0-A2): назначить роль варианта — ★ выбранный / 🔁 резервный
+    // (single-select в рамках родитель+семейство; повторно — снять).
+    modulesHost.querySelectorAll('.pr-sub-row [data-act="var-selected"], .pr-sub-row [data-act="var-reserve"]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = b.closest('.pr-sub-row')?.dataset.subId;
+        if (!id) return;
+        const role = b.getAttribute('data-act') === 'var-selected' ? 'selected' : 'reserve';
+        try {
+          const cur = getVariantRole(id);
+          setVariantRole(id, cur === role ? null : role);
+          prToast(cur === role ? 'Роль снята' : (role === 'selected' ? '✔ Выбранный вариант' : '✔ Резервный вариант'));
+        } catch (e) { prToast('Ошибка: ' + (e.message || e), 'error'); }
+        render();
       });
     });
 

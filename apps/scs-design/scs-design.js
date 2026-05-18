@@ -11,7 +11,9 @@ import {
   projectModulePrefix,
   listProjectsForModule, createSketchForModule,
   // v0.59.372: подпроекты внутри родительского.
-  listSubProjects, createSubProject
+  listSubProjects, createSubProject,
+  // v0.60.755 (8.0-A2): роли варианта — выбранный ★ / резервный 🔁.
+  getVariantRole, setVariantRole
 } from 'shared/project-storage.js';
 // v0.59.278: project-scoped экземпляры стоек (см. shared/rack-storage.js).
 import {
@@ -350,12 +352,17 @@ function _renderProjectBadgeImpl(pid, host) {
     subBlockHtml = `<span style="margin-left:14px;padding:2px 8px;background:#dbeafe;color:#1e3a8a;border-radius:4px;font-size:12px;font-weight:500" title="Вариант СКС: ${esc(nm)}${s.designation ? ' (обозначение ' + esc(s.designation) + ')' : ''}">⊞ ${esc(nm)}${desigPart}</span>` +
       `<button type="button" class="sd-btn-sel" id="sd-sub-new" title="Добавить ещё один вариант СКС в этом проекте (например, для альтернативного решения)" style="margin-left:6px;font-size:11px;padding:2px 8px">＋ ещё вариант СКС</button>`;
   } else {
+    const roleGlyph = (r) => r === 'selected' ? '★ ' : (r === 'reserve' ? '🔁 ' : '');
     const subOpts = subs.map(s => {
       const labelDesig = s.designation ? `[${esc(s.designation)}] ` : '';
-      return `<option value="${esc(s.id)}"${s.id === activeSubId ? ' selected' : ''}>${labelDesig}${esc(s.name || '(без имени)')}</option>`;
+      const rg = roleGlyph(getVariantRole(s.id));
+      return `<option value="${esc(s.id)}"${s.id === activeSubId ? ' selected' : ''}>${rg}${labelDesig}${esc(s.name || '(без имени)')}</option>`;
     }).join('');
+    const curRole = getVariantRole(activeSubId);
     subBlockHtml = `<span class="muted" style="margin-left:14px">Вариант СКС:</span>
       <select id="sd-subproject-switcher" title="Выберите вариант СКС внутри проекта">${subOpts}</select>
+      <button type="button" class="sd-btn-sel" id="sd-var-selected" title="Отметить активный вариант как ВЫБРАННЫЙ (★ основной, как в подборе холода/ИБП). Повторно — снять." style="margin-left:6px;font-size:11px;padding:2px 8px${curRole === 'selected' ? ';background:#fde68a;border-color:#f59e0b' : ''}">★ выбранный</button>
+      <button type="button" class="sd-btn-sel" id="sd-var-reserve" title="Отметить активный вариант как РЕЗЕРВНЫЙ (🔁). Повторно — снять." style="font-size:11px;padding:2px 8px${curRole === 'reserve' ? ';background:#bfdbfe;border-color:#3b82f6' : ''}">🔁 резервный</button>
       <button type="button" class="sd-btn-sel" id="sd-sub-new" title="Добавить ещё один вариант СКС">＋</button>`;
   }
 
@@ -396,6 +403,20 @@ function _renderProjectBadgeImpl(pid, host) {
     setActiveProjectId(e.target.value);
     location.reload();
   });
+  // v0.60.755 (8.0-A2): пометки роли активного варианта (★ выбранный /
+  // 🔁 резервный) — single-select в рамках проекта (setVariantRole снимает
+  // ту же роль с siblings). Повторный клик по текущей роли — снять.
+  const _setVarRole = (role) => {
+    const sid = (typeof activeSubId !== 'undefined' && activeSubId) ? activeSubId : getActiveProjectId();
+    if (!sid) return;
+    try {
+      const cur = getVariantRole(sid);
+      setVariantRole(sid, cur === role ? null : role);
+    } catch {}
+    location.reload();
+  };
+  document.getElementById('sd-var-selected')?.addEventListener('click', () => _setVarRole('selected'));
+  document.getElementById('sd-var-reserve')?.addEventListener('click', () => _setVarRole('reserve'));
   document.getElementById('sd-sub-new')?.addEventListener('click', async () => {
     if (!parent) {
       // Без родителя — попросить выбрать его в dropdown'е выше.
