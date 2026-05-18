@@ -43,8 +43,41 @@
 // ВАЖНО: schema-id экспортируемого JSON (`raschet.project/1`) — стабильный
 // wire-format, НЕ привязан к APP_NS (иначе сломается импорт ранее
 // экспортированных файлов). См. exportProject/importProject ниже.
-export const APP_NS = 'raschet';
+export const APP_NS = 'getools';
 const NS = (suffix) => `${APP_NS}.${suffix}`;
+
+// Переименование продукта Raschet → Genesis Engineering Tools (GE Tools).
+// Одноразовая идемпотентная LS-миграция префикса (RENAME.md §2): копируем
+// `raschet.<rest>` → `<APP_NS>.<rest>` ТОЛЬКО если целевого ключа ещё нет
+// (не затираем новые данные). Старые ключи НЕ удаляем — rollback-safe,
+// чистка старого префикса — отдельной поздней версией. Выполняется при
+// загрузке модуля ПЕРВЫМ (до построителей ключей и нижних backfill-IIFE),
+// т.к. весь LS-неймспейс уже читается через APP_NS. Покрывает и сырые
+// `raschet.*` литералы (R2-долг) — миграция по строковому префиксу, не
+// по коду. Schema-id экспорта (`raschet.project/1`) — стабильный
+// wire-format, НАМЕРЕННО не мигрирует (см. exportProject/importProject).
+(function _migrateNsFromRaschet() {
+  try {
+    const OLD = 'raschet';
+    if (APP_NS === OLD) return;
+    const GUARD = `${APP_NS}.migratedFrom.${OLD}.v1`;
+    if (localStorage.getItem(GUARD) === '1') return;
+    const oldPrefix = OLD + '.';
+    const newPrefix = APP_NS + '.';
+    const pairs = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(oldPrefix)) continue;
+      const nk = newPrefix + k.slice(oldPrefix.length);
+      if (localStorage.getItem(nk) == null) pairs.push([nk, localStorage.getItem(k)]);
+    }
+    pairs.forEach(([nk, v]) => { try { localStorage.setItem(nk, v); } catch {} });
+    localStorage.setItem(GUARD, '1');
+    if (pairs.length) {
+      console.info(`[project-storage] LS-неймспейс мигрирован raschet→${APP_NS}: ${pairs.length} ключей перенесено (старые сохранены, чистка — позже).`);
+    }
+  } catch (e) { /* best-effort: не блокируем загрузку приложения */ }
+})();
 
 const LS_PROJECTS       = NS('projects.v1');          // массив метаданных
 const LS_ACTIVE_PROJECT = NS('activeProjectId.v1');   // id активного
@@ -486,7 +519,7 @@ export function exportProject(id) {
 
 export function importProject(obj) {
   if (!obj || obj.schema !== 'raschet.project/1' || !obj.project) {
-    throw new Error('Не похоже на проект Raschet (schema ≠ raschet.project/1)');
+    throw new Error('Не похоже на проект GE Tools (schema ≠ raschet.project/1)');
   }
   // Если id уже есть — создадим новый, чтобы не затирать существующий.
   const existing = getProject(obj.project.id);

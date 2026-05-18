@@ -95,7 +95,7 @@ export function mountFooter(opts) {
   foot.innerHTML = `
     <div style="flex:1"></div>
     <div class="rs-mfoot-right">
-      <span>Raschet <b>v${appVersion}</b></span>
+      <span>GE Tools <b>v${appVersion}</b></span>
       <span class="rs-mfoot-dot">·</span>
       <a data-act="log">Журнал изменений «${moduleTitle}»</a>
     </div>

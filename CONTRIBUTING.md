@@ -1,4 +1,4 @@
-# CONTRIBUTING — Raschet
+# CONTRIBUTING — GE Tools
 
 Платформа: vanilla-JS, **zero-build**, сырые ES-модули, GitHub Pages
 (deploy = push в `main`). Архитектура — Ядро + независимые модули по

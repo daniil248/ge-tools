@@ -188,7 +188,7 @@ export function mountHeader(opts = {}) {
   header.innerHTML =
     `<div class="rs-header-left">` +
       (showHome ? `<a class="rs-home-btn" href="${esc(home)}" title="К программам" aria-label="К программам">${HOME_SVG}</a>` : '') +
-      `<span class="rs-brand">Raschet</span>` +
+      `<span class="rs-brand">GE Tools</span>` +
       (title ? `<span class="rs-subtitle">${esc(title)}</span>` : '') +
       backBtnHtml +
       projBadgeHtml +

@@ -1,4 +1,4 @@
-# ARCHITECTURE — структура файлов модулей Raschet
+# ARCHITECTURE — структура файлов модулей GE Tools
 
 > **⚠ ПЕРЕСМОТР МОДЕЛИ СЛОЁВ (2026-05-17 — memory:architecture_layers,
 > ROADMAP X.4.5).** Дополнения Пользователя: **D1** электрорасчёты —

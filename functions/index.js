@@ -1,5 +1,5 @@
 /**
- * Raschet Cloud Functions
+ * Genesis Engineering Tools (GE Tools) — Cloud Functions
  * =========================================================================
  * Collaboration C.9 — email-нотификации запросов доступа.
  *
@@ -31,11 +31,14 @@ const db = getFirestore();
 
 // Публичный URL приложения (GitHub Pages). Можно переопределить через
 // firebase functions:config:set app.url="…" + process.env.APP_URL.
+// ВНИМАНИЕ: fallback совпадает с реальным путём GitHub Pages. После
+// фактического переименования репозитория (инфра-шаг) — задать env
+// APP_URL на новую площадку и обновить этот литерал (RENAME.md §1).
 const APP_URL = process.env.APP_URL || 'https://daniil248.github.io/raschet/';
 
 // «От кого» для писем. Реальный адрес настраивается в расширении
 // Trigger Email (SMTP sender).
-const FROM_NAME = 'Raschet';
+const FROM_NAME = 'GE Tools';
 
 function esc(s) {
   return String(s || '')
