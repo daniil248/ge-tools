@@ -125,12 +125,20 @@ export function mountHeader(opts = {}) {
     try { pushNavStep({ moduleId, projectId: ctx.projectId, url: location.href }); } catch {}
   }
 
-  const prev = inProjectMode ? (() => { try { return getPreviousStep(); } catch { return null; } })() : null;
   const proj = inProjectMode ? (() => { try { return getProject(ctx.projectId); } catch { return null; } })() : null;
 
-  // Виртуальный prev из ?from= — только в project-mode.
-  const effectivePrev = inProjectMode
-    ? (prev || (ctx.fromModule ? { moduleId: ctx.fromModule, url: null } : null))
+  // v0.60.758 (репорт Пользователя: «кнопка назад должна быть только если
+  // пользователь перешёл в этот модуль из другого приложения»). Раньше
+  // back показывался и по sessionStorage-стеку (getPreviousStep) — стек
+  // живёт до закрытия вкладки, поэтому повторный ПРЯМОЙ вход в модуль в
+  // той же вкладке показывал залежавшийся «Назад» (нелогично на
+  // standalone-запуске). Теперь back-кнопка СТРОГО по ?from=<модуль> в
+  // URL (явный переход из другого модуля), вне зависимости от
+  // project-mode. Прямой/standalone-вход (нет ?from=) — без «Назад».
+  // Стек навигации (pushNavStep) сохранён для прочей логики, но НЕ
+  // управляет видимостью этой кнопки. Решение Пользователя 2026-05-18.
+  const effectivePrev = (ctx.fromModule && ctx.fromModule !== moduleId)
+    ? { moduleId: ctx.fromModule, url: null }
     : null;
 
   // v0.60.342 (по репорту Пользователя 2026-05-06: «2 раза карточка
