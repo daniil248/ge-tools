@@ -5222,6 +5222,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (_ovWrap) _ovRO.observe(_ovWrap);
     if (_ovRow) _ovRO.observe(_ovRow);
   }
+  // v0.60.742: точный триггер для «связи мимо портов до перезагрузки».
+  // Корень: первый drawLinkOverlay() в renderSelected() считает
+  // getBoundingClientRect ДО завершения асинхронного reflow — главное,
+  // до загрузки веб-шрифтов: после их применения метрики .sd-unit
+  // (высота/позиция портов) сдвигаются, а перерисовки нет (reload
+  // «чинит», т.к. шрифт уже в кэше). Точечно перерисовываем после
+  // полной загрузки и после готовности шрифтов (идемпотентно, поверх
+  // ResizeObserver v0.60.741 — взаимодополняюще, без двойного вреда).
+  window.addEventListener('load', () => { scheduleOverlay(); _ovSettle(); });
+  try {
+    if (document.fonts && document.fonts.ready &&
+        typeof document.fonts.ready.then === 'function') {
+      document.fonts.ready.then(() => { scheduleOverlay(); _ovSettle(); });
+    }
+  } catch {}
 
   // v0.59.360: sync «выбран rack-узел в схеме → подсветка стойки на плане».
   // Родитель (Конструктор схем) шлёт postMessage с schemeNodeId; находим
