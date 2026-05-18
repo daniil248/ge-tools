@@ -31,10 +31,12 @@ const db = getFirestore();
 
 // Публичный URL приложения (GitHub Pages). Можно переопределить через
 // firebase functions:config:set app.url="…" + process.env.APP_URL.
-// ВНИМАНИЕ: fallback совпадает с реальным путём GitHub Pages. После
-// фактического переименования репозитория (инфра-шаг) — задать env
-// APP_URL на новую площадку и обновить этот литерал (RENAME.md §1).
-const APP_URL = process.env.APP_URL || 'https://daniil248.github.io/raschet/';
+// Площадка после переезда репозитория daniil248/raschet → daniil248/ge-tools
+// (slug ge-tools, решение Пользователя). Fallback указывает на новый
+// GitHub Pages URL; для прод-functions задать env APP_URL (RENAME.md §1).
+// Действует после фактического переименования репо Пользователем + redeploy
+// functions (firebase). Старый /raschet/ перестаёт обслуживаться Pages.
+const APP_URL = process.env.APP_URL || 'https://daniil248.github.io/ge-tools/';
 
 // «От кого» для писем. Реальный адрес настраивается в расширении
 // Trigger Email (SMTP sender).
