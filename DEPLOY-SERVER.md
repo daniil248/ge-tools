@@ -31,7 +31,7 @@ psql "postgres://getools:<DB_PASSWORD>@127.0.0.1:5432/getools" -f ~/getools/serv
 mkdir -p ~/getools           # сюда rsync-ит tools/deploy.sh
 
 # 4. Backend
-cd ~/getools/server && npm ci --omit=dev
+cd /var/www/getools/server && npm install --omit=dev   # lockfile отсутствует — install, не ci
 cp .env.example .env && nano .env   # DATABASE_URL/JWT_SECRET/SMTP/APP_URL
 ```
 

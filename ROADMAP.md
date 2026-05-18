@@ -7,7 +7,9 @@
 > Репозиторий переименован `daniil248/raschet`→`daniil248/ge-tools`,
 > live `https://daniil248.github.io/ge-tools/` (v0.60.746, ВЫПОЛНЕНО).
 >
-> **Статус:** v0.60.767 (2026-05-18). Платформа + предметные модули.
+> **Статус:** v0.60.768 (2026-05-18). Платформа + предметные модули.
+> Прод: https://getools.netchess.ru (Timeweb VPS, бэкенд+Postgres),
+> двойной деплой git+сервер. GitHub Pages — пока тоже жив.
 > Мультидисциплинарность (X.4.5.3 Вариант I) —
 > завершена ПОЛНОСТЬЮ (Ф-A…Ф-G). Архитектурная модуляризация (фазы
 > 0–2 плана) — закрыта. Модуль отчётов (flow-редизайн) — закрыт.
@@ -247,7 +249,9 @@ cross-filter / tooltips / zoom Ctrl+wheel — платформенно.
   `server/` (Express+pg+JWT+nodemailer скелет: /api/auth · /kv —
   зеркало project-storage · /projects · /mail) + `db/schema.sql`
   (Postgres JSONB); `.gitignore`-защита секретов, `server-access.env`
-  ВНЕ репо. Остаток (при живом сервере, фазами C1–C4): Firestore→
+  ВНЕ репо. ✅ **РАЗВЁРНУТО (v0.60.768): https://getools.netchess.ru**
+  живой — статика+бэкенд+Postgres+TLS, чужие проекты не тронуты,
+  двойной деплой git+сервер активен. Остаток (фазами C1–C4): Firestore→
   Postgres импорт + клиентский транспорт project-storage→HTTP `/kv`;
   Firebase Auth→/api/auth (+Google OAuth); Cloud Functions→SMTP;
   согласованный клиентский cutover. `arch:17.2,17.3,40`

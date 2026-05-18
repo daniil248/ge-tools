@@ -7,6 +7,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "setup": "npm install --omit=dev --no-audit --no-fund",
     "migrate": "psql \"$DATABASE_URL\" -f db/schema.sql"
   },
   "dependencies": {

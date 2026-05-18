@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.768', date: '2026-05-18', items: [
+      '🌐 <b>СЕРВЕР ЖИВ: https://getools.netchess.ru развёрнут на Timeweb VPS</b>. Статика (приложение) + бэкенд /api (Express+Postgres, systemd getools-api на 127.0.0.1:8090, TLS Let’s Encrypt, http→https). E2E: constants.js APP_VERSION=git HEAD, /api/health={"ok":true}. <b>Общий сервер — чужое НЕ тронуто</b>: добавлен изолированный nginx-vhost (только getools.netchess.ru; reload, не restart), отдельная PG роль/БД getools (idempotent), бэкенд localhost-only (не открыт лишний публичный порт); сайты agregator/netchess/crashgame и docker-проекты 81xx/9xxx целы. Фикс: server/package.json + runbook — `npm install` (lockfile отсутствует, не `ci`). <b>Двойной деплой git+сервер активен</b> (memory:dual_deploy_server): git push + заливка рабочего дерева в /var/www/getools (tar/sftp через ssh_run, вне репо). Клиент по-прежнему на Firebase — cutover на серверный бэкенд НЕ выполнен (фазы C1–C4 миграции — отдельно, при готовности). Файлы: server/package.json, DEPLOY-SERVER.md, ROADMAP.md, js/engine/constants.js.',
+    ] },
     { version: '0.60.767', date: '2026-05-18', items: [
       '🚀 <b>Деплой на Timeweb VPS — bring-up (общий сервер, аккуратно)</b>. Recon: Ubuntu 22.04, система nginx (80/443/8888, чужие сайты agregator/crashgame/app — НЕ тронуты), PostgreSQL 14, Node 20, docker-проекты на 81xx/9xxx/3xxx — НЕ тронуты. Аддитивно: PG роль+БД getools (idempotent, чужие БД не тронуты), /var/www/getools. server.js: бэкенд слушает HOST||127.0.0.1 (localhost-only — не открываем лишний публичный порт рядом с чужими проектами; nginx проксирует). Порт 8090 (свободен). Двойной деплой: git push + заливка кода на сервер. changelog-lint OK. Файлы: server/server.js, ROADMAP.md, js/engine/constants.js.',
     ] },
