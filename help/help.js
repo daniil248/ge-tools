@@ -142,7 +142,7 @@ function handleHashChange() {
   const id = (location.hash || '').replace(/^#/, '').trim();
   if (!id) {
     $('hc-article').innerHTML = `<div class="hc-empty">
-      <h1>Центр помощи Raschet</h1>
+      <h1>Центр помощи GE Tools</h1>
       <p>Выберите статью слева или категорию ниже.</p>
       <div id="hc-cat-cards" class="hc-cat-cards"></div>
     </div>`;

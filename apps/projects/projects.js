@@ -1227,7 +1227,7 @@ async function openGlobalHistoryModal() {
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:8px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);width:min(95vw,1100px);max-height:90vh;display:flex;flex-direction:column">
       <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between">
-        <h3 style="margin:0;font-size:16px">📜 Глобальная история проектов Raschet</h3>
+        <h3 style="margin:0;font-size:16px">📜 Глобальная история проектов</h3>
         <button type="button" id="gh-close" style="background:none;border:none;font-size:22px;cursor:pointer;color:#64748b;padding:0;line-height:1" title="Закрыть">×</button>
       </div>
       <div style="padding:14px 18px;overflow:auto;flex:1">${html}</div>

@@ -60,7 +60,7 @@ export function mountFooter(opts = {}) {
       `<div class="rs-footer-links">${linksHtml}</div>` +
       `<div class="rs-footer-meta">` +
         `<span class="rs-footer-version" title="Версия приложения">${esc(version)}</span>` +
-        `<span class="rs-footer-copyright">© ${year} Raschet Platform</span>` +
+        `<span class="rs-footer-copyright">© ${year} GE Tools</span>` +
       `</div>` +
     `</div>`;
 

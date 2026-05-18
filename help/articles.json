@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "version": "1.0.0",
-  "description": "Манифест статей центра помощи Raschet. Категории + статьи с cross-references.",
+  "description": "Манифест статей центра помощи GE Tools. Категории + статьи с cross-references.",
   "categories": [
     { "id": "getting-started", "name": "Начало работы",       "icon": "🏁", "order": 1 },
     { "id": "modules",         "name": "Модули",              "icon": "📦", "order": 2 },
@@ -12,9 +12,9 @@
   "articles": [
     {
       "id": "intro",
-      "title": "Что такое Raschet",
+      "title": "Что такое GE Tools",
       "category": "getting-started",
-      "summary": "Платформа для проектирования электроснабжения объектов: ЦОД, промплощадки, инфраструктура.",
+      "summary": "Набор инженерных и управленческих модулей для проектирования объектов: ЦОД, промплощадки, инфраструктура.",
       "file": "intro.html",
       "related": ["projects-overview", "module-tech-workspace", "module-schematic"]
     },

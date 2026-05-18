@@ -2190,7 +2190,7 @@ async function _printUpsReport() {
     }
   }
 
-  content.push(B.hr(), B.caption(`Документ сформирован автоматически Raschet · ${new Date().toLocaleDateString('ru-RU')}`));
+  content.push(B.hr(), B.caption(`Документ сформирован автоматически GE Tools · ${new Date().toLocaleDateString('ru-RU')}`));
 
   try {
     const { composeReport } = await import('shared/report/compose.js');

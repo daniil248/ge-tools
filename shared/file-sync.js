@@ -35,7 +35,7 @@
 
 const FILE_PICKER_OPTS = {
   types: [{
-    description: 'Raschet Project',
+    description: 'GE Tools Project',
     accept: { 'application/json': ['.raschet.json', '.json'] },
   }],
   excludeAcceptAllOption: false,
@@ -103,7 +103,7 @@ export function parseFilePayload(text) {
   if (Array.isArray(obj.nodes) && Array.isArray(obj.conns)) {
     return { scheme: obj, meta: {}, savedAt: null };
   }
-  throw new Error('Файл не похож на проект Raschet (нет _format или nodes/conns)');
+  throw new Error('Файл не похож на проект GE Tools (нет _format или nodes/conns)');
 }
 
 /**

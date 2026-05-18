@@ -499,7 +499,7 @@ export function initToolbar() {
 
   // === Экспорт спецификации (BOM) в XLSX / CSV ===
   const exportBomFn = () => {
-    const projName = document.getElementById('project-name')?.textContent || 'Raschet';
+    const projName = document.getElementById('project-name')?.textContent || 'GE Tools';
     try {
       if (typeof window !== 'undefined' && window.XLSX) {
         const r = exportBomXlsx(projName);
@@ -522,7 +522,7 @@ export function initToolbar() {
   // предзаполненными позициями.
   const bomToLogisticsFn = () => {
     try {
-      const projName = document.getElementById('project-name')?.textContent || 'Raschet';
+      const projName = document.getElementById('project-name')?.textContent || 'GE Tools';
       const bom = buildBOM();
       if (!bom.length) { flash('BOM пуст — нечего передавать', 'warn'); return; }
       const items = bom.map(r => ({

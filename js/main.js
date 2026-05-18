@@ -2021,7 +2021,7 @@ async function handleLoadProjectFile(e) {
     const text = await f.text();
     const scheme = JSON.parse(text);
     if (!scheme || typeof scheme !== 'object' || !Array.isArray(scheme.nodes) || !Array.isArray(scheme.conns)) {
-      throw new Error('Файл не похож на схему Raschet (нет nodes/conns)');
+      throw new Error('Файл не похож на схему GE Tools (нет nodes/conns)');
     }
     // Имя проекта: "<имя файла> (импорт DD.MM.YYYY HH:MM)"
     const base = f.name.replace(/\.json$/i, '');
@@ -8818,7 +8818,7 @@ async function init() {
   // Справка по главному модулю — floating-«?» в правом-нижнем углу
   mountHelp({
     module: 'engine',
-    title: 'Конструктор схем Raschet',
+    title: 'Конструктор схем',
     usage: `
       <h4>Назначение модуля</h4>
       <p>Главный инструмент — drag-and-drop конструктор принципиальных схем электроснабжения. Собирает граф «источник → щит → потребитель» с автоматическим расчётом токов, подбором кабеля, автоматов и проверкой координации защит.</p>

@@ -95,7 +95,7 @@ function defaultPrintRequirements(st) {
       <tr><td style="padding:4px 12px 4px 0;color:#555">Schuko</td><td><b>≥ ${st.outlets.schuko}</b></td></tr>
       <tr><td style="padding:4px 12px 4px 0;color:#555">Производители</td><td><b>${st.mfgs.size ? esc(Array.from(st.mfgs).join(', ')) : 'Любой'}</b></td></tr>
     </table>`,
-    `<p style="margin-top:16px;font:11px/1.4 sans-serif;color:#888">Лист требований · Raschet · ${new Date().toLocaleDateString()}</p>`,
+    `<p style="margin-top:16px;font:11px/1.4 sans-serif;color:#888">Лист требований · GE Tools · ${new Date().toLocaleDateString()}</p>`,
   ];
   const w = window.open('', '_blank', 'width=600,height=700');
   if (!w) return;

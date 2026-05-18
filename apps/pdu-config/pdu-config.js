@@ -596,7 +596,7 @@ function buildRequirementsText() {
     ``,
     `**Количество PDU в стойке:** ${r.pdusCount}`,
     ``,
-    `_Сгенерировано: Raschet · Конфигуратор PDU · ${new Date().toLocaleString('ru-RU')}_`,
+    `_Сгенерировано: GE Tools · Конфигуратор PDU · ${new Date().toLocaleString('ru-RU')}_`,
   ].join('\n');
 }
 

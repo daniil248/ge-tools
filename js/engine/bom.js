@@ -766,7 +766,7 @@ export function exportBomXlsx(projectName) {
   ];
   const wb = window.XLSX.utils.book_new();
   window.XLSX.utils.book_append_sheet(wb, ws, 'BOM');
-  const fname = (projectName || 'Raschet') + ' — Спецификация.xlsx';
+  const fname = (projectName || 'GE Tools') + ' — Спецификация.xlsx';
   window.XLSX.writeFile(wb, fname);
   return { fname, rows: bom.length };
 }
@@ -830,7 +830,7 @@ export function exportBomCsv(projectName) {
   const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (projectName || 'Raschet') + ' — Спецификация.csv';
+  a.download = (projectName || 'GE Tools') + ' — Спецификация.csv';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   return { fname: a.download, rows: bom.length };
