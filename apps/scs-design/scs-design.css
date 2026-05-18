@@ -119,17 +119,8 @@
   border-bottom: 1px solid #e2e8f0;
   margin-bottom: 4px;
 }
-/* Ф-F2 (§5.1): sidebar-аккордеон single-open. Заголовок кликабелен,
-   стрелка ▾/▸ отражает состояние; свёрнутый блок прячет всё кроме
-   заголовка. Чистая презентация (UI-chrome, не движок). */
-.sd-plan-side-h { cursor: pointer; user-select: none; }
-.sd-plan-side-h::before {
-  content: '▾'; display: inline-block; width: 1em;
-  font-size: 10px; color: #64748b; transition: transform .12s;
-}
-.sd-acc-collapsed > .sd-plan-side-h::before { transform: rotate(-90deg); }
-.sd-acc-collapsed > *:not(.sd-plan-side-h) { display: none !important; }
-.sd-acc-collapsed { gap: 0; }
+/* Ф-F2 ОТКАЧЕН (v0.60.740): аккордеон прятал кнопки-тулбары sd-plan-
+   side (репорт «кнопки не работают»). CSS удалён, поведение как было. */
 .sd-plan-side-row {
   display: flex;
   flex-direction: column;
