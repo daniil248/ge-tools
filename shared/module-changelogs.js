@@ -4,6 +4,9 @@
 
 export const CHANGELOGS = {
   'engine': [
+    { version: '0.60.754', date: '2026-05-18', items: [
+      '⭐ <b>ROADMAP 8.0-A1: семантика «выбранный/резервный» вариант — API-шов (cache-safe деплой 1/2)</b>. Директива Пользователя: под-проект = ВАРИАНТ как подбор холода/ИБП (выбранный ★ + резервный). shared/project-storage.js +VARIANT_ROLES, +listVariants(parentId,moduleId) (sketch-варианты родителя в семействе модуля, сортировка selected→reserve→прочие), +getVariantRole(subId), +setVariantRole(subId,role) (single-select в рамках родитель+семейство: назначение снимает ту же роль с siblings; null — снять). <b>Чисто аддитивный слой метаданных</b> (поле variantRole в projects.v1) — namespace данных НЕ трогается, миграции НЕТ (нулевой риск; опциональное слияние namespace — поздний инкремент 8.0-C). preserve-on-miss (отсутствие поля = роль не задана). <b>0 потребителей — cache-safe</b> (CONTRIBUTING §6a): UI scs-design/projects подключается деплоем 8.0-A2 после распространения экспортов. Файлы: shared/project-storage.js, ROADMAP.md, js/engine/constants.js.',
+    ] },
     { version: '0.60.753', date: '2026-05-18', items: [
       '🏷 <b>Релейбл «вариант» доведён до единого picker-поповера и бейджа (label-only)</b>. Продолжение релейбла v0.60.752: shared/app-header.js — если активный проект kind:sketch (т.е. ВАРИАНТ), поповер показывает «Активный вариант» / «Сейчас работаем в варианте:» / «…сохраняются под выбранным вариантом» + пометка «· вариант» у имени; tooltip standalone-бейджа — «пишутся в вариант «…»» вместо «проект». <b>Только подписи</b> (activeIsVariant = activeProj.kind===sketch); модель данных/namespace/фильтр picker НЕ трогались — ноль миграции, ноль риска (полный variant-aware рефактор + selected/reserve + миграция остаются отложенной фазой ROADMAP 8.0 по решению Пользователя). Полные проекты (kind:full) — без изменений, «проект». Файлы: shared/app-header.js, ROADMAP.md, js/engine/constants.js.',
     ] },

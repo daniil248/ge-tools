@@ -262,6 +262,55 @@ export function updateProject(id, patch) {
   return arr[i];
 }
 
+// ===========================================================================
+// v0.60.754 — ROADMAP 8.0-A: семантика «выбранный / резервный» ВАРИАНТ.
+// Директива Пользователя: под-проект = ВАРИАНТ внутри проекта, как подбор
+// холода/ИБП (выбранный ★ + резервный). Это АДДИТИВНЫЙ слой метаданных на
+// объекте варианта (поле variantRole в projects.v1) — НЕ трогает namespace
+// данных, НЕ мигрирует ничего (нулевой риск; полное слияние namespace —
+// отдельный поздний инкремент 8.0-C, если понадобится). Ограничение: в
+// рамках (родитель + семейство модуля) ровно один selected и максимум один
+// reserve — как isMainVariant single-select в configuration-catalog.
+// Отсутствие поля = роль не задана (нейтрально; preserve-on-miss).
+// ===========================================================================
+export const VARIANT_ROLES = ['selected', 'reserve'];
+
+// Варианты родителя в рамках семейства модуля (sketch с parentProjectId),
+// аннотированные ролью; сортировка selected → reserve → прочие (по дате).
+export function listVariants(parentProjectId, moduleId) {
+  const subs = listSubProjects(parentProjectId, moduleId) || [];
+  const rank = (v) => (v === 'selected' ? 0 : (v === 'reserve' ? 1 : 2));
+  return subs
+    .map(s => ({ ...s, variantRole: VARIANT_ROLES.includes(s && s.variantRole) ? s.variantRole : null }))
+    .sort((a, b) => rank(a.variantRole) - rank(b.variantRole) || (b.updatedAt || 0) - (a.updatedAt || 0));
+}
+
+export function getVariantRole(subId) {
+  const p = subId ? getProject(subId) : null;
+  return (p && VARIANT_ROLES.includes(p.variantRole)) ? p.variantRole : null;
+}
+
+// Назначить роль варианту. role ∈ 'selected'|'reserve'|null. Single-select
+// в рамках (parentProjectId + семейство ownerModule): назначение selected/
+// reserve снимает ту же роль с siblings. null — снять роль. Аддитивно,
+// preserve-on-miss (прочие поля variant'а не трогаем). Возвращает обновл.
+export function setVariantRole(subId, role) {
+  const sub = subId ? getProject(subId) : null;
+  if (!sub || sub.kind !== 'sketch') return null;
+  if (role !== null && !VARIANT_ROLES.includes(role)) return null;
+  if (role && sub.parentProjectId) {
+    const fam = _familyOf(sub.ownerModule);
+    const siblings = listProjects().filter(p =>
+      p && p.kind === 'sketch' &&
+      p.parentProjectId === sub.parentProjectId &&
+      fam.includes(p.ownerModule) &&
+      p.id !== sub.id &&
+      p.variantRole === role);
+    for (const s of siblings) updateProject(s.id, { variantRole: null });
+  }
+  return updateProject(subId, { variantRole: role });
+}
+
 // v0.59.278: копирование проекта. Копирует метаданные (name + «(копия)») и
 // ВСЕ scoped-данные (raschet.project.<srcPid>.* → raschet.project.<dstPid>.*).
 // Возвращает объект созданного проекта. Не переносит неявные зависимости

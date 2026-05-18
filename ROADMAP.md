@@ -7,7 +7,7 @@
 > Репозиторий переименован `daniil248/raschet`→`daniil248/ge-tools`,
 > live `https://daniil248.github.io/ge-tools/` (v0.60.746, ВЫПОЛНЕНО).
 >
-> **Статус:** v0.60.753 (2026-05-18). Платформа + предметные модули.
+> **Статус:** v0.60.754 (2026-05-18). Платформа + предметные модули.
 > Мультидисциплинарность (X.4.5.3 Вариант I) —
 > завершена ПОЛНОСТЬЮ (Ф-A…Ф-G). Архитектурная модуляризация (фазы
 > 0–2 плана) — закрыта. Модуль отчётов (flow-редизайн) — закрыт.
@@ -202,12 +202,13 @@ cross-filter / tooltips / zoom Ctrl+wheel — платформенно.
   релейбл UI «под-проект/СКС-проект/мини-проект/подпроект» → «вариант»
   (scs-design, projects, project-storage default-имена, единый
   picker-поповер + standalone-бейдж label-only при kind:sketch).
-  **Отложено
-  (рефактор данных, по решению Пользователя):** варианты ВНУТРИ
-  namespace проекта (как `configuration-catalog` холода/ИБП) +
-  selected/reserve-семантика + variant-aware единый picker + миграция
-  существующих sketch-под-проектов (риск, многошагово, с verify).
-  memory:selection_model `arch:1.27,17.1`
+  **Рефактор (по решению Пользователя, поэтапно с verify):**
+  8.0-A selected/reserve-семантика — API ✅ (v0.60.754: VARIANT_ROLES/
+  listVariants/getVariantRole/setVariantRole, аддитивно, 0 миграции);
+  далее 8.0-A2 UI (scs-design picker + карточка projects: ★ выбранный /
+  🔁 резервный). Отложено: 8.0-B variant-aware единый picker;
+  8.0-C опц. слияние namespace вариантов внутрь проекта + миграция
+  существующих sketch (риск). memory:selection_model `arch:1.27,17.1`
 - [ ] **8.1** FS-as-primary за async-интерфейсом project-storage
   (load/save/list/remove), фолбэк LS, не ломая sync-seam. `arch:17.2,34`
 - [ ] **8.2** HTTP/IDB-транспорты; большие датасеты LS→IndexedDB. `arch:17.2,Фаза 34`
