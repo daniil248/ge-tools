@@ -300,6 +300,58 @@ function renderProjectProperties(p, host) {
   // прочие данные проекта, полный адрес, эти данные должны быть там, в
   // свойствах проекта». Реквизиты хранятся в project.requisites (object),
   // чтобы не засорять плоский project namespace.
+  // v0.60.762 (8.0-F / спека FR3): объект-props для СЛИМ-сущности.
+  // Конфигурация — наследует от родителя (read-only, для штампа,
+  // правило feedback_project_location); 1-дисц. проект — свои
+  // минимальные реквизиты. Без категории объекта/дерейтинга/мульти-
+  // локации/ГИП-as-object (это уровень проекта-комплекса). Ранний
+  // выход — тяжёлый объект-блок не строится. Движок/данные не трогаем.
+  if (isSlimEntity(p)) {
+    const r0 = p.requisites || {};
+    const isConfig = isConfiguration(p);
+    const parent = (isConfig && p.parentProjectId) ? getProject(p.parentProjectId) : null;
+    const pr = (parent && parent.requisites) || {};
+    const disc = projectDisciplineOf(p) || p.ownerModule || '—';
+    const loc = parent && parent.location && typeof parent.location === 'object'
+      ? (parent.location.name || ((parent.location.lat != null && parent.location.lon != null) ? `${parent.location.lat}, ${parent.location.lon}` : '—'))
+      : '—';
+    if (isConfig) {
+      host.innerHTML = `
+        <div style="padding:10px 12px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:5px;margin-bottom:12px;font-size:12.5px;color:#3730a3">
+          🧩 <b>Конфигурация дисциплины</b> «${esc(disc)}» внутри проекта-объекта. Объект-свойства наследуются от родителя (read-only) — правка в карточке объекта.
+        </div>
+        <div class="pr-req-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px 12px;margin-bottom:12px">
+          ${[['Объект-проект', parent ? (parent.name || parent.id) : '—'], ['Шифр', pr.code || '—'], ['Заказчик', pr.customer || '—'], ['Объект / адрес', pr.address || '—'], ['Стадия', pr.stage || '—'], ['Локация', loc]]
+            .map(([k, v]) => `<div><span style="font-size:11px;color:#64748b;display:block">${esc(k)}</span><span style="font-weight:600">${esc(String(v))}</span></div>`).join('')}
+        </div>
+        ${parent
+          ? `<a href="project.html?project=${esc(parent.id)}" class="pr-btn-sel" style="font-size:12px;padding:4px 10px;text-decoration:none">→ Открыть карточку объекта</a>`
+          : '<span class="muted" style="font-size:12px;color:#b91c1c">⚠ Родительский проект-объект не найден</span>'}
+        <label style="display:block;margin-top:14px"><span style="font-size:11.5px;color:#475569;display:block">Описание конфигурации:</span>
+          <textarea data-req="description" rows="3" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px;resize:vertical">${esc(r0.description || '')}</textarea></label>`;
+    } else {
+      host.innerHTML = `
+        <div style="padding:10px 12px;background:#ecfeff;border:1px solid #a5f3fc;border-radius:5px;margin-bottom:12px;font-size:12.5px;color:#155e75">
+          🧩 <b>Одна дисциплина</b> «${esc(disc)}» — самостоятельный 1-дисциплинарный проект. Минимальные реквизиты для штампа отчётов (без категории объекта/дерейтинга/ГИП).
+        </div>
+        <div class="pr-req-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;margin-bottom:12px">
+          <label><span style="font-size:11.5px;color:#475569;display:block">Обозначение / шифр:</span><input type="text" data-req="code" value="${esc(r0.code || '')}" placeholder="напр. 25013-…-СКС-1" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px"></label>
+          <label><span style="font-size:11.5px;color:#475569;display:block">Заказчик:</span><input type="text" data-req="customer" value="${esc(r0.customer || '')}" placeholder="напр. Qarmet" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px"></label>
+          <label><span style="font-size:11.5px;color:#475569;display:block">Объект / адрес:</span><input type="text" data-req="address" value="${esc(r0.address || '')}" placeholder="напр. г. Темиртау" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px"></label>
+          <label><span style="font-size:11.5px;color:#475569;display:block">Стадия:</span><input type="text" data-req="stage" value="${esc(r0.stage || '')}" placeholder="напр. П / РД" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px"></label>
+        </div>
+        <label style="display:block"><span style="font-size:11.5px;color:#475569;display:block">Описание:</span>
+          <textarea data-req="description" rows="3" style="width:100%;padding:5px 8px;border:1px solid #cbd5e1;border-radius:3px;font:inherit;font-size:12.5px;resize:vertical">${esc(r0.description || '')}</textarea></label>`;
+    }
+    host.querySelectorAll('[data-req]').forEach(inp => {
+      inp.addEventListener('change', () => {
+        const requisites = { ...(p.requisites || {}), [inp.dataset.req]: inp.value };
+        updateProject(p.id, { requisites });
+      });
+    });
+    return;
+  }
+
   const r = p.requisites || {};
   const requisitesHtml = `
     <div class="pr-req-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;margin-bottom:14px">
